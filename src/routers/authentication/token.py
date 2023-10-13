@@ -1,0 +1,105 @@
+import time 
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Body
+
+from config.models.user import User
+from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword
+from config.settings.general import get_general_settings
+from config.settings.token import get_share_token_settings
+
+from services.date import get_time_stamp
+from services.mail import send_email_in_background
+from services.random_generators import get_random_string
+from services.users import get_user_from_login, check_user_allowed, is_user_admin
+from services.encryption import create_access_token, check_for_verification_code_in_token, check_share_token_password
+from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect
+
+from lib.user.UserHandling import UserDB
+
+
+router = APIRouter(
+    prefix="/api/auth/token",
+    tags=["Token", "Authentication"]
+    )
+
+
+# @router.get("/user")
+# def get_users(user : User = Depends(is_user_admin)):
+#     """
+#     Returns a list of users.
+#     """
+#     print(user)
+#     users = UserDB.get_users()
+#     return users
+
+@router.post("/", response_description="Returns a jwt token after login.", response_model=TokenResponse)
+def login_for_access_token(background_task : BackgroundTasks, 
+                           user : User = Depends(get_user_from_login), 
+                           verification_code : str = Depends(lambda : get_random_string(12))):
+    """
+    Returns a jwt token upon succesfull login.
+    """
+    #create jwt token with just the id and the verifiation code
+    jwt_token = create_access_token(user.model_dump(),
+                                    key_subset=["label"],
+                                    add_dict={"verification_code" : verification_code})
+
+    send_email_in_background(
+        background_tasks=background_task,
+        subject="Token Verification",
+        email_to=[user.email],
+        cc = [],
+        body={
+            "app_name" : get_general_settings().app_name,
+            "first_name" : user.firstname,
+            "verification_code" : verification_code
+        },
+        template_mame="verification_code.html"
+    )
+
+    return TokenResponse(success=True,token=jwt_token,verified=False)
+
+
+
+@router.post("/verify", 
+             response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
+             response_model=TokenResponse)
+def verify_token_by_code(verification : TokenVerificationCode, 
+                         decoded_token: dict = Depends(check_for_verification_code_in_token)):
+    """
+    Verifies jwt by comparing the verification code that has been sent by mail to the one hidden in the jwt token.
+    
+    """
+    if verification.verification_code != decoded_token["verification_code"]:
+        raise verification_code_incorrect
+    #get user by id 
+    user_label = decoded_token["label"]
+    user_exists, user_in_db = UserDB.get_user_by_label(user_label)
+    user : User = check_user_allowed(user_exists, user_in_db)
+
+    jwt_token = create_access_token(user.model_dump(),
+                                    key_subset=["label"],
+                                    add_dict={"verified" : True, 
+                                              "verified_at" : get_time_stamp()})
+    
+    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role)
+
+### Share Token
+
+@router.post("/share", 
+             summary="Share tokens can be used to push qc runs to the app without loggin in every time. Creating a share token requires admin rights and the application specific password.")
+def create_share_token(inputPassword: ShareTokenPassword, user : User = Depends(is_user_admin)):
+    """
+    Share tokens require user admin rights as well as a password which is defined in the env file.
+    """
+    print(user,inputPassword.pw)
+    ##should this be for a user? 
+    if check_share_token_password(inputPassword.pw):
+        print("pw correct")
+        jwt_token = create_access_token(user.model_dump(), key_subset=["id"], add_dict={"created_at" : get_time_stamp()}, share_token=True)
+        return TokenResponse(success=True,token= jwt_token,verified=False, role=0)
+    raise share_token_pw_incorrect
+
+
+
+
