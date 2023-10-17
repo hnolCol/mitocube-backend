@@ -3,14 +3,14 @@ import time
 from fastapi import APIRouter, BackgroundTasks, Depends, Body
 
 from config.models.user import User
-from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword
+from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword, TokenValidResponse
 from config.settings.general import get_general_settings
 from config.settings.token import get_share_token_settings
 
 from services.date import get_time_stamp
 from services.mail import send_email_in_background
 from services.random_generators import get_random_string
-from services.users import get_user_from_login, check_user_allowed, is_user_admin
+from services.users import get_user_from_login, check_user_allowed, is_user_admin, get_user_from_token
 from services.encryption import create_access_token, check_for_verification_code_in_token, check_share_token_password
 from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect
 
@@ -42,7 +42,9 @@ def login_for_access_token(background_task : BackgroundTasks,
     #create jwt token with just the id and the verifiation code
     jwt_token = create_access_token(user.model_dump(),
                                     key_subset=["label"],
-                                    add_dict={"verification_code" : verification_code})
+                                    add_dict={
+                                        "verification_code" : verification_code,
+                                        })
 
     send_email_in_background(
         background_tasks=background_task,
@@ -60,6 +62,12 @@ def login_for_access_token(background_task : BackgroundTasks,
     return TokenResponse(success=True,token=jwt_token,verified=False)
 
 
+
+@router.get("/valid", response_description="Checks if a token from local storage is valid and returns the user's role and details",
+            response_model=TokenValidResponse)
+def check_token(user : User = Depends(get_user_from_token)):
+    """"""
+    return TokenValidResponse(success=True, role = user.role, verified = True)
 
 @router.post("/verify", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 

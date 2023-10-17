@@ -13,11 +13,10 @@ def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends()) -> Us
     user_exists, user_in_db  = UserDB.get_user_by_email(form_data.username)
     #user verification check
     user_in_db = check_user_allowed(user_exists,user_in_db)
-   
+    
     if not verify_password(form_data.password, user_in_db.password.get_secret_value()):
         raise credentials_exception
     return user_in_db
-
 
 def check_user_allowed(user_exists, user : User) -> User:
     """Checks if user is allowed to login"""
@@ -28,8 +27,13 @@ def check_user_allowed(user_exists, user : User) -> User:
     
     return user 
 
+def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
+    """"""
+    if "verified" in token and token["verified"]:
+        return token 
+    raise token_not_valid_exception
 
-def get_user_from_token(token = Depends(get_decoded_token)) -> User:
+def get_user_from_token(token = Depends(check_token_verified)) -> User:
     """Extracts the user from a token"""
     #DB.get_user_by_id()
     if "label" not in token : token_not_valid_exception

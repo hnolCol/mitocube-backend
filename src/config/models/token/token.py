@@ -25,3 +25,10 @@ class TokenResponse(BaseModel):
     verified : bool = False
     role : UserRolesEnum = 0
     msg : Optional[str] = None 
+
+
+class TokenValidResponse(BaseModel):
+    """Response model for a valid token"""
+    success : bool
+    role : UserRolesEnum = 0
+    verified : bool = False

@@ -22,7 +22,6 @@ router = APIRouter(
     tags=["Dataset"]
     )
 
-
 @router.get("/dataset/{data_id}/data", response_model=API_DatasetData)
 def get_dataset_data(data_id : str):
     """
@@ -33,7 +32,6 @@ def get_dataset_data(data_id : str):
     ```
     data : [{colName1 : value1, colName2: value2, ...}, {colName1 : value1, colName2: value2, ..}]
     ```
-
 
     Validation Error 
 
