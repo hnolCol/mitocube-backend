@@ -73,6 +73,7 @@ class PublicUser(BaseModel):
     To distinguish them, the API deadend for those is /api/collaborators
     while api/users is restricted to admin rights. 
     """
+    label : str
     firstname : str
     lastname : str 
     research_group : str 

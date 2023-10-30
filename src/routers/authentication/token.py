@@ -67,7 +67,7 @@ def login_for_access_token(background_task : BackgroundTasks,
             response_model=TokenValidResponse)
 def check_token(user : User = Depends(get_user_from_token)):
     """"""
-    return TokenValidResponse(success=True, role = user.role, verified = True)
+    return TokenValidResponse(success=True, role = user.role, verified = True, firstname=user.firstname, lastname=user.lastname, label=user.label)
 
 @router.post("/verify", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
@@ -90,7 +90,7 @@ def verify_token_by_code(verification : TokenVerificationCode,
                                     add_dict={"verified" : True, 
                                               "verified_at" : get_time_stamp()})
     
-    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role)
+    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role, firstname = user.firstname, lastname=user.lastname, label=user.label)
 
 ### Share Token
 
@@ -103,7 +103,6 @@ def create_share_token(inputPassword: ShareTokenPassword, user : User = Depends(
     print(user,inputPassword.pw)
     ##should this be for a user? 
     if check_share_token_password(inputPassword.pw):
-        print("pw correct")
         jwt_token = create_access_token(user.model_dump(), key_subset=["id"], add_dict={"created_at" : get_time_stamp()}, share_token=True)
         return TokenResponse(success=True,token= jwt_token,verified=False, role=0)
     raise share_token_pw_incorrect

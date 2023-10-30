@@ -1,6 +1,7 @@
 import os 
 
 from fastapi import FastAPI, Request
+from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,9 +22,10 @@ from routers.attributes import attributes
 from routers.authentication import token, user
 from routers.features import faetures
 from routers.info import info
+from routers.annotations import annotations
 
 
-router_sources = [dataset, submission, attributes, token,  user, faetures, info]
+router_sources = [dataset, submission, attributes, token,  user, faetures, info, annotations]
 
 GENERAL_SETTINGS = get_general_settings()
 DB_SETTINGS = get_db_settings()
@@ -45,8 +47,8 @@ app = FastAPI(
     title=GENERAL_SETTINGS.app_name,
     version=GENERAL_SETTINGS.version,
     description=GENERAL_SETTINGS.description,
-    redoc_url="/api/doc"
-)
+    redoc_url="/api/doc",
+    default_response_class=ORJSONResponse)
 
 app.add_middleware(
     CORSMiddleware,

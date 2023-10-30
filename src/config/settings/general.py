@@ -11,7 +11,7 @@ class General(BaseSettings):
     version : str = "0.1"
     lead_contact : EmailStr = "h.nolte@age.mpg.de"
     description : str = "MitoCube offers protein-centric searches to explore the expression of a protein in all acquired proteomic datasets."
-    allowed_email_domains : List[str] = ["@uni-koeln.de","@age.mpg.de","@uni-bonn.de"]
+    allowed_email_domains : List[str] = ["@uni-koeln.de","@age.mpg.de","@uni-bonn.de","@instantclue.de"]
     # class Config:
     #     env_file = ".env"
     #     case_sensitive = True
