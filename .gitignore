@@ -9,6 +9,8 @@ env/
 # C extensions
 *.so
 
+/resources/users/users.json
+
 # Distribution / packaging
 .Python
 build/

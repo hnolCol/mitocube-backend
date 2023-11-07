@@ -19,12 +19,6 @@ A = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/annot
 A = A.rename(columns={"Gene Names" : "gene_name","Protein names":"protein_name","Length" : "length","Organism":"organism"})
 A.index.rename(name = "uniprot_id",inplace=True)
 
-print([AttributeValue(id = n,
-                           tag = f"att_feature:{x['uniprot_id']}",
-                           attribute_id= -1,
-                           name = f"{x['gene_name']} - {x['uniprot_id']}", 
-                           details=f"{x['organism']}-{x['protein_name']}") for n,x in enumerate(A.reset_index().to_dict(orient="records"))])
-
 @router.get('/features', summary="Returns all features that are present in the database (uniprot downloaded for available organisms).", response_model=List[Feature])
 def get_features_in_database(user : User =  Depends(get_user_from_token)) :
     """"""

@@ -9,6 +9,7 @@ from lib.data.dataset.ABCDataset import MCDataset
 from lib.data.dataset.PandaDataset import PandaFileDataset
 
 from config.settings.db import get_db_settings
+from config.models.attributes import Attribute
 
 DB_SETTINGS = get_db_settings()
 
@@ -198,13 +199,20 @@ class PandaFileDatabase(MCDatabase):
                 n_datasetFolders += 1
 
         return n_datasetFolders
+    
+
+    def getMandatorySubmissionAttributes(self) -> typing.List[Attribute]:
+        """"""
+        attributes = self.attributes
+        boolIdx = attributes["mandatory_for_submission"] == True
+        return [Attribute(**attr) for attr in attributes.loc[boolIdx,:].to_dict(orient="records")]
 
     def getSize(self) -> int:
         """"""
         # Todo: Write documentation
         dir_root = DB_SETTINGS.db_datadir
 
-        if not os.path.exists(dir_root):
+        if not os.path.exists(dir_root): #actually no need since pydantic checks (however only at start)
             raise Exception(f"Invalid database path {dir_root}")
 
         def get_dir_size(path: str):

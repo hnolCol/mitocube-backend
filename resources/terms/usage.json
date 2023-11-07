@@ -1,0 +1,12 @@
+{
+    "title" : "Data Policy",
+    "version" : "0.1",
+    "created_on" : "",
+    "last_modified_on" : "",
+    "authors" : ["Hendrik Nolte", "Andreas Lidner"],
+    "data_policy" : [
+        {"section" : "Access of Data", "text" : "Writte permission of the Principal investigator is required for third parties to access any kind of data."},
+        {"section" : "Usage of Data", "text" : "Data usage within a publication or at public presentations must always be based on an agreement between the original data supplier/ dataset owner and the data users. This agreement might be in written or oral form."}
+    ]
+    
+}

@@ -32,8 +32,8 @@ DB_SETTINGS = get_db_settings()
 ROOT_PATH = get_absolute_path_to_dir(__file__)
 
 ## check and create paths
-paths = Paths(ROOT_PATH, DB_SETTINGS) #class should only be used to get paths 
-print(paths.submissions)
+#paths = Paths(ROOT_PATH, DB_SETTINGS) #class should only be used to get paths 
+#print(paths.submissions)
 
 
 origins = [
@@ -61,6 +61,16 @@ app.add_middleware(
 for rs in router_sources:
     if hasattr(rs,"router"):
         app.include_router(getattr(rs,"router"))
+
+
+## host the static html of the frontend 
+templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
+@app.get("/", include_in_schema=False)
+def frontend(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+print(os.path.join(GENERAL_SETTINGS.frontend_build,"assets"))
+app.mount("/assets", StaticFiles(directory=os.path.join(GENERAL_SETTINGS.frontend_build,"assets"), html=True), name="frontend")
 
 
 if __name__ == "__main__":

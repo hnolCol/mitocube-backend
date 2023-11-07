@@ -39,6 +39,19 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
     #print([Attribute(**x) for x in attributes.to_dict(orient="records")])
     return {"attributes" : [Attribute(**x) for x in attributes.to_dict(orient="records")], "attribute_values" : attribute_values.to_dict(orient="records")}
 
+
+@router.get("/attributes/user", response_model=AttributeResponse)
+def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeResponse:
+    """
+    Returns the stored attributes 
+    """
+    db  = MCDatabase.getDatabase()
+    attributes = db.attributes.loc[db.attributes["allow_for_user"],:]
+    attribute_values = db.attribute_values.loc[db.attribute_values["attribute_id"].isin(attributes["id"].values)]
+    #print([Attribute(**x) for x in attributes.to_dict(orient="records")])
+    return {"attributes" : [Attribute(**x) for x in attributes.to_dict(orient="records")], "attribute_values" : attribute_values.to_dict(orient="records")}
+
+
 @router.post("/attributes")
 def add_attribute(attribute : Attribute) -> List[Attribute]:
     """Adds an attribute and returns the updated list"""

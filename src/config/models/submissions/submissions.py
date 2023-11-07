@@ -2,26 +2,37 @@ import time
 
 from datetime import datetime 
 from typing import List, Dict
-
+from pydantic import AnyUrl
 from pydantic import BaseModel 
 from pydantic import Field
 from pydantic import field_validator
-
+from pydantic import field_serializer
 from config.models.user import PublicUser
 from config.models.attributes import Attribute, AttributeValue
 from config.settings.metatexts import MetaTexts 
 
 from services.random_generators import get_random_string
 
+class SubmissionLink(BaseModel):
+    """"""
+    id : str 
+    url : AnyUrl
+    comment : str = None
 
+
+    @field_serializer("url", mode="plain")
+    def url_to_string(v : AnyUrl):
+        return str(v)
 
 class NewSubmission(BaseModel):
     """Add a submission"""
     created_on : float = Field(..., default_factory= time.time)
     sampleNames : List[str]
+    replicates : List[int]
     collaborators : List[PublicUser]
     attributeTable : List[Dict[str,List[AttributeValue]]]
     metatext : Dict[str,str]
+    links : List[SubmissionLink]
     label : str = Field(...,min_length=10, max_length=10)
     title : str 
     datasetAttributeValues : Dict[str,List[AttributeValue]]

@@ -36,6 +36,18 @@ user_forbidden = HTTPException(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+user_not_found = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The user is not in the database.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+user_registration_failed = HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="The user registration failed. User mail might already be registered.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 verification_code_missing = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalid. Verification not found.",
@@ -70,5 +82,13 @@ validation_code_exception = HTTPException(
 
 dataid_not_found_exception = HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail="Dataset ID was not found.",
+        detail="Dataset ID/Label was not found.",
         headers={"WWW-Authenticate": "Bearer"})
+
+
+mandatory_dataset_attrs_not_found_exception = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Mandatory dataset attribute missing.",
+        headers={"WWW-Authenticate": "Bearer"})
+
+

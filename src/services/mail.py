@@ -9,7 +9,9 @@ email_settings = get_email_settings( )
 
 templates = [email_settings.mail_verification_template, 
              email_settings.mail_confirmation_template,
-             email_settings.mail_project_state_template]
+             email_settings.mail_project_state_template,
+             email_settings.mail_submission_complete_template,
+             email_settings.mail_account_generated_template]
 
 MAIL_CONFIG = ConnectionConfig(
                 MAIL_USERNAME=email_settings.mail_username,
@@ -30,13 +32,14 @@ def send_email_in_background(background_tasks : BackgroundTasks,
                              email_to: list[EmailStr], 
                              cc : list[EmailStr] = [], 
                              body : dict = {}, 
-                             template_mame : str = "verification_code.html") -> None:
+                             template_mame : str = "verification_code.html",
+                             include_setting_cc : bool = True) -> None:
     """Sends a message via mail"""
 
     message = MessageSchema(
         subject=subject,
         recipients=email_to,
-        cc = cc + email_settings.mail_cc,
+        cc = cc + email_settings.mail_cc if include_setting_cc  else cc,
         template_body=body,
         subtype=MessageType.html,
     )
@@ -46,3 +49,21 @@ def send_email_in_background(background_tasks : BackgroundTasks,
         raise ValueError("Template_name not found.")
 
     background_tasks.add_task(fm.send_message, message, template_name=template_mame)
+
+
+async def async_send_email(subject : str, 
+                             email_to: list[EmailStr], 
+                             cc : list[EmailStr] = [], 
+                             body : dict = {}, 
+                             template_mame : str = "verification_code.html",
+                             include_setting_cc : bool = True) -> None:
+    """"""
+    message = MessageSchema(
+        subject=subject,
+        recipients=email_to,
+        cc = cc + email_settings.mail_cc if include_setting_cc  else cc,
+        template_body=body,
+        subtype=MessageType.html,
+    )
+    fm = FastMail(MAIL_CONFIG)
+    await fm.send_message(message,template_name=template_mame)

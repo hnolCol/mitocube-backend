@@ -10,9 +10,6 @@ class MetaText(BaseModel):
     text : str
 
 
-
-
-
 class MetaTexts(BaseSettings):
     """
     Base settings to defined metatexts for a proeject

@@ -33,8 +33,8 @@ def submission_to_json(submission : NewSubmission, user : User):
     json["user_label"] = user.label 
     json["collaborators"] = [user.label for user in submission.collaborators]
     json["n_samples"] = len(submission.sampleNames) 
+    json["links"] = [link.model_dump() for link in  submission.links]
     
-
     ## add metatext 
     json["metatext"] = {}
     for metatext_tag, metatext in submission.metatext.items():
@@ -46,17 +46,17 @@ def submission_to_json(submission : NewSubmission, user : User):
         json["dataset_attributes"][datasetAttribute.tag] = [attr.tag for attr in submission.datasetAttributeValues[datasetAttribute.tag]]
     ## add sample names
     json["sample_names"] = submission.sampleNames
+    ## add replicate ids 
+    json["replicates"] = submission.replicates 
     ## add samples attributes and add the sample name index
     samplesAttributesJson = {}
     for samplesAttribute in submission.samplesAttributes:
-        print(samplesAttribute)
         sampleAttrTag = samplesAttribute["attribute"]["tag"]
         samplesAttributesJson[sampleAttrTag] = {}
     
     for n,sampleAttributeRow in enumerate(submission.attributeTable):
         sampleName = submission.sampleNames[n]
         for sampleAttrTag, attributeValues in sampleAttributeRow.items():
-            print(attributeValues)
             for attributeValue in attributeValues:
                 if attributeValue.tag not in samplesAttributesJson[sampleAttrTag]:
                     samplesAttributesJson[sampleAttrTag][attributeValue.tag] = []

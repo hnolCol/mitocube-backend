@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Body
 from config.models.user import User
 from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword, TokenValidResponse
 from config.settings.general import get_general_settings
-from config.settings.token import get_share_token_settings
+from config.settings.email import get_email_settings
 
 from services.date import get_time_stamp
 from services.mail import send_email_in_background
@@ -16,7 +16,8 @@ from config.exceptions.HTTPExceptions import verification_code_incorrect, share_
 
 from lib.user.UserHandling import UserDB
 
-
+EMAIL_SETTINGS = get_email_settings()
+GENERAL_SETTINGS = get_general_settings()
 router = APIRouter(
     prefix="/api/auth/token",
     tags=["Token", "Authentication"]
@@ -52,11 +53,11 @@ def login_for_access_token(background_task : BackgroundTasks,
         email_to=[user.email],
         cc = [],
         body={
-            "app_name" : get_general_settings().app_name,
+            "app_name" : GENERAL_SETTINGS.app_name,
             "first_name" : user.firstname,
             "verification_code" : verification_code
         },
-        template_mame="verification_code.html"
+        template_mame=EMAIL_SETTINGS.mail_verification_template
     )
 
     return TokenResponse(success=True,token=jwt_token,verified=False)
