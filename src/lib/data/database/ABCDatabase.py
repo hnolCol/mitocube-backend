@@ -5,7 +5,9 @@ from collections import OrderedDict
 from lib.data.dataset.ABCDataset import MCDataset
 
 from lib.data.DesignPatterns import SingletonABCMeta, JsonSerializable
+
 from config.settings.db import get_db_settings
+from config.models.attributes import Attribute
 
 DB_SETTINGS = get_db_settings()
 
@@ -135,6 +137,11 @@ class MCDatabase(metaclass=SingletonABCMeta):
             return PandaFileDatabase()
         else:
             raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
+
+
+    @abstractmethod
+    def getMandatorySubmissionAttributes(self) -> typing.List[Attribute]:
+        """Returns the list of dataset attributes that are mandatory."""
 
     @abstractmethod
     def getNumberOfDatasets(self) -> int:

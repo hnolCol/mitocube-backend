@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Body
 from config.models.user import User
 from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword, TokenValidResponse
 from config.settings.general import get_general_settings
-from config.settings.token import get_share_token_settings
+from config.settings.email import get_email_settings
 
 from services.date import get_time_stamp
 from services.mail import send_email_in_background
@@ -16,7 +16,8 @@ from config.exceptions.HTTPExceptions import verification_code_incorrect, share_
 
 from lib.user.UserHandling import UserDB
 
-
+EMAIL_SETTINGS = get_email_settings()
+GENERAL_SETTINGS = get_general_settings()
 router = APIRouter(
     prefix="/api/auth/token",
     tags=["Token", "Authentication"]
@@ -52,11 +53,11 @@ def login_for_access_token(background_task : BackgroundTasks,
         email_to=[user.email],
         cc = [],
         body={
-            "app_name" : get_general_settings().app_name,
+            "app_name" : GENERAL_SETTINGS.app_name,
             "first_name" : user.firstname,
             "verification_code" : verification_code
         },
-        template_mame="verification_code.html"
+        template_mame=EMAIL_SETTINGS.mail_verification_template
     )
 
     return TokenResponse(success=True,token=jwt_token,verified=False)
@@ -67,7 +68,7 @@ def login_for_access_token(background_task : BackgroundTasks,
             response_model=TokenValidResponse)
 def check_token(user : User = Depends(get_user_from_token)):
     """"""
-    return TokenValidResponse(success=True, role = user.role, verified = True)
+    return TokenValidResponse(success=True, role = user.role, verified = True, firstname=user.firstname, lastname=user.lastname, label=user.label)
 
 @router.post("/verify", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
@@ -90,7 +91,7 @@ def verify_token_by_code(verification : TokenVerificationCode,
                                     add_dict={"verified" : True, 
                                               "verified_at" : get_time_stamp()})
     
-    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role)
+    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role, firstname = user.firstname, lastname=user.lastname, label=user.label)
 
 ### Share Token
 
@@ -103,7 +104,6 @@ def create_share_token(inputPassword: ShareTokenPassword, user : User = Depends(
     print(user,inputPassword.pw)
     ##should this be for a user? 
     if check_share_token_password(inputPassword.pw):
-        print("pw correct")
         jwt_token = create_access_token(user.model_dump(), key_subset=["id"], add_dict={"created_at" : get_time_stamp()}, share_token=True)
         return TokenResponse(success=True,token= jwt_token,verified=False, role=0)
     raise share_token_pw_incorrect

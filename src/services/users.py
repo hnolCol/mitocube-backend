@@ -1,11 +1,24 @@
 from fastapi.security import  OAuth2PasswordRequestForm
 from fastapi import Depends
-
+from pydantic import EmailStr
+from typing import List, Tuple
 from services.encryption import verify_password, get_decoded_token
 from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentials_exception, user_blocked, user_role_too_low, token_not_valid_exception
-from config.models.user import User, UserRolesEnum
+from config.models.user import User, UserRolesEnum, PublicUser
 
 from lib.user.UserHandling import UserDB
+
+
+
+def get_users_from_user_labels(user_labels : List[str]) -> List[Tuple[bool,User]]:
+    """Returns the list of emails"""
+    return [UserDB.get_user_by_label(user_label) for user_label in user_labels]
+
+def are_public_users_allowed(users : List[PublicUser]) -> List[bool]:
+    """"""
+    user_labels = [u.label for u in users]
+    users_from_db = get_users_from_user_labels(user_labels)
+    return [u[1].allow_login for u in users_from_db if u[0]]
 
 def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends()) -> User:
     """Returns the user from a login"""
@@ -24,7 +37,6 @@ def check_user_allowed(user_exists, user : User) -> User:
         raise user_form_data_incorrect
     if not user.allow_login:
         raise user_blocked
-    
     return user 
 
 def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:

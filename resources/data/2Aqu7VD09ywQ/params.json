@@ -38,7 +38,12 @@
         }
     ],
     "attributes_dataset" : {
-
+        "att_instrument" : [
+            "att_instrument:Boris", "att_instrument:Doris"
+        ],
+        "att_media" : [
+            "att_media:RPMI"
+        ]
 
     },
     "attributes_samples": {

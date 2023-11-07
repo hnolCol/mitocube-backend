@@ -50,10 +50,12 @@ class PandaFileDataset(MCDataset):
         if not os.path.exists(path_dataset): raise Exception("Dataset not found.")
         path_data = os.path.join(path_dataset,"data.txt")
 
-        data = pd.read_csv(path_data, sep="\t", index_col="Key")
-        data = data.loc[data.index.dropna(), :]  # remove nan index  # ToDo: Should we really remove NAs?
-
-        self._cached_data_table = data
+        if os.path.exists(path_data):
+            data = pd.read_csv(path_data, sep="\t", index_col="Key")
+            data = data.loc[data.index.dropna(), :]  # remove nan index  # ToDo: Should we really remove NAs?
+            self._cached_data_table = data
+            self._data_uploaded = True
+       
         meta = self._read_meta()
         self._state = meta["state"]
         self._user_label = meta["user_label"]
@@ -83,7 +85,7 @@ class PandaFileDataset(MCDataset):
     def write(self):
         """"""
         # Todo: Write documentation
-        str_dir = os.path.join(DB_SETTINGS.db_datadir,self._id)
+        str_dir = os.path.join(DB_SETTINGS.db_datadir,self._label)
         if not os.path.exists(str_dir):
             os.mkdir(str_dir)
 
@@ -94,3 +96,9 @@ class PandaFileDataset(MCDataset):
                 json.dump(self.getMetaJson(), file_out)
         else:
             raise Exception(f"A dataset with id {self._id} already exists.")
+
+
+    def hasData(self):
+        """"""
+        path_dataset_data = os.path.join(DB_SETTINGS.db_datadir,self._label,"data.txt")
+        return os.path.exists(path_dataset_data)

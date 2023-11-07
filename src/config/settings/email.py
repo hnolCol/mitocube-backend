@@ -25,11 +25,12 @@ class Email(BaseSettings):
     mail_validate_certs : bool = False
     mail_from_name : str = "MitoCube Support"
     mail_cc : List[EmailStr] = ["h.nolte@age.mpg.de","support@mitocube.com"] #"dominique.diehl@age.mpg.de", 
-    mail_template_dir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/src/templates/email"
+    mail_template_dir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/templates/email"
     mail_verification_template : str = "verification_code.html"
     mail_confirmation_template : str = "email_confirmation.html"
     mail_project_state_template : str = "state_changed.html"
-
+    mail_submission_complete_template : str = "submission_complete.html"
+    mail_account_generated_template : str = "account_generated.html"
     class Config:
         env_file = ".env"
         extra = "ignore"

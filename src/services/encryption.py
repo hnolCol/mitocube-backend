@@ -93,7 +93,6 @@ def create_share_token(to_encode : dict, current_time : datetime) -> str:
     expire = current_time + SHARE_TOKEN_SETTINGS.expires_after_hours
 
     to_encode["exp"] = expire
-
     return jwt.encode(to_encode,
                     SHARE_TOKEN_SETTINGS.jwt_share_key.get_secret_value(), 
                     algorithm=SHARE_TOKEN_SETTINGS.jwt_algorithm)

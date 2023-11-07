@@ -19,19 +19,27 @@ GENERAL_SETTINGS = get_general_settings()
 
 class BasicUser(BaseModel):
     """The very basic user information"""
-    
+    label : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
     firstname : str 
     lastname : str 
     institute : str 
     research_group : str 
     created_on : float = Field(default_factory=time.time)
 
+class BasicUserWithEmail(BasicUser):
+    """
+    """
+    email : EmailStr 
+    @field_validator("email")
+    def check_email_domain(cls, v: EmailStr) -> EmailStr:
+        """Checks if email domain is allowed"""
+        if not any(v.endswith(email_domain) for email_domain in GENERAL_SETTINGS.allowed_email_domains):
+            raise ValueError("Email adresses must end with an allowed domain. Please contact your administrator.")
+        return v 
 
-class User(BasicUser):
+class User(BasicUserWithEmail):
     """BaseModel for a user"""
     id : int
-    label : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
-    email : EmailStr 
     updated_on : float  = None 
     expires_after : float = None
     password : SecretStr = None
@@ -40,26 +48,34 @@ class User(BasicUser):
     salt : str = None
     # image : bytearray = None
 
-    @field_validator("email")
-    def check_email_domain(cls, v: EmailStr) -> EmailStr:
-        """Checks if email domain is allowed"""
-        if not any(v.endswith(email_domain) for email_domain in GENERAL_SETTINGS.allowed_email_domains):
-            raise ValueError("Email adresses must end with an allowed domain. Please contact your administrator.")
-        return v 
     
+class UserModelForRegistration(BasicUserWithEmail):
+    """"""
+    password : str = Field(default_factory=lambda : get_random_string(10)) #generate a random password upon generation, will be send via email to user
+    role : UserRolesEnum
+
+    @field_validator("role",mode="before")
+    def validate_role(v : str):
+        """From a post request"""
+        return int(v)
+
+class UserModelForUpdate(BaseModel):
+    """"""
+    label : str = Field(...,min_length=8, max_length=8)
+    firstname : str 
+    lastname : str 
+    institute : str 
+    research_group : str 
+    role : UserRolesEnum
+    updated_on : float = Field(default_factory=time.time)
+
 
 class AdminUserView(BasicUser):
     """"""
     id : int
-    label : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
     email : EmailStr 
     allow_login : bool
     role : UserRolesEnum
-
-    # @field_serializer("created_on")
-    # def dt_to_timestamp(dt : datetime):
-    #     ""
-    #     return dt.timestamp()
 
 class UsersAdminResponse(BaseModel):
     """API Admin Response"""
@@ -73,19 +89,26 @@ class PublicUser(BaseModel):
     To distinguish them, the API deadend for those is /api/collaborators
     while api/users is restricted to admin rights. 
     """
+    label : str
     firstname : str
     lastname : str 
     research_group : str 
     institute : str 
     email : EmailStr
 
-
-
 class Collaborators(BaseModel):
     users : List[PublicUser]
+
+
+class UseRoleReponse(BaseModel):
+    """"""
+    roles : dict = Field(default_factory=lambda : get_inversed_enum_as_dict(UserRolesEnum))
 
 #user_dict = DB().get_user_by_id(id="asdada")
 
 
-   
+
+class UserLabel(BaseModel):
+    """"""
+    label : str = Field(...,min_length=8,max_length=8)
 

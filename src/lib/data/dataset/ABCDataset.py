@@ -78,6 +78,10 @@ class MCDataset(JsonSerializable):
         self._loadedFromDatabase = True
 
     @abstractmethod
+    def hasData(self):
+        """Checks if dataset has data"""
+
+    @abstractmethod
     def _readFromDatabase(self):
         """"""
         # Todo: Write documentation

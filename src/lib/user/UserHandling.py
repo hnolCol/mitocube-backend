@@ -2,9 +2,23 @@
 
 from config.models.user import User, UserRolesEnum 
 from services.encryption import create_password_hash
+from services.random_generators import get_random_string
+from services.paths.utils import check_dir_exists, join_path
+from services.mail import  async_send_email
+from services.json import read_json, save_json
 from typing import List, Tuple
+from fastapi import BackgroundTasks
+from config.models.user import AdminUserView, UsersAdminResponse, UserModelForRegistration, UserModelForUpdate
+from config.exceptions.HTTPExceptions import user_registration_failed, user_not_found
+from config.settings.db import get_db_settings 
+from config.settings.general import get_general_settings
+from config.settings.email import get_email_settings
+import asyncio
+import os 
 
-from config.models.user import AdminUserView, UsersAdminResponse
+DB_SETTINGS = get_db_settings()
+GENERAL_SETTINGS = get_general_settings()
+EMAIL_SETTINGS = get_email_settings()
 
 fake_DB : List[User] = [
     User(
@@ -22,7 +36,7 @@ fake_DB : List[User] = [
         label = "asdth23a",
         firstname="Emil",
         lastname="Nolte",
-        email="nolte@age.mpg.de",
+        email="nolte@instantclue.de",
         password=create_password_hash("Hallo"),
         institute="CECAD",
         email_verified=True, 
@@ -32,33 +46,130 @@ fake_DB : List[User] = [
 
 class UserDB:
 
+    def __init__(self) -> None:
+        
+        user_dir = DB_SETTINGS.db_userdir
+        
+        exists, self.user_dir = check_dir_exists(user_dir) #create the dir if not existance
+        self._load_users()
+
+    def _get_file_path(self) -> str:
+        """"""
+        return join_path(self.user_dir,"users.json")
+
+    def _load_users(self,):
+
+        user_db_file = self._get_file_path()
+        if not os.path.exists(user_db_file):
+            auto_pw = get_random_string(10)
+            ## create lead contact
+            lead_contact = User(
+                id = 0,
+                password=create_password_hash(auto_pw),
+                firstname=GENERAL_SETTINGS.lead_contact_first_name,
+                lastname=GENERAL_SETTINGS.lead_contact_last_name,
+                email=GENERAL_SETTINGS.lead_contact,
+                research_group=GENERAL_SETTINGS.lead_contact_group,
+                institute=GENERAL_SETTINGS.lead_contact_institute,
+                role=UserRolesEnum.ADMIN
+                )
+            
+            self.DB = [lead_contact]
+            self._save_db()
+            #send mail and await (this increases the time, but should just run the very first time the app is initiated.)
+            asyncio.run(async_send_email(subject="Lead Account Generated",
+                            email_to=[lead_contact.email],
+                            body={
+                                "app_name" : GENERAL_SETTINGS.app_name,
+                                "first_name" : GENERAL_SETTINGS.lead_contact_first_name,
+                                "password" : auto_pw
+                            },
+                            template_mame=EMAIL_SETTINGS.mail_account_generated_template,
+                            include_setting_cc=True))
+                                     
+        else:
+            self.DB = [User(**user_props) for user_props in read_json(user_db_file)]
+    
+
+    def _update(self) -> List[User]:
+        """Updates Users and returns the DB"""
+        self._load_users()
+        return self.DB 
+
+    def _save_db(self):
+        """Save the db to a file"""
+        user_db_file = self._get_file_path()
+        DB = [user.model_dump(exclude_none=True) for user in self.DB]
+        for n,user in enumerate(self.DB):
+            DB[n]["password"] = user.password.get_secret_value()
+        save_json(DB,user_db_file)
+
+
+    def add_user(self, user_props : UserModelForRegistration):
+        """Add user to db - user model for registration contains a randomly generated password."""
+        DB = self._update()
+        #check user email in db, return error
+        exists, user = self.get_user_by_email(email=user_props.email)
+        if exists : raise user_registration_failed
+        next_id = max([user.id for user in DB])
+        pw_hash = create_password_hash(user_props.password)
+        user_props_from_request = user_props.model_dump(exclude=["password"])
+        to_add_user = User(id = next_id+1,password=pw_hash,**user_props_from_request)
+        DB.append(to_add_user)
+        self._save_db()
+
+
+    def block_user_by_label(self, user_label : str) -> List[User]:
+        """"""
+        DB = self._update()
+        exists, user_to_block = self.get_user_by_label(user_label)
+        if not exists: user_not_found
+        user_to_block.allow_login = False 
+        #ugly update TO DO update by user index
+        self.DB = [user if user.label != user_to_block.label else user_to_block for user in self.DB]
+        self._save_db()
 
     def get_users(self) -> List[User]:
         """"""
-        return fake_DB
+        return self._update()
 
     def get_user_by_id(self, id):
         ""
-        users = [user for user in fake_DB if user.id == id]
+        users = [user for user in self.DB if user.id == id]
         if len(users) == 0:
             return False, None
         return True, users[0]
     
     def get_user_by_label(self, user_label):
         ""
-        users = [user for user in fake_DB if user.label == user_label]
+        users = [user for user in self.DB if user.label == user_label]
         if len(users) == 0:
             return False, None
         return True, users[0]
     
     def get_user_by_email(self, email : str) -> User:
         ""
-        users = [user for user in fake_DB if user.email == email]
+        users = [user for user in self.DB if user.email == email]
         if len(users) == 0:
             return False, None
         return True, users[0]
     
     def get_number_of_users(self) -> int:
-        return len(fake_DB)
+        return len(self.DB)
+    
+
+    def update_user_by_label(self,user_label : str, user_props : UserModelForUpdate):
+        """Update a user in the DB by the user_label using a user_props"""
+        DB = self._update()
+        for userIdx, user in enumerate(DB):
+            if user.label == user_label:
+                user_props_updated = {**user.model_dump(exclude_none=True),**user_props.model_dump(exclude_none=True)}
+                break 
+        #handle error if user cannot be constructed.
+        updated_user = User(**user_props_updated)
+    
+        DB[userIdx] = updated_user
+        self._save_db()
+
 
 UserDB = UserDB() #ensure it is like a singleton 
