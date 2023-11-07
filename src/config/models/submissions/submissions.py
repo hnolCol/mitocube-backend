@@ -1,7 +1,7 @@
 import time
 
 from datetime import datetime 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pydantic import AnyUrl
 from pydantic import BaseModel 
 from pydantic import Field
@@ -24,7 +24,6 @@ class SubmissionLink(BaseModel):
     def url_to_string(v : AnyUrl):
         return str(v)
     
-
 class SampleAttribute(BaseModel):
     """
     """
@@ -62,8 +61,28 @@ class NewSubmission(BaseModel):
             raise ValueError(f"Minimal length not met for {min_length_not_met}")
 
         return v 
+    
+
+class SampleAttributeFromDB(BaseModel):
+    """"""
+    name : str
+    values : Dict[str,List[int]]
 
 
+class SubmissionFromMetaDB(BaseModel):
+    ""
+    created_on : float
+    modified_on : Optional[float]
+    label : str
+    title : str
+    user_label : str
+    collaborators : List[str]
+    replicates : List[int]
+    sample_names : List[str]
+    metatext : Dict[str,str] = {}
+    dataset_attributes : Dict[str,List[str]]
+    samples_attributes : Dict[str,SampleAttributeFromDB]
+    links : List[SubmissionLink] = []
 
 
 class SubmissionIDResponse(BaseModel):

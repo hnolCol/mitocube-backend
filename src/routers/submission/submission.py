@@ -15,7 +15,7 @@ from config.models.attributes import Attribute
 from config.models.submissions.submissions import NewSubmission
 from config.models.user import User
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionResponse, SubmissionIDResponse
+from config.models.submissions.submissions import SubmissionResponse, SubmissionIDResponse, SubmissionFromMetaDB
 
 from services.users import get_user_from_token, are_public_users_allowed
 from services.submission import submission_to_json, check_for_missing_mandatory_attribute
@@ -31,6 +31,13 @@ router = APIRouter(
     tags=["Submission"],
     )
 
+
+db = MCDatabase.getDatabase()
+metadata = db.getJSONDatasets()
+
+print(metadata)
+for label, meta in metadata.items():
+    print(SubmissionFromMetaDB(**meta))
 
 @router.get("/submission/id",
     summary = "Returns a unique id for a new submission.",
@@ -50,7 +57,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     db  = MCDatabase.getDatabase()
     mandatory_attributes = db.getMandatorySubmissionAttributes()
     missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
-    
+
     if len(missing_mand_attributes) > 0: return mandatory_dataset_attrs_not_found_exception.add_note(f"Missing : {[attr.tag for attr in missing_mand_attributes]}")
     json_data = submission_to_json (submission,user)
     
@@ -76,9 +83,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
                                     "label" : submission.label
                                 },
                                 template_mame=EMAIL_SETTINGS.mail_submission_complete_template)
-        
-
-    return 
+    
 
 
 @router.get("/submission/submissions")
