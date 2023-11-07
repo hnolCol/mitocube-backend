@@ -18,6 +18,8 @@ class General(BaseSettings):
     allowed_email_domains : List[str] = ["@uni-koeln.de","@age.mpg.de","@uni-bonn.de","@instantclue.de"]
 
     frontend_build : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-frontend/dist"
+    frontend_build_assets : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-frontend/dist/assets"
+    
     class Config:
          env_file = ".env"
          case_sensitive = True

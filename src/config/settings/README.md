@@ -22,6 +22,9 @@ lead_contact : EmailStr = "your.email@cool.de"
 description : str = "MitoCube offers protein-centric searches to explore the expression of a protein in all acquired proteomic datasets."
 allowed_email_domains : List[str] = ["@cool-domain.de"]
 
+frontend_build : DirectoryPath = "/.../dist" #front end build that includes the index.html for the frontend build
+frontend_build_assets : DirectoryPath . 
+
 #token settings
 jwt_key : SecretStr #make it very long and random
 

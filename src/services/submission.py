@@ -51,16 +51,16 @@ def submission_to_json(submission : NewSubmission, user : User):
     ## add samples attributes and add the sample name index
     samplesAttributesJson = {}
     for samplesAttribute in submission.samplesAttributes:
-        sampleAttrTag = samplesAttribute["attribute"]["tag"]
-        samplesAttributesJson[sampleAttrTag] = {}
+        sampleAttrTag = samplesAttribute.attribute.tag
+        samplesAttributesJson[sampleAttrTag] = {"name" : samplesAttribute.name, "values" : {}}
     
     for n,sampleAttributeRow in enumerate(submission.attributeTable):
-        sampleName = submission.sampleNames[n]
+        #sampleName = submission.sampleNames[n]
         for sampleAttrTag, attributeValues in sampleAttributeRow.items():
             for attributeValue in attributeValues:
-                if attributeValue.tag not in samplesAttributesJson[sampleAttrTag]:
-                    samplesAttributesJson[sampleAttrTag][attributeValue.tag] = []
-                samplesAttributesJson[sampleAttrTag][attributeValue.tag].append(n)
+                if attributeValue.tag not in samplesAttributesJson[sampleAttrTag]["values"]:
+                    samplesAttributesJson[sampleAttrTag]["values"][attributeValue.tag] = []
+                samplesAttributesJson[sampleAttrTag]["values"][attributeValue.tag].append(n)
     json["samples_attributes"] = samplesAttributesJson
         #json["samples_attributes"][datasetAttribute.tag] = [attr.tag for attr in submission.datasetAttributeValues[datasetAttribute.tag]]
     return json 

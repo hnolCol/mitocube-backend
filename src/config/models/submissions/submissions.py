@@ -23,6 +23,13 @@ class SubmissionLink(BaseModel):
     @field_serializer("url", mode="plain")
     def url_to_string(v : AnyUrl):
         return str(v)
+    
+
+class SampleAttribute(BaseModel):
+    """
+    """
+    attribute : Attribute
+    name : str 
 
 class NewSubmission(BaseModel):
     """Add a submission"""
@@ -37,7 +44,7 @@ class NewSubmission(BaseModel):
     title : str 
     datasetAttributeValues : Dict[str,List[AttributeValue]]
     datasetAttributes : List[Attribute]
-    samplesAttributes : List[Dict]
+    samplesAttributes : List[SampleAttribute]
 
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
