@@ -1,4 +1,5 @@
 from datetime import datetime
+from config.enums.states import SubmissionStates
 from config.models.attributes import Attribute
 from config.models.submissions.submissions import NewSubmission
 from config.models.user import User
@@ -28,6 +29,7 @@ def submission_to_json(submission : NewSubmission, user : User):
     json = {}
     json["created_on"] = submission.created_on
     json["created_on_dt"] = datetime.fromtimestamp(submission.created_on).strftime("%m/%d/%Y, %H:%M:%S")
+    json["state"] = SubmissionStates.SUBIMITTED
     json["label"] = submission.label 
     json["title"] = submission.title 
     json["user_label"] = user.label 

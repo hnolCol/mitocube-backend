@@ -10,7 +10,7 @@ from pydantic import field_serializer
 from config.models.user import PublicUser
 from config.models.attributes import Attribute, AttributeValue
 from config.settings.metatexts import MetaTexts 
-
+from config.enums.states import SubmissionStates
 from services.random_generators import get_random_string
 
 class SubmissionLink(BaseModel):
@@ -72,7 +72,8 @@ class SampleAttributeFromDB(BaseModel):
 class SubmissionFromMetaDB(BaseModel):
     ""
     created_on : float
-    modified_on : Optional[float]
+    modified_on : Optional[float] = None
+    state : SubmissionStates
     label : str
     title : str
     user_label : str

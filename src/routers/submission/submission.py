@@ -8,6 +8,7 @@ from config.settings.db import get_db_settings
 from config.settings.metatexts import MetaTexts
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
+from config.enums.states import SubmissionStates
 
 from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception
 
@@ -16,6 +17,7 @@ from config.models.submissions.submissions import NewSubmission
 from config.models.user import User
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
 from config.models.submissions.submissions import SubmissionResponse, SubmissionIDResponse, SubmissionFromMetaDB
+from config.models.submissions.states import StateResponse
 
 from services.users import get_user_from_token, are_public_users_allowed
 from services.submission import submission_to_json, check_for_missing_mandatory_attribute
@@ -26,18 +28,12 @@ from services.paths.utils import check_dir_exists, join_path
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
 DB_SETTINGS = get_db_settings()
+
 router = APIRouter(
     prefix="/api",
     tags=["Submission"],
     )
 
-
-db = MCDatabase.getDatabase()
-metadata = db.getJSONDatasets()
-
-print(metadata)
-for label, meta in metadata.items():
-    print(SubmissionFromMetaDB(**meta))
 
 @router.get("/submission/id",
     summary = "Returns a unique id for a new submission.",
@@ -48,7 +44,7 @@ def get_submission_id():
     """
     return SubmissionIDResponse()
 
-@router.post("/submission",summary="Add submission to the database")
+@router.post("/submissions",summary="Add submission to the database")
 def add_submission(background_task : BackgroundTasks ,submission : NewSubmission, user : User = Depends(get_user_from_token)):
     """
     Adds a submission to the database
@@ -86,20 +82,21 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     
 
 
-@router.get("/submission/submissions")
+@router.get("/submissions")
 def get_submission(user : User = Depends(get_user_from_token)):
     """
     Returns the submissions depending on the user's role. 
     Curators and admins are able to see all submissions
     while standard users can only see their own submissions
     """
+    
     db = MCDatabase.getDatabase()
     metadata = db.getJSONDatasets()
     if user.role < UserRolesEnum.CURATOR:
-        return [dataset_meta for dataset_meta in metadata if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
+        return [SubmissionFromMetaDB(**dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
     else:
         #return all if user at least curator
-        return metadata 
+        return [SubmissionFromMetaDB(**dataset_meta) for dataset_label, dataset_meta in metadata.items()]
     
 
 @router.get("/submission/metatext",
@@ -108,3 +105,12 @@ def get_submission(user : User = Depends(get_user_from_token)):
 def get_meta_text(user : User = Depends(get_user_from_token)):
     """"""
     return MetaTexts().model_dump()
+
+
+
+
+@router.get("/submissions/states", summary="Returns the states enum as well as colors associated with the state.")
+def get_project_states(user : User = Depends(get_user_from_token)):
+    """"""
+    return StateResponse()
+
