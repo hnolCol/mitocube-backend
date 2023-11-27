@@ -5,13 +5,15 @@ from config.models.user import User
 from config.models.dataset.data import API_DatasetData
 
 from config.models.dataset.data import DatasetPCAResponse
-
+from config.models.submissions.submissions import SubmissionFromMetaDB
 from lib.data.database.ABCDatabase import MCDatabase 
 from lib.data.transform.PCA import PCATransform
+from lib.data.transform.FeatureData import FeatureData
 from lib.data.filter.NoMissingValues import NoNaNFilter
+
 from services.users import get_user_from_token, is_user_at_least_curator
 
-
+import pandas as pd 
 
 #print(DB)
 
@@ -22,8 +24,8 @@ router = APIRouter(
     tags=["Dataset"]
     )
 
-@router.get("/dataset/{data_id}/data", response_model=API_DatasetData)
-def get_dataset_data(data_id : str):
+@router.get("/datasets/{dataset_label}/data", response_model=[])
+def get_dataset_data(dataset_label : str):
     """
     Returns the data for a specific dataset
     
@@ -37,19 +39,54 @@ def get_dataset_data(data_id : str):
 
     data_id not found in database. 
     """
-    API_DatasetData("1231",[],{})
-    return {}
+    db = MCDatabase.getDatabase()
+    dataset = db.getDataset(dataset_label)
+    data_table = dataset.getDataTable()
+    return data_table.to_numpy().tolist()
+
+# class QCResponse(BaseModel):
+
+
+@router.get("/datasets/{dataset_label}/qc", 
+            response_model=[], 
+            summary="Quality control of data set. Includes a statistic summary.")
+def get_dataset_data(dataset_label : str):
+    """
+    Returns the summary statistcs data for a specific dataset
+    """
+    db = MCDatabase.getDatabase()
+    dataset = db.getDataset(dataset_label)
+    metadata : SubmissionFromMetaDB = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    datatable = dataset.getDataTable()
+    data_summary = datatable.describe()
+    data_summary.loc["total",:] = datatable.index.size
+
+    
+    if "att_poi" in metadata.dataset_attributes: 
+        pois = metadata.dataset_attributes["att_poi"]
+        ids = [poi.split(":")[-1].upper() for poi in pois]
+        poi_data = [FeatureData(dataset).transform(id, add_annotations=True) for id in ids if id in datatable.index]
+
+    return {"stats" : data_summary.to_dict(), 
+            "poi_data" : [{
+                "annotations" : annotations,
+                "data" : data.to_dict(orient="records"),
+                "samples_attributes" : samples_attributes} for data, samples_attributes, annotations in poi_data]
+            }
+
+
 
 #parameter endpoints 
-@router.get("/dataset/{dataset_label}/meta",
-            tags=["Parameters"])
+@router.get("/datasets/{dataset_label}/meta",
+            response_model=SubmissionFromMetaDB,
+            tags=["Parameters","Meta data"])
 def get_dataset_params(dataset_label : str, user : User = Depends(get_user_from_token)):
     """
     Returns the metadata associated to the dataset
     """
     db = MCDatabase.getDatabase()
-    dataset = db.getDataset(dataset_label)
-    return dataset.getMetaJson()
+    metadata : SubmissionFromMetaDB = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    return metadata
 
 #volcano plot
 @router.get("/dataset/{data_id}/volcano")

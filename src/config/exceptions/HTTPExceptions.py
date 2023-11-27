@@ -85,6 +85,10 @@ dataid_not_found_exception = HTTPException(
         detail="Dataset ID/Label was not found.",
         headers={"WWW-Authenticate": "Bearer"})
 
+label_not_found_exception = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Label was not found.",
+        headers={"WWW-Authenticate": "Bearer"})
 
 mandatory_dataset_attrs_not_found_exception = HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,

@@ -8,7 +8,6 @@ class FeatureDataResponse(BaseModel):
     """
     Response model for feature data.
     """
-    status : str = "Ok"
     feature_id : str
     attributes_samples : Dict[str,Dict]
     dataset_labels : List[str] #labels of datasets

@@ -7,4 +7,5 @@ class MetaTextSubmissionResponse(BaseModel):
     placeholders : Dict[str,str]
     required : Dict[str,bool]
     min_text_length : Dict[str,int]
+    names : Dict[str,str]
     tags : Dict[str,str]

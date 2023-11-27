@@ -27,8 +27,14 @@ def get_features_in_database(user : User =  Depends(get_user_from_token)) :
 @router.get('/features/attributeValues', summary="Returns all features that are present in the database in the format for attribute value selection.", response_model=List[AttributeValue])
 def get_features_in_database_as_values(user : User =  Depends(get_user_from_token)) :
     """"""
+    ## add controls somewhere else!! -> in annotation datasets.
+    CONTORLS = [AttributeValue(attribute_id=-1,tag=f"att_feature:GFP", name = "GFP", details="GFP Proteins (knock-down control)", id=-2),
+                AttributeValue(attribute_id=-1,tag=f"att_feature:scr", name = "Scrambled", details="Scrambled Protein Sequence", id=-3),
+                AttributeValue(attribute_id=-1,tag=f"att_feature:ctrl", name = "Control", details="Control sgRNA or siRNA", id=-4),
+                AttributeValue(attribute_id=-1,tag=f"att_feature:fluc", name = "FLUC", details="FLUC Protein", id=-1),
+                AttributeValue(attribute_id=-1,tag=f"att_feature:rluc", name = "RLUC", details="RLUC Protein as a control", id=-5)]
 
-    return [AttributeValue(id = n,
+    return CONTORLS + [AttributeValue(id = n,
                            tag = f"att_feature:{x['uniprot_id']}",
                            attribute_id= -1,
                            name = f"{x['gene_name']}", 

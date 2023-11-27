@@ -15,7 +15,7 @@ class MetaTexts(BaseSettings):
     Base settings to defined metatexts for a proeject
     submission
     """
-    titles : List[str] = ["Research Aim","Experimental Procedure","Additional information"]
+    titles : List[str] = ["Research Aim","Experimental Procedure","Additional Information"]
     placeholders : Dict[str,str] = {
         "metatext:research_aim" : "Please enter some background information about your project. Think about it like a small abstract in a paper.",
         "metatext:experimental_procedure" : "Please provide detailed information about the experimental procedure.",
@@ -31,10 +31,15 @@ class MetaTexts(BaseSettings):
         "metatext:experimental_procedure" : 50,
         "metatext:add_info" : 0
         }
+    names : Dict[str,str] = {
+        "metatext:research_aim" : "Research Aim",
+        "metatext:experimental_procedure" : "Experimental Procedure",
+        "metatext:add_info" : "Additional Information"
+    }
     tags : Dict[str,str] = {
         "Research Aim" : "metatext:research_aim",
-        "Experimental Procedure" : "metatext:experimental_procedure",
-        "Additional information" : "metatext:add_info"
+        "Experimental Procedure" : "metatext:experimental_procedure" ,
+        "Additional Information" : "metatext:add_info"
     }
     
 

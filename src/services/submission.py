@@ -2,6 +2,7 @@ from datetime import datetime
 from config.enums.states import SubmissionStates
 from config.models.attributes import Attribute
 from config.models.submissions.submissions import NewSubmission
+from config.models.submissions.timeline import Timeline, TimelineEntry
 from config.models.user import User
 from typing import List 
 
@@ -29,7 +30,7 @@ def submission_to_json(submission : NewSubmission, user : User):
     json = {}
     json["created_on"] = submission.created_on
     json["created_on_dt"] = datetime.fromtimestamp(submission.created_on).strftime("%m/%d/%Y, %H:%M:%S")
-    json["state"] = SubmissionStates.SUBIMITTED
+    json["state"] = SubmissionStates.SUBMITTED
     json["label"] = submission.label 
     json["title"] = submission.title 
     json["user_label"] = user.label 
@@ -64,5 +65,8 @@ def submission_to_json(submission : NewSubmission, user : User):
                     samplesAttributesJson[sampleAttrTag]["values"][attributeValue.tag] = []
                 samplesAttributesJson[sampleAttrTag]["values"][attributeValue.tag].append(n)
     json["samples_attributes"] = samplesAttributesJson
+    #create timeline
+    #overwrite what ever the user cretaed, change? 
+    json["timeline"] = Timeline(entries=[TimelineEntry(id=0,comment="Project created", state=SubmissionStates.SUBMITTED, user_label=user.label)])
         #json["samples_attributes"][datasetAttribute.tag] = [attr.tag for attr in submission.datasetAttributeValues[datasetAttribute.tag]]
     return json 

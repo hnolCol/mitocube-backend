@@ -10,6 +10,7 @@ from lib.data.dataset.PandaDataset import PandaFileDataset
 
 from config.settings.db import get_db_settings
 from config.models.attributes import Attribute
+from config.models.submissions.submissions import SubmissionFromMetaDB
 
 DB_SETTINGS = get_db_settings()
 
@@ -32,9 +33,13 @@ class PandaFileDatabase(MCDatabase):
     def contains(self, datasetIds: typing.List) -> int:
         """"""
         # Todo: Write documentation
-        items = self.getDataIDs()
+        items = self.getDataIDs() 
 
-        return sum([item in datasetIds for item in items])
+        return [item in datasetIds for item in items] ##changed!!
+    
+    def labelExists(self, dataset_label: str) -> bool:
+        """"""
+        return dataset_label in self.getDataIDs()
 
     def getAttributeTable(self) -> pd.DataFrame:
         """"""
@@ -125,7 +130,7 @@ class PandaFileDatabase(MCDatabase):
 
         return datasetFolders[ix_left:ix_right]
 
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, typing.Any]:
+    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, SubmissionFromMetaDB]:
         """"""
         # Todo: Write documentation
         datasets = {}
@@ -135,18 +140,34 @@ class PandaFileDatabase(MCDatabase):
 
         for label in labels:
             if label in self._cached_datasets:
-                datasets[label] = {"id": self._cached_datasets[label]._id,
-                                   "user_id" : self._cached_datasets[label]._user_id,
-                                   "label": self._cached_datasets[label]._label,
-                                  # "email": self._cached_datasets[label]._contact_email, #defined by user id 
-                                   "state": self._cached_datasets[label]._state,
-                                   #"instrument": self._cached_datasets[label]._instrument,
-                                   "title": self._cached_datasets[label]._title,
-                                  # "experimentator": self._cached_datasets[label]._experimentator, #defined by user id
-                                   #"group_name": self._cached_datasets[label]._name_group, #defined by user id 
-                                   "created_on": self._cached_datasets[label]._created_on,
-                                   "sample_attributes" : self._cached_datasets[label]._attributes_samples
-                                   }
+                ##TO DO. Change this and incorporate pydantic model.
+                datasets[label] = SubmissionFromMetaDB(
+                    title= self._cached_datasets[label]._title,
+                    replicates= self._cached_datasets[label]._replicates,
+                    n_samples=len(self._cached_datasets[label]._sample_names),
+                    state= self._cached_datasets[label]._state,
+                    label=self._cached_datasets[label]._label, 
+                    user_label=self._cached_datasets[label]._user_label,
+                    created_on=self._cached_datasets[label]._created_on,
+                    samples_attributes=self._cached_datasets[label]._attributes_samples,
+                    dataset_attributes=self._cached_datasets[label]._attributes_dataset,
+                    metatext=self._cached_datasets[label]._metatexts,
+                    collaborators=self._cached_datasets[label]._collaborators,
+                    sample_names=self._cached_datasets[label]._sample_names,
+                    timeline=self._cached_datasets[label]._timeline)
+                
+                # datasets[label] = {"id": self._cached_datasets[label]._id,
+                #                    "user_id" : self._cached_datasets[label]._user_id,
+                #                    "label": self._cached_datasets[label]._label,
+                #                   # "email": self._cached_datasets[label]._contact_email, #defined by user id 
+                #                    "state": self._cached_datasets[label]._state,
+                #                    #"instrument": self._cached_datasets[label]._instrument,
+                #                    "title": self._cached_datasets[label]._title,
+                #                   # "experimentator": self._cached_datasets[label]._experimentator, #defined by user id
+                #                    #"group_name": self._cached_datasets[label]._name_group, #defined by user id 
+                #                    "created_on": self._cached_datasets[label]._created_on,
+                #                    "sample_attributes" : self._cached_datasets[label]._attributes_samples
+                                   
                                    #date_uploaded_on": self._cached_datasets[label]._uploaded_on}
             else:
                 labels_toQuery.append(label)
@@ -155,7 +176,7 @@ class PandaFileDatabase(MCDatabase):
             # ToDo: read json
             for label in labels_toQuery:
                 #quick fix to just load_meta_only 
-                datasets[label] = PandaFileDataset(label=label,load_meta_only=True)._read_meta()
+                datasets[label] = PandaFileDataset(label=label,load_meta_only=True).get_meta_data()
             pass
 
         return datasets
@@ -200,9 +221,8 @@ class PandaFileDatabase(MCDatabase):
 
         return n_datasetFolders
     
-
     def getMandatorySubmissionAttributes(self) -> typing.List[Attribute]:
-        """"""
+        """Should be maybe handled in frontend?"""
         attributes = self.attributes
         boolIdx = attributes["mandatory_for_submission"] == True
         return [Attribute(**attr) for attr in attributes.loc[boolIdx,:].to_dict(orient="records")]

@@ -7,9 +7,11 @@ from pydantic import BaseModel
 from pydantic import Field
 from pydantic import field_validator
 from pydantic import field_serializer
+
 from config.models.user import PublicUser
 from config.models.attributes import Attribute, AttributeValue
-from config.settings.metatexts import MetaTexts 
+from config.models.submissions.timeline import Timeline, TimelineEntry
+from config.settings.metatexts import MetaTexts
 from config.enums.states import SubmissionStates
 from services.random_generators import get_random_string
 
@@ -44,6 +46,7 @@ class NewSubmission(BaseModel):
     datasetAttributeValues : Dict[str,List[AttributeValue]]
     datasetAttributes : List[Attribute]
     samplesAttributes : List[SampleAttribute]
+    timeline : Timeline = Field(...,default_factory=Timeline)
 
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
@@ -62,6 +65,13 @@ class NewSubmission(BaseModel):
 
         return v 
     
+class UpdateDatasetAttributesInSubmission(BaseModel):
+    """Update submission model"""
+    modified_on : float = Field(..., default_factory= time.time)
+    datasetAttributeValues : Dict[str,List[AttributeValue]]
+    datasetAttributes : List[Attribute]
+
+
 
 class SampleAttributeFromDB(BaseModel):
     """"""
@@ -80,10 +90,12 @@ class SubmissionFromMetaDB(BaseModel):
     collaborators : List[str]
     replicates : List[int]
     sample_names : List[str]
+    n_samples : int
     metatext : Dict[str,str] = {}
     dataset_attributes : Dict[str,List[str]]
     samples_attributes : Dict[str,SampleAttributeFromDB]
     links : List[SubmissionLink] = []
+    timeline : Timeline = Field(...,default_factory=Timeline)
 
 
 class SubmissionIDResponse(BaseModel):
