@@ -9,3 +9,4 @@ class MetaTextSubmissionResponse(BaseModel):
     min_text_length : Dict[str,int]
     names : Dict[str,str]
     tags : Dict[str,str]
+    allowed_for_state : Dict[str,int]

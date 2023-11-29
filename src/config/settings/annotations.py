@@ -10,7 +10,7 @@ class Annotations(BaseSettings):
     """
     path_annotations : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/annotations"
     annotation_file_seperator : str = "\t"
-    annotation_feature_id_columns : List[str] = ["Entry","Key", "Uniprot ID", "Protein ID"]
+    annotation_feature_id_columns : List[str] = ["Entry","Key", "Uniprot ID", "Protein ID", "Uniprot"]
     class Config:
         env_file = ".env"
         extra = "ignore"

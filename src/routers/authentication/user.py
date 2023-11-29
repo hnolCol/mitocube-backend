@@ -25,13 +25,14 @@ router = APIRouter(
 @router.post("/users/user", summary="Add a new user.")
 def add_user_to_the_database(background_task : BackgroundTasks, user_props : dict, user : User = Depends(is_user_admin)):
     """
-    Adds a user to the database
+    Adds a user to the database. Currently requires admin rights.
     """
     #TO DO: should find another solution for this renmaing, also in patch 
     user_props_att_renamed = dict([(k.replace("att_user_",""), v if not isinstance(v, dict) else v["name"]) for k,v in user_props.items()])
     try:
         user_to_add = UserModelForRegistration(**user_props_att_renamed)
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=422,detail=str(e))
     UserDB.add_user(user_props=user_to_add) #throws ane exception if there is a problem
 
@@ -49,21 +50,18 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : dic
 
 @router.patch("/users/user", summary="Updates some properties of a user")
 def update_user(user_props : dict, user : User = Depends(is_user_admin)):
-    """can only be performed by an admin."""
+    """Requires admin rights. Change to allow that users modify themselves."""
+    print(user_props)
     user_props_att_renamed = dict([(k.replace("att_user_",""), v if not isinstance(v, dict) else v["name"]) for k,v in user_props.items()])
     try:
         user_to_update = UserModelForUpdate(**user_props_att_renamed)
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=422,detail=str(e))
         
     UserDB.update_user_by_label(user_label = user_to_update.label, user_props=user_to_update)
     
 
-
-@router.post("/users/user/block", summary="Add a new user.")
-def block_user(user_props : UserLabel, user : User = Depends(is_user_admin)):
-    """Blocks the user. Limited to admin users."""
-    UserDB.block_user_by_label(user_props.label)
 
 
 @router.get("/users/full",  response_model=UsersAdminResponse)
@@ -92,8 +90,17 @@ def get_user_roles(user : User = Depends(get_user_from_token)):
     return UseRoleReponse()
 
 
+@router.delete("/users/{user_label}", summary="Deletes a user. Requires admin rights.")
+def delete_user(user_label : str, user : User = Depends(is_user_admin)):
+    """Deletes specific user. Returns an error if token does not belong to admin"""
+    UserDB.delete_user_by_label(user_label)
 
+## inconsistent!  - change
 
+@router.post("/users/user/block", summary="Block a user. Requires admin rights.")
+def block_user(user_props : UserLabel, user : User = Depends(is_user_admin)):
+    """Blocks the user. Limited to admin users."""
+    UserDB.block_user_by_label(user_props.label)
 
 # @router.post("/")
 # def add_user(user : User = Depends(is_user_admin)):

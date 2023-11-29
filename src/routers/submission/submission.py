@@ -50,6 +50,7 @@ def get_submission_id():
             response_model=MetaTextSubmissionResponse)
 def get_meta_text(user : User = Depends(get_user_from_token)):
     """"""
+    print(MetaTexts().model_dump())
     return MetaTexts().model_dump()
 
 
@@ -145,7 +146,7 @@ def update_submission(background_task : BackgroundTasks,
                                  "state" : SubmissionStates(updated_submission.state).name,
                                  "title" : updated_submission.title,
                                  "submission_label" : submission_label,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}/submissions/{updated_submission.label}"
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}/dataset/{updated_submission.label}"
                              },
                              template_mame=EMAIL_SETTINGS.mail_project_state_template)
 

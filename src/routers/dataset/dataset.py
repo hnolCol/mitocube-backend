@@ -10,6 +10,7 @@ from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.filter.NoMissingValues import NoNaNFilter
+from config.exceptions.HTTPExceptions import no_data_found
 
 from services.users import get_user_from_token, is_user_at_least_curator
 
@@ -58,6 +59,8 @@ def get_dataset_data(dataset_label : str):
     dataset = db.getDataset(dataset_label)
     metadata : SubmissionFromMetaDB = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
     datatable = dataset.getDataTable()
+    if datatable is None or datatable.empty:
+        raise no_data_found
     data_summary = datatable.describe()
     data_summary.loc["total",:] = datatable.index.size
 
@@ -69,7 +72,7 @@ def get_dataset_data(dataset_label : str):
 
     return {"stats" : data_summary.to_dict(), 
             "poi_data" : [{
-                "annotations" : annotations,
+                "annotations" : annotations.to_dict(),
                 "data" : data.to_dict(orient="records"),
                 "samples_attributes" : samples_attributes} for data, samples_attributes, annotations in poi_data]
             }

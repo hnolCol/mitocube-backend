@@ -90,6 +90,11 @@ label_not_found_exception = HTTPException(
         detail="Label was not found.",
         headers={"WWW-Authenticate": "Bearer"})
 
+no_data_found = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No datatable could be found for the label.",
+        headers={"WWW-Authenticate": "Bearer"})
+
 mandatory_dataset_attrs_not_found_exception = HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="Mandatory dataset attribute missing.",

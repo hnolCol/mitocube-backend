@@ -39,12 +39,25 @@ class PandaAnnoations(Annotations):
             key_names_found = [key_name for key_name in ANNOTATION_SETTINGS.annotation_feature_id_columns if key_name in X.columns]
             if len(key_names_found) == 0: raise ValueError("None of the key names found!!")
             X.set_index(key_names_found [0],drop=True,inplace=True)
-            X.index.rename("uniprot_id")    
+            X.index.rename("uniprot_id", inplace=True)   
             loaded_files.append(X)
-
-        annotations = pd.concat(loaded_files,join="outer")
-
+       
+        print(loaded_files)
+        #pd.DataFrame().join()
+        if len(loaded_files) == 2:
+            annotations = loaded_files[0].join(loaded_files[1], how="outer")
+        #annotations = pd.concat(loaded_files,join="outer",axis=1)
+        else:
+            annotations = loaded_files[0]
+        print(f"Loaded {len(loaded_files)} files.")
         self._cached_annotations[organism_id] = annotations
+        return annotations 
+
+    def _getAnnotations(self, organism_id : str) -> pd.DataFrame:
+        """"""
+        if organism_id in self._cached_annotations: return self._cached_annotations[organism_id]
+
+        return self._readAnnotationFile(organism_id)
 
     def get_annotations_by_featureID(self, feature_id: str, organism_id: str) -> pd.DataFrame:
         """"""
@@ -56,4 +69,11 @@ class PandaAnnoations(Annotations):
             annotions = self._readAnnotationFile(organism_id)
     
         if feature_id in annotions.index:
-            return annotions.loc[feature_id]
+            return annotions.loc[feature_id,:]
+        return pd.Series() 
+    
+
+    def get_features_by_organism(self, organism_id : str):
+        """"""
+        return self._getAnnotations(organism_id)
+

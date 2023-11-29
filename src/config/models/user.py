@@ -52,7 +52,7 @@ class User(BasicUserWithEmail):
 class UserModelForRegistration(BasicUserWithEmail):
     """"""
     password : str = Field(default_factory=lambda : get_random_string(10)) #generate a random password upon generation, will be send via email to user
-    role : UserRolesEnum
+    role : UserRolesEnum = UserRolesEnum.STANDARD
 
     @field_validator("role",mode="before")
     def validate_role(v : str):

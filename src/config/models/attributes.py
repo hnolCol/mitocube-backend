@@ -71,7 +71,7 @@ class AttributeValue(BaseModel):
     attribute_id : int
     name : str
     tag : str 
-    details : str = None
+    details : Optional[str] = ""
     
     @field_validator("tag")
     @classmethod

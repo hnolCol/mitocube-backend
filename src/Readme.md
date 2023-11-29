@@ -5,7 +5,7 @@
 
 ## Create virtual environment
 
-Python 3.11
+ - Python 3.11
 
 # Install requirements 
 
@@ -15,11 +15,9 @@ pip3 install -r requirments.txt
 
 ## Settings
 
-
 Settings are handle using pydantics `BaseSettings` which are devided into several submodules. 
-Importantly, you can overwrite the standard settings by defining them in the env file. This will overwrite the default. This is in particular 
-useful and required once you download an update from the GitHub repository. This will overwrite likely changes made in the settings, but ensures that require 
-settings are available.
+Importantly, you can overwrite the standard settings by defining them in the env file. This will overwrite the default. This is in particular useful once you download an update from the GitHub repository. This will otherwise overwrite likely changes made in the settings, but also ensures that require 
+settings are available (compared to moving settings to another folder). Due to the developmental stage, __settings are likely to change__.
 
 ### Settings should to be defined in the env file. 
 
@@ -77,6 +75,24 @@ db_user : str
 db_name : str
 db_pw : SecretStr
 ```
+
+
+
+## Starting the backend
+
+For a first test it is useful to start the FastAPI backend directly from the virtual env. 
+- activate the virtual env (```source/env/bin/activate```)
+- pydantic will throw an error if the settings are of a wrong type 
+- Upon start, the lead user will be created using the settings. If your email settings are correctly defined, a auto generated password will be send to the ```lead_contact``` email adress. 
+- start the frontend and try to login or use the API endpoints (see docs)
+
+
+# Attributes
+
+Attributes are fundamental to the function of the web application and ensure harmonized metadata. 
+
+
+
 
 ## General
 

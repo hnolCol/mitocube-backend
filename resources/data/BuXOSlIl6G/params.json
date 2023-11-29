@@ -143,7 +143,7 @@
             "att_experiment:expression_proteome"
         ],
         "att_organism": [
-            "att_organism:human"
+            "att_organism:up000005640"
         ],
         "att_poi": [
             "att_poi:q9y5t4",

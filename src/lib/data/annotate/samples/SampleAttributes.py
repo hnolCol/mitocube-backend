@@ -14,7 +14,6 @@ class SampleAttributeAnnotation(SampleAnnotation):
         meta_data = self._dataset.getMetaJson()
         sample_names = meta_data.sample_names #mabe change to runnames
         attributes_samples = meta_data.samples_attributes #attributeTag -> sampleName Index
-        sample_name_index_mapper  = dict([(idx,sample_name) for idx, sample_name in enumerate(meta_data.sample_names)])
     
         sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
         sample_attribute_by_name = OrderedDict()
@@ -23,7 +22,6 @@ class SampleAttributeAnnotation(SampleAnnotation):
             sample_attribute_name = attributes.name 
             sample_attribute_values = attributes.values 
             attribute_mapper = value_mapper_from_dict(sample_attribute_values) 
-            print(attribute_mapper)
             sample_idces.loc[:,sample_attribute_name] = sample_idces.index.map(attribute_mapper)
             sample_attribute_by_name[sample_attribute_name] = list(sample_attribute_values.keys())
         #replace indices with sample names

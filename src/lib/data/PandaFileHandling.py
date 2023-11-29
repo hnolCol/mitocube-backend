@@ -131,7 +131,7 @@ class PandaFileDatabase(MCDatabase):
 
     def getDatasetAttributeJSON(self, tag: str = "") -> typing.Dict:
         """"""
-        # db.getDatasetAttributeJSON(tag="att_organism:human")
+        # db.getDatasetAttributeJSON(tag="att_organism:up000005640")
 
         db_rows = self.attributes_merged[(self.attributes_merged["value_tag"] == tag) &
                                          self.attributes_merged["allow_for_dataset"]]
@@ -260,7 +260,6 @@ class PandaFileDatabase(MCDatabase):
         # Todo: Write documentation
         try:
             # ToDo: read attribute values from file
-            print()
             in_json = open(config("db-attributefile"), "r")
             json_attributes = json.load(in_json)
             in_json.close()

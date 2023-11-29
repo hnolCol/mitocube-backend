@@ -30,6 +30,7 @@ class FeatureData(DatasetTransform):
         attributes_samples = {}
         data = self._dataset.getDataTable()
         metadata = self._dataset.getMetaJson()
+        organism_id = metadata.dataset_attributes["att_organism"][0].split(":")[-1].upper() #should we allow more organism?
         if feature_id not in data.index:
             return pd.DataFrame(), {} #ValueError(f"Feature ID was not found in the dataset {self._dataset.getLabel()}.")
         sample_names = metadata.sample_names
@@ -43,9 +44,8 @@ class FeatureData(DatasetTransform):
             annotation_db = Annotations.get_annotation_db()
             #get annotations!! 
             ann = {}
-            organism_id = "UP000005640"
             ann = annotation_db.get_annotations_by_featureID(feature_id,organism_id)
-            
+
 
             # if feature_id in A.index:
             #     ann = A.loc[feature_id,:].to_dict()
