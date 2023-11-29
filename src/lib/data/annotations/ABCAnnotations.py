@@ -11,6 +11,7 @@ from config.settings.db import get_db_settings
 
 GENERAL_SETTINGS = get_general_settings() 
 DB_SETTINGS = get_db_settings()
+
 class Annotations(metaclass = SingletonABCMeta):
 
     def __init__(self) -> None:

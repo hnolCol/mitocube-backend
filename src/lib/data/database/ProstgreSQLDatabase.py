@@ -11,7 +11,7 @@ from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.DesignPatterns import SQLConnection 
 
 from config.settings.db import get_db_settings
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 
 DB_SETTINGS = get_db_settings()
 
@@ -295,7 +295,7 @@ class PostgreSQLDatabase(MCDatabase):
                 db_cur.close()
             raise err
 
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, SubmissionFromMetaDB]:
+    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, DatasetSubmissionModel]:
         """"""
         # Todo: Write documentation
         datasets = {}

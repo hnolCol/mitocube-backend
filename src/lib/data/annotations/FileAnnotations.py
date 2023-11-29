@@ -23,7 +23,6 @@ class PandaAnnoations(Annotations):
         dir_path  = ANNOTATION_SETTINGS.path_annotations    
 
         organisms = [organisms for organisms in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path,organisms))]
-        print(organisms)
         self._annotations = organisms
 
     def _readAnnotationFile(self, organism_id : str) -> pd.DataFrame:
@@ -42,7 +41,6 @@ class PandaAnnoations(Annotations):
             X.index.rename("uniprot_id", inplace=True)   
             loaded_files.append(X)
        
-        print(loaded_files)
         #pd.DataFrame().join()
         if len(loaded_files) == 2:
             annotations = loaded_files[0].join(loaded_files[1], how="outer")

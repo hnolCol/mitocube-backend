@@ -8,7 +8,7 @@ from lib.data.DesignPatterns import SingletonABCMeta
 
 from config.settings.db import get_db_settings
 from config.models.attributes import Attribute
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 
 DB_SETTINGS = get_db_settings()
 
@@ -83,7 +83,7 @@ class MCDatabase(metaclass=SingletonABCMeta):
         return dataset
 
     @abstractmethod
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, SubmissionFromMetaDB]:
+    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, DatasetSubmissionModel]:
         """"""
         # Todo: Write documentation
         pass

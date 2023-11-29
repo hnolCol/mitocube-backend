@@ -16,7 +16,7 @@ from config.models.attributes import Attribute
 from config.models.submissions.submissions import NewSubmission, UpdateDatasetAttributesInSubmission
 from config.models.user import User
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionResponse, SubmissionIDResponse, SubmissionFromMetaDB
+from config.models.submissions.submissions import SubmissionResponse, SubmissionIDResponse, DatasetSubmissionModel
 from config.models.submissions.states import StateResponse, StateChange
 from config.models.submissions.timeline import TimelineEntry, Timeline
 
@@ -79,7 +79,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     if exists:
         params_path = join_path(dataset_dir,"params.json")
         #store json in resource
-        save_json(SubmissionFromMetaDB(**json_data).model_dump(exclude_none=True),params_path)
+        save_json(DatasetSubmissionModel(**json_data).model_dump(exclude_none=True),params_path)
         #check if users are actually in DB and allowed
         #This information is not in the PublicUser and we need to get the user from the userDB
         check_collaborators = are_public_users_allowed(submission.collaborators)
@@ -103,7 +103,7 @@ def update_submission(background_task : BackgroundTasks,
                       submission_label : str,
                       state_change : StateChange,  
                       datasetAttributes : UpdateDatasetAttributesInSubmission, 
-                      user : User = Depends(is_user_at_least_curator)) -> SubmissionFromMetaDB:
+                      user : User = Depends(is_user_at_least_curator)) -> DatasetSubmissionModel:
     """
     Update datasetattribute along with the state if user is at least curator.
     Returns the updated version of the complete submission.
@@ -132,7 +132,7 @@ def update_submission(background_task : BackgroundTasks,
                                       for attr in datasetAttributes.datasetAttributes if attr.tag in datasetAttributes.datasetAttributeValues])
     # pool dataset attributes
     metadata["dataset_attributes"] = {**metadata["dataset_attributes"], **updated_dataset_attributes}
-    updated_submission = SubmissionFromMetaDB(**metadata)
+    updated_submission = DatasetSubmissionModel(**metadata)
     dataset = db.getDataset(submission_label)
     dataset.write_json(updated_submission)
 

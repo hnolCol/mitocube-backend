@@ -10,7 +10,7 @@ from lib.data.dataset.PandaDataset import PandaFileDataset
 
 from config.settings.db import get_db_settings
 from config.models.attributes import Attribute
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 
 DB_SETTINGS = get_db_settings()
 
@@ -130,7 +130,7 @@ class PandaFileDatabase(MCDatabase):
 
         return datasetFolders[ix_left:ix_right]
 
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, SubmissionFromMetaDB]:
+    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, DatasetSubmissionModel]:
         """"""
         # Todo: Write documentation
         datasets = {}
@@ -141,7 +141,7 @@ class PandaFileDatabase(MCDatabase):
         for label in labels:
             if label in self._cached_datasets:
                 ##TO DO. Change this and incorporate pydantic model.
-                datasets[label] = SubmissionFromMetaDB(
+                datasets[label] = DatasetSubmissionModel(
                     title= self._cached_datasets[label]._title,
                     replicates= self._cached_datasets[label]._replicates,
                     n_samples=len(self._cached_datasets[label]._sample_names),

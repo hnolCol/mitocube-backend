@@ -6,7 +6,7 @@ import pandas as pd
 from lib.data.dataset.ABCDataset import MCDataset 
 import os 
 import json 
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 from config.settings.db import get_db_settings
 
 DB_SETTINGS = get_db_settings()
@@ -92,7 +92,7 @@ class PandaFileDataset(MCDataset):
     #     self._attributes_samples = meta["samples_attributes"]
     #     self._sample_names = meta["sample_names"]
 
-    def _read_meta(self, meta : Optional[SubmissionFromMetaDB] = None) -> None:
+    def _read_meta(self, meta : Optional[DatasetSubmissionModel] = None) -> None:
         """"""
         path_dataset = os.path.join(DB_SETTINGS.db_datadir,self._label) # TO DO: CHange this, 
         path_meta = os.path.join(path_dataset,"params.json")
@@ -100,7 +100,7 @@ class PandaFileDataset(MCDataset):
         if os.path.exists(path_meta) and meta is None:
             with open(path_meta,"r+") as file: #ensure proper closing 
                 meta_file = json.load(file)
-                meta = SubmissionFromMetaDB(**meta_file)
+                meta = DatasetSubmissionModel(**meta_file)
         if meta is None: raise Exception("Dataset seems to be missing params.", self._label)
         self._state = meta.state
         self._user_label = meta.user_label
@@ -121,12 +121,12 @@ class PandaFileDataset(MCDataset):
         self._sample_names = meta.sample_names
         self._timeline = meta.timeline
         
-    def get_meta_data(self, meta : Optional[SubmissionFromMetaDB] = None) -> SubmissionFromMetaDB:
+    def get_meta_data(self, meta : Optional[DatasetSubmissionModel] = None) -> DatasetSubmissionModel:
         """
         """
         if meta is None:
             self._read_meta()
-        return SubmissionFromMetaDB(
+        return DatasetSubmissionModel(
             title=self._title,
             replicates=self._replicates,
             n_samples=len(self._sample_names),
@@ -157,7 +157,7 @@ class PandaFileDataset(MCDataset):
             raise Exception(f"A dataset with id {self._id} already exists.")
 
 
-    def write_json(self, meta : SubmissionFromMetaDB, update : bool = True):
+    def write_json(self, meta : DatasetSubmissionModel, update : bool = True):
         ""
         str_dir = os.path.join(DB_SETTINGS.db_datadir,self._label)
         if not os.path.exists(str_dir):

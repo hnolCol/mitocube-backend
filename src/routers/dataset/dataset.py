@@ -5,7 +5,7 @@ from config.models.user import User
 from config.models.dataset.data import API_DatasetData
 
 from config.models.dataset.data import DatasetPCAResponse
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 from lib.data.database.ABCDatabase import MCDatabase 
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
@@ -57,7 +57,7 @@ def get_dataset_data(dataset_label : str):
     """
     db = MCDatabase.getDatabase()
     dataset = db.getDataset(dataset_label)
-    metadata : SubmissionFromMetaDB = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
     datatable = dataset.getDataTable()
     if datatable is None or datatable.empty:
         raise no_data_found
@@ -81,14 +81,14 @@ def get_dataset_data(dataset_label : str):
 
 #parameter endpoints 
 @router.get("/datasets/{dataset_label}/meta",
-            response_model=SubmissionFromMetaDB,
+            response_model=DatasetSubmissionModel,
             tags=["Parameters","Meta data"])
 def get_dataset_params(dataset_label : str, user : User = Depends(get_user_from_token)):
     """
     Returns the metadata associated to the dataset
     """
     db = MCDatabase.getDatabase()
-    metadata : SubmissionFromMetaDB = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
     return metadata
 
 #volcano plot

@@ -6,7 +6,7 @@ from datetime import datetime
 import time 
 import numpy as np 
 import pandas as pd 
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.submissions.states import SubmissionStates
 from config.settings.metatexts import MetaTexts
 from services.enums import get_inversed_enum_as_dict, get_enum_as_dict
@@ -115,7 +115,7 @@ def migrate_from_folder(submission_dir = "/Users/hnolte/Desktop/data/dynamic/sub
 
 
         currentState = jsonFile["State"].upper() if jsonFile["State"].upper() not in ["MEASURING PAUSED","DATA ANALYSIS"] else jsonFile["State"].upper().split(" ")[-1]
-        metadata = SubmissionFromMetaDB(label=submission_label,
+        metadata = DatasetSubmissionModel(label=submission_label,
                              title=jsonFile["Title"],
                              state=states[currentState],
                              collaborators=[],

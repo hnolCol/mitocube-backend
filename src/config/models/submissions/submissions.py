@@ -79,7 +79,7 @@ class SampleAttributeFromDB(BaseModel):
     values : Dict[str,List[int]]
 
 
-class SubmissionFromMetaDB(BaseModel):
+class DatasetSubmissionModel(BaseModel):
     ""
     created_on : float
     modified_on : Optional[float] = None

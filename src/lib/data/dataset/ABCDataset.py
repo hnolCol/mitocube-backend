@@ -4,7 +4,7 @@ import typing
 from abc import abstractmethod
 from deprecated import deprecated
 from lib.data.DesignPatterns import JsonSerializable
-from config.models.submissions.submissions import SubmissionFromMetaDB
+from config.models.submissions.submissions import DatasetSubmissionModel
 import random 
 
 class MCDataset(JsonSerializable):
@@ -187,13 +187,13 @@ class MCDataset(JsonSerializable):
         # Todo: Write documentation
         return self._label
 
-    def getMetaJson(self) -> SubmissionFromMetaDB:
+    def getMetaJson(self) -> DatasetSubmissionModel:
         """"""
         # Todo: Write documentation
        
         if not self._isLoaded():
             self._read_meta() ##changed!
-        return SubmissionFromMetaDB(
+        return DatasetSubmissionModel(
             title=self._title,
             replicates=self._replicates,
             n_samples=len(self._sample_names),
@@ -330,6 +330,6 @@ class MCDataset(JsonSerializable):
         pass
 
     @abstractmethod
-    def write_json(self , meta : SubmissionFromMetaDB, update : bool):
+    def write_json(self , meta : DatasetSubmissionModel, update : bool):
         """Write only json data (e.g. store meta data for example when updated)"""
         pass 
