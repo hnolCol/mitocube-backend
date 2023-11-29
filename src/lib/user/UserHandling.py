@@ -119,7 +119,7 @@ class UserDB:
         self._save_db()
 
 
-    def block_user_by_label(self, user_label : str) -> List[User]:
+    def block_user_by_label(self, user_label : str) -> None:
         """"""
         DB = self._update()
         exists, user_to_block = self.get_user_by_label(user_label)
@@ -128,6 +128,14 @@ class UserDB:
         #ugly update TO DO update by user index
         self.DB = [user if user.label != user_to_block.label else user_to_block for user in self.DB]
         self._save_db()
+
+
+    def delete_user_by_label(self, user_label : str):
+        """"""
+        exists, userInDB = self.get_user_by_label(user_label)
+        if exists:
+            self.DB = [user for user in self.DB if user.label != userInDB.label]
+            self._save_db()
 
     def get_users(self) -> List[User]:
         """"""

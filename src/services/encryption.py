@@ -99,7 +99,6 @@ def create_share_token(to_encode : dict, current_time : datetime) -> str:
 
 def get_decoded_token(token : str = Depends(oauth2_scheme)):
     "Decodes token from HTTP request"
-    print(token,"cannot find tokne?")
     return decode_token(token)
 
 def get_decoded_token_for_verification(token = Depends(oauth2_scheme_validate)):

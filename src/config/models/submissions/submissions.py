@@ -1,16 +1,18 @@
 import time
 
 from datetime import datetime 
-from typing import List, Dict
+from typing import List, Dict, Optional
 from pydantic import AnyUrl
 from pydantic import BaseModel 
 from pydantic import Field
 from pydantic import field_validator
 from pydantic import field_serializer
+
 from config.models.user import PublicUser
 from config.models.attributes import Attribute, AttributeValue
-from config.settings.metatexts import MetaTexts 
-
+from config.models.submissions.timeline import Timeline, TimelineEntry
+from config.settings.metatexts import MetaTexts
+from config.enums.states import SubmissionStates
 from services.random_generators import get_random_string
 
 class SubmissionLink(BaseModel):
@@ -24,7 +26,6 @@ class SubmissionLink(BaseModel):
     def url_to_string(v : AnyUrl):
         return str(v)
     
-
 class SampleAttribute(BaseModel):
     """
     """
@@ -45,6 +46,7 @@ class NewSubmission(BaseModel):
     datasetAttributeValues : Dict[str,List[AttributeValue]]
     datasetAttributes : List[Attribute]
     samplesAttributes : List[SampleAttribute]
+    timeline : Timeline = Field(...,default_factory=Timeline)
 
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
@@ -62,8 +64,38 @@ class NewSubmission(BaseModel):
             raise ValueError(f"Minimal length not met for {min_length_not_met}")
 
         return v 
+    
+class UpdateDatasetAttributesInSubmission(BaseModel):
+    """Update submission model"""
+    modified_on : float = Field(..., default_factory= time.time)
+    datasetAttributeValues : Dict[str,List[AttributeValue]]
+    datasetAttributes : List[Attribute]
 
 
+
+class SampleAttributeFromDB(BaseModel):
+    """"""
+    name : str
+    values : Dict[str,List[int]]
+
+
+class DatasetSubmissionModel(BaseModel):
+    ""
+    created_on : float
+    modified_on : Optional[float] = None
+    state : SubmissionStates
+    label : str
+    title : str
+    user_label : str
+    collaborators : List[str]
+    replicates : List[int]
+    sample_names : List[str]
+    n_samples : int
+    metatext : Dict[str,str] = {}
+    dataset_attributes : Dict[str,List[str]]
+    samples_attributes : Dict[str,SampleAttributeFromDB]
+    links : List[SubmissionLink] = []
+    timeline : Timeline = Field(...,default_factory=Timeline)
 
 
 class SubmissionIDResponse(BaseModel):

@@ -5,27 +5,15 @@ from typing import List
 from config.models.user import User
 from config.models.attributes import Attribute, AttributeValue, AttributeResponse
 from lib.data.database.ABCDatabase import MCDatabase
-
+from config.enums.users.roles import UserRolesEnum
 from services.users import get_user_from_token
-
+from services.enums import get_enum_as_dict
 import pandas as pd 
 
 router = APIRouter(
     prefix="/api",
     tags=["Attributes"]
     )
-
-
-##load fake features for testing!!! DELTE
-A = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/annotations/UP000000589/data.txt",sep="\t", index_col="Entry")
-A = A.rename(columns={"Gene Names" : "gene_name","Protein names":"protein_name","Length" : "length","Organism":"organism"})
-A.index.rename(name = "uniprot_id",inplace=True)
-
-feature_attr = [AttributeValue(id = n,
-                           tag = f"att_feature:{x['uniprot_id']}",
-                           attribute_id= -1,
-                           name = f"{x['gene_name']} - {x['uniprot_id']}", 
-                           details=f"{x['organism']}-{x['protein_name']}") for n,x in enumerate(A.reset_index().to_dict(orient="records"))]
 
 
 @router.get("/attributes", response_model=AttributeResponse)
@@ -36,8 +24,9 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
     db  = MCDatabase.getDatabase()
     attributes = db.attributes
     attribute_values = db.attribute_values 
+    # for testingAttributeResponse(attributes=[Attribute(**x) for x in attributes.to_dict(orient="records")],attribute_values=attribute_values.to_dict(orient="records"))
     #print([Attribute(**x) for x in attributes.to_dict(orient="records")])
-    return {"attributes" : [Attribute(**x) for x in attributes.to_dict(orient="records")], "attribute_values" : attribute_values.to_dict(orient="records")}
+    return {"attributes" : attributes.to_dict(orient="records"), "attribute_values" : attribute_values.to_dict(orient="records")}
 
 
 @router.get("/attributes/user", response_model=AttributeResponse)
@@ -48,8 +37,19 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
     db  = MCDatabase.getDatabase()
     attributes = db.attributes.loc[db.attributes["allow_for_user"],:]
     attribute_values = db.attribute_values.loc[db.attribute_values["attribute_id"].isin(attributes["id"].values)]
+    attrValues = [AttributeValue(**x) for x in attribute_values.to_dict(orient="records")]
+    attrs = [Attribute(**x) for x in attributes.to_dict(orient="records")]
+    if user.role == UserRolesEnum.ADMIN:
+        ## only admin can change the user role
+        max_attr_value_id = db.attribute_values["id"].max()
+        role_attr = [attr for attr in attrs if attr.tag == "att_user_role"][0]
+        user_roles = get_enum_as_dict(UserRolesEnum)
+        attrValues.extend([{"id" : max_attr_value_id + 1, "attribute_id" : role_attr.id, "details" : role_name.title(), "name" : role, "tag" : f"att_user_role:{role}"} for n,(role_name, role) in enumerate(user_roles.items())])
+    else:
+        attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
+    print(attrValues)
     #print([Attribute(**x) for x in attributes.to_dict(orient="records")])
-    return {"attributes" : [Attribute(**x) for x in attributes.to_dict(orient="records")], "attribute_values" : attribute_values.to_dict(orient="records")}
+    return {"attributes" : attrs , "attribute_values" : attrValues}
 
 
 @router.post("/attributes")

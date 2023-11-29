@@ -4,6 +4,7 @@ import typing
 from abc import abstractmethod
 from deprecated import deprecated
 from lib.data.DesignPatterns import JsonSerializable
+from config.models.submissions.submissions import DatasetSubmissionModel
 import random 
 
 class MCDataset(JsonSerializable):
@@ -16,16 +17,19 @@ class MCDataset(JsonSerializable):
                  title: str = None,
                  #experimentator: str = None,
                  user_label : str = None,
+                 collaborators : typing.List[str] = [],
                #  name_group: str = None,
-                 contact_email: str = None,  # ToDo: Countercheck default values
+               #  contact_email: str = None,  # ToDo: Countercheck default values
                  created_on: str = None,  # ToDo: Check DataType Date
                  uploaded_on: str = None,
                  data_table: pd.DataFrame = None,
                  metatexts: typing.Dict = None,
                  urls: typing.List = None,
-                 replicates: typing.Dict = None,
+                 replicates: typing.List[int] = [],
                  attributes_dataset: typing.Dict = None,
                  attributes_samples: typing.Dict = None,
+                 sample_names : typing.List[str] = [],
+                 timeline : typing.Dict = None,
                 # instrument: typing.Dict = None,
                  loadFromDatabase: bool = False, 
                  load_meta_only : bool = False):  # ToDo: Check DataType Date
@@ -33,6 +37,8 @@ class MCDataset(JsonSerializable):
         # Todo: Write documentation
         self._id = dataset_id
         self._label = label
+        self._load_meta_only = load_meta_only
+        self._cached_data_table = None
 
         if loadFromDatabase:
             self._refresh()
@@ -41,7 +47,7 @@ class MCDataset(JsonSerializable):
         else:
             self._loadedFromDatabase = False
 
-            self._contact_email = contact_email
+           # self._contact_email = contact_email
             self._state = state
 
             self._cached_data_table = data_table
@@ -51,11 +57,13 @@ class MCDataset(JsonSerializable):
             self._replicates = replicates
             self._attributes_dataset = attributes_dataset
             self._attributes_samples = attributes_samples
-
+            self._sample_names = sample_names
             #self._instrument = instrument
 
             self._title = title
             self._user_label = user_label
+            self._collaborators = collaborators
+            self._timeline = timeline
             #self._experimentator = experimentator
             #self._name_group = name_group
 
@@ -74,6 +82,7 @@ class MCDataset(JsonSerializable):
     def _refresh(self):
         """"""
         # Todo: Write documentation
+        self._load_meta_only = False
         self._readFromDatabase()
         self._loadedFromDatabase = True
 
@@ -178,12 +187,26 @@ class MCDataset(JsonSerializable):
         # Todo: Write documentation
         return self._label
 
-    def getMetaJson(self) -> typing.Dict[str, typing.Any]:
+    def getMetaJson(self) -> DatasetSubmissionModel:
         """"""
         # Todo: Write documentation
        
         if not self._isLoaded():
-            self._refresh()
+            self._read_meta() ##changed!
+        return DatasetSubmissionModel(
+            title=self._title,
+            replicates=self._replicates,
+            n_samples=len(self._sample_names),
+            label=self._label, 
+            state=self._state,
+            user_label=self._user_label,
+            created_on=self._created_on,
+            samples_attributes=self._attributes_samples,
+            dataset_attributes=self._attributes_dataset,
+            metatext=self._metatexts,
+            collaborators=self._collaborators,
+            sample_names=self._sample_names,
+            timeline=self._timeline)
 
         return {"id": self._id,
                 "label": self._label,
@@ -197,6 +220,7 @@ class MCDataset(JsonSerializable):
                 "n_rows": self._cached_data_table.shape[0],
                 "n_samples": self._cached_data_table.shape[1], #this excludes that there can be extra data in the table. 
                 "metatexts": self._metatexts,
+
                # "urls": self._urls,
               #  "replicates": self._replicates,
              #   "attributes": self._attributes_dataset,
@@ -304,3 +328,8 @@ class MCDataset(JsonSerializable):
         """"""
         # Todo: Write documentation
         pass
+
+    @abstractmethod
+    def write_json(self , meta : DatasetSubmissionModel, update : bool):
+        """Write only json data (e.g. store meta data for example when updated)"""
+        pass 

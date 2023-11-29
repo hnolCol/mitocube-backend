@@ -20,6 +20,8 @@ class Attribute(BaseModel):
     allow_for_genotype : bool = False #attributes that are allowed for specifiying a genotype.
     allow_for_dataset : bool = False
     allow_for_user : bool = False,
+    allow_for_state : Optional[int] = None
+    allow_numeric_input : bool = False
     mandatory_for_submission : bool = False,
     mandatory_for_active : bool = False,
     allow_features_as_values : bool = False #all the available features are utilized as the values, if values are available this is ignored!
@@ -69,7 +71,7 @@ class AttributeValue(BaseModel):
     attribute_id : int
     name : str
     tag : str 
-    details : str = None
+    details : Optional[str] = ""
     
     @field_validator("tag")
     @classmethod
@@ -82,6 +84,13 @@ class AttributeValue(BaseModel):
         if len(v.split(":")) != 2:
             raise ValueError("Tag must canontain exactly one ':'")
         return v.lower()
+    
+    @field_validator("name", mode="before")
+    @classmethod
+    def check_name(cls, v : Any) -> str:
+        """Checks tags to contain att_ and a :"""
+        if not isinstance(v,str): return str(v)
+        else: return v 
 
 class AttributeResponse(BaseModel):
     """Response model for receiving attributes."""
