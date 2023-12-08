@@ -18,26 +18,25 @@ router = APIRouter(
 @router.get("/{feature_id}/data", response_model=FeatureDataResponse)
 def get_dataset_data(feature_id : str, user : User = Depends(get_user_from_token)):
     """
-    Returns the data for a specific feature
-    
+    Returns the data for a specific feature.
     """
 
-    # db = MCDatabase.getDatabase()
-    # dataIDS = db.getAllDataIDs()
-    # feature_data_by_dataset_label = {}
-    # attributes_sample_by_dataset_label = {}
-    # for dataset_label in dataIDS:
-    #     dataset = db.getDataset(label=dataset_label)
-    #     feature_data, attributes_samples = FeatureData(dataset).transform(feature_id)
-    #     if feature_data.empty: continue
-    #     feature_data_by_dataset_label[dataset_label] =  feature_data
-    #     attributes_sample_by_dataset_label[dataset_label] = attributes_samples
-    #
-    return {}
-        # "feature_id": feature_id,
-        # "dataset_labels" : list(feature_data_by_dataset_label.keys()),
-        # "data" : feature_data_by_dataset_label,
-        # "attributes_samples" : attributes_sample_by_dataset_label
+    db = MCDatabase.getDatabase()
+    dataset_labels = db.getAllDataLabels()
+    feature_data_by_dataset_label = {}
+    attributes_sample_by_dataset_label = {}
+
+    for label in dataset_labels:
+        dataset = db.getDataset(label=label)
+        feature_data, attributes_samples = FeatureData(dataset).transform(feature_id)
+        if not feature_data.empty:
+            feature_data_by_dataset_label[label] = feature_data
+            attributes_sample_by_dataset_label[label] = attributes_samples
+
+    return {"feature_id": feature_id,
+            "dataset_labels" : list(feature_data_by_dataset_label.keys()),
+            "data" : feature_data_by_dataset_label,
+            "attributes_samples" : attributes_sample_by_dataset_label}
 
 
 @router.get("/{feature_id}/annotation", summary="Returns the stored annotations in the annotation database.")
