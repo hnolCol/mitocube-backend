@@ -1,10 +1,14 @@
-import pandas as pd 
-import typing 
+from __future__ import annotations
+
+from datetime import timedelta
+
+import pandas as pd
+from typing import List, Dict, Any
 from abc import abstractmethod
 from collections import OrderedDict
 from lib.data.dataset.ABCDataset import MCDataset
 
-from lib.data.DesignPatterns import SingletonABCMeta
+from lib.DesignPatterns import SingletonABCMeta, ExpiringValue
 
 from config.settings.db import get_db_settings
 from config.models.attributes import Attribute
@@ -13,63 +17,74 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 DB_SETTINGS = get_db_settings()
 
 
+class InvalidDatasetLabelError(Exception):
+    pass
+
+
 class MCDatabase(metaclass=SingletonABCMeta):
     """"""
     # Todo: Write documentation
 
     def __init__(self):  # ToDo: Check DataType Date
-        """Constructor"""
+        """Singleton Constructor"""
         # Todo: Write documentation
         self._cached_datasets = OrderedDict()
 
+        # otherTestiTestValue = 69
+
+        # def doTestiTest():
+        #     print(" >>> doTestiTest() !!!")
+        #     return otherTestiTestValue
+
+        # self.testitest = ExpiringValue[int](expireTime=timedelta(seconds = 5),
+        #                                     value=42,
+        #                                     updateProcess = doTestiTest)
+
+
     def clearCachedDatasets(self):
-        """"""
+        """
+        Clears the cached of (memory) stored datasets.
+        """
         # Todo: Write documentation
         self._cached_datasets.clear()
 
     @abstractmethod
-    def contains(self, datasetIds: typing.List) -> int:
-        """"""
-        # Todo: Write documentation
-        pass
-
-    @abstractmethod
-    def labelExists(self,dataset_label : str) -> bool:
+    def doesLabelExists(self, dataset_label : str) -> bool:
         """
-        Returns true if the dataset label exists. 
+        Returns true if the dataset label exists.
         """
         pass
-
-    def insert(obj: MCDataset):
-        """"""
-        # Todo: Write documentation
-        obj.write()
 
     @abstractmethod
     def getAttributeTable(self) -> pd.DataFrame:
-        """"""
-        # Todo: Write documentation
+        """
+        Returns the full attribute table as Panda DataFrame.
+        """
         pass
 
     @abstractmethod
-    def getSampleAttributeJSON(self, grouping_json: typing.Dict = {}) -> typing.Dict:
-        """"""
+    def getSampleAttributeJSON(self, grouping_json: Dict = {}) -> Dict:
+        """
+
+        """
         # Todo: Write documentation
         pass
 
     def getDataset(self, label: str) -> MCDataset:
-        """"""
-        # Todo: Write documentation
+        """
+        Returns a dataset object with the defined label. If it is cached, take it from memory, otherwise read it from the long-term database. Raises an InvalidDatasetLabelError exception if the dataset (label) is not found.
+        """
         dataset = None
 
         if label in self._cached_datasets.keys():
             dataset = self._cached_datasets[label]
             self._cached_datasets.move_to_end(label, last=True)
         else:
-            if DB_SETTINGS.db_handler == "postgresql":
-                from lib.data.dataset.PostgreSQLDataset import PostgreSQLDataset
-                dataset = PostgreSQLDataset(label=label, loadFromDatabase=True)
-            elif DB_SETTINGS.db_handler == "pandafiles":
+            # if DB_SETTINGS.db_handler == "postgresql":
+            #     from lib.data.dataset.PostgreSQLDataset import PostgreSQLDataset
+            #     dataset = PostgreSQLDataset(label=label, loadFromDatabase=True)
+            # elif DB_SETTINGS.db_handler == "pandafiles":
+            if DB_SETTINGS.db_handler == "pandafiles":
                 from lib.data.dataset.PandaDataset import PandaFileDataset
                 dataset = PandaFileDataset(label=label, loadFromDatabase=True)
             else:
@@ -83,18 +98,22 @@ class MCDatabase(metaclass=SingletonABCMeta):
         return dataset
 
     @abstractmethod
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, DatasetSubmissionModel]:
-        """"""
+    def getJSONDatasets(self, labels: List[str] = []) -> Dict[str, DatasetSubmissionModel]:
+        """
+
+        """
         # Todo: Write documentation
         pass
 
-    def getDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, MCDataset]:
-        """"""
+    def getDatasets(self, labels: List[str] = []) -> Dict[str, MCDataset]:
+        """
+        Returns a dictionary of the datasets defined in labels. Uses the database labels as keys. Labels with no matching dataset in the database will be silently ignored and an e
+        """
         # Todo: Write documentation
         datasets = {}
 
         if len(labels) < 1:
-            labels = self.getAllDataIDs()
+            labels = self.getAllDataLabels()
 
         for label in labels:
             if label in self._cached_datasets.keys():
@@ -105,42 +124,37 @@ class MCDatabase(metaclass=SingletonABCMeta):
         return datasets
 
     @abstractmethod
-    def getDatasetAttributeJSON(self, tag: str = "") -> typing.Dict:
+    def getDatasetAttributeJSON(self, tag: str = "") -> Dict:
         """"""
         # Todo: Write documentation
         pass
 
     @abstractmethod
-    def getAllDataIDs(self, sort_createdOn_desc: bool = False) -> typing.List[str]:
-        """"""
+    def getAllDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
+        """
+        Equivalent to getAllDataIDs() but returns a list of database string labels instead of numerical ids.
+        """
         # Todo: Write documentation
         pass
 
     @abstractmethod
-    def getAllDataLabels(self, sort_createdOn_desc: bool = False) -> typing.List[str]:
-        """"""
-        # Todo: Write documentation
-        pass
-
-    @abstractmethod
-    def getDataIDs(self,
-                   n_limit: int = 42,
-                   n_offset: int = 0,
-                   sort_createdOn_desc: bool = False) -> typing.List[str]:
+    def getDatasetsWithLabels(self,
+                              n_limit: int = 42,
+                              n_offset: int = 0,
+                              sort_createdOn_desc: bool = False) -> List[str]:
         """"""
         # Todo: Write documentation
         pass
 
     @staticmethod
-    def getDatabase():
-        """"""
-        # Todo: Write documentation
-        # https: // stackoverflow.com / questions / 33533148 / how - do - i - type - hint - a - method -
-        # with-the - type - of - the - enclosing -class
+    def getDatabase() -> MCDatabase:
+        """
+        Returns a (singleton) database object depending on the settings. Either A PandaFileDatabase or PostgreSQLDatabase.
+        """
         if DB_SETTINGS.db_handler == "postgresql":
             from lib.data.database.ProstgreSQLDatabase import PostgreSQLDatabase
             return PostgreSQLDatabase()
-        elif DB_SETTINGS.db_handler =="pandafiles":
+        elif DB_SETTINGS.db_handler == "pandafiles":
             from lib.data.database.FileDatabase import PandaFileDatabase
             return PandaFileDatabase()
         else:
@@ -148,29 +162,52 @@ class MCDatabase(metaclass=SingletonABCMeta):
 
 
     @abstractmethod
-    def getMandatorySubmissionAttributes(self) -> typing.List[Attribute]:
-        """Returns the list of dataset attributes that are mandatory."""
+    def getMandatorySubmissionAttributes(self) -> List[Attribute]:
+        """
+        Returns a list of mandatory attributes.
+        """
+        pass
 
     @abstractmethod
     def getNumberOfDatasets(self) -> int:
-        """"""
+        """
+        Returns numbers of datasets saved in the database.
+        """
         # Todo: Write documentation
         pass
 
     @abstractmethod
-    def getFeatures(self) -> list:
+    def getFeatures(self) -> List:
         """
         Returns all features in the database 
         """
-        return []
+        pass
 
     @abstractmethod
-    def getDatasetsWhereFeatureIsFound(self, feature_id : str) -> list:
-        """Returns all datasets that contain a specific feature"""
+    def getFeatureTable(self, features : List[str]) -> Dict[str, Any]:  # ToDo: Or return panda?
+        """
+        Returns a Diction (or panda.Dataframe) of the all features or features requested (argument features).
+        """
+        pass
 
+    @abstractmethod
+    def getDatasetsWithFeature(self, feature_id : str) -> List:
+        """
+        Returns all datasets that contain a specific feature as List.
+        """
+        pass
 
     @abstractmethod
     def getSize(self) -> int:
-        """"""
+        """
+        Returns used size for data in bytes.
+        """
         # Todo: Write documentation
         pass
+
+    def insert(obj: MCDataset):
+        """
+        Adds/Writes new MCDataset to the database.
+        """
+        # Todo: Write documentation
+        obj.write()

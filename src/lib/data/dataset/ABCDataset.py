@@ -1,11 +1,17 @@
+# from __future__ import annotations
 
 import pandas as pd 
-import typing 
+import typing
+from typing import List, Dict, Any
+from pydantic import BaseModel, Field, field_serializer
+
 from abc import abstractmethod
 from deprecated import deprecated
-from lib.data.DesignPatterns import JsonSerializable
+from lib.DesignPatterns import JsonSerializable
 from config.models.submissions.submissions import DatasetSubmissionModel
-import random 
+import random
+from lib.DesignPatterns import JsonSerializable
+import random
 
 class MCDataset(JsonSerializable):
     """Replacement for the Data.Dataset"""
@@ -47,7 +53,7 @@ class MCDataset(JsonSerializable):
         else:
             self._loadedFromDatabase = False
 
-           # self._contact_email = contact_email
+            # self._contact_email = contact_email
             self._state = state
 
             self._cached_data_table = data_table
@@ -197,7 +203,7 @@ class MCDataset(JsonSerializable):
             title=self._title,
             replicates=self._replicates,
             n_samples=len(self._sample_names),
-            label=self._label, 
+            label=self._label,
             state=self._state,
             user_label=self._user_label,
             created_on=self._created_on,
@@ -332,4 +338,4 @@ class MCDataset(JsonSerializable):
     @abstractmethod
     def write_json(self , meta : DatasetSubmissionModel, update : bool):
         """Write only json data (e.g. store meta data for example when updated)"""
-        pass 
+        pass

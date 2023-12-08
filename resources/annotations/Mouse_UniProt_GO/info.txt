@@ -1,0 +1,3 @@
+var	value
+class	GoKeywordAnnotation
+species_id	10090

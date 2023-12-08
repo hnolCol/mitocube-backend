@@ -6,7 +6,7 @@ from services.transforms import value_mapper_from_dict
 from lib.data.dataset.ABCDataset import MCDataset
 from lib.data.transform.ABCTransform import DatasetTransform
 from lib.data.annotate.samples.SampleAttributes import SampleAttributeAnnotation
-from lib.data.annotations.ABCAnnotations import Annotations
+# from lib.data.annotations.ABCAnnotations import AnnotationSettings
  ##load fake features 
 # A = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/annotations/UP000000589/data.txt",sep="\t", index_col="Entry")
 # A = A.rename(columns={"Gene Names" : "gene_name","Protein names":"protein_name","Length" : "length","Organism":"organism"})

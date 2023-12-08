@@ -1,0 +1,11 @@
+map	from
+entry	Entry
+key	Entry Name
+proteins	Protein names
+genes	Gene Names
+organism	Organism
+organism_id	Organism (ID)
+aa_length	Length
+mass	Mass
+details_source	https://www.uniprot.org/uniprotkb
+details_source_Date	2023-12-05

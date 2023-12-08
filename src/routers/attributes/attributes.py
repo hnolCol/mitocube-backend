@@ -21,7 +21,7 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
     """
     Returns the stored attributes 
     """
-    db  = MCDatabase.getDatabase()
+    db = MCDatabase.getDatabase()
     attributes = db.attributes
     attribute_values = db.attribute_values 
     # for testingAttributeResponse(attributes=[Attribute(**x) for x in attributes.to_dict(orient="records")],attribute_values=attribute_values.to_dict(orient="records"))
@@ -34,7 +34,7 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
     """
     Returns the stored attributes 
     """
-    db  = MCDatabase.getDatabase()
+    db = MCDatabase.getDatabase()
     attributes = db.attributes.loc[db.attributes["allow_for_user"],:]
     attribute_values = db.attribute_values.loc[db.attribute_values["attribute_id"].isin(attributes["id"].values)]
     attrValues = [AttributeValue(**x) for x in attribute_values.to_dict(orient="records")]

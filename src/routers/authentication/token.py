@@ -96,7 +96,7 @@ def verify_token_by_code(verification : TokenVerificationCode,
 ### Share Token
 
 @router.post("/share", 
-             summary="Share tokens can be used to push qc runs to the app without loggin in every time. Creating a share token requires admin rights and the application specific password.")
+             summary="Share tokens can be used to push qc runs to the app without login in every time. Creating a share token requires admin rights and the application specific password.")
 def create_share_token(inputPassword: ShareTokenPassword, user : User = Depends(is_user_admin)):
     """
     Share tokens require user admin rights as well as a password which is defined in the env file.

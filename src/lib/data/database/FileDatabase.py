@@ -1,43 +1,46 @@
-import os 
-import typing 
-import json 
-import pandas as pd 
-import numpy as np 
+import os
+import json
+from typing import Any, Dict, List
+from threading import Lock
 
+import pandas as pd 
+import numpy as np
+
+# from lib.DesignPatterns import SingletonABCMeta
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.dataset.ABCDataset import MCDataset
 from lib.data.dataset.PandaDataset import PandaFileDataset
 
 from config.settings.db import get_db_settings
+# from config.settings.annotationsettings import get_annotation_settings
+
 from config.models.attributes import Attribute
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 DB_SETTINGS = get_db_settings()
 
-
 class PandaFileDatabase(MCDatabase):
     """"""
-    # Todo: Write documentation
 
     def __init__(self):
         """Constructor"""
         # Todo: Write documentation
         super().__init__()
 
+        self._lock = Lock()  # Synchronization primitive to make it multi-threading safe
 
         self.attributes = None
         self.attribute_values = None
         self.attributes_merged = None  # cached merged version of self.attributes and self.attribute_values
+
+        self.stat_nProteins = 42
+        self.stat_nInstruments = 42
+        self.stat_nUsers = 42
+        self.stat_nTurnarounds = 42
+
         self._import_attributes()
 
-    def contains(self, datasetIds: typing.List) -> int:
-        """"""
-        # Todo: Write documentation
-        items = self.getDataIDs() 
-
-        return [item in datasetIds for item in items] ##changed!!
-    
-    def labelExists(self, dataset_label: str) -> bool:
+    def doesLabelExists(self, dataset_label: str) -> bool:
         """"""
         return dataset_label in self.getDataIDs()
 
@@ -46,7 +49,7 @@ class PandaFileDatabase(MCDatabase):
         # Todo: Write documentation
         return self.attributes_merged
 
-    def getSampleAttributeJSON(self, grouping_json: typing.Dict = {}) -> typing.Dict:
+    def getSampleAttributeJSON(self, grouping_json: Dict = {}) -> Dict:
         """"""
         # Todo: Write documentation
         db_rows = self.attributes_merged[self.attributes_merged["value_tag"].isin(list(grouping_json.keys())) &
@@ -67,7 +70,7 @@ class PandaFileDatabase(MCDatabase):
                                                        allow_as_filter=db_rows["allow_as_filter"].iloc[0],
                                                        grouping_json=json_groups)
 
-    def getDatasetAttributeJSON(self, tag: str = "") -> typing.Dict:
+    def getDatasetAttributeJSON(self, tag: str = "") -> Dict:
         """"""
         # db.getDatasetAttributeJSON(tag="att_organism:up000005640")
 
@@ -75,9 +78,9 @@ class PandaFileDatabase(MCDatabase):
                                          self.attributes_merged["allow_for_dataset"]]
 
         if db_rows.shape[0] == 0:
-            raise Exception(f"No match for the attribute_value with the tag '{tag}'.")
+            raise LookupError(f"No match for the attribute_value with the tag '{tag}'.")
         elif db_rows.shape[0] > 1:
-            raise Exception(f"No unique for the attribute_value with the tag '{tag}'.")
+            raise LookupError(f"No unique for the attribute_value with the tag '{tag}'.")
 
         return MCDataset.buildAttributesJsonItem(db_id=db_rows["attribute_id"].iloc[0],
                                                  attribute_parent_id=db_rows["attribute_parent_id"].iloc[0],
@@ -90,30 +93,29 @@ class PandaFileDatabase(MCDatabase):
                                                  value=db_rows["value"].iloc[0],
                                                  details=db_rows["details"].iloc[0])
 
-    def getAllDataIDs(self, sort_createdOn_desc: bool = False) -> typing.List[str]:
-        """"""
-        # Todo: Write documentation
+    def getAllDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
+        """Returns the list of dataset by their label (same as id for Pandas, different for SQL)"""
+        self._lock.acquire()
         datasetFolders = []
 
         dir_root = DB_SETTINGS.db_datadir
 
         if not os.path.exists(dir_root):
-            raise Exception(f"Invalid database path {dir_root}")
+            self._lock.release()
+            raise FileNotFoundError(f"Invalid database path {dir_root}")
 
         for item in os.scandir(dir_root):
             if item.is_dir():
                 datasetFolders.append(item.name)
         # ToDo: Implement sort_createdOn_desc #requires loading
+        self._lock.release()
+
         return datasetFolders
-    
-    def getAllDataLabels(self, sort_createdOn_desc: bool = False) -> typing.List[str]:
-        """Returns the list of dataset by their label (same as id for Pandas, different for SQL)"""
-        return self.getAllDataIDs()
 
     def getDataIDs(self,
                    n_limit: int = 42,  # ToDo: Implement Limit
                    n_offset: int = 0,  # ToDo: Implement Offset
-                   sort_createdOn_desc: bool = False) -> typing.List[str]:
+                   sort_createdOn_desc: bool = False) -> List[str]:
         """"""
         datasetFolders = self.getAllDataIDs()
 
@@ -130,13 +132,14 @@ class PandaFileDatabase(MCDatabase):
 
         return datasetFolders[ix_left:ix_right]
 
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, DatasetSubmissionModel]:
+    def getJSONDatasets(self, labels: List[str] = []) -> Dict[str, DatasetSubmissionModel]:
         """"""
         # Todo: Write documentation
         datasets = {}
         labels_toQuery = []
         if len(labels) < 1:
-            labels = self.getAllDataIDs()
+            labels = self.getAllDataLabels()
+            # labels = self.getAllDataIDs()
 
         for label in labels:
             if label in self._cached_datasets:
@@ -167,8 +170,7 @@ class PandaFileDatabase(MCDatabase):
                 #                    #"group_name": self._cached_datasets[label]._name_group, #defined by user id 
                 #                    "created_on": self._cached_datasets[label]._created_on,
                 #                    "sample_attributes" : self._cached_datasets[label]._attributes_samples
-                                   
-                                   #date_uploaded_on": self._cached_datasets[label]._uploaded_on}
+                #                    date_uploaded_on": self._cached_datasets[label]._uploaded_on}
             else:
                 labels_toQuery.append(label)
 
@@ -180,21 +182,32 @@ class PandaFileDatabase(MCDatabase):
             pass
 
         return datasets
-    
-       
-    def getFeatures(self) -> typing.List[str]:
+
+
+    def getFeatures(self) -> List[str]:
         """
         Returns all features in the database 
         """
         data_labels = self.getAllDataLabels()
+
         features = []
+
         for label in data_labels:
             features.append(self.getDataset(label).getDataTable().index.values)
         
         return np.unique(features)
 
-    
-    def getDatasetsWhereFeatureIsFound(self, feature_id : str) -> typing.List[str]:
+    def getFeatureTable(self, features : List[str]) -> Dict[str, Any]:  # ToDo: Or return panda?
+        """"""
+        # Todo: Write documentation
+        featureTable = dict()
+
+        if features is not None and features:
+            pass  # featureTable = filled
+
+        return featureTable
+
+    def getDatasetsWithFeature(self, feature_id : str) -> List[str]:
         """Returns all datasets that contain a specific feature"""
         data_labels = self.getAllDataLabels()
         features = []
@@ -205,6 +218,11 @@ class PandaFileDatabase(MCDatabase):
         
         return features
 
+    def getDatasetsWithLabels(self, n_limit: int = 42, n_offset: int = 0, sort_createdOn_desc: bool = False) -> List[str]:
+        pass
+
+    # Todo: Write documentation
+
     def getNumberOfDatasets(self) -> int:
         """"""
         # Todo: Write documentation
@@ -213,7 +231,7 @@ class PandaFileDatabase(MCDatabase):
         dir_root = DB_SETTINGS.db_datadir
 
         if not os.path.exists(dir_root):
-            raise Exception(f"Invalid database path {dir_root}")
+            raise FileNotFoundError(f"Invalid database path {dir_root}")
 
         for item in os.scandir(dir_root):
             if item.is_dir():
@@ -221,7 +239,7 @@ class PandaFileDatabase(MCDatabase):
 
         return n_datasetFolders
     
-    def getMandatorySubmissionAttributes(self) -> typing.List[Attribute]:
+    def getMandatorySubmissionAttributes(self) -> List[Attribute]:
         """Should be maybe handled in frontend?"""
         attributes = self.attributes
         boolIdx = attributes["mandatory_for_submission"] == True
@@ -233,7 +251,7 @@ class PandaFileDatabase(MCDatabase):
         dir_root = DB_SETTINGS.db_datadir
 
         if not os.path.exists(dir_root): #actually no need since pydantic checks (however only at start)
-            raise Exception(f"Invalid database path {dir_root}")
+            raise FileNotFoundError(f"Invalid database path {dir_root}")
 
         def get_dir_size(path: str):
             sum_size = 0

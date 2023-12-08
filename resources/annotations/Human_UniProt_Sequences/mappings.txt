@@ -1,0 +1,4 @@
+map	from
+entry	Entry
+key	Entry Name
+sequence	Sequence

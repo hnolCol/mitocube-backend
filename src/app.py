@@ -20,12 +20,13 @@ from routers.dataset import dataset
 from routers.submission import submission
 from routers.attributes import attributes
 from routers.authentication import token, user
-from routers.features import faetures
+from routers.features import features
 from routers.info import info
 from routers.annotations import annotations
+# from routers import play  # route to test things during development ###########################################################
 
-
-router_sources = [dataset, submission, attributes, token,  user, faetures, info, annotations]
+router_sources = [dataset, submission, attributes, token, user, features, info, annotations]
+# router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
 DB_SETTINGS = get_db_settings()
@@ -74,8 +75,4 @@ app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_asset
 if __name__ == "__main__":
     
     uvicorn.run(app, port = 5000)
-
-
-
-
 

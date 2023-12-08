@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 from typing import List, Annotated
 from collections import OrderedDict
-from lib.data.database.ABCDatabase import MCDatabase 
+from lib.data.database.ABCDatabase import MCDatabase
 
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
@@ -112,7 +112,7 @@ def update_submission(background_task : BackgroundTasks,
     """
     
     db = MCDatabase.getDatabase()
-    if not db.labelExists(submission_label): return label_not_found_exception
+    if not db.doesLabelExists(submission_label): return label_not_found_exception
     # get submission from database 
     submission_state = state_change.state
     submissionMetaData = db.getJSONDatasets(labels = [submission_label])[submission_label]

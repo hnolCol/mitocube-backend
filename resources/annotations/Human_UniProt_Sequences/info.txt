@@ -1,0 +1,3 @@
+var	value
+class	SequenceAnnotation
+species_id	9606

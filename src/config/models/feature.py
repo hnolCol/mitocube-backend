@@ -8,7 +8,7 @@ class FeatureDataResponse(BaseModel):
     """
     Response model for feature data.
     """
-    feature_id : str
+    feature_id : str  # Todo: Rename to feature_key
     attributes_samples : Dict[str,Dict]
     dataset_labels : List[str] #labels of datasets
     data : Dict[str,pd.DataFrame] #data key - dataset_labe 

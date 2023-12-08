@@ -1,102 +1,136 @@
+from abc import abstractmethod
 
-import pandas as pd 
-import typing 
+import typing
+import pandas as pd
+
+from lib.DesignPatterns import SingletonABCMeta
 
 try:
     import psycopg2 
 except:
-    pass 
+    pass
+
 from lib.data.dataset.ABCDataset import MCDataset 
 from lib.data.database.ABCDatabase import MCDatabase
-from lib.data.DesignPatterns import SQLConnection 
 
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
 
+
 DB_SETTINGS = get_db_settings()
+
+
+class SQLConnection(metaclass=SingletonABCMeta):  # ABC
+    """Singleton class that opens, shares and closes a shared connection to the configured database."""
+
+    def __del__(self):  # ToDo: Use __del__ or __exit__? Look it up
+        """
+        Destructor will close the shared psycopg2.connections.
+
+        :raise Errors.
+        """
+        self.closeAllConnections()
+
+    def __exit__(self):  # ToDo: Use __del__ or __exit__? Look it up
+        """
+        Destructor will close the shared psycopg2.connections.
+
+        :raise Errors
+        """
+        self.closeAllConnections()
+
+    @abstractmethod
+    def closeAllConnections(self):
+        """
+        Closes the shared connection.
+
+        :raise Errors.
+        """
+        pass
+
+    @abstractmethod
+    def getDatabaseName(self) -> str:
+        """Returns the name of the database connected to."""
+        pass
+
+    @abstractmethod
+    def getConnection(self):
+        """
+        Get a connection from the pool.
+
+        :raise Errors.
+        :return: connection object
+        :rtype: connection
+        """
+        pass
+
+    @abstractmethod
+    def returnConnection(self, conn):
+        """
+        Release the connection back to the pool.
+
+        :raise Errors.
+        """
+        pass
+
 
 class PostgreSQLConnection(SQLConnection):  # (metaclass=SingletonMeta):
     """Singleton class that opens, shares and closes a shared psycopg2.connection to the configured database."""
 
-    #: Holds the shared connection object.
-    # conn = None  # Todo: Figure out type, e.g. psycopg2.connection like does not work
-
-    # __db_ip: str = None
-    # __db_name: str = None
-    # __db_user: str = None
-    # __db_pw: str = None
-
     def __init__(self):
         """
-        The Constructor of DBConnection creates a new psycopg2.connection to the PostgreSQL database that can be shared.
+        The Constructor of DBConnection creates a new psycopg2.pool.ThreadedConnectionPool to the PostgreSQL database that can be shared.
 
         :raise Errors.
         """
-        self.__db_ip =  DB_SETTINGS.db_ip
+        self.__db_ip = DB_SETTINGS.db_ip
         self.__db_name = DB_SETTINGS.db_name
         self.__db_user = DB_SETTINGS.db_user
         self.__db_pw = DB_SETTINGS.db_pw
-        super().__init__()
+
+        # https://pynative.com/psycopg2-python-postgresql-connection-pooling/#h-threadedconnectionpool
+        self.__db_pool = psycopg2.pool.ThreadedConnectionPool(minconn=4,  # ToDo: currently hardcoded, should we allow to configure that as well?
+                                                              maxconn=16,
+                                                              user=self.__db_user,
+                                                              password=self.__db_pw,
+                                                              host=self.__db_ip,
+                                                              port="5432",
+                                                              database=self.__db_name)
 
     def getDatabaseName(self):
-        """"""
+        """Returns the name of the database connected to."""
         # ToDo: Write documentation
         return self.__db_name
 
-    def openNewConnection(self):
-        """
-        The method will open and return a new shared psycopg2.connection to the configured database and will close the
-        previous shared connection.
-
-        :raise Errors defined at <https://www.psycopg.org/docs/errors.html>.
-        :return: connection object
-        :rtype: psycopg2.connection
-        """
-        if self.conn is not None:
-            self.conn.close()
-
-        self.conn = self.getIndependentConnection()
-
-        return self.conn
-
-    def closeConnection(self):
+    def closeAllConnections(self):
         """
         Closes the shared connection.
 
-        :raise Errors defined at <https://www.psycopg.org/docs/errors.html>
+        :raise Errors.
         """
-        if self.conn is not None:
-            self.conn.close()
-            self.conn = None
+        self.__db_pool.closeall()
 
     def getConnection(self):
         """
-        Returns the currently shared psycopg2.connection object.
+        Returns a shared psycopg2.connection object from the pool.
 
         :raise Errors defined at <https://www.psycopg.org/docs/errors.html>
         :return: connection object
         :rtype: psycopg2.connection
         """
-        if self.conn is None:
-            self.openNewConnection()
+        return self.__db_pool.getconn()
 
-        return self.conn
-
-    def getIndependentConnection(self):  # Todo: Turn to static?
+    def returnConnection(self, conn):
         """
-        The method will open and return a new psycopg2.connection to the configured database without closing the
-        existing connection. The returned connections is not shared and has to be closed manually.
+        Release the connection back to the pool.
 
-        :raise Errors defined at <https://www.psycopg.org/docs/errors.html>
-        :return: connection object
-        :rtype: psycopg2.connection
+        :raise Errors.
         """
-        return psycopg2.connect(host=self.__db_ip, database=self.__db_name,
-                                user=self.__db_user, password=self.__db_pw)
+        self.__db_pool.putconn(conn)
 
 
-class PostgreSQLDatabase(MCDatabase):
-    """"""
+class PostgreSQLDatabase:  # (MCDatabase):
+    """PostgreSQL implementation of the MCDatabase object."""
     # Todo: Write documentation
 
     def contains(self, datasetIds: typing.List) -> int:
