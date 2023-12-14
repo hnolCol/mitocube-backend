@@ -39,9 +39,9 @@ class PCATransform(DatasetTransform):
 
         #get PCA plot with samples_attributes annotations
         projected_data = pd.DataFrame(pca.components_.T,columns=component_names, index=data.columns.to_numpy())
-        sample_names_annotaed ,attributes_samples = SampleAttributeAnnotation(self._dataset).annotate()
+        sample_names_annotaed ,samples_attributes = SampleAttributeAnnotation(self._dataset).annotate()
         projected_data = projected_data.join(sample_names_annotaed)
 
-        return projected_data, drivers, explained_variance
+        return projected_data, drivers, explained_variance, samples_attributes
 
 

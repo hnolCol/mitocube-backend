@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends
 
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import User
-from config.models.dataset.data import API_DatasetData
 
 from config.models.dataset.data import DatasetPCAResponse
 from config.models.submissions.submissions import DatasetSubmissionModel
@@ -54,6 +53,7 @@ def get_dataset_data(dataset_label : str):
 def get_dataset_data(dataset_label : str):
     """
     Returns the summary statistcs data for a specific dataset
+    TO DO : Add response model.
     """
     db = MCDatabase.getDatabase()
     dataset = db.getDataset(dataset_label)
@@ -72,9 +72,9 @@ def get_dataset_data(dataset_label : str):
 
     return {"stats" : data_summary.to_dict(), 
             "poi_data" : [{
-                "annotations" : annotations.to_dict(),
-                "data" : data.to_dict(orient="records"),
-                "samples_attributes" : samples_attributes} for data, samples_attributes, annotations in poi_data]
+            "annotations" : annotations.to_dict(),
+            "data" : data.to_dict(orient="records"),
+            "samples_attributes" : samples_attributes} for data, samples_attributes, annotations in poi_data]
             }
 
 
@@ -92,7 +92,7 @@ def get_dataset_params(dataset_label : str, user : User = Depends(get_user_from_
     return metadata
 
 #volcano plot
-@router.get("/dataset/{data_id}/volcano")
+@router.get("/datasets/{data_id}/volcano")
 def get_dataset_volcano(data_id : str, test_details : dict):
     """
     Returns the result of a Principal component anaylsis (PCA)
@@ -100,10 +100,8 @@ def get_dataset_volcano(data_id : str, test_details : dict):
     """
     return {}
 
-
-
 #heatmap endpoints 
-@router.get("/dataset/{data_id}/heatmap",
+@router.get("/datasets/{data_id}/heatmap",
             tags=["Heatmap"])
 def get_dataset_heatmap(data_id : str, test_details : dict):
     """
@@ -115,20 +113,28 @@ def get_dataset_heatmap(data_id : str, test_details : dict):
     return {}
 
 #pca endpoints
-
-@router.get("/dataset/{dataset_label}/pca",
+@router.get("/datasets/{dataset_label}/pca",
             response_model=DatasetPCAResponse,
             tags=["Dimensional reduction","PCA"])
+
 def get_dataset_pca(dataset_label : str, user : User = Depends(get_user_from_token)):
     """
-    Returns the result of a Principal component anaylsis (PCA)
+    Returns the result of a Principal component anaylsis (PCA).
     """
     db = MCDatabase.getDatabase()
     dataset = db.getDataset(dataset_label)
     idcs = NoNaNFilter(dataset).get_indices()
     
-    projected_data, drivers, variance_explained = PCATransform(dataset=dataset,
+    projected_data, drivers, variance_explained, samples_attributes = PCATransform(dataset=dataset,
                                         n_components=4, #get from settings!
                                         subset_index=idcs).transform()
     
-    return DatasetPCAResponse(projection=projected_data,drivers=drivers,variance_explained=variance_explained)
+    projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")
+    drivers_to_browser = drivers.reset_index(names="index").to_dict(orient="records")
+
+    return DatasetPCAResponse(
+        projection=projected_data_to_browser,
+        drivers=drivers_to_browser,
+        variance_explained=variance_explained, 
+        samples_attributes=samples_attributes
+        )

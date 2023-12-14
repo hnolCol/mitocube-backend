@@ -17,7 +17,7 @@ router = APIRouter(
 
 
 
-@router.get("/info/app",summary="Returns basic information about the app.")
+@router.get("/info/app",summary="Returns basic information about the app.", response_model=InfoResponse)
 def get_application_info(user : User = Depends(get_user_from_token)):
     """"""
     return InfoResponse(

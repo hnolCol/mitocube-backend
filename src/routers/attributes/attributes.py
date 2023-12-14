@@ -24,15 +24,13 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
     db = MCDatabase.getDatabase()
     attributes = db.attributes
     attribute_values = db.attribute_values 
-    # for testingAttributeResponse(attributes=[Attribute(**x) for x in attributes.to_dict(orient="records")],attribute_values=attribute_values.to_dict(orient="records"))
-    #print([Attribute(**x) for x in attributes.to_dict(orient="records")])
     return {"attributes" : attributes.to_dict(orient="records"), "attribute_values" : attribute_values.to_dict(orient="records")}
 
 
 @router.get("/attributes/user", response_model=AttributeResponse)
 def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeResponse:
     """
-    Returns the stored attributes 
+    Returns the stored attributes for a user.
     """
     db = MCDatabase.getDatabase()
     attributes = db.attributes.loc[db.attributes["allow_for_user"],:]
@@ -47,8 +45,6 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
         attrValues.extend([{"id" : max_attr_value_id + 1, "attribute_id" : role_attr.id, "details" : role_name.title(), "name" : role, "tag" : f"att_user_role:{role}"} for n,(role_name, role) in enumerate(user_roles.items())])
     else:
         attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
-    print(attrValues)
-    #print([Attribute(**x) for x in attributes.to_dict(orient="records")])
     return {"attributes" : attrs , "attribute_values" : attrValues}
 
 

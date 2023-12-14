@@ -11,15 +11,7 @@ class FeatureDataResponse(BaseModel):
     feature_id : str  # Todo: Rename to feature_key
     attributes_samples : Dict[str,Dict]
     dataset_labels : List[str] #labels of datasets
-    data : Dict[str,pd.DataFrame] #data key - dataset_labe 
+    data : Dict[str,List[Dict]] #data key - dataset_labe 
 
-    class Config:
-        arbitrary_types_allowed = True
     
-    @field_serializer("data")
-    def transform_data(data : Dict[str,pd.DataFrame]):
-        """Transform the dataset to json"""
-        return OrderedDict([(data_label,data_frame.reset_index(names="index").to_dict(orient="records")) for data_label, data_frame in data.items() if isinstance(data_frame,pd.DataFrame) and not data_frame.empty])
-
-
 
