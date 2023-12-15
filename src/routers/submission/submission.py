@@ -12,7 +12,7 @@ from config.enums.states import SubmissionStates
 
 from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, label_not_found_exception, user_role_too_low
 
-from config.models.attributes import Attribute
+from config.models.attributes import AttributeModel
 from config.models.submissions.submissions import NewSubmission, UpdateDatasetAttributesInSubmission
 from config.models.user import User
 from config.models.submissions.metatexts import MetaTextSubmissionResponse

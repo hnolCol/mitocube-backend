@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-from datetime import timedelta
-
-import pandas as pd
-from typing import List, Dict, Any
 from abc import abstractmethod
 from collections import OrderedDict
-from lib.data.dataset.ABCDataset import MCDataset
+# from datetime import timedelta
+from typing import List, Dict  # , Any
+from deprecated import deprecated
 
-from lib.DesignPatterns import SingletonABCMeta, ExpiringValue
+import pandas as pd
+
+from lib.data.dataset.ABCDataset import MCDataset
+from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
 
 from config.settings.db import get_db_settings
-from config.models.attributes import Attribute
+from config.models.attributes import AttributeModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 DB_SETTINGS = get_db_settings()
@@ -19,6 +20,87 @@ DB_SETTINGS = get_db_settings()
 
 class InvalidDatasetLabelError(Exception):
     pass
+
+class MCAttributes(metaclass=SingletonABCMeta):
+    """"""
+    # Todo: Write documentation
+
+    @staticmethod
+    def getAttributeDatabase() -> MCAttributes:
+        """
+        Returns a (singleton) database object depending on the settings. Either A PandaFileDatabase or PostgreSQLDatabase.
+        """
+        if DB_SETTINGS.db_handler == "postgresql":
+            from lib.data.database.ProstgreSQLDatabase import PostgreSQLAttributes
+            return PostgreSQLAttributes()
+        elif DB_SETTINGS.db_handler == "pandafiles":
+            from lib.data.database.FileDatabase import PandaFileAttributes
+            return PandaFileAttributes()
+        else:
+            raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
+
+    @abstractmethod
+    def getAttributes(self) -> pd.DataFrame:
+        """
+        Returns the full attribute table as Panda DataFrame.
+        """
+        pass
+
+    @abstractmethod
+    def getAttributeValues(self) -> pd.DataFrame:
+        """
+        Returns the full attribute value table as Panda DataFrame.
+        """
+        pass
+
+    @abstractmethod
+    def getAttributeTable(self) -> pd.DataFrame:
+        """
+        Returns a table combining attributes and attributes values as Panda DataFrame.
+        """
+        pass
+
+    @abstractmethod
+    def getMandatoryAttributesForStage(self, stage : int) -> List[str]:
+        """
+        Returns a list of tags of mandatory attributes required from defined stage
+        """
+        pass
+
+    @abstractmethod
+    def getMandatoryActivationAttributes(self) -> List[str]:
+        """
+        Returns a list of tags of mandatory attributes.
+        """
+        pass
+
+    @abstractmethod
+    def getMandatorySubmissionAttributes(self) -> List[str]:
+        """
+        Returns a list of tags of mandatory attributes.
+        """
+        pass
+
+    @abstractmethod
+    def update(self):
+        """
+        Triggers a reload of the database.
+        """
+        pass
+
+    #@abstractmethod
+    # def add(self):
+   ##     """
+    #     Triggers a reload of the database.
+    #     """
+    #     pass
+
+    # @abstractmethod
+    # def remove(self):
+    #     """
+    #     Triggers a reload of the database.
+    ##    """
+    #     pass
 
 
 class MCDatabase(metaclass=SingletonABCMeta):
@@ -28,18 +110,16 @@ class MCDatabase(metaclass=SingletonABCMeta):
     def __init__(self):  # ToDo: Check DataType Date
         """Singleton Constructor"""
         # Todo: Write documentation
+
         self._cached_datasets = OrderedDict()
 
         # otherTestiTestValue = 69
-
         # def doTestiTest():
         #     print(" >>> doTestiTest() !!!")
         #     return otherTestiTestValue
-
         # self.testitest = ExpiringValue[int](expireTime=timedelta(seconds = 5),
         #                                     value=42,
         #                                     updateProcess = doTestiTest)
-
 
     def clearCachedDatasets(self):
         """
@@ -56,17 +136,9 @@ class MCDatabase(metaclass=SingletonABCMeta):
         pass
 
     @abstractmethod
-    def getAttributeTable(self) -> pd.DataFrame:
-        """
-        Returns the full attribute table as Panda DataFrame.
-        """
-        pass
-
-    @abstractmethod
+    @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
     def getSampleAttributeJSON(self, grouping_json: Dict = {}) -> Dict:
-        """
-
-        """
+        """"""
         # Todo: Write documentation
         pass
 
@@ -99,9 +171,7 @@ class MCDatabase(metaclass=SingletonABCMeta):
 
     @abstractmethod
     def getJSONDatasets(self, labels: List[str] = []) -> Dict[str, DatasetSubmissionModel]:
-        """
-
-        """
+        """"""
         # Todo: Write documentation
         pass
 
@@ -113,7 +183,7 @@ class MCDatabase(metaclass=SingletonABCMeta):
         datasets = {}
 
         if len(labels) < 1:
-            labels = self.getAllDataLabels()
+            labels = self.getDataLabels()
 
         for label in labels:
             if label in self._cached_datasets.keys():
@@ -124,13 +194,14 @@ class MCDatabase(metaclass=SingletonABCMeta):
         return datasets
 
     @abstractmethod
+    @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
     def getDatasetAttributeJSON(self, tag: str = "") -> Dict:
         """"""
         # Todo: Write documentation
         pass
 
     @abstractmethod
-    def getAllDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
+    def getDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
         """
         Equivalent to getAllDataIDs() but returns a list of database string labels instead of numerical ids.
         """
@@ -160,9 +231,9 @@ class MCDatabase(metaclass=SingletonABCMeta):
         else:
             raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
 
-
     @abstractmethod
-    def getMandatorySubmissionAttributes(self) -> List[Attribute]:
+    @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
+    def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
         """
         Returns a list of mandatory attributes.
         """
@@ -174,20 +245,6 @@ class MCDatabase(metaclass=SingletonABCMeta):
         Returns numbers of datasets saved in the database.
         """
         # Todo: Write documentation
-        pass
-
-    @abstractmethod
-    def getFeatures(self) -> List:
-        """
-        Returns all features in the database 
-        """
-        pass
-
-    @abstractmethod
-    def getFeatureTable(self, features : List[str]) -> Dict[str, Any]:  # ToDo: Or return panda?
-        """
-        Returns a Diction (or panda.Dataframe) of the all features or features requested (argument features).
-        """
         pass
 
     @abstractmethod
@@ -205,7 +262,7 @@ class MCDatabase(metaclass=SingletonABCMeta):
         # Todo: Write documentation
         pass
 
-    def insert(obj: MCDataset):
+    def insert(self, obj: MCDataset):
         """
         Adds/Writes new MCDataset to the database.
         """

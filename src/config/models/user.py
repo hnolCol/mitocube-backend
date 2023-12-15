@@ -40,7 +40,7 @@ class BasicUserWithEmail(BasicUser):
 class User(BasicUserWithEmail):
     """BaseModel for a user"""
     id : int
-    updated_on : float  = None 
+    updated_on : float = None
     expires_after : float = None
     password : SecretStr = None
     allow_login : bool = True 

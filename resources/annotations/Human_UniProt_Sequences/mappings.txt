@@ -1,4 +1,4 @@
 map	from
 entry	Entry
-key	Entry Name
+key	Entry
 sequence	Sequence

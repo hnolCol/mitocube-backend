@@ -1,12 +1,12 @@
 from datetime import datetime
 from config.enums.states import SubmissionStates
-from config.models.attributes import Attribute
+from config.models.attributes import AttributeModel
 from config.models.submissions.submissions import NewSubmission
 from config.models.submissions.timeline import Timeline, TimelineEntry
 from config.models.user import User
 from typing import List 
 
-def check_for_missing_mandatory_attribute(submission : NewSubmission, attributes : List[Attribute]) -> List[Attribute]:
+def check_for_missing_mandatory_attribute(submission : NewSubmission, attributes : List[AttributeModel]) -> List[AttributeModel]:
     """
     Checks if attributes are present in the submission
     : submission . Submission Model from a post request 

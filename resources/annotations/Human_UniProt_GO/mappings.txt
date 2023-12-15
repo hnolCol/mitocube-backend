@@ -1,6 +1,6 @@
 map	from
 entry	Entry
-key	Entry Name
+key	Entry
 keywords	Keywords
 keywords_id	Keyword ID
 go	Gene Ontology (GO)

@@ -1,5 +1,3 @@
-import os 
-
 from fastapi import FastAPI, Request
 from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,18 +9,17 @@ import uvicorn
 ### import settings
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
-### import services 
-from services.paths.paths import Paths 
+from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase, AnnotationDatabase
+from lib.data.database.ABCDatabase import MCAttributes
+### import services
 from services.paths.utils import get_absolute_path_to_dir
 
 ### import routers
 from routers.dataset import dataset
 from routers.submission import submission
-from routers.attributes import attributes
 from routers.authentication import token, user
-from routers.features import features
 from routers.info import info
-from routers.annotations import annotations
+from routers.annotations import annotations, attributes, features
 # from routers import play  # route to test things during development ###########################################################
 
 router_sources = [dataset, submission, attributes, token, user, features, info, annotations]
@@ -55,14 +52,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-### add routers from packages 
+### add routers from packages
 for rs in router_sources:
     if hasattr(rs,"router"):
         app.include_router(getattr(rs,"router"))
 
-
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
+
+db_features = PandaFeatureDatabase()
+db_features.update()  # load all configured Features (UniProt)
+
+db_annotations = AnnotationDatabase()
+db_annotations.update()  # load all configured Annotations
+
+db_attributes = MCAttributes.getAttributeDatabase()
+db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
+
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -71,6 +77,4 @@ app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_asset
 
 
 if __name__ == "__main__":
-    
     uvicorn.run(app, port = 5000)
-

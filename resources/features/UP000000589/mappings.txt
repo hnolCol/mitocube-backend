@@ -1,11 +1,12 @@
 map	from
-entry	Entry
-key	Entry Name
+key	Entry
+entry	Entry Name
 proteins	Protein names
 genes	Gene Names
 organism	Organism
 organism_id	Organism (ID)
 aa_length	Length
 mass	Mass
+proteom_id	UP000000589
 details_source	https://www.uniprot.org/uniprotkb
 details_source_Date	2023-12-06

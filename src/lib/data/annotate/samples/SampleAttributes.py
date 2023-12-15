@@ -1,10 +1,13 @@
-
+from deprecated import deprecated
 from collections import OrderedDict
-import pandas as pd
+
 from lib.data.annotate.samples.ABCSampleAnnotate import SampleAnnotation
+from services.transforms import value_mapper_from_dict
 
-from services.transforms import value_mapper_from_dict 
+import pandas as pd
 
+
+@deprecated(reason="Please use the MCAttribute, MCDatabase or MCDataset related classes")
 class SampleAttributeAnnotation(SampleAnnotation):
 
     def annotate(self) -> pd.DataFrame:
@@ -26,4 +29,4 @@ class SampleAttributeAnnotation(SampleAnnotation):
             sample_attribute_by_name[sample_attribute_name] = list(sample_attribute_values.keys())
         #replace indices with sample names
         sample_idces.index = sample_names
-        return sample_idces, sample_attribute_by_name
+        return sample_idces, sample_attribute_by_name  # ToDo: Wrong return type

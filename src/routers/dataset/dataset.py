@@ -64,7 +64,6 @@ def get_dataset_data(dataset_label : str):
     data_summary = datatable.describe()
     data_summary.loc["total",:] = datatable.index.size
 
-    
     if "att_poi" in metadata.dataset_attributes: 
         pois = metadata.dataset_attributes["att_poi"]
         ids = [poi.split(":")[-1].upper() for poi in pois]

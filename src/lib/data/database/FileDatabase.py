@@ -1,23 +1,127 @@
 import os
+from abc import ABC
+from threading import Lock
+from deprecated import deprecated
+
 import json
 from typing import Any, Dict, List
-from threading import Lock
 
-import pandas as pd 
+import pandas
+import pandas as pd
 import numpy as np
 
 # from lib.DesignPatterns import SingletonABCMeta
-from lib.data.database.ABCDatabase import MCDatabase
+from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 from lib.data.dataset.ABCDataset import MCDataset
 from lib.data.dataset.PandaDataset import PandaFileDataset
 
 from config.settings.db import get_db_settings
 # from config.settings.annotationsettings import get_annotation_settings
 
-from config.models.attributes import Attribute
+from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 DB_SETTINGS = get_db_settings()
+
+
+class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
+    """"""
+
+    def __init__(self):
+        super().__init__()
+
+        self._lock = Lock()  # Synchronization primitive to make it multi-threading safe
+
+        self.attributes = None
+        self.attribute_values = None
+        self.attributes_merged = None  # cached merged version of self.attributes and self.attribute_values
+
+    def _import(self):
+        """"""
+        # Todo: Write documentation
+
+        attribute_file_path = DB_SETTINGS.attribute_file
+
+        try:
+            with open(attribute_file_path, "r+") as attribute_json_file:
+                json_attributes = json.load(attribute_json_file)
+
+            self._attributes = pd.DataFrame.from_dict(json_attributes["attributes"])
+            self._attribute_values = pd.DataFrame.from_dict(json_attributes["attribute_values"])
+
+            self._attributes_merged = pd.merge(self._attributes, self._attribute_values, left_on="id", right_on="attribute_id")
+            self._attributes_merged = self._attributes_merged.drop(columns=["attribute_id"])
+
+            self._attributes_merged = self._attributes_merged.rename(columns={"id_x": "attribute_id",
+                                                                              "parent_id": "attribute_parent_id",
+                                                                              "tag_x": "attribute_tag",
+                                                                              "name_x": "attribute",
+                                                                              "id_y": "value_id",
+                                                                              "tag_y": "value_tag",
+                                                                              "name_y": "value"})
+
+        except Exception as err:
+            raise Exception("Unable to import attribute JSON file %s. Original Exception: %s" % (attribute_file_path, str(err)))
+
+    def getAttributes(self) -> pd.DataFrame:
+        """
+        Returns the full attribute table as Panda DataFrame.
+        """
+        return self._attributes
+
+    def getAttributeValues(self) -> pd.DataFrame:
+        """
+        Returns the full attribute value table as Panda DataFrame.
+        """
+        return self._attribute_values
+
+    def getAttributeTable(self) -> pd.DataFrame:
+        """
+        Returns a table combining attributes and attributes values as Panda DataFrame.
+        """
+        return self._attributes_merged
+
+    def getMandatoryAttributesForStage(self, stage : int) -> List[str]:
+        """
+        Returns a list of tags of mandatory attributes required from defined stage
+        """
+        return self._attributes.loc[self._attributes["min_state"] < 2, "tag"].tolist()
+
+    def getMandatoryActivationAttributes(self) -> List[str]:
+        """
+        Returns a list of tags of mandatory attributes.
+        """
+        return self._attributes.loc[self._attributes["mandatory_for_active"], "tag"].tolist()
+
+    def getMandatorySubmissionAttributes(self) -> List[str]:
+        """
+        Returns a list of tags of mandatory attributes.
+        """
+        return self._attributes.loc[self._attributes["mandatory_for_submission"], "tag"].tolist()
+
+    def update(self):
+        """
+        Triggers a reload of the database.
+        """
+        self._import()
+
+    # ToDo: Write / Insert / remove methods
+    # def addAttribute(self, attribute : AttributeModel):
+    #     """"""
+    #     pass
+
+    # def addAttributeValue(self, item : AttributeValueModel):
+    #     """"""
+    #     pass
+
+    # def removeAttribute(self, tag : str):
+    #     """"""
+    #     pass
+
+    # def removeAttributeValue(self, tag : str):
+    #     """"""
+    #     pass
+
 
 class PandaFileDatabase(MCDatabase):
     """"""
@@ -93,7 +197,7 @@ class PandaFileDatabase(MCDatabase):
                                                  value=db_rows["value"].iloc[0],
                                                  details=db_rows["details"].iloc[0])
 
-    def getAllDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
+    def getDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
         """Returns the list of dataset by their label (same as id for Pandas, different for SQL)"""
         self._lock.acquire()
         datasetFolders = []
@@ -138,7 +242,7 @@ class PandaFileDatabase(MCDatabase):
         datasets = {}
         labels_toQuery = []
         if len(labels) < 1:
-            labels = self.getAllDataLabels()
+            labels = self.getDataLabels()
             # labels = self.getAllDataIDs()
 
         for label in labels:
@@ -188,7 +292,7 @@ class PandaFileDatabase(MCDatabase):
         """
         Returns all features in the database 
         """
-        data_labels = self.getAllDataLabels()
+        data_labels = self.getDataLabels()
 
         features = []
 
@@ -209,7 +313,7 @@ class PandaFileDatabase(MCDatabase):
 
     def getDatasetsWithFeature(self, feature_id : str) -> List[str]:
         """Returns all datasets that contain a specific feature"""
-        data_labels = self.getAllDataLabels()
+        data_labels = self.getDataLabels()
         features = []
         for label in data_labels:
             features = self.getDataset(label).getDataTable().index
@@ -239,11 +343,11 @@ class PandaFileDatabase(MCDatabase):
 
         return n_datasetFolders
     
-    def getMandatorySubmissionAttributes(self) -> List[Attribute]:
+    def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
         """Should be maybe handled in frontend?"""
         attributes = self.attributes
         boolIdx = attributes["mandatory_for_submission"] == True
-        return [Attribute(**attr) for attr in attributes.loc[boolIdx,:].to_dict(orient="records")]
+        return [AttributeModel(**attr) for attr in attributes.loc[boolIdx, :].to_dict(orient="records")]
 
     def getSize(self) -> int:
         """"""

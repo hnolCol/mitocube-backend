@@ -193,7 +193,7 @@ src
     │   │   ├── general.py
     │   │   ├── proteomes
     │   │   │   ├── __init__.py
-    │   │   │   └── annotations.py
+    │   │   │   └── annotationsettings.py
     │   │   └── token.py
     │   └── user_input
     │       ├── __init__.py
@@ -259,7 +259,7 @@ src
     │   └── users.py
     ├── setup_utils
     │   ├── README.md
-    │   ├── annotations.py
+    │   ├── annotationsettings.py
     │   └── paths.py
     └── templates
         └── email

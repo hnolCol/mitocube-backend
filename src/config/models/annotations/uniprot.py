@@ -1,8 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel, field_serializer
 
-
-class API_UniprotAnnotations(BaseModel):
+class API_UniprotAnnotationsModel(BaseModel):
     """
     BaseModel for downloading Uniprot Annotations.
     Cursor is required for pagination. (https://www.uniprot.org/help/pagination)

@@ -2,8 +2,8 @@ import os
 import requests 
 from typing import List, Dict, Optional
 #internal imports 
-from config.models.annotations.proteome import Proteome
-from config.models.annotations.uniprot import API_UniprotAnnotations
+from config.models.annotations.proteome import ProteomeModel
+from config.models.annotations.uniprot import API_UniprotAnnotationsModel
 
 from ..ftp import list_ftp_directory, downloadFileFromFTP
 from services.paths.utils import getPathToResources, check_dir_exists
@@ -13,9 +13,9 @@ from pydantic import BaseModel
 import pandas as pd 
 #https://rest.uniprot.org/uniprotkb/search?compressed=true&fields=accession%2Creviewed%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Clength%2Cgo_p%2Cgo_c%2Cgo_f&format=tsv&query=%28%28proteome%3AUP000005640%29%29&size=500
 
-def download_proteome_annotations(annotationUrl : str, 
-                                  proteome : Proteome, 
-                                  apiParamModel : BaseModel = API_UniprotAnnotations) -> pd.DataFrame:
+def download_proteome_annotations(annotationUrl : str,
+                                  proteome : ProteomeModel,
+                                  apiParamModel : BaseModel = API_UniprotAnnotationsModel) -> pd.DataFrame:
     """
     Download annotations from Uniprot Server using proteome upid. 
     The function utilizes pagination (e.g. downloads sets of 500 entries per API get request)
@@ -61,8 +61,8 @@ def download_proteome_annotations(annotationUrl : str,
 
 
 
-def downloadRecentProteomeFasta(proteome : Proteome, 
-                                domain : str = "ftp.uniprot.org", 
+def downloadRecentProteomeFasta(proteome : ProteomeModel,
+                                domain : str = "ftp.uniprot.org",
                                 path : str = "/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes"):
     """
     Download a reference proteome data file using Uniprot's puid

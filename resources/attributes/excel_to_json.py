@@ -19,8 +19,10 @@ __last_modified__ = "20231120"
 __author__ = "Hendrik Nolte"
 
     
-FILE = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.xlsx"
-FILE_OUT = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json"
+# FILE = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.xlsx"
+# FILE_OUT = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json"
+FILE = "/home/andreaslindner/Projects/ImmunoCube_V2/mitocube-backend/resources/attributes/attributes.xlsx"
+FILE_OUT = "/home/andreaslindner/Projects/ImmunoCube_V2/mitocube-backend/resources/attributes/attributes.json"
 
 ATTRIBUTE_SHEET = "attributes"
 ATTRIBUTE_VALUES_SHEET = "attribute_values"
@@ -53,10 +55,10 @@ attr_values = pd.read_excel(FILE,sheet_name=ATTRIBUTE_VALUES_SHEET)
 
 attrs = attr.dropna(how="all")
 attrs["id"] = np.arange(attrs.index.size)
-tag_mapper = dict([(tag,id) for tag,id in attrs[["tag","id"]].values])
+tag_mapper = dict([(tag,id) for tag, id in attrs[["tag","id"]].values])
 parent_ids = attrs["parent_tag"].map(tag_mapper)
 
-attrs.loc[:,"parent_id"] = parent_ids 
+attrs.loc[:,"parent_id"] = parent_ids  # ToDo: issue, saved as float, parent_ids.astype(int, errors="ignore") does not work
 attr_values.loc[:,"attribute_id"] = attr_values["attribute_tag"].map(tag_mapper)
 attr_values = attr_values.dropna(how="all")
 attr_values.dropna(subset=["attribute_id"], inplace=True)

@@ -1,8 +1,17 @@
-from abc import abstractmethod
+import os
+from abc import ABC, abstractmethod
+from threading import Lock
 
-import typing
+import pandas
+from deprecated import deprecated
+
+import json
+from typing import Any, Dict, List
+
 import pandas as pd
+import numpy as np
 
+from config.models.attributes import AttributeModel
 from lib.DesignPatterns import SingletonABCMeta
 
 try:
@@ -11,7 +20,7 @@ except:
     pass
 
 from lib.data.dataset.ABCDataset import MCDataset 
-from lib.data.database.ABCDatabase import MCDatabase
+from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
@@ -129,11 +138,51 @@ class PostgreSQLConnection(SQLConnection):  # (metaclass=SingletonMeta):
         self.__db_pool.putconn(conn)
 
 
-class PostgreSQLDatabase:  # (MCDatabase):
+class PostgreSQLAttributes(MCAttributes):
+    """"""
+
+    def __init__(self):
+        super().__init__()
+
+        self._lock = Lock()  # Synchronization primitive to make it multi-threading safe
+
+    def getAttributeTable(self) -> pd.DataFrame:
+        """
+
+        """
+        return pandas.DataFrame()
+
+    def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
+        """
+
+        """
+        return []
+
+    def update(self):
+        """ Triggers a reload of the database."""
+        # no implementation required.
+        pass
+
+
+class PostgreSQLDatabase(MCDatabase):
     """PostgreSQL implementation of the MCDatabase object."""
+
+    def doesLabelExists(self, dataset_label: str) -> bool:
+        pass
+
+    def getDatasetsWithLabels(self, n_limit: int = 42, n_offset: int = 0, sort_createdOn_desc: bool = False) -> List[str]:
+        pass
+
+    def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
+        pass
+
+    def getDatasetsWithFeature(self, feature_id: str) -> List:
+        pass
+
+    # Todo: Check above
     # Todo: Write documentation
 
-    def contains(self, datasetIds: typing.List) -> int:
+    def contains(self, datasetIds: List) -> int:
         """"""
         # Todo: Write documentation
         db_conn = None
@@ -185,7 +234,7 @@ class PostgreSQLDatabase:  # (MCDatabase):
                 db_cur.close()
             raise err
 
-    def getDatasetAttributeJSON(self, tag: str = "") -> typing.Dict:
+    def getDatasetAttributeJSON(self, tag: str = "") -> Dict:
         """"""
         # Todo: Write documentation
         db_conn = None
@@ -232,7 +281,7 @@ class PostgreSQLDatabase:  # (MCDatabase):
                 db_cur.close()
             raise err
 
-    def getSampleAttributeJSON(self, grouping_json: typing.Dict = {}) -> typing.Dict:
+    def getSampleAttributeJSON(self, grouping_json: Dict = {}) -> Dict:
         """"""
         # Todo: Write documentation
         db_conn = None
@@ -283,7 +332,7 @@ class PostgreSQLDatabase:  # (MCDatabase):
                 db_cur.close()
             raise err
 
-    def getAllDataIDs(self, sort_createdOn_desc: bool = False) -> typing.List[str]:
+    def getDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
         """"""
         # Todo: Write documentation
         db_conn = None
@@ -305,7 +354,7 @@ class PostgreSQLDatabase:  # (MCDatabase):
                 db_cur.close()
             raise err
 
-    def getDataIDs(self, n_limit: int = 42, n_offset: int = 0, sort_createdOn_desc: bool = False) -> typing.List[str]:
+    def getDataIDs(self, n_limit: int = 42, n_offset: int = 0, sort_createdOn_desc: bool = False) -> List[str]:
         """"""
         # Todo: Write documentation
         db_conn = None
@@ -329,7 +378,7 @@ class PostgreSQLDatabase:  # (MCDatabase):
                 db_cur.close()
             raise err
 
-    def getJSONDatasets(self, labels: typing.List[str] = []) -> typing.Dict[str, DatasetSubmissionModel]:
+    def getJSONDatasets(self, labels: List[str] = []) -> Dict[str, DatasetSubmissionModel]:
         """"""
         # Todo: Write documentation
         datasets = {}

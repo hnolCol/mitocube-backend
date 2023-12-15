@@ -9,7 +9,7 @@ from pydantic import field_validator
 from pydantic import field_serializer
 
 from config.models.user import PublicUser
-from config.models.attributes import Attribute, AttributeValue
+from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.submissions.timeline import Timeline, TimelineEntry
 from config.settings.metatexts import MetaTexts
 from config.enums.states import SubmissionStates
@@ -29,7 +29,7 @@ class SubmissionLink(BaseModel):
 class SampleAttribute(BaseModel):
     """
     """
-    attribute : Attribute
+    attribute : AttributeModel
     name : str 
 
 class NewSubmission(BaseModel):
@@ -38,13 +38,13 @@ class NewSubmission(BaseModel):
     sampleNames : List[str]
     replicates : List[int]
     collaborators : List[PublicUser]
-    attributeTable : List[Dict[str,List[AttributeValue]]]
+    attributeTable : List[Dict[str,List[AttributeValueModel]]]
     metatext : Dict[str,str]
     links : List[SubmissionLink]
     label : str = Field(...,min_length=10, max_length=10)
     title : str 
-    datasetAttributeValues : Dict[str,List[AttributeValue]]
-    datasetAttributes : List[Attribute]
+    datasetAttributeValues : Dict[str,List[AttributeValueModel]]
+    datasetAttributes : List[AttributeModel]
     samplesAttributes : List[SampleAttribute]
     timeline : Timeline = Field(...,default_factory=Timeline)
 
@@ -68,8 +68,8 @@ class NewSubmission(BaseModel):
 class UpdateDatasetAttributesInSubmission(BaseModel):
     """Update submission model"""
     modified_on : float = Field(..., default_factory= time.time)
-    datasetAttributeValues : Dict[str,List[AttributeValue]]
-    datasetAttributes : List[Attribute]
+    datasetAttributeValues : Dict[str,List[AttributeValueModel]]
+    datasetAttributes : List[AttributeModel]
 
 
 
@@ -108,7 +108,7 @@ class SubmissionResponse(BaseModel):
     """BaseModel for an API Submission of a submission"""
     data_id : str 
     craeted_on : datetime = time.time()
-    attributes : List[Attribute]
-    attribute_values : List[AttributeValue]
+    attributes : List[AttributeModel]
+    attribute_values : List[AttributeValueModel]
 
 

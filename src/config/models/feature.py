@@ -1,17 +1,17 @@
-from pydantic import BaseModel, field_serializer, field_validator, root_validator
-from typing import List, Dict, Any
-from collections import OrderedDict
-import pandas as pd 
+from deprecated import deprecated
+from pydantic import BaseModel  # , field_serializer, field_validator, root_validator
+from typing import List, Dict  # , Any
+# from collections import OrderedDict
+# import pandas as pd
 
 
-class FeatureDataResponse(BaseModel):
+@deprecated("Please use FeatureDataResponseModel(BaseModel) in annotation.feature.py")
+class FeatureDataResponseModel(BaseModel):
     """
     Response model for feature data.
     """
-    feature_id : str  # Todo: Rename to feature_key
+    feature_id : str
     attributes_samples : Dict[str,Dict]
-    dataset_labels : List[str] #labels of datasets
-    data : Dict[str,List[Dict]] #data key - dataset_labe 
-
-    
+    dataset_labels : List[str]  # labels of datasets
+    data : Dict[str,List[Dict]]  # data key - dataset_label
 
