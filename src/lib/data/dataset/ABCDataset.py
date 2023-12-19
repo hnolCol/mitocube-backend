@@ -12,6 +12,8 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 import random
 from lib.DesignPatterns import JsonSerializable
 import random
+from collections import OrderedDict
+from services.transforms import value_mapper_from_dict
 
 class MCDataset(JsonSerializable):
     """Replacement for the Data.Dataset"""
@@ -315,6 +317,28 @@ class MCDataset(JsonSerializable):
                 "groupingCmap": json_grouping_cmap,
                 "groupings": json_groupings
                 }
+
+    def getSamplesAttributes(self):
+        """
+        """
+        
+        meta_data = self.getMetaJson()
+        sample_names = meta_data.sample_names #mabe change to runnames
+        samples_attributes = meta_data.samples_attributes #attributeTag -> sampleName Index
+    
+        sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
+        sample_attribute_by_name = OrderedDict()
+        if not isinstance(samples_attributes,dict): TypeError("attributes_samples must be a dictionary.")
+        for attributes  in  samples_attributes.values():
+            sample_attribute_name = attributes.name 
+            sample_attribute_values = attributes.values 
+            #switch keys and values to map samples indices
+            attribute_mapper = value_mapper_from_dict(sample_attribute_values) 
+            sample_idces.loc[:,sample_attribute_name] = sample_idces.index.map(attribute_mapper)
+            sample_attribute_by_name[sample_attribute_name] = list(sample_attribute_values.keys())
+        #replace indices with sample names
+        sample_idces.index = sample_names
+        return sample_idces, sample_attribute_by_name  # ToDo: Wrong return type
 
     def isLoadedFromDatabase(self) -> bool:
         """"""

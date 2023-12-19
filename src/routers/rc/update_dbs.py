@@ -9,7 +9,7 @@ from config.models.user import User
 
 router = APIRouter(
     prefix="/api/rc",
-    tags=["Dataset"]
+    tags=["Remote Control"]
     )
 
 

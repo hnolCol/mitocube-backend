@@ -1,14 +1,18 @@
-from fastapi import APIRouter, Depends 
+from fastapi import APIRouter, Depends, HTTPException
 
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import User
 
 from config.models.dataset.data import DatasetPCAResponse
 from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
+
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.filter.NoMissingValues import NoNaNFilter
+from lib.data.runs.RunList import RunListCreater
+
 from config.exceptions.HTTPExceptions import no_data_found
 
 from services.users import get_user_from_token, is_user_at_least_curator
@@ -137,3 +141,27 @@ def get_dataset_pca(dataset_label : str, user : User = Depends(get_user_from_tok
         variance_explained=variance_explained, 
         samples_attributes=samples_attributes
         )
+
+
+@router.post("/datasets/{dataset_label}/runlist", response_model=RunListModel, tags = ["Runlist"])
+def get_dataset_runlist(dataset_label : str, runlist_props : RunListRequestPropsModel): #user : User = Depends(get_user_from_token)
+    """
+    Creates a runlist for a specific dataset. 
+
+    """
+    db = MCDatabase.getDatabase()
+    dataset = db.getDataset(dataset_label)
+    sample_idces, sample_attribute_by_name = dataset.getSamplesAttributes()
+    print(sample_idces, sample_attribute_by_name)
+    try:
+        runlist = RunListCreater(sample_list=sample_idces, 
+                                 user_label="hallo", 
+                                 dataset_label=dataset_label, 
+                                 **runlist_props.model_dump()
+                                 ).create()
+        print(runlist)
+        return runlist
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
+    

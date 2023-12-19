@@ -60,14 +60,14 @@ for rs in router_sources:
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
-db_features = PandaFeatureDatabase()
-db_features.update()  # load all configured Features (UniProt)
+# db_features = PandaFeatureDatabase()
+# db_features.update()  # load all configured Features (UniProt)
 
-db_annotations = AnnotationDatabase()
-db_annotations.update()  # load all configured Annotations
+# db_annotations = AnnotationDatabase()
+# db_annotations.update()  # load all configured Annotations
 
-db_attributes = MCAttributes.getAttributeDatabase()
-db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
+# db_attributes = MCAttributes.getAttributeDatabase()
+# db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
 
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):

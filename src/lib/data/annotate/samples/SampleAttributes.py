@@ -7,7 +7,7 @@ from services.transforms import value_mapper_from_dict
 import pandas as pd
 
 
-@deprecated(reason="Please use the MCAttribute, MCDatabase or MCDataset related classes")
+@deprecated(reason="Please use the MCDataset's getSamplesAttributes()")
 class SampleAttributeAnnotation(SampleAnnotation):
 
     def annotate(self) -> pd.DataFrame:
