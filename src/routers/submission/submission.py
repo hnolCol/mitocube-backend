@@ -231,7 +231,6 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
         meta_data = dataset.getMetaJson().model_dump()
         meta_data["runlist"] = runlist
         updated_meta_data = DatasetSubmissionModel(**meta_data)
-        print(updated_meta_data)
         dataset.write_json(updated_meta_data,update=True)
         response = RunListResponseModel(**runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
         return response 
