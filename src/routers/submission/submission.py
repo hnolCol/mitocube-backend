@@ -207,6 +207,7 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
 
     Returns
     -------
+    RunListResponseModel
 
 
     Raises
@@ -229,7 +230,9 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
                                  **runlist_props.model_dump()
                                  ).create()
         meta_data = dataset.getMetaJson().model_dump()
+        #overwrite the json runlist. 
         meta_data["runlist"] = runlist
+        #TODO: add a timeline entry
         updated_meta_data = DatasetSubmissionModel(**meta_data)
         dataset.write_json(updated_meta_data,update=True)
         response = RunListResponseModel(**runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)

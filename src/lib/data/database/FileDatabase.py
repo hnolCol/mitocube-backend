@@ -64,11 +64,11 @@ class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
         except Exception as err:
             raise Exception("Unable to import attribute JSON file %s. Original Exception: %s" % (attribute_file_path, str(err)))
 
-    def getAttributes(self, sort : bool = True) -> pd.DataFrame:
+    def getAttributes(self, sort : bool = True, sort_by : str = "priority") -> pd.DataFrame:
         """"""
         if sort:
             #sort attributes according to priority in descending order.
-            return self._attributes.sort_values(by="priority", ascending=False)
+            return self._attributes.sort_values(by=sort_by, ascending=False)
         return self._attributes
 
     def getAttributeValues(self) -> pd.DataFrame:

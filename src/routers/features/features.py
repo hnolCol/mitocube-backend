@@ -18,7 +18,7 @@ router = APIRouter(
 
 @router.get("/{feature_key}/data",
             response_model=FeatureDataResponseModel)
-def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from_token), max_datasets : int = 200):
     """
     Returns the data for a specific feature in all datasets it was detected in. 
     

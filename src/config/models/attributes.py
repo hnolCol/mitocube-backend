@@ -137,6 +137,8 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
     #value : float  # ToDo: str or float or int? or more flexible? :: The excel table says attribute_value, value is not a float then, maybe like
     value : Union[float,str,int] #maybe like this? #changed the excel header attribute_value to value since attribute_id referece to the attribute not the attribute value
     description : Optional[str] = ""
+    feature : Optional[str] = None #feature_key 
+    
    # feature : str # i dont understand feature here, in my view the attribute_value becomes the feature ID, but I we probably dont need this anymore and we should use the FeatureModel instead. 
     
     @field_validator("tag")  # ToDo, issue with return type?

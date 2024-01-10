@@ -27,7 +27,7 @@ DB_SETTINGS = get_db_settings()
 
 
 class Annotation(ABC):
-
+    
     @abstractmethod
     def contains(self, feature_key: str) -> bool:
         """Returns true if the defined feature (key) has a stored annotation. Otherwise, false."""
@@ -451,7 +451,7 @@ class PandaFeatureDatabase(FeatureDatabase):
         self._cached_features : Dict[str,pd.DataFrame] = {}  # Dict[str (proteome_id), pd.DataFrame(index=[], columns=["entry", "key", "proteins", "genes", "organism", "aa_length"])]
 
 
-    def find(self, values : List[str], proteome_id: str = None, columns : List[Literal["entry","proteins","genes"]] = None) -> pd.DataFrame:
+    def find(self, values : List[str], proteome_id: str, columns : List[Literal["entry","proteins","genes"]] = None) -> pd.DataFrame:
         """
         Finds List[str] values in the List[str] columns defined. 
         Only the values "entry", "proteins" and "genes" are allowed in columns. Columns "proteins" and "genes" are used by default.
@@ -624,7 +624,7 @@ class PandaFeatureDatabase(FeatureDatabase):
                 #first filtering step. 
                 
                 #find mappings "from" that exist and subset them
-                from_found = mappings.loc[:,"from"].isin(features.columns)
+                from_found = mappings.loc[:,"from"].isin(features.columns) 
                 mapping_subset = mappings.loc[from_found,:]
                 #get the key column name in the original data (e.g. Entry)
                 
