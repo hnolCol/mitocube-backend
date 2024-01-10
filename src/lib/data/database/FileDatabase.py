@@ -47,6 +47,7 @@ class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
                 json_attributes = json.load(attribute_json_file)
 
             self._attributes = pd.DataFrame.from_dict(json_attributes["attributes"])
+            
             self._attribute_values = pd.DataFrame.from_dict(json_attributes["attribute_values"])
 
             self._attributes_merged = pd.merge(self._attributes, self._attribute_values, left_on="id", right_on="attribute_id")
@@ -63,10 +64,11 @@ class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
         except Exception as err:
             raise Exception("Unable to import attribute JSON file %s. Original Exception: %s" % (attribute_file_path, str(err)))
 
-    def getAttributes(self) -> pd.DataFrame:
-        """
-        Returns the full attribute table as Panda DataFrame.
-        """
+    def getAttributes(self, sort : bool = True) -> pd.DataFrame:
+        """"""
+        if sort:
+            #sort attributes according to priority in descending order.
+            return self._attributes.sort_values(by="priority", ascending=False)
         return self._attributes
 
     def getAttributeValues(self) -> pd.DataFrame:
@@ -85,7 +87,7 @@ class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
         """
         Returns a list of tags of mandatory attributes required from defined stage
         """
-        return self._attributes.loc[self._attributes["min_state"] < 2, "tag"].tolist()
+        return self._attributes.loc[self._attributes["min_state"] == stage, "tag"].tolist()
 
     def getMandatoryActivationAttributes(self) -> List[str]:
         """
@@ -221,20 +223,21 @@ class PandaFileDatabase(MCDatabase):
                    n_offset: int = 0,  # ToDo: Implement Offset
                    sort_createdOn_desc: bool = False) -> List[str]:
         """"""
-        datasetFolders = self.getAllDataIDs()
+        
+        labels = self.getDataLabels()
 
         ix_left = n_offset  # ToDo: Alternative ix_left = n_offset * (n_limit + 1)
         ix_right = ix_left + n_limit
 
-        if ix_right > len(datasetFolders):
-            ix_right = len(datasetFolders)  # ToDo: Different handling for out of index?
+        if ix_right > len(labels):
+            ix_right = len(labels)  # ToDo: Different handling for out of index?
 
-        if ix_left > len(datasetFolders):
-            ix_left = len(datasetFolders)  # ToDo: Different handling for out of index?
+        if ix_left > len(labels):
+            ix_left = len(labels)  # ToDo: Different handling for out of index?
 
         # ToDo: Implement sort_createdOn_desc
 
-        return datasetFolders[ix_left:ix_right]
+        return labels[ix_left:ix_right]
 
     def getJSONDatasets(self, labels: List[str] = []) -> Dict[str, DatasetSubmissionModel]:
         """"""
@@ -247,34 +250,29 @@ class PandaFileDatabase(MCDatabase):
 
         for label in labels:
             if label in self._cached_datasets:
-                ##TO DO. Change this and incorporate pydantic model.
-                datasets[label] = DatasetSubmissionModel(
-                    title= self._cached_datasets[label]._title,
-                    replicates= self._cached_datasets[label]._replicates,
-                    n_samples=len(self._cached_datasets[label]._sample_names),
-                    state= self._cached_datasets[label]._state,
-                    label=self._cached_datasets[label]._label, 
-                    user_label=self._cached_datasets[label]._user_label,
-                    created_on=self._cached_datasets[label]._created_on,
-                    samples_attributes=self._cached_datasets[label]._attributes_samples,
-                    dataset_attributes=self._cached_datasets[label]._attributes_dataset,
-                    metatext=self._cached_datasets[label]._metatexts,
-                    collaborators=self._cached_datasets[label]._collaborators,
-                    sample_names=self._cached_datasets[label]._sample_names,
-                    timeline=self._cached_datasets[label]._timeline)
+                #this is super error prone since if we change something in dataset then one has to 
+                #remember to change here as well, otherwise chashed is not equal loaded. : 
+                cached_dataset : MCDataset = self._cached_datasets[label] #to get easy coding, assign type.
+                ##maybe just : 
+                datasets[label] = cached_dataset.getMetaJson()
                 
-                # datasets[label] = {"id": self._cached_datasets[label]._id,
-                #                    "user_id" : self._cached_datasets[label]._user_id,
-                #                    "label": self._cached_datasets[label]._label,
-                #                   # "email": self._cached_datasets[label]._contact_email, #defined by user id 
-                #                    "state": self._cached_datasets[label]._state,
-                #                    #"instrument": self._cached_datasets[label]._instrument,
-                #                    "title": self._cached_datasets[label]._title,
-                #                   # "experimentator": self._cached_datasets[label]._experimentator, #defined by user id
-                #                    #"group_name": self._cached_datasets[label]._name_group, #defined by user id 
-                #                    "created_on": self._cached_datasets[label]._created_on,
-                #                    "sample_attributes" : self._cached_datasets[label]._attributes_samples
-                #                    date_uploaded_on": self._cached_datasets[label]._uploaded_on}
+                # datasets[label] = DatasetSubmissionModel(
+                #     title= cached_dataset._title,
+                #     replicates= cached_dataset._replicates,
+                #     n_samples=len(cached_dataset._sample_names),
+                #     state= cached_dataset._state,
+                #     label=cached_dataset._label, 
+                #     user_label=cached_dataset._user_label,
+                #     created_on=cached_dataset._created_on,
+                #     samples_attributes=cached_dataset._attributes_samples,
+                #     dataset_attributes=cached_dataset._attributes_dataset,
+                #     metatext=cached_dataset._metatexts,
+                #     collaborators=cached_dataset._collaborators,
+                #     sample_names=cached_dataset._sample_names,
+                #     timeline=cached_dataset._timeline,
+                #     runlist=cached_dataset._runlist,
+                #     links=cached_dataset._urls)
+                
             else:
                 labels_toQuery.append(label)
 
@@ -282,7 +280,7 @@ class PandaFileDatabase(MCDatabase):
             # ToDo: read json
             for label in labels_toQuery:
                 #quick fix to just load_meta_only 
-                datasets[label] = PandaFileDataset(label=label,load_meta_only=True).get_meta_data()
+                datasets[label] = PandaFileDataset(label=label,load_meta_only=True).getMetaJson(force_reload=True)
             pass
 
         return datasets
@@ -311,13 +309,12 @@ class PandaFileDatabase(MCDatabase):
 
         return featureTable
 
-    def getDatasetsWithFeature(self, feature_id : str) -> List[str]:
-        """Returns all datasets that contain a specific feature"""
+    def getDatasetsWithFeature(self, feature_key : str) -> List[str]:
         data_labels = self.getDataLabels()
         features = []
         for label in data_labels:
             features = self.getDataset(label).getDataTable().index
-            if feature_id in features:
+            if feature_key in features:
                 features.append(label)
         
         return features
@@ -395,9 +392,7 @@ class PandaFileDatabase(MCDatabase):
         except Exception as err:
             raise Exception("Unable to import attribute JSON file: " + str(err))
 
-
-
-# DB = PandaFileDatabase()
+   
 # dataset = DB.getAllDataIDs()
 
 

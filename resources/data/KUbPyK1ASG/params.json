@@ -1,6 +1,5 @@
 {
     "created_on": 1699947967.057771,
-    "modified_on": 1700758751.013123,
     "state": 4,
     "label": "KUbPyK1ASG",
     "title": "Torin induced proteome rewiring",
@@ -79,7 +78,7 @@
     "n_samples": 32,
     "metatext": {
         "metatext:research_aim": "adasdada adasdadaadasdadaadasdadaadasdadaadasdadaadasdadaadasdadaadasdada\nadasdadaadasdadaadasdada\nadasdada\nadasdada\nadasdada",
-        "metatext:experimental_procedure": "To isolate crude mitochondria, freshly collected TA muscle samples were washed once in cold PBS and incubated in 4 mL Mito buffer A (220 mM mannitol, 70 mM sucrose, 20 mM HEPES/KOH, 0.5 mM PMSF, 2 mg/mL BSA, 1 mM EDTA/Tris pH 7.4) supplemented with protease and phosphatase inhibitors on ice. The tissues were homogenized in a motor-driven potter (20 strokes, 1000 rpm) and cell debris was pelleted at 800 g for 5 min at 4 \u00b0C. The supernatant was collected, the pellet was subjected to a second homogenization (20 strokes, 1000 rpm), centrifuged at 800 g for 5 min at 4 \u00b0C, the supernatant was combined with the supernatant from the first homogenization, and centrifuged at 8000 g for 5 min at 4 \u00b0C. The supernatant was discarded and the pellet was resuspended in 1 mL Mito buffer B (220 mM mannitol, 70 mM sucrose, 20 mM HEPES/KOH, 0.5 mM PMSF, 1 mM EDTA/Tris pH 7.4), centrifuged twice at 8000 g for 5 min at 4 \u00b0C and the mitochondrial pellet was resuspended in 1 mL buffer B. Finally, the samples were centrifuged at 10,000 g for 5 min at 4 \u00b0C and the mitochondria were resuspended in 300\u2013500 \u03bcL Mito buffer B. \nSamples from subcellular fractionation were prepared for MS analysis by in-solution digestion. Urea-containing samples were reduced by adding DTT at a final concentration of 5 mM for 1 h at RT. Alkylation with IAA at a final concentration of 40 mM was performed for 30 min in the dark at RT. Next, the samples were digested with 1 \u03bcL LysC for 2\u20133 h at RT. Finally, the samples were diluted with 50 mM ABC to a urea concentration of 2 M and incubated with 1 \u03bcL 0.5 mg/mL trypsin overnight at RT, acidified to 1% FA and purified on StageTips."
+        "metatext:experimental_procedure": "To isolate crude mitochondria, freshly collected TA muscle samples were washed once in cold PBS and incubated in 4 mL Mito buffer A (220 mM mannitol, 70 mM sucrose, 20 mM HEPES/KOH, 0.5 mM PMSF, 2 mg/mL BSA, 1 mM EDTA/Tris pH 7.4) supplemented with protease and phosphatase inhibitors on ice. The tissues were homogenized in a motor-driven potter (20 strokes, 1000 rpm) and cell debris was pelleted at 800 g for 5 min at 4 °C. The supernatant was collected, the pellet was subjected to a second homogenization (20 strokes, 1000 rpm), centrifuged at 800 g for 5 min at 4 °C, the supernatant was combined with the supernatant from the first homogenization, and centrifuged at 8000 g for 5 min at 4 °C. The supernatant was discarded and the pellet was resuspended in 1 mL Mito buffer B (220 mM mannitol, 70 mM sucrose, 20 mM HEPES/KOH, 0.5 mM PMSF, 1 mM EDTA/Tris pH 7.4), centrifuged twice at 8000 g for 5 min at 4 °C and the mitochondrial pellet was resuspended in 1 mL buffer B. Finally, the samples were centrifuged at 10,000 g for 5 min at 4 °C and the mitochondria were resuspended in 300–500 μL Mito buffer B. \nSamples from subcellular fractionation were prepared for MS analysis by in-solution digestion. Urea-containing samples were reduced by adding DTT at a final concentration of 5 mM for 1 h at RT. Alkylation with IAA at a final concentration of 40 mM was performed for 30 min in the dark at RT. Next, the samples were digested with 1 μL LysC for 2–3 h at RT. Finally, the samples were diluted with 50 mM ABC to a urea concentration of 2 M and incubated with 1 μL 0.5 mg/mL trypsin overnight at RT, acidified to 1% FA and purified on StageTips."
     },
     "dataset_attributes": {
         "att_lysis_method": [
@@ -260,6 +259,371 @@
                 "user_label": "VpVff4sS",
                 "state": 4,
                 "comment": "Beautiful data are uploaded. "
+            }
+        ]
+    },
+    "runlist": {
+        "created_at": 1704894754.33856,
+        "user_label": "VpVff4sS",
+        "dataset_label": "KUbPyK1ASG",
+        "n_runs": 32,
+        "n_plates": 1,
+        "fractionated": false,
+        "n_fractions": 0,
+        "scrambled": true,
+        "scrambled_across_plates": false,
+        "runs": [
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_09_fjwS",
+                "label": "fjwS",
+                "index": 0,
+                "measurement_index": 0,
+                "plate_index": 0,
+                "column_index": 8,
+                "row_index": 0,
+                "position_label": "A9",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_01_ol3f",
+                "label": "ol3f",
+                "index": 1,
+                "measurement_index": 1,
+                "plate_index": 0,
+                "column_index": 0,
+                "row_index": 0,
+                "position_label": "A1",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_23_fDQ7",
+                "label": "fDQ7",
+                "index": 2,
+                "measurement_index": 2,
+                "plate_index": 0,
+                "column_index": 2,
+                "row_index": 2,
+                "position_label": "C3",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_19_I56t",
+                "label": "I56t",
+                "index": 3,
+                "measurement_index": 3,
+                "plate_index": 0,
+                "column_index": 8,
+                "row_index": 1,
+                "position_label": "B9",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_27_Xdbb",
+                "label": "Xdbb",
+                "index": 4,
+                "measurement_index": 4,
+                "plate_index": 0,
+                "column_index": 6,
+                "row_index": 2,
+                "position_label": "C7",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_31_6SmC",
+                "label": "6SmC",
+                "index": 5,
+                "measurement_index": 5,
+                "plate_index": 0,
+                "column_index": 0,
+                "row_index": 3,
+                "position_label": "D1",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_24_uTQN",
+                "label": "uTQN",
+                "index": 6,
+                "measurement_index": 6,
+                "plate_index": 0,
+                "column_index": 3,
+                "row_index": 2,
+                "position_label": "C4",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_30_OUqG",
+                "label": "OUqG",
+                "index": 7,
+                "measurement_index": 7,
+                "plate_index": 0,
+                "column_index": 9,
+                "row_index": 2,
+                "position_label": "C10",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_13_eto2",
+                "label": "eto2",
+                "index": 8,
+                "measurement_index": 8,
+                "plate_index": 0,
+                "column_index": 2,
+                "row_index": 1,
+                "position_label": "B3",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_08_XwSm",
+                "label": "XwSm",
+                "index": 9,
+                "measurement_index": 9,
+                "plate_index": 0,
+                "column_index": 7,
+                "row_index": 0,
+                "position_label": "A8",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_16_bjll",
+                "label": "bjll",
+                "index": 10,
+                "measurement_index": 10,
+                "plate_index": 0,
+                "column_index": 5,
+                "row_index": 1,
+                "position_label": "B6",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_25_dhbb",
+                "label": "dhbb",
+                "index": 11,
+                "measurement_index": 11,
+                "plate_index": 0,
+                "column_index": 4,
+                "row_index": 2,
+                "position_label": "C5",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_10_KDLp",
+                "label": "KDLp",
+                "index": 12,
+                "measurement_index": 12,
+                "plate_index": 0,
+                "column_index": 9,
+                "row_index": 0,
+                "position_label": "A10",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_26_B6q9",
+                "label": "B6q9",
+                "index": 13,
+                "measurement_index": 13,
+                "plate_index": 0,
+                "column_index": 5,
+                "row_index": 2,
+                "position_label": "C6",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_22_7sEK",
+                "label": "7sEK",
+                "index": 14,
+                "measurement_index": 14,
+                "plate_index": 0,
+                "column_index": 1,
+                "row_index": 2,
+                "position_label": "C2",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_12_cH41",
+                "label": "cH41",
+                "index": 15,
+                "measurement_index": 15,
+                "plate_index": 0,
+                "column_index": 1,
+                "row_index": 1,
+                "position_label": "B2",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_18_UZlK",
+                "label": "UZlK",
+                "index": 16,
+                "measurement_index": 16,
+                "plate_index": 0,
+                "column_index": 7,
+                "row_index": 1,
+                "position_label": "B8",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_06_0sIb",
+                "label": "0sIb",
+                "index": 17,
+                "measurement_index": 17,
+                "plate_index": 0,
+                "column_index": 5,
+                "row_index": 0,
+                "position_label": "A6",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_15_cenZ",
+                "label": "cenZ",
+                "index": 18,
+                "measurement_index": 18,
+                "plate_index": 0,
+                "column_index": 4,
+                "row_index": 1,
+                "position_label": "B5",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_02_hlHR",
+                "label": "hlHR",
+                "index": 19,
+                "measurement_index": 19,
+                "plate_index": 0,
+                "column_index": 1,
+                "row_index": 0,
+                "position_label": "A2",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_04_Xx5L",
+                "label": "Xx5L",
+                "index": 20,
+                "measurement_index": 20,
+                "plate_index": 0,
+                "column_index": 3,
+                "row_index": 0,
+                "position_label": "A4",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_07_ywYN",
+                "label": "ywYN",
+                "index": 21,
+                "measurement_index": 21,
+                "plate_index": 0,
+                "column_index": 6,
+                "row_index": 0,
+                "position_label": "A7",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_29_YCwF",
+                "label": "YCwF",
+                "index": 22,
+                "measurement_index": 22,
+                "plate_index": 0,
+                "column_index": 8,
+                "row_index": 2,
+                "position_label": "C9",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_14_y3e4",
+                "label": "y3e4",
+                "index": 23,
+                "measurement_index": 23,
+                "plate_index": 0,
+                "column_index": 3,
+                "row_index": 1,
+                "position_label": "B4",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_11_iGq3",
+                "label": "iGq3",
+                "index": 24,
+                "measurement_index": 24,
+                "plate_index": 0,
+                "column_index": 0,
+                "row_index": 1,
+                "position_label": "B1",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_28_kuc6",
+                "label": "kuc6",
+                "index": 25,
+                "measurement_index": 25,
+                "plate_index": 0,
+                "column_index": 7,
+                "row_index": 2,
+                "position_label": "C8",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_32_J4hL",
+                "label": "J4hL",
+                "index": 26,
+                "measurement_index": 26,
+                "plate_index": 0,
+                "column_index": 1,
+                "row_index": 3,
+                "position_label": "D2",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_21_f0Gc",
+                "label": "f0Gc",
+                "index": 27,
+                "measurement_index": 27,
+                "plate_index": 0,
+                "column_index": 0,
+                "row_index": 2,
+                "position_label": "C1",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_20_a6iw",
+                "label": "a6iw",
+                "index": 28,
+                "measurement_index": 28,
+                "plate_index": 0,
+                "column_index": 9,
+                "row_index": 1,
+                "position_label": "B10",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_05_HXXh",
+                "label": "HXXh",
+                "index": 29,
+                "measurement_index": 29,
+                "plate_index": 0,
+                "column_index": 4,
+                "row_index": 0,
+                "position_label": "A5",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_17_Dw81",
+                "label": "Dw81",
+                "index": 30,
+                "measurement_index": 30,
+                "plate_index": 0,
+                "column_index": 6,
+                "row_index": 1,
+                "position_label": "B7",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240110_KUbPyK1ASG_HeEm_03_JWBB",
+                "label": "JWBB",
+                "index": 31,
+                "measurement_index": 31,
+                "plate_index": 0,
+                "column_index": 2,
+                "row_index": 0,
+                "position_label": "A3",
+                "aggregated_samples": []
             }
         ]
     }

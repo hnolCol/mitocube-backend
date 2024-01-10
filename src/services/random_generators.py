@@ -3,7 +3,19 @@ import random
 import numpy as np
 
 def get_random_string(N  : int = 20) -> str:
-    "Returns a random string of N characters"
+    """
+    Returns a pseudo random string of N characters using upper, lowercases as well digits
+
+    Parameters
+    ----------
+    N : int, default 20 
+        The length of the pseudo-randomly created string 
+
+    Returns 
+    -------
+    str 
+        The pseudo random string. 
+    """
     return ''.join(random.choices(string.ascii_uppercase + string.digits + string.ascii_lowercase, k=N))
 
 def get_random_number(min_value : int, max_value : int, size : int | tuple = 1) -> int:

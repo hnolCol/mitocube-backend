@@ -30,10 +30,23 @@ oauth2_scheme_share = OAuth2PasswordBearer(tokenUrl="api/auth/token/share", auto
 
 
 def create_password_hash(password : str) -> str:
-    """Create a passsword hash using the pwd-cryp. Salt is automatically generated.
-
+    """
+    Create a password hash using the pwd-crypt. Salt is automatically generated.
+    
     Documentation
+    -------------
     https://passlib.readthedocs.io/en/stable/lib/passlib.hash.bcrypt.html#passlib.hash.bcrypt
+    
+    Parameters
+    ----------
+    password : str 
+        The plain password for which the hash should be created. USes the algorithm which is defined
+        in the encryption settings.
+        
+    Returns
+    -------
+    str 
+        Password hash.
     """
     return pwd_context.hash(password)
 
@@ -44,15 +57,27 @@ def verify_password(plain_password : str, password_hash : str) -> bool:
 
 def create_access_token(data: dict, 
                         key_subset : List[str] = None, 
-                        add_dict : dict = None, share_token : bool = False) -> str:
+                        add_dict : dict = None,
+                        share_token : bool = False) -> str:
     """
     Encodes data (dict) in a jwt token using the jwt secret key.
-
-    :key_subset ```List[str]```: Specifies key in data that should be used.
-    :add_dict ```Dict```: A dict that can be added to the data. 
     
-    Returns 
-    jwt token as a string
+    Parameters
+    ----------
+    data : dict
+        The data to encode in the token. 
+    key_subset : List[str], default None
+        Specifies key in data that should be used.
+    add_dict : dict, default None 
+        Data that should be added to the actual data. 
+        Convenient to avoid merging of dicts before. 
+    share_token : bool, default False
+        If the access_token should is a share token and not a simple login token. 
+        
+    Returns
+    -------
+    str
+        Encoded jwt token
     """
     
     if len(data) == 0:
@@ -86,10 +111,23 @@ def create_access_token(data: dict,
                         algorithm=user_token_settings.jwt_algorithm)
 
 def create_share_token(to_encode : dict, current_time : datetime) -> str:
+    """Create a share token.
+
+    Parameters
+    ----------
+    to_encode : dict
+        The data to include in the token. Please note that the key 'exp' is reserved and
+        will be overwritten to provide an expiration date of the token. 
+    current_time : datetime
+        The current time. The timedelta in the share_token_settings is added
+        until the token is valid. 
+
+    Returns
+    -------
+    str
+        Encoded token. 
     """
-    Create a share token.
-    """
-    
+     
     expire = current_time + SHARE_TOKEN_SETTINGS.expires_after_hours
 
     to_encode["exp"] = expire
@@ -136,11 +174,23 @@ def decode_token(token : str) -> dict:
 def check_for_verification_code_in_token(decoded_token = Depends(get_decoded_token_for_verification)) -> str:
     """
     Checks if decoded token contains the verification code.
-    Function Depends on get_decoded_token. 
-    Exceptions
-        HTTP Exception (Token invalid, Verification not found).
+    Function Depends on get_decoded_token_for_verification. 
+    
+    Parameters
+    ----------
+    decoded_token : str
+        The decoded token. 
+    
     Returns
-    decoded token 
+    -------
+    str
+        The decoded token.
+    
+    Raises
+    ------
+    HTTP Exception 
+        If token invalid and/or the verification code is not found
+
     """
     if "verification_code" not in decoded_token:
         raise verification_code_missing
@@ -149,7 +199,18 @@ def check_for_verification_code_in_token(decoded_token = Depends(get_decoded_tok
 
 
 def check_share_token_password(plainPassword : str) -> bool:
-    """Checks if the share token password is correct."""
+    """Checks if the share token password is correct.
+
+    Parameters
+    ----------
+    plainPassword : str
+        The password in as a plain string. Usually the input from a post request. 
+
+    Returns
+    -------
+    bool
+        If the password matches the share_token_pw from the settings. 
+    """
     return SHARE_TOKEN_SETTINGS.share_token_pw.get_secret_value() == plainPassword
    
     

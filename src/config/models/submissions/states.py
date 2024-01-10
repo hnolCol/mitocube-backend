@@ -15,7 +15,7 @@ class StateResponse(BaseModel):
 
 
 
-class StateChange(BaseModel):
+class StateChangeModel(BaseModel):
     """State Change Model"""
     craeted_on : float = Field(..., default_factory=time) 
     prev_state : SubmissionStates

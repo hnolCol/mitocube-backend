@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from config.enums.users.roles import UserRolesEnum
-from config.models.user import User
+from config.models.user import UserModel
 
 from config.models.dataset.data import DatasetPCAResponse
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
 
-from lib.data.database.ABCDatabase import MCDatabase
+from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.filter.NoMissingValues import NoNaNFilter
-from lib.data.runs.RunList import RunListCreater
 
 from config.exceptions.HTTPExceptions import no_data_found
 
@@ -60,6 +59,8 @@ def get_dataset_data(dataset_label : str):
     TO DO : Add response model.
     """
     db = MCDatabase.getDatabase()
+    
+
     dataset = db.getDataset(dataset_label)
     metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
     datatable = dataset.getDataTable()
@@ -86,7 +87,7 @@ def get_dataset_data(dataset_label : str):
 @router.get("/datasets/{dataset_label}/meta",
             response_model=DatasetSubmissionModel,
             tags=["Parameters","Meta data"])
-def get_dataset_params(dataset_label : str, user : User = Depends(get_user_from_token)):
+def get_dataset_params(dataset_label : str, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the metadata associated to the dataset
     """
@@ -120,12 +121,13 @@ def get_dataset_heatmap(data_id : str, test_details : dict):
             response_model=DatasetPCAResponse,
             tags=["Dimensional reduction","PCA"])
 
-def get_dataset_pca(dataset_label : str, user : User = Depends(get_user_from_token)):
+def get_dataset_pca(dataset_label : str, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the result of a Principal component anaylsis (PCA).
     """
     db = MCDatabase.getDatabase()
     dataset = db.getDataset(dataset_label)
+    if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found the dataset {dataset_label}.")
     idcs = NoNaNFilter(dataset).get_indices()
     
     projected_data, drivers, variance_explained, samples_attributes = PCATransform(dataset=dataset,
@@ -142,26 +144,3 @@ def get_dataset_pca(dataset_label : str, user : User = Depends(get_user_from_tok
         samples_attributes=samples_attributes
         )
 
-
-@router.post("/datasets/{dataset_label}/runlist", response_model=RunListModel, tags = ["Runlist"])
-def get_dataset_runlist(dataset_label : str, runlist_props : RunListRequestPropsModel): #user : User = Depends(get_user_from_token)
-    """
-    Creates a runlist for a specific dataset. 
-
-    """
-    db = MCDatabase.getDatabase()
-    dataset = db.getDataset(dataset_label)
-    sample_idces, sample_attribute_by_name = dataset.getSamplesAttributes()
-    print(sample_idces, sample_attribute_by_name)
-    try:
-        runlist = RunListCreater(sample_list=sample_idces, 
-                                 user_label="hallo", 
-                                 dataset_label=dataset_label, 
-                                 **runlist_props.model_dump()
-                                 ).create()
-        print(runlist)
-        return runlist
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-        
-    

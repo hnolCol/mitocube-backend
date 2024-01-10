@@ -11,7 +11,7 @@ class Token(BaseModel):
     token_type : str = "Bearer"
 
 class TokenVerificationCode(BaseModel):
-    """Validation Code for Specific User Token"""
+    """Validation Code for Specific UserModel Token"""
     verification_code : str #= Field(...,default_factory=lambda : get_random_string(N = 12))
 
 class ShareTokenPassword(BaseModel):

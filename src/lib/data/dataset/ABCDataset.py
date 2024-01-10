@@ -2,13 +2,14 @@
 
 import pandas as pd 
 import typing
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 from pydantic import BaseModel, Field, field_serializer
 
 from abc import abstractmethod
 from deprecated import deprecated
 from lib.DesignPatterns import JsonSerializable
 from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.submissions.runs import RunListModel
 import random
 from lib.DesignPatterns import JsonSerializable
 import random
@@ -23,11 +24,8 @@ class MCDataset(JsonSerializable):
                  label: str = None,
                  state: str = None,
                  title: str = None,
-                 #experimentator: str = None,
                  user_label : str = None,
                  collaborators : typing.List[str] = [],
-               #  name_group: str = None,
-               #  contact_email: str = None,  # ToDo: Countercheck default values
                  created_on: str = None,  # ToDo: Check DataType Date
                  uploaded_on: str = None,
                  data_table: pd.DataFrame = None,
@@ -38,7 +36,7 @@ class MCDataset(JsonSerializable):
                  attributes_samples: typing.Dict = None,
                  sample_names : typing.List[str] = [],
                  timeline : typing.Dict = None,
-                # instrument: typing.Dict = None,
+                 runlist : typing.Optional[RunListModel] = None,
                  loadFromDatabase: bool = False, 
                  load_meta_only : bool = False):  # ToDo: Check DataType Date
         """Constructor"""
@@ -67,7 +65,7 @@ class MCDataset(JsonSerializable):
             self._attributes_samples = attributes_samples
             self._sample_names = sample_names
             #self._instrument = instrument
-
+            self._runlist = runlist
             self._title = title
             self._user_label = user_label
             self._collaborators = collaborators
@@ -182,9 +180,16 @@ class MCDataset(JsonSerializable):
         # Todo: Write documentation
         return self._id
 
-    def getDataTable(self) -> pd.DataFrame:
-        """"""
-        # Todo: Write documentation
+    def getDataTable(self) -> pd.DataFrame | None:
+        """
+        Returns the quantitative datatable (feature x samples) of the dataset.
+        
+        Returns
+        -------
+        pd.DataFrame | None 
+            If dataset does not have a data table yet, None is returned. 
+            Check with dataset.hasData() if data are available.
+        """
         if not self._isLoaded():
             self._refresh()
 
@@ -195,12 +200,22 @@ class MCDataset(JsonSerializable):
         # Todo: Write documentation
         return self._label
 
-    def getMetaJson(self) -> DatasetSubmissionModel:
-        """"""
-        # Todo: Write documentation
+    def getMetaJson(self, force_reload : bool = False) -> DatasetSubmissionModel:
+        """Returns the meta data. 
+        
+        Parameters
+        ----------
+        force_reload : bool, default False
+            If True reloads the data using the function _read_meta() even if the data were loaded before.
+        
+        Returns
+        -------
+        DatasetSubmissionModel
+            The meta data. 
+        """
        
-        if not self._isLoaded():
-            self._read_meta() ##changed!
+        if not self._isLoaded() or force_reload:
+            self._read_meta() 
         return DatasetSubmissionModel(
             title=self._title,
             replicates=self._replicates,
@@ -214,27 +229,9 @@ class MCDataset(JsonSerializable):
             metatext=self._metatexts,
             collaborators=self._collaborators,
             sample_names=self._sample_names,
-            timeline=self._timeline)
-
-        return {"id": self._id,
-                "label": self._label,
-                "state": self._state,
-                "title": self._title,
-                "user_label" : self._user_label,
-                "email": self._contact_email,
-                "created_on": self._created_on,
-                #"date_uploaded_on": self._uploaded_on,
-                #"instrument": self._instrument,
-                "n_rows": self._cached_data_table.shape[0],
-                "n_samples": self._cached_data_table.shape[1], #this excludes that there can be extra data in the table. 
-                "metatexts": self._metatexts,
-
-               # "urls": self._urls,
-              #  "replicates": self._replicates,
-             #   "attributes": self._attributes_dataset,
-              #  "n_attributes": len(self._attributes_dataset),
-                "attributes_samples": self._attributes_samples,
-                "n_attribute_samples": len(self._attributes_samples)}
+            timeline=self._timeline,
+            runlist=self._runlist,
+            links = self._urls)
 
 
     @deprecated(version='1.1', reason="Change of the data format: Please use the toJson(...) method.")
@@ -318,12 +315,35 @@ class MCDataset(JsonSerializable):
                 "groupings": json_groupings
                 }
 
-    def getSamplesAttributes(self):
+    def getSamplesAttributes(self, map_tags_to : bool = False, tag_mapper : dict = {}) -> Tuple[pd.DataFrame, OrderedDict[str,List[str]]]:
         """
-        """
+        Dataset function that maps the samples attributes to the sample names and is intended to be used in a HTTPResponse. 
+        If multiple samples attribute values are assigned to a single sample, the tags are separated by a simple
+        sample " ". 
         
+        TODO : Should likely be moved to the PandaDataset and PostgreSQLDataset
+
+        Parameters
+        ----------
+        map_tags_to : bool, default False 
+            If yes the attribute value tags (att_<attribute_text>:value) is mapped to any given dict provided in tag_mapper. If
+            the tag is not found, simply the tag is returned.
+        tag_mapper : dict, default {}
+            The mapper to map tags to any value. Likely the text representation of an attribute value. 
+
+        Returns
+        -------
+        samples_idces : pd.DataFrame 
+            DataFrame where indices are the sample_names and the each column represents a samples attribute.
+            The column name represent the name. If map_tags_to is ``False``, then the values in each column
+            are the ``attribute values tags``. Otherwise the values of the mapper-dict ``tag_mapper``. 
+        
+        sample_attribute_by_name : OrderedDict 
+            A dict with samples attribute names as keys and values as List[str] containing the sample attribute value
+            tags. 
+        """
         meta_data = self.getMetaJson()
-        sample_names = meta_data.sample_names #mabe change to runnames
+        sample_names = meta_data.sample_names 
         samples_attributes = meta_data.samples_attributes #attributeTag -> sampleName Index
     
         sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
@@ -334,18 +354,22 @@ class MCDataset(JsonSerializable):
             sample_attribute_values = attributes.values 
             #switch keys and values to map samples indices
             attribute_mapper = value_mapper_from_dict(sample_attribute_values) 
+            if map_tags_to and len(tag_mapper) > 0:
+                #multiple tags are separated currently by a space. Therefore split first.
+                attribute_mapper = OrderedDict([k," ".join(tag_mapper[tag] if tag in tag_mapper else tag for tag in v.split(" "))] for k,v in attribute_mapper.items())
+
             sample_idces.loc[:,sample_attribute_name] = sample_idces.index.map(attribute_mapper)
             sample_attribute_by_name[sample_attribute_name] = list(sample_attribute_values.keys())
         #replace indices with sample names
         sample_idces.index = sample_names
-        return sample_idces, sample_attribute_by_name  # ToDo: Wrong return type
+        return sample_idces, sample_attribute_by_name
 
     def isLoadedFromDatabase(self) -> bool:
         """"""
         # Todo: Write documentation
         return self._loadedFromDatabase
 
-    def toJson(self) -> typing.Dict[str, typing.Any]:
+    def toJson(self) -> Dict[str, typing.Any]:
         """"""
         # Todo: Write documentation
         json = self.getMetaJson()

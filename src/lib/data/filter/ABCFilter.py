@@ -7,6 +7,18 @@ from lib.data.dataset.ABCDataset import MCDataset
 
 class DatasetFilter(ABC):
     """
+    Abstract Class for a dataset filter. 
+
+    Parameters
+    ----------
+    dataset : MCDataset
+        The dataset to be filtered.
+
+    Methods
+    -------
+    get_indices()
+        Returns the pd.Index of the dataset data that match the filtering.     
+
     """
     def __init__(self, dataset : MCDataset) -> None:
         """

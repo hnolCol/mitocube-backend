@@ -1,47 +1,51 @@
 
+import asyncio
+import os 
 
-from config.models.user import User, UserRolesEnum 
+from typing import List, Tuple
+from fastapi import BackgroundTasks
+
+from config.exceptions.HTTPExceptions import user_registration_failed, user_not_found
+from config.settings.db import get_db_settings 
+from config.settings.general import get_general_settings
+from config.settings.email import get_email_settings
+
+from config.models.user import AdminUserView, UsersAdminResponse, UserModelForRegistration, UserModelForUpdate
+from config.models.user import UserModel, UserRolesEnum 
+
 from services.encryption import create_password_hash
 from services.random_generators import get_random_string
 from services.paths.utils import check_dir_exists, join_path
 from services.mail import  async_send_email
 from services.json import read_json, save_json
-from typing import List, Tuple
-from fastapi import BackgroundTasks
-from config.models.user import AdminUserView, UsersAdminResponse, UserModelForRegistration, UserModelForUpdate
-from config.exceptions.HTTPExceptions import user_registration_failed, user_not_found
-from config.settings.db import get_db_settings 
-from config.settings.general import get_general_settings
-from config.settings.email import get_email_settings
-import asyncio
-import os 
+
 
 DB_SETTINGS = get_db_settings()
 GENERAL_SETTINGS = get_general_settings()
 EMAIL_SETTINGS = get_email_settings()
 
-fake_DB : List[User] = [
-    User(
-        id = 1,
-        label = "asd7123a",
-        firstname="Hendrik",
-        lastname="Nolte",
-        email="h.nolte@age.mpg.de",
-        password=create_password_hash("Hallo"),
-        institute="MPI",
-        email_verified=True, 
-        research_group="Langer", 
-        role=UserRolesEnum.ADMIN),
-    User(id=2,
-        label = "asdth23a",
-        firstname="Emil",
-        lastname="Nolte",
-        email="nolte@instantclue.de",
-        password=create_password_hash("Hallo"),
-        institute="CECAD",
-        email_verified=True, 
-        research_group="Krueger", 
-        role=UserRolesEnum.ADMIN)]
+# fake_DB : List[UserModel] = [
+#     UserModel(
+#         id = 1,
+#         label = "asd7123a",
+#         firstname="Hendrik",
+#         lastname="Nolte",
+#         email="h.nolte@age.mpg.de",
+#         password=create_password_hash("Hallo"),
+#         institute="MPI",
+#         email_verified=True, 
+#         research_group="Langer", 
+#         role=UserRolesEnum.ADMIN),
+#     UserModel(id=2,
+#         label = "asdth23a",
+#         firstname="Emil",
+#         lastname="Nolte",
+#         email="nolte@instantclue.de",
+#         password=create_password_hash("Hallo"),
+#         institute="CECAD",
+#         email_verified=True, 
+#         research_group="Krueger", 
+#         role=UserRolesEnum.ADMIN)]
 
 
 class UserDB:
@@ -57,13 +61,13 @@ class UserDB:
         """"""
         return join_path(self.user_dir,"users.json")
 
-    def _load_users(self,):
+    def _load_users(self):
 
         user_db_file = self._get_file_path()
         if not os.path.exists(user_db_file):
             auto_pw = get_random_string(10)
             ## create lead contact
-            lead_contact = User(
+            lead_contact = UserModel(
                 id = 0,
                 password=create_password_hash(auto_pw),
                 firstname=GENERAL_SETTINGS.lead_contact_first_name,
@@ -85,13 +89,12 @@ class UserDB:
                                 "password" : auto_pw
                             },
                             template_mame=EMAIL_SETTINGS.mail_account_generated_template,
-                            include_setting_cc=True))
-                                     
+                            include_setting_cc=True))                    
         else:
-            self.DB = [User(**user_props) for user_props in read_json(user_db_file)]
+            self.DB = [UserModel(**user_props) for user_props in read_json(user_db_file)]
     
 
-    def _update(self) -> List[User]:
+    def _update(self) -> List[UserModel]:
         """Updates Users and returns the DB"""
         self._load_users()
         return self.DB 
@@ -114,7 +117,7 @@ class UserDB:
         next_id = max([user.id for user in DB])
         pw_hash = create_password_hash(user_props.password)
         user_props_from_request = user_props.model_dump(exclude=["password"])
-        to_add_user = User(id = next_id+1,password=pw_hash,**user_props_from_request)
+        to_add_user = UserModel(id = next_id+1,password=pw_hash,**user_props_from_request)
         DB.append(to_add_user)
         self._save_db()
 
@@ -137,7 +140,7 @@ class UserDB:
             self.DB = [user for user in self.DB if user.label != userInDB.label]
             self._save_db()
 
-    def get_users(self) -> List[User]:
+    def get_users(self) -> List[UserModel]:
         """"""
         return self._update()
 
@@ -155,7 +158,7 @@ class UserDB:
             return False, None
         return True, users[0]
     
-    def get_user_by_email(self, email : str) -> User:
+    def get_user_by_email(self, email : str) -> UserModel:
         ""
         users = [user for user in self.DB if user.email == email]
         if len(users) == 0:
@@ -174,7 +177,7 @@ class UserDB:
                 user_props_updated = {**user.model_dump(exclude_none=True),**user_props.model_dump(exclude_none=True)}
                 break 
         #handle error if user cannot be constructed.
-        updated_user = User(**user_props_updated)
+        updated_user = UserModel(**user_props_updated)
     
         DB[userIdx] = updated_user
         self._save_db()

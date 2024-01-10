@@ -2,7 +2,7 @@ from fastapi import APIRouter , Depends
 
 from typing import List
 
-from config.models.user import User
+from config.models.user import UserModel
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 from config.enums.users.roles import UserRolesEnum
@@ -17,9 +17,9 @@ router = APIRouter(
 
 
 @router.get("/attributes", response_model=AttributeResponseModel)
-def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeResponseModel:
+def get_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
     """
-    Returns the stored attribute and attribute value definitions.
+    Returns the stored attribute and attribute values.
     """
     db_attributes = MCAttributes.getAttributeDatabase()
 
@@ -28,7 +28,7 @@ def get_attributes(user : User = Depends(get_user_from_token)) -> AttributeRespo
 
 
 @router.get("/attributes/user", response_model=AttributeResponseModel)
-def get_user_attributes(user : User = Depends(get_user_from_token)) -> AttributeResponseModel:
+def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
     """
     Returns the stored attribute and attribute value definitions that can be assigned to a user.
     """
@@ -57,29 +57,28 @@ def get_user_attributes(user : User = Depends(get_user_from_token)) -> Attribute
 @router.post("/attributes")
 def add_attribute(attribute : AttributeModel) -> List[AttributeModel]:
     """Adds an attribute and returns the updated list"""
-
+    #ToDo: implement adding attributes from the GUI. 
     db_attributes = MCAttributes.getAttributeDatabase()
-
     return [AttributeModel(**item) for item in db_attributes.getAttributes().to_dict(orient="records")]
     # return db_attributes.getAttributes().to_dict(orient="records")  # ToDo: How to cast into a AttributeModel?
 
 
 @router.get("/attributes/{attribute_id}")
-def get_attribute_by_id(attribute_id : str) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?
+def get_attribute_by_id(attribute_id : int) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?, ID, these were placeholders from the very beginning, changed them
     """
     Returns the attribute by its ID
     """
     return {}
 
-@router.get("/attributes/{attribute_name}")
-def get_attribute_by_name(attribute_name : str) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?
+@router.get("/attributes/{attribute_tag}")
+def get_attribute_by_name(attribute_tag : str) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?, the tag, changed. 
     """
-    Returns attribute by its name
+    Returns a single attribute by its tag
     """
     return {}
 
 @router.delete("/attributes/{attribute_id}")
-def delete_attribute_by_id(attribute_id : str) -> dict:
+def delete_attribute_by_id(attribute_id : int) -> dict:
     """Deletes an attribute by ID"""
     return {}  # ToDo: What should be returned? deleted attributes? Tag or IDs?
 

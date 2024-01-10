@@ -176,7 +176,7 @@ class PostgreSQLDatabase(MCDatabase):
     def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
         pass
 
-    def getDatasetsWithFeature(self, feature_id: str) -> List:
+    def getDatasetsWithFeature(self, feature_key: str) -> List:
         pass
 
     # Todo: Check above

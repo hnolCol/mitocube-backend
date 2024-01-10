@@ -19,7 +19,8 @@ from routers.dataset import dataset
 from routers.submission import submission
 from routers.authentication import token, user
 from routers.info import info
-from routers.annotations import annotations, attributes, features
+from routers.annotations import annotations, attributes
+from routers.features import features
 # from routers import play  # route to test things during development ###########################################################
 
 router_sources = [dataset, submission, attributes, token, user, features, info, annotations]
@@ -60,14 +61,14 @@ for rs in router_sources:
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
-# db_features = PandaFeatureDatabase()
-# db_features.update()  # load all configured Features (UniProt)
+db_features = PandaFeatureDatabase()
+db_features.update()  # load all configured Features (UniProt)
 
-# db_annotations = AnnotationDatabase()
-# db_annotations.update()  # load all configured Annotations
+db_annotations = AnnotationDatabase()
+db_annotations.update()  # load all configured Annotations
 
-# db_attributes = MCAttributes.getAttributeDatabase()
-# db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
+db_attributes = MCAttributes.getAttributeDatabase()
+db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
 
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):

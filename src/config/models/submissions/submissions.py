@@ -10,7 +10,8 @@ from pydantic import field_serializer
 
 from config.models.user import PublicUser
 from config.models.attributes import AttributeModel, AttributeValueModel
-from config.models.submissions.timeline import Timeline, TimelineEntry
+from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
+from config.models.submissions.runs import RunListModel
 from config.settings.metatexts import MetaTexts
 from config.enums.states import SubmissionStates
 from services.random_generators import get_random_string
@@ -27,13 +28,27 @@ class SubmissionLink(BaseModel):
         return str(v)
     
 class SampleAttribute(BaseModel):
-    """
+    """_summary_
+
+    Parameters
+    ----------
+    attribute : AttributeModel 
+        The attribute model 
+    name : str 
+        The name of the samples attributes
     """
     attribute : AttributeModel
     name : str 
 
-class NewSubmission(BaseModel):
-    """Add a submission"""
+class NewSubmissionModel(BaseModel):
+    """
+    Model to handle submissions from the ui. 
+
+    Parameters
+    ----------
+
+
+    """
     created_on : float = Field(..., default_factory= time.time)
     sampleNames : List[str]
     replicates : List[int]
@@ -46,7 +61,7 @@ class NewSubmission(BaseModel):
     datasetAttributeValues : Dict[str,List[AttributeValueModel]]
     datasetAttributes : List[AttributeModel]
     samplesAttributes : List[SampleAttribute]
-    timeline : Timeline = Field(...,default_factory=Timeline)
+    timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
 
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
@@ -95,7 +110,8 @@ class DatasetSubmissionModel(BaseModel):
     dataset_attributes : Dict[str,List[str]]
     samples_attributes : Dict[str,SampleAttributeFromDB]
     links : List[SubmissionLink] = []
-    timeline : Timeline = Field(...,default_factory=Timeline)
+    timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
+    runlist : Optional[RunListModel] = None 
 
 
 class SubmissionIDResponse(BaseModel):
@@ -103,12 +119,5 @@ class SubmissionIDResponse(BaseModel):
     id: str = Field(default_factory= lambda : get_random_string(N=10))
     created_on : datetime = Field(default_factory= datetime.now)
 
-
-class SubmissionResponse(BaseModel):
-    """BaseModel for an API Submission of a submission"""
-    data_id : str 
-    craeted_on : datetime = time.time()
-    attributes : List[AttributeModel]
-    attribute_values : List[AttributeValueModel]
 
 

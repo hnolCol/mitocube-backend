@@ -9,7 +9,7 @@ import pandas as pd
 
 @deprecated(reason="Please use the MCDataset's getSamplesAttributes()")
 class SampleAttributeAnnotation(SampleAnnotation):
-
+    #TODO: we can delete this, I moved it to MCDataset.. 
     def annotate(self) -> pd.DataFrame:
         """Annotates sample attributes"""
         #sample_names_values = self._dataset.getDataTable().columns.to_numpy()

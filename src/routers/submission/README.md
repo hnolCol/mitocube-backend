@@ -1,7 +1,7 @@
 
 
 ```python
-class NewSubmission(BaseModel):
+class NewSubmissionModel(BaseModel):
     """Add a submission"""
     sampleNames : List[str]
     collaborators : List[PublicUser]

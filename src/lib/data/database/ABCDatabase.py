@@ -40,9 +40,19 @@ class MCAttributes(metaclass=SingletonABCMeta):
             raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
 
     @abstractmethod
-    def getAttributes(self) -> pd.DataFrame:
+    def getAttributes(self, sort : bool = True) -> pd.DataFrame:
         """
         Returns the full attribute table as Panda DataFrame.
+        
+        Paramaters
+        ----------
+        sort : bool, default True
+            If true, the attributes will be sorted by the column priority. 
+            
+        Returns
+        -------
+        pd.DataFrame 
+            The attributes in the database
         """
         pass
 
@@ -177,7 +187,18 @@ class MCDatabase(metaclass=SingletonABCMeta):
 
     def getDatasets(self, labels: List[str] = []) -> Dict[str, MCDataset]:
         """
-        Returns a dictionary of the datasets defined in labels. Uses the database labels as keys. Labels with no matching dataset in the database will be silently ignored and an e
+        Returns a dictionary of the datasets defined in labels. 
+        Uses the database labels as keys. Labels with no matching label in the database will be silently ignored.
+
+        Parameters
+        ----------
+        labels : List[str], default []
+            The dataset labels to be returned. If a label is missing, it will be ignored. 
+
+        Returns
+        -------
+        Dict[str, MCDataset]
+            The datasets as a dictionary with labels as keys. Any missing label will not exists in the output.
         """
         # Todo: Write documentation
         datasets = {}
@@ -188,7 +209,7 @@ class MCDatabase(metaclass=SingletonABCMeta):
         for label in labels:
             if label in self._cached_datasets.keys():
                 datasets[label] = self._cached_datasets[label]
-            else:
+            elif self.doesLabelExists(label): # otherwise it will return None which we would then have again to check for.
                 datasets[label] = self.getDataset(label)
 
         return datasets
@@ -248,9 +269,15 @@ class MCDatabase(metaclass=SingletonABCMeta):
         pass
 
     @abstractmethod
-    def getDatasetsWithFeature(self, feature_id : str) -> List:
+    def getDatasetsWithFeature(self, feature_key : str) -> List:
         """
         Returns all datasets that contain a specific feature as List.
+
+        Parameters
+        ----------
+
+        feature_key : str 
+            The feature key (e.g. Uniprot ID)
         """
         pass
 

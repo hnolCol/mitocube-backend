@@ -37,7 +37,7 @@ class BasicUserWithEmail(BasicUser):
             raise ValueError("Email adresses must end with an allowed domain. Please contact your administrator.")
         return v 
 
-class User(BasicUserWithEmail):
+class UserModel(BasicUserWithEmail):
     """BaseModel for a user"""
     id : int
     updated_on : float = None
@@ -84,7 +84,7 @@ class UsersAdminResponse(BaseModel):
 
 class PublicUser(BaseModel):
     """
-    Public BaseModel for a User. 
+    Public BaseModel for a UserModel. 
     Public indicates user info to be seen by other users.
     To distinguish them, the API deadend for those is /api/collaborators
     while api/users is restricted to admin rights. 
@@ -96,16 +96,14 @@ class PublicUser(BaseModel):
     institute : str 
     email : EmailStr
 
-class Collaborators(BaseModel):
+class CollaboratorsResponseModel(BaseModel):
+    """Collaborators Mdeol"""
     users : List[PublicUser]
 
 
-class UseRoleReponse(BaseModel):
-    """"""
+class UseRoleReponseModel(BaseModel):
+    """The user roles response model."""
     roles : dict = Field(default_factory=lambda : get_inversed_enum_as_dict(UserRolesEnum))
-
-#user_dict = DB().get_user_by_id(id="asdada")
-
 
 
 class UserLabel(BaseModel):

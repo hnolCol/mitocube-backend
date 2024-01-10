@@ -10,7 +10,7 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.submissions.states import SubmissionStates
 from config.settings.metatexts import MetaTexts
 from services.enums import get_inversed_enum_as_dict, get_enum_as_dict
-from config.models.submissions.timeline import TimelineModel, TimelineEntryModel
+from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from  collections import Counter
 org = {
     "Saccharomyces cerevisiae (Baker's Yeast)" : "UP000002311", 
@@ -105,13 +105,13 @@ def migrate_from_folder(submission_dir = "/Users/hnolte/Desktop/data/dynamic/sub
                     stateName = "ANALYSIS"
                 if stateName.upper() == "MEASURING PAUSED":
                     stateName = "PAUSED"
-                e.append(TimelineEntryModel(id = n,
+                e.append(TimeLineEntryModel(id = n,
                                             created_on=datetime.strptime(timeString,"%Y%m%d").timestamp(),
                                             user_label=user_label,
                                             state=states[stateName.upper()]))
                 
                 
-            timeLineMolde = TimelineModel(created_on=unixtime, modified_on= time.time(), entries=e)
+            timeLineMolde = TimeLineModel(created_on=unixtime, modified_on= time.time(), entries=e)
 
 
         currentState = jsonFile["State"].upper() if jsonFile["State"].upper() not in ["MEASURING PAUSED","DATA ANALYSIS"] else jsonFile["State"].upper().split(" ")[-1]
