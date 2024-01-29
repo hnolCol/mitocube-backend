@@ -4,6 +4,9 @@ from collections import OrderedDict
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 from lib.data.runs.runs import RunListCreator
+from lib.user.UserHandling import UserDB
+
+
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 from config.settings.metatexts import MetaTexts
@@ -17,13 +20,13 @@ from config.models.attributes import AttributeModel
 from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission
 from config.models.user import UserModel
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel
+from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel
 from config.models.submissions.states import StateResponse, StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel, RunListResponseModel
 
 from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator
-from services.submission import submission_to_json, check_for_missing_mandatory_attribute
+from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attributes
 from services.json import save_json
 from services.mail import send_email_in_background
 from services.paths.utils import check_dir_exists, join_path
@@ -57,7 +60,6 @@ def get_submission_id():
             response_model=MetaTextSubmissionResponse)
 def get_meta_text(user : UserModel = Depends(get_user_from_token)):
     """"""
-    print(MetaTexts().model_dump())
     return MetaTexts().model_dump()
 
 
@@ -79,7 +81,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
 
     if len(missing_mand_attributes) > 0: return mandatory_dataset_attrs_not_found_exception.add_note(f"Missing : {[attr.tag for attr in missing_mand_attributes]}")
     json_data = submission_to_json(submission,user)
-    
+
     data_dir = DB_SETTINGS.db_datadir
     dataset_dir = join_path(data_dir,submission.label)
     exists, dataset_dir = check_dir_exists(dataset_dir)
@@ -166,7 +168,7 @@ def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curato
     pass 
 
 
-@router.get("/submissions")
+@router.get("/submissions", response_model=List[DatasetSubmissionResponseModel])
 def get_submission(user : UserModel = Depends(get_user_from_token)):
     """
     Returns the submissions depending on the user's role. 
@@ -176,11 +178,12 @@ def get_submission(user : UserModel = Depends(get_user_from_token)):
 
     db = MCDatabase.getDatabase()
     metadata = db.getJSONDatasets()
+    #map_tags_to_attributes(list(metadata.values())[0])
     if user.role < UserRolesEnum.CURATOR:
-        return [dataset_meta for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
+        return [map_tags_to_attributes(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
     else:
         #return all if user at least curator
-        return [dataset_meta for dataset_label, dataset_meta in metadata.items()]
+        return [map_tags_to_attributes(dataset_meta) for dataset_label, dataset_meta in metadata.items()]
     
 
 
@@ -221,7 +224,9 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
     attributes = MCAttributes.getAttributeDatabase()
     attribute_values = attributes.getAttributeValues()
     attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
-    dataset = db.getDataset(label = submission_label)
+    try: dataset = db.getDataset(label = submission_label) 
+    except: raise label_not_found_exception
+    
     sample_idces, _ = dataset.getSamplesAttributes(map_tags_to=True,tag_mapper=attribute_value_by_tag)
     try:
         runlist = RunListCreator(sample_list=sample_idces, 
@@ -241,3 +246,18 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
         raise HTTPException(status_code=400, detail=str(e))
         
     
+    
+    
+@router.get("/submissions/{submission_label}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
+def get_submission_runlist(submission_label : str, user : UserModel = Depends(get_user_from_token)) -> RunListResponseModel:
+    db = MCDatabase.getDatabase()
+    try: dataset = db.getDataset(label = submission_label) 
+    except: raise label_not_found_exception
+    metadata = dataset.getMetaJson()
+    runlist = metadata.runlist
+    if runlist is not None: 
+        user_label = runlist.user_label 
+        user_exists, user = UserDB.get_user_by_label(user_label)
+        if user_exists:
+            return RunListResponseModel(**metadata.runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
+    raise Exception(status_code = 404, detail = "No runlist found.")

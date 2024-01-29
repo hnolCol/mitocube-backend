@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
-from config.models.annotations.feature import FeatureDataResponseModel
+from config.models.annotations.feature import FeatureDataResponseModel, FeatureModel
 from lib.data.annotations.ABCAnnotations import AnnotationDatabase
 from services.users import get_user_from_token
+from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.FeatureData import FeatureData
@@ -15,6 +16,33 @@ router = APIRouter(
     prefix="/api/features",
     tags=["Features"]
     )
+
+
+@router.get("")
+def get_features_by_query(proteome_id : str, query : str, max_features : int = 30): #, user : UserModel = Depends(get_user_from_token)
+    """_summary_
+
+    Parameters
+    ----------
+    query : str
+        _description_
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    feature_db = PandaFeatureDatabase()
+    features = feature_db.find(values=[query], proteome_id=proteome_id)
+    if features.empty: return []
+    if features.index.size > max_features:
+        features = features.head(max_features)
+    features = features.reset_index(names="key").to_dict(orient="records")
+    #features = features.to_dict(orient="records")  # [{'col1': 1, 'col2': 0.5}, {'col1': 2, 'col2': 0.75}]
+    return [FeatureModel(**item) for item in features] 
+    
 
 @router.get("/{feature_key}/data",
             response_model=FeatureDataResponseModel)
@@ -89,6 +117,7 @@ def get_feature_sequence(feature_key : str): #user : UserModel = Depends(get_use
     db_annotations = AnnotationDatabase()
     annotations = db_annotations.getAnnotations(feature_key=feature_key, subset=["SequenceAnnotation"])  # ToDo: What return Model is needed by GUI?
     print(annotations)
-    #TODO : the key of the sequence annotation is informative but overloaded? 
-    return {
-        "feature_key" : feature_key, **annotations}
+    if len(annotations) == 0: raise HTTPException(status_code=404, detail="No sequene annotations found.")
+    sequence = list(annotations.values())[0][0]
+    #TODO : the key of the sequence annotation is informative but overloaded? what happends if nothing found? 
+    return {"feature_key" : feature_key, "sequence" : sequence}

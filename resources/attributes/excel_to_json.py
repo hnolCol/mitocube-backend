@@ -19,10 +19,10 @@ __last_modified__ = "20231120"
 __author__ = "Hendrik Nolte"
 
     
-# FILE = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.xlsx"
-# FILE_OUT = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json"
-FILE = "/home/andreaslindner/Projects/ImmunoCube_V2/mitocube-backend/resources/attributes/attributes.xlsx"
-FILE_OUT = "/home/andreaslindner/Projects/ImmunoCube_V2/mitocube-backend/resources/attributes/attributes.json"
+FILE = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.xlsx"
+FILE_OUT = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json"
+#FILE = "/home/andreaslindner/Projects/ImmunoCube_V2/mitocube-backend/resources/attributes/attributes.xlsx"
+#FILE_OUT = "/home/andreaslindner/Projects/ImmunoCube_V2/mitocube-backend/resources/attributes/attributes.json"
 
 ATTRIBUTE_SHEET = "attributes"
 ATTRIBUTE_VALUES_SHEET = "attribute_values"

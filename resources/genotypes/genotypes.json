@@ -1,0 +1,81 @@
+[
+    {
+        "label": "QzUBY",
+        "text": "Ndufs6(+/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "P52503",
+                "genes": "Ndufs6 Ip13",
+                "proteins": "NADH dehydrogenase [ubiquinone] iron-sulfur protein 6, mitochondrial (Complex I-13kD-A) (CI-13kD-A) (NADH-ubiquinone oxidoreductase 13 kDa-A subunit)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 116,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "P52503",
+                        "genes": "Ndufs6 Ip13",
+                        "proteins": "NADH dehydrogenase [ubiquinone] iron-sulfur protein 6, mitochondrial (Complex I-13kD-A) (CI-13kD-A) (NADH-ubiquinone oxidoreductase 13 kDa-A subunit)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 116,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 339,
+                        "attribute_id": 48,
+                        "text": "Deletion",
+                        "tag": "att_gene_engineering:deletion",
+                        "value": "deletion",
+                        "description": "Gene deletion"
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 344,
+                        "attribute_id": 49,
+                        "text": "Heterezygot (+/-)",
+                        "tag": "att_gene_zygosity:(+/-)",
+                        "value": "(+/-)",
+                        "description": "Heterozygous"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 334,
+                        "attribute_id": 47,
+                        "text": "CRISPR-mediated",
+                        "tag": "att_gene_editing_method:crispr",
+                        "value": "crispr",
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
+                    }
+                ],
+                "att_protein_mutation": [
+                    {
+                        "id": 688,
+                        "attribute_id": 86,
+                        "text": "Frameshift",
+                        "tag": "att_protein_mutation:frameshift",
+                        "value": "frameshift",
+                        "description": "Frameshift mediated by a double strand break"
+                    }
+                ],
+                "att_protein_position": [
+                    {
+                        "id": 700,
+                        "attribute_id": 87,
+                        "text": "Region",
+                        "tag": "att_protein_position:region",
+                        "value": "region",
+                        "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
+                    }
+                ]
+            }
+        ]
+    }
+]

@@ -115,11 +115,6 @@
         "att_quantification": [
             "att_quantification:isobaric"
         ],
-        "att_metabolic_label": [],
-        "att_organism": [],
-        "att_ms": [
-            "att_ms:expl480"
-        ],
         "att_acquisition": [
             "att_acquisition:dda",
             "att_acquisition:dia"
@@ -132,6 +127,9 @@
         ],
         "att_column_length": [
             "att_column_length:50"
+        ],
+        "att_organism": [
+            "att_organism:UP000005640"
         ]
     },
     "samples_attributes": {

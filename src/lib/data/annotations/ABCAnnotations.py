@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import os
 from abc import ABC, abstractmethod
 from threading import Lock
@@ -20,6 +19,7 @@ from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 
 from services.regex import build_regex_for_search
+
 
 ANNOTATION_SETTINGS = get_annotation_settings()
 GENERAL_SETTINGS = get_general_settings() 
@@ -496,7 +496,7 @@ class PandaFeatureDatabase(FeatureDatabase):
                                      columns = strs_columns)
         for str_column in strs_columns:
             # added proteome_id here.
-            search_result.loc[:,str_column] = features[str_column].str.contains(pat=reg_exp,case=True,regex=True)
+            search_result.loc[:,str_column] = features[str_column].str.contains(pat=reg_exp,case=False,regex=True)
         #check for any match
         results_or = search_result.any(axis=1)
 
@@ -525,7 +525,7 @@ class PandaFeatureDatabase(FeatureDatabase):
 
         if proteome_id is None:
             collected_features = pd.DataFrame(index=[],
-                                              columns=["entry", "key", "proteins", "genes", "organism", "organism_id",
+                                              columns=["entry", "proteins", "genes", "organism", "organism_id", #removing "key" since it is the index? otherwise nan everywhere
                                                        "aa_length", "mass", "proteome_id"])
             if keys is None:
                 for proteome_id_loop, item in self._cached_features.items(): 
@@ -635,6 +635,7 @@ class PandaFeatureDatabase(FeatureDatabase):
                 features.fillna(value="", inplace=True)
                 #remove na indices (if for example the file contained extra lines, then remove duplicates)
                 features = features.loc[features.index.dropna().drop_duplicates(keep="first"),:] 
+       
                 # print(features)
                 # print(mappings)
                 # features = pd.concat([features.loc[:, mappings.loc["entry"][0]],

@@ -14,7 +14,7 @@ class DB(BaseSettings):
     data_id_length : int = 8 #length of the dataID (randomly generated string)
 
     attribute_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json"
-
+    genotype_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json"
     db_handler :Literal["pandafiles","postgresql"] = "pandafiles"  # ToDo: use class names instead? - I gues to set the setting in an env file, these names are more convenient? 
     
     db_datadir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data"

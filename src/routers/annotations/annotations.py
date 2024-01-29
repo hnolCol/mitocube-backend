@@ -19,11 +19,11 @@ router = APIRouter(
 
 
 @router.get('/features',  # /api/annotations/features
-            summary="Returns all features that are present in the database (uniprot downloaded for available organisms).",
+            summary="Returns all features that are present in the database (Uniprot downloaded for available organisms).",
             response_model=List[FeatureModel])
-def get_features_in_database(organism : Optional[AttributeValueModel] = None, user : BasicUserWithEmail = Depends(get_user_from_token)) :
+def get_features_in_database(proteome_id : Optional[str] = None, user : BasicUserWithEmail = Depends(get_user_from_token)) :
     """
-    Returns all features that are present in the database (uniprot downloaded for available organisms). 
+    Returns all features that are present in the database (Uniprot downloaded for available organisms). 
     This is not the list of features present in the datasets but rather the features that are annotation information exist for and
     the reference proteome consists of. 
     
@@ -35,8 +35,8 @@ def get_features_in_database(organism : Optional[AttributeValueModel] = None, us
 
     Parameters
     ----------
-    organism : AttributeModel, default None
-        Organism as provided in the attribute values. 
+    proteome_id : str, default None
+        Uniprot reference proteome. 
     user : BasicUserWithEmail 
         The user extracted from the token using FastAPI Depends function 
 
@@ -49,12 +49,14 @@ def get_features_in_database(organism : Optional[AttributeValueModel] = None, us
 
     """
     db_features = PandaFeatureDatabase()
-    proteome_id = organism.value if organism is not None else None      
     features = db_features.get(proteome_id=proteome_id) #if organism is provided. 
-    features.rename(columns={"key": "uniprot_id", "proteins": "protein_name", "genes": "gene_name", "aa_length": "length"},
-                    inplace=True)  # Other Columns: "entry": "uniprot_id", "organism": "organism", "mass": "mass", "organism_id": "organism_id",
+       
+    features = features.reset_index(names="key")
     features = features.to_dict(orient="records")  # [{'col1': 1, 'col2': 0.5}, {'col1': 2, 'col2': 0.75}]
     return [FeatureModel(**item) for item in features] 
+
+
+
 
 
 @router.post('/features/attributeValues',  # /api/annotations/features/attributeValues

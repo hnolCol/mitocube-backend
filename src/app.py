@@ -11,19 +11,21 @@ from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase, AnnotationDatabase
 from lib.data.database.ABCDatabase import MCAttributes
+from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 ### import services
 from services.paths.utils import get_absolute_path_to_dir
 
 ### import routers
-from routers.dataset import dataset
+from routers.dataset import dataset, heatmap, volcano
 from routers.submission import submission
 from routers.authentication import token, user
 from routers.info import info
 from routers.annotations import annotations, attributes
 from routers.features import features
+from routers.genotypes import genotypes
 # from routers import play  # route to test things during development ###########################################################
 
-router_sources = [dataset, submission, attributes, token, user, features, info, annotations]
+router_sources = [dataset, submission, attributes, token, user, features, info, annotations, heatmap, volcano, genotypes]
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
@@ -70,6 +72,9 @@ db_annotations.update()  # load all configured Annotations
 db_attributes = MCAttributes.getAttributeDatabase()
 db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
 
+db_genotypes = MCGenotypes.getGenotypeDatabase()
+db_genotypes.update()
+
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -78,4 +83,4 @@ app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_asset
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, port = 5000)
+    uvicorn.run(app, port = 5000, proxy_headers=True)

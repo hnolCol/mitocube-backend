@@ -21,6 +21,8 @@ from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 
+from services.json import read_json
+
 DB_SETTINGS = get_db_settings()
 
 
@@ -43,8 +45,7 @@ class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
         attribute_file_path = DB_SETTINGS.attribute_file
 
         try:
-            with open(attribute_file_path, "r+") as attribute_json_file:
-                json_attributes = json.load(attribute_json_file)
+            json_attributes = read_json(attribute_file_path)
 
             self._attributes = pd.DataFrame.from_dict(json_attributes["attributes"])
             

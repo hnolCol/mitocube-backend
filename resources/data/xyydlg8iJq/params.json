@@ -1,0 +1,78 @@
+{
+    "created_on": 1706533776.4441879,
+    "state": 0,
+    "label": "xyydlg8iJq",
+    "title": "Beatuful projet ",
+    "user_label": "VpVff4sS",
+    "collaborators": [],
+    "replicates": [
+        1,
+        2,
+        1,
+        2
+    ],
+    "sample_names": [
+        "20240129_xyydlg8iJq_01_",
+        "20240129_xyydlg8iJq_02_",
+        "20240129_xyydlg8iJq_03_",
+        "20240129_xyydlg8iJq_04_"
+    ],
+    "n_samples": 4,
+    "metatext": {
+        "metatext:research_aim": "asdasdada asdasdada asdasdada asdasdada asdasdada asdasdada \nsdasdada asdasdada asdasdada asdasdada asdasdada \nsdasdada asdasdada asdasdada asdasdada asdasdada \nsdasdada asdasdada asdasdada asdasdada asdasdada \n",
+        "metatext:experimental_procedure": "sdasdada asdasdada asdasdada asdasdada asdasdada \nsdasdada asdasdada asdasdada asdasdada asdasdada "
+    },
+    "dataset_attributes": {
+        "att_organism": [
+            "att_organism:up000000589"
+        ],
+        "att_omics_type": [
+            "att_omics_type:proteomics"
+        ],
+        "att_poi": [
+            "att_poi:P52503"
+        ],
+        "att_experiment": [
+            "att_experiment:expression_proteome"
+        ]
+    },
+    "samples_attributes": {
+        "att_knockdown": {
+            "name": "Gene Knock-down",
+            "values": {
+                "att_knockdown:Q8K3J1": [
+                    0,
+                    1
+                ],
+                "att_knockdown:Q8BJL1": [
+                    2,
+                    3
+                ]
+            }
+        }
+    },
+    "samples_genotypes": {
+        "QzUBY": [
+            0,
+            1,
+            2,
+            3
+        ]
+    },
+    "links": [],
+    "timeline": {
+        "created_on": 1706533776.4579918,
+        "modified_on": 1706533776.4579918,
+        "label": "b113IlaCG4Zvv0gqz6k4",
+        "entries": [
+            {
+                "id": 0,
+                "label": "g5PpIREwxHywrgWqXECo",
+                "created_on": 1706533776.457979,
+                "user_label": "VpVff4sS",
+                "state": 0,
+                "comment": "Project created"
+            }
+        ]
+    }
+}

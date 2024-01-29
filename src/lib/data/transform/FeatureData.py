@@ -41,9 +41,9 @@ class FeatureData(DatasetTransform):
         if add_annotations:
             # annotation_db = Annotations.get_annotation_db()  # ToDo: where does that comes from?
             db_annotations = AnnotationDatabase()
-
+            print(proteome_id,feature_key)
             annotations[feature_key] = db_annotations.getAnnotations(feature_key=feature_key, proteome_id=proteome_id, subset=["GOAnnotation"])
-            
+        print(annotations)
         return feature_data, attributes_samples, annotations
 
         

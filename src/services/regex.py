@@ -17,9 +17,13 @@ def build_regex_for_search(search_strings : List[str]) -> str:
         Regex of style ({string1})|({string}).
     """
     reg_exp = r'' #init reg ex
-    for search_string in search_strings:
-        reg_exp += r'({})|'.format(search_string)
+    for n,search_string in enumerate(search_strings):
+        if n == 0:
+            reg_exp += r'(?:{})|'.format(search_string)
+        else:
+            reg_exp += r'({})|'.format(search_string)
     reg_exp = reg_exp[:-1] #strip of last |
+    
     return reg_exp
 
 def get_cursor_from_header_link(link : str) -> str:

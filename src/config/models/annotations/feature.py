@@ -1,13 +1,15 @@
 from pydantic import BaseModel
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 class FeatureModel(BaseModel):
     """Base Model for a Feature"""
-    uniprot_id : str 
-    gene_name : str 
-    protein_name : str 
+    key : str 
+    tag : Optional[str] = None
+    genes : str 
+    proteins : str 
     organism : str
-    length : int
+    aa_length : int
+    reviewed : Optional[bool] = True 
 
 class FeatureDataResponseModel(BaseModel):
     """

@@ -109,7 +109,7 @@ class AttributeModel(BaseModel):
         """Checks the tag of an attribute and """
         if not v.startswith("att_"):
             raise ValueError("Attribute Tags must start 'att_'. Example : 'att_organism")
-        return v.lower()
+        return v #remove lower, otherwise proteome maps are inconsistent
 
 
 class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id (check definitions first)
@@ -151,7 +151,7 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
             raise ValueError("AttributeValue tags must follow the the pattern <attribute_tag>:<attribute_value>")
         if len(v.split(":")) != 2:
             raise ValueError("Tag must contain exactly one ':'")
-        return v.lower()
+        return v #changed from v.lower() this otherwise for uniprotIDs and proteome_ids  .upper() must be called, okay?
     
     @field_validator("text", mode="before")  # ToDo, issue with return type?
     @classmethod

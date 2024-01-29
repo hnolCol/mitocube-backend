@@ -4,10 +4,12 @@ from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
 
 from config.models.dataset.data import DatasetPCAResponse
-from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.submissions.submissions import DatasetSubmissionModel, DatasetSubmissionResponseModel
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
+from config.models.annotations.feature import FeatureModel
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.filter.NoMissingValues import NoNaNFilter
@@ -15,11 +17,8 @@ from lib.data.filter.NoMissingValues import NoNaNFilter
 from config.exceptions.HTTPExceptions import no_data_found
 
 from services.users import get_user_from_token, is_user_at_least_curator
-
+from services.submission import map_tags_to_attributes
 import pandas as pd 
-
-#print(DB)
-
 
 
 router = APIRouter(
@@ -58,11 +57,13 @@ def get_dataset_data(dataset_label : str):
     Returns the summary statistcs data for a specific dataset
     TO DO : Add response model.
     """
+    poi_data = []
     db = MCDatabase.getDatabase()
-    
 
     dataset = db.getDataset(dataset_label)
     metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    #TODO Check if proteome/organism is there, otherwise cause error 
+    proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[-1].upper()  # should we allow more organism?
     datatable = dataset.getDataTable()
     if datatable is None or datatable.empty:
         raise no_data_found
@@ -72,20 +73,25 @@ def get_dataset_data(dataset_label : str):
     if "att_poi" in metadata.dataset_attributes: 
         pois = metadata.dataset_attributes["att_poi"]
         ids = [poi.split(":")[-1].upper() for poi in pois]
+        feature_db = PandaFeatureDatabase()
+        features = feature_db.get(keys=ids,proteome_id=proteome_id).reset_index(names="key")
+        feature_annotations = features.to_dict(orient="records")
         poi_data = [FeatureData(dataset).transform(id, add_annotations=True) for id in ids if id in datatable.index]
 
     return {"stats" : data_summary.to_dict(), 
             "poi_data" : [{
-            "annotations" : annotations.to_dict(),
+            "feature_key" : ids[n],
+            "feature_annotations" : FeatureModel(**feature_annotations[n], tag=f"att_poi:{feature_annotations[n]['key']}"),
+            "annotations" : {},
             "data" : data.to_dict(orient="records"),
-            "samples_attributes" : samples_attributes} for data, samples_attributes, annotations in poi_data]
+            "samples_attributes" : samples_attributes} for n,(data, samples_attributes, annotations) in enumerate(poi_data)]
             }
 
 
 
 #parameter endpoints 
 @router.get("/datasets/{dataset_label}/meta",
-            response_model=DatasetSubmissionModel,
+            response_model=DatasetSubmissionResponseModel,
             tags=["Parameters","Meta data"])
 def get_dataset_params(dataset_label : str, user : UserModel = Depends(get_user_from_token)):
     """
@@ -93,28 +99,9 @@ def get_dataset_params(dataset_label : str, user : UserModel = Depends(get_user_
     """
     db = MCDatabase.getDatabase()
     metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
-    return metadata
-
-#volcano plot
-@router.get("/datasets/{data_id}/volcano")
-def get_dataset_volcano(data_id : str, test_details : dict):
-    """
-    Returns the result of a Principal component anaylsis (PCA)
-
-    """
-    return {}
-
-#heatmap endpoints 
-@router.get("/datasets/{data_id}/heatmap",
-            tags=["Heatmap"])
-def get_dataset_heatmap(data_id : str, test_details : dict):
-    """
-    Returns data to feed into a heatmap for visualization.
     
-    Requires the definition of a statistical test to show a subset of the data. 
+    return map_tags_to_attributes(metadata)
 
-    """
-    return {}
 
 #pca endpoints
 @router.get("/datasets/{dataset_label}/pca",
@@ -126,17 +113,29 @@ def get_dataset_pca(dataset_label : str, user : UserModel = Depends(get_user_fro
     Returns the result of a Principal component anaylsis (PCA).
     """
     db = MCDatabase.getDatabase()
+    feature_db = PandaFeatureDatabase()
     dataset = db.getDataset(dataset_label)
-    if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found the dataset {dataset_label}.")
+    metadata = dataset.getMetaJson()
+    proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[1].upper()
+    
+    if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     idcs = NoNaNFilter(dataset).get_indices()
     
     projected_data, drivers, variance_explained, samples_attributes = PCATransform(dataset=dataset,
                                         n_components=4, #get from settings!
                                         subset_index=idcs).transform()
     
+    
     projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")
-    drivers_to_browser = drivers.reset_index(names="index").to_dict(orient="records")
-
+    
+    
+    # add feature information to drivers
+    feature_keys = drivers.index 
+    features = feature_db.get(keys=feature_keys.tolist(), proteome_id=proteome_id, ignoreMissing=True)
+   
+    drivers_with_feature_info = pd.concat([drivers,features],axis=1)
+    drivers_with_feature_info.reset_index(names="index", inplace=True)
+    drivers_to_browser = drivers_with_feature_info.to_dict(orient="records")
     return DatasetPCAResponse(
         projection=projected_data_to_browser,
         drivers=drivers_to_browser,
