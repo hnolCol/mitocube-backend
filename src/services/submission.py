@@ -64,7 +64,6 @@ def map_tags_to_attributes(submission : DatasetSubmissionModel):
     db_attributes = MCAttributes.getAttributeDatabase()
     db_features = PandaFeatureDatabase()
     attributes= db_attributes.getAttributes().set_index("tag")
-    print(attributes)
     proteome_id = dataset_attributes["att_organism"][0].split(":")[-1]
     attribute_values= db_attributes.getAttributeValues().set_index("tag")
     mapped_dataset_attributes = OrderedDict()

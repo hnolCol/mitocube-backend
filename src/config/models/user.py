@@ -3,12 +3,13 @@ from pydantic import Field
 from pydantic import EmailStr 
 from pydantic import SecretStr
 from pydantic import field_validator
-from pydantic import field_serializer
+from pydantic import field_serializer, model_serializer
 from datetime import datetime
 from typing import List 
 import time 
 
 from config.settings.general import get_general_settings
+from config.models.attributes import AttributeValueModel
 from config.enums.users.roles import UserRolesEnum
 from services.random_generators import get_random_string
 from services.enums import get_inversed_enum_as_dict
@@ -39,7 +40,7 @@ class BasicUserWithEmail(BasicUser):
 
 class UserModel(BasicUserWithEmail):
     """BaseModel for a user"""
-    id : int
+    id : int = None
     updated_on : float = None
     expires_after : float = None
     password : SecretStr = None
@@ -58,6 +59,28 @@ class UserModelForRegistration(BasicUserWithEmail):
     def validate_role(v : str):
         """From a post request"""
         return int(v)
+
+
+class AddUserPropsModel(BaseModel):
+    
+    att_user_firstname : str 
+    att_user_lastname : str 
+    att_user_institute : AttributeValueModel
+    att_user_research_group : AttributeValueModel
+    att_user_email : EmailStr
+    att_user_role : UserRolesEnum = UserRolesEnum.STANDARD
+
+    @model_serializer()
+    def serialize_model(self):
+        return UserModel(
+            email=self.att_user_email,
+            firstname=self.att_user_firstname,
+            lastname=self.att_user_lastname,
+            role = self.att_user_role,
+            research_group= self.att_user_research_group.text,
+            institute=self.att_user_institute.text
+        ).model_dump(exclude_none=True)
+    
 
 class UserModelForUpdate(BaseModel):
     """"""

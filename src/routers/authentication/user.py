@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.exceptions import HTTPException
-from typing import List 
+from typing import List, Dict
 from config.exceptions.HTTPExceptions import user_role_too_low
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
-from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel
+from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel
 from services.encryption import decode_token
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
@@ -22,17 +22,16 @@ router = APIRouter(
 
 
 
-@router.post("/users/user", summary="Add a new user.")
-def add_user_to_the_database(background_task : BackgroundTasks, user_props : dict, user : UserModel = Depends(is_user_admin)):
+@router.post("/users", summary="Add a new user to the database.")
+def add_user_to_the_database(background_task : BackgroundTasks, user_props : AddUserPropsModel, user : UserModel = Depends(is_user_admin)):
     """
     Adds a user to the database. Currently requires admin rights.
     """
     #TO DO: should find another solution for this renmaing, also in patch 
-    user_props_att_renamed = dict([(k.replace("att_user_",""), v if not isinstance(v, dict) else v["name"]) for k,v in user_props.items()])
+    user_props = user_props.model_dump(exclude_none=True)
     try:
-        user_to_add = UserModelForRegistration(**user_props_att_renamed)
+        user_to_add = UserModelForRegistration(**user_props )
     except Exception as e:
-        print(e)
         raise HTTPException(status_code=422,detail=str(e))
     UserDB.add_user(user_props=user_to_add) #throws ane exception if there is a problem
 
@@ -48,15 +47,39 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : dic
                              template_mame=EMAIL_SETTINGS.mail_account_generated_template)
 
 
+@router.post("/users/pw",summary="Allows users to change the password for themselves.")
+def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
+    """_summary_
+
+    Parameters
+    ----------
+    updated_pw : Dict
+        A dict of shape updated_pw = {"password" : <string>}.
+    user : UserModel, optional
+        The User identified using the jwt token, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    HTTPException
+        _description_
+    """
+    try:
+        UserDB.update_user_password_by_label(user_label=user.label, password = updated_pw["password"])
+    except Exception as e:
+        raise HTTPException(status_code=400,detail="An error occurred during password change.")
+    
 @router.patch("/users/user", summary="Updates some properties of a user")
 def update_user(user_props : dict, user : UserModel = Depends(is_user_admin)):
     """Requires admin rights. Change to allow that users modify themselves."""
-    print(user_props)
     user_props_att_renamed = dict([(k.replace("att_user_",""), v if not isinstance(v, dict) else v["name"]) for k,v in user_props.items()])
     try:
         user_to_update = UserModelForUpdate(**user_props_att_renamed)
     except Exception as e:
-        print(e)
         raise HTTPException(status_code=422,detail=str(e))
         
     UserDB.update_user_by_label(user_label = user_to_update.label, user_props=user_to_update)

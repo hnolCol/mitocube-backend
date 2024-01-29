@@ -1,6 +1,7 @@
 
 import asyncio
 import os 
+import time 
 
 from typing import List, Tuple
 from fastapi import BackgroundTasks
@@ -49,7 +50,12 @@ EMAIL_SETTINGS = get_email_settings()
 
 
 class UserDB:
-
+    """
+    PROTOTYPE USER DB 
+    
+    could break if multiple changes to the db happen at the same type
+    TODO: add lock and moe to sql 
+    """
     def __init__(self) -> None:
         
         user_dir = DB_SETTINGS.db_userdir
@@ -172,15 +178,44 @@ class UserDB:
     def update_user_by_label(self,user_label : str, user_props : UserModelForUpdate):
         """Update a user in the DB by the user_label using a user_props"""
         DB = self._update()
+        user_props_updated = None
         for userIdx, user in enumerate(DB):
             if user.label == user_label:
                 user_props_updated = {**user.model_dump(exclude_none=True),**user_props.model_dump(exclude_none=True)}
                 break 
+        if user_props_updated is None:
+            raise ValueError("Error while finding user.....")
         #handle error if user cannot be constructed.
         updated_user = UserModel(**user_props_updated)
     
         DB[userIdx] = updated_user
         self._save_db()
 
+    def update_user_password_by_label(self, user_label : str, password : str):
+        """Updates a user's password.
+
+        Parameters
+        ----------
+        user_label : str
+            The user label, a unique id given for each user. 
+        password : str
+            Plain string password.
+        """
+        print(password)
+        user_props = None
+        pw_hash = create_password_hash(password)
+        DB = self._update()
+        for userIdx, user in enumerate(DB):
+            if user.label == user_label:
+                user_props = user.model_dump(exclude_none=True,exclude=["password","updated_on"])
+                break 
+        if user_props is None:
+            raise ValueError("Error while finding user.....")
+        
+        updated_user = UserModel(**user_props, password=pw_hash, updated_on=time.time())
+        DB[userIdx] = updated_user
+        self._save_db()
+        
+        
 
 UserDB = UserDB() #ensure it is like a singleton 

@@ -125,9 +125,9 @@ def update_submission(background_task : BackgroundTasks,
     # get submission from database 
     dataset = db.getDataset(submission_label)
     submission_state = state_change.state
-    submissionMetaData = dataset.getMetaJson()
+    metadata = dataset.getMetaJson()
     # dump the model to a dict to modify it.
-    metadata = submissionMetaData.model_dump()
+    metadata = metadata.model_dump()
     # update state using the State enumerater 
     metadata["state"] =  submission_state
     metadata["modified_on"] = datasetAttributes.modified_on 
@@ -147,7 +147,8 @@ def update_submission(background_task : BackgroundTasks,
     
     dataset.write_json(updated_submission)
 
-    send_email_in_background(background_tasks=background_task,
+    if state_change.prev_state != state_change.state:
+        send_email_in_background(background_tasks=background_task,
                              subject=f"Project {updated_submission.title} ({updated_submission.label}) state updated.",
                              email_to=[user.email],
                              include_setting_cc=True,
@@ -260,4 +261,4 @@ def get_submission_runlist(submission_label : str, user : UserModel = Depends(ge
         user_exists, user = UserDB.get_user_by_label(user_label)
         if user_exists:
             return RunListResponseModel(**metadata.runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
-    raise Exception(status_code = 404, detail = "No runlist found.")
+    raise HTTPException(status_code = 404, detail = "No runlist found.")
