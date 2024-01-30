@@ -18,6 +18,8 @@ router = APIRouter(
     )
 
 
+
+
 @router.get('/features',  # /api/annotations/features
             summary="Returns all features that are present in the database (Uniprot downloaded for available organisms).",
             response_model=List[FeatureModel])

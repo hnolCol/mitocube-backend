@@ -19,6 +19,14 @@ router = APIRouter(
     tags=["Features"]
     )
 
+#TODO: maybe we add a Database with controls instead of this bs? 
+TYPICAL_CONTROLS = [
+    FeatureModel(key="CTRL", proteins="Ctrl", genes="Ctrl", organism="None", aa_length=900, reviewed=True),
+    FeatureModel(key="GFP", proteins="GFP protein", genes="GFP", organism="None", aa_length=50, reviewed=True),
+    FeatureModel(key="IgG", proteins="IgG Protein", genes="IgG", organism="None", aa_length=50, reviewed=True),
+    FeatureModel(key="scr", genes="scr", proteins="Scrambled feature", organism="None", aa_length=1, reviewed=True)
+]
+
 
 @router.get("")
 def get_features_by_query(proteome_id : str, query : str, max_features : int = 30): #, user : UserModel = Depends(get_user_from_token)
@@ -69,8 +77,6 @@ def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from
 
     
     """
-
-    
     db = MCDatabase.getDatabase()
     dataset_labels = db.getDataLabels()
     feature_data_by_dataset_label : Dict[str,pd.DataFrame] = {}
@@ -81,14 +87,13 @@ def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from
     for label in dataset_labels:
         dataset = db.getDataset(label=label)
         metadata = dataset.getMetaJson()
-        #TODO this is something we could cash as as well? Mapping the tags from the DB to the actual attributes
-        
         
         if dataset.hasData() and metadata.state == SubmissionStates.PUBLISHED:
             feature_data, attributes_samples, annotations = FeatureData(dataset).transform(feature_key, add_annotations=True)
-            #print(attributes_samples)
+
             if not feature_data.empty and isinstance(feature_data,pd.DataFrame):
                 updated_metadata = map_tags_to_attribute_in_metadata(metadata)
+                #TODO this is something we could cash as as well? Mapping the tags from the DB to the actual attributes
                 feature_data_by_dataset_label[label] = feature_data
                 attributes_sample_by_dataset_label[label] = attributes_samples
                 attribute_samples_by_sample_collection.update(updated_metadata.samples_attributes_by_sample)

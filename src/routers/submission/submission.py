@@ -76,6 +76,10 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     """
     
     db  = MCDatabase.getDatabase()
+    
+    if submission.label in db.getDataLabels():
+        raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update a submission.")
+    
     mandatory_attributes = db.getMandatorySubmissionAttributes()
     missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
 
@@ -146,7 +150,7 @@ def update_submission(background_task : BackgroundTasks,
     #update meta data in dataset and write json file.
     
     dataset.write_json(updated_submission)
-
+    
     if state_change.prev_state != state_change.state:
         send_email_in_background(background_tasks=background_task,
                              subject=f"Project {updated_submission.title} ({updated_submission.label}) state updated.",
