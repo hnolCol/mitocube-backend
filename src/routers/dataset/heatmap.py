@@ -12,7 +12,7 @@ from config.exceptions.HTTPExceptions import no_data_found
 from config.models.user import UserModel
 
 from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attributes
+from services.submission import map_tags_to_attribute_in_metadata
 
 
 
@@ -38,11 +38,11 @@ def get_dataset_heatmap(dataset_label : str, n_clusters : int = 8, user : UserMo
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     stats = OneWayANOVA(dataset).get_stats()
     metadata = dataset.getMetaJson()
-    
+    #merge data and sort them after clusters.
     clusters, zscores = HierarchicalClustering(dataset).get_clusters(idcs = stats.index, n_clusters= n_clusters)
-    stats_and_zscores = stats.join([zscores,clusters], how="left")
+    stats_and_zscores = stats.join([zscores,clusters], how="left").sort_values(by="cluster")
     
-    clusters_for_group = clusters.reset_index() #index is now number, before keys
+    clusters_for_group = clusters.loc[stats_and_zscores.index,:].reset_index() #index is now number, before keys
     grouped_clusters = clusters_for_group.groupby(by="cluster")
     cluster_indices = [(cluster_idx,cluster_data.index.to_list()) for cluster_idx, cluster_data in grouped_clusters]
  

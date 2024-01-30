@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from typing import Dict, List, Optional
-
+from typing import Dict, List, Optional, Union
+from config.models.attributes import AttributeModel, AttributeValueModel
 class FeatureModel(BaseModel):
     """Base Model for a Feature"""
     key : str 
@@ -21,7 +21,7 @@ class FeatureDataResponseModel(BaseModel):
         The key of the feature (UniprotID)
     dataset_labels : List[str]
         The list of dataset labels in which the feature_key has been found. 
-    attribute_samples 
+    samples_attributes 
         The attribute samples in a dictionary. Keys are the 
         dataset labels, and values are the samples attributes. (sample_attribute.name -> List[AttributeValuesTag])
     annotations : Dict[str, List[str]]
@@ -29,7 +29,10 @@ class FeatureDataResponseModel(BaseModel):
         are a list of annotations such as GO terms. 
     """
     feature_key : str
-    attributes_samples : Dict[str, Dict[str,List[str]]]
+    samples_attributes : Dict[str, Dict[str,List[str]]]
     dataset_labels : List[str]  # labels of datasets
     data : Dict[str, List[Dict]]  # data key - dataset_label
-    annotations : Dict[str, List[str]]
+    samples_attributes_by_sample : Dict[str, Dict[str,List[Union[AttributeValueModel,FeatureModel]]]]
+    attributes : Dict[str,AttributeModel] #The attributes by tags 
+    attribute_values_by_tag : Dict[str,Union[AttributeValueModel,FeatureModel]]
+    #annotations : Dict[str, List[str]]

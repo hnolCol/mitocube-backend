@@ -18,7 +18,7 @@ from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 from config.exceptions.HTTPExceptions import no_data_found
 
 from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attributes
+from services.submission import map_tags_to_attribute_in_metadata
 import pandas as pd 
 
 

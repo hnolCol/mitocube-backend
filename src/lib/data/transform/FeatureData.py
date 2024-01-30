@@ -29,21 +29,24 @@ class FeatureData(DatasetTransform):
         proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[-1].upper()  # should we allow more organism?
 
         if feature_key not in data.index:
+            if add_annotations:
+                return pd.DataFrame(), {}, {}
             return pd.DataFrame(), {}  # ValueError(f"Feature ID was not found in the dataset {self._dataset.getLabel()}.")
 
         sample_names = metadata.sample_names
         feature_data : pd.DataFrame = pd.DataFrame(data.loc[feature_key,sample_names].values, index = sample_names, columns=["value"])  # name is for the values in the pandas seeries return by loc
 
         if add_sample_attributes:
-            sample_names_annotated, attributes_samples = SampleAttributeAnnotation(self._dataset).annotate()  # ToDo: What is it supposed to do here?
-            feature_data = feature_data.join(sample_names_annotated)
+            sample_names_annotated, attributes_samples = self._dataset.getSamplesAttributes()
+            #sample_names_annotated, attributes_samples = SampleAttributeAnnotation(self._dataset).annotate()  # ToDo: What is it supposed to do here?
+            
+            feature_data = feature_data.join(sample_names_annotated, how="left")
 
         if add_annotations:
             # annotation_db = Annotations.get_annotation_db()  # ToDo: where does that comes from?
             db_annotations = AnnotationDatabase()
-            print(proteome_id,feature_key)
             annotations[feature_key] = db_annotations.getAnnotations(feature_key=feature_key, proteome_id=proteome_id, subset=["GOAnnotation"])
-        print(annotations)
+            
         return feature_data, attributes_samples, annotations
 
         

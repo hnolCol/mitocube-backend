@@ -349,7 +349,7 @@ class MCDataset(JsonSerializable):
         sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
         sample_attribute_by_name = OrderedDict()
         if not isinstance(samples_attributes,dict): TypeError("attributes_samples must be a dictionary.")
-        for attributes  in  samples_attributes.values():
+        for attribute_tag, attributes  in  samples_attributes.items():
             sample_attribute_name = attributes.name 
             sample_attribute_values = attributes.values 
             #switch keys and values to map samples indices
@@ -358,8 +358,8 @@ class MCDataset(JsonSerializable):
                 #multiple tags are separated currently by a space. Therefore split first.
                 attribute_mapper = OrderedDict([k," ".join(tag_mapper[tag] if tag in tag_mapper else tag for tag in v.split(" "))] for k,v in attribute_mapper.items())
 
-            sample_idces.loc[:,sample_attribute_name] = sample_idces.index.map(attribute_mapper)
-            sample_attribute_by_name[sample_attribute_name] = list(sample_attribute_values.keys())
+            sample_idces.loc[:,attribute_tag] = sample_idces.index.map(attribute_mapper)
+            sample_attribute_by_name[attribute_tag] = list(sample_attribute_values.keys())
         #replace indices with sample names
         sample_idces.index = sample_names
         return sample_idces, sample_attribute_by_name

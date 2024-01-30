@@ -52,7 +52,7 @@ def map_tags(
             return attr_values_in_attribute_values    
     return []   
 
-def map_tags_to_attributes(submission : DatasetSubmissionModel):
+def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     """
 
     Parameters
@@ -77,9 +77,14 @@ def map_tags_to_attributes(submission : DatasetSubmissionModel):
     #map sample attributes 
     mapped_sample_attributes = OrderedDict()
     sample_attributes = submission.samples_attributes
+    sample_names = submission.sample_names
+    sample_attribute_by_sample_name = OrderedDict([(sample_name, {}) for sample_name in sample_names])
+    attribute_values_by_tag = {}
+    
     for attribute_tag, sample_attributes in sample_attributes.items():
         attribute = AttributeModel(**attributes.loc[attribute_tag,:].to_dict(), tag=attribute_tag)
-        mapped_attributes[attribute_tag] = attribute
+        if attribute_tag not in mapped_attributes:
+            mapped_attributes[attribute_tag] = attribute
         attr_value_tags = sample_attributes.values.keys() 
         mapped_sample_attributes[attribute_tag] = {
             "name" : sample_attributes.name,
@@ -87,12 +92,25 @@ def map_tags_to_attributes(submission : DatasetSubmissionModel):
             "attribute_values" : {}
         }
         mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_id,attribute_values,db_features)
-        for attr_value_tag, mapped_attr_values in zip(attr_value_tags,mapped_attribute_values):
-            mapped_sample_attributes[attribute_tag]["attribute_values"][attr_value_tag] = mapped_attr_values
-                
+        for attr_value_tag, mapped_attr_value in zip(attr_value_tags,mapped_attribute_values):
+            mapped_sample_attributes[attribute_tag]["attribute_values"][attr_value_tag] = mapped_attr_value
+            if attr_value_tag not in attribute_values_by_tag:
+                attribute_values_by_tag[attr_value_tag] = mapped_attr_value
+            
+        for attribute_value_tag, sampleIndices in sample_attributes.values.items():
+            for sampleIdx in sampleIndices:
+                sample_name = sample_names[sampleIdx]
+                if attribute_tag not in sample_attribute_by_sample_name[sample_name]:
+                    sample_attribute_by_sample_name[sample_name][attribute_tag] = []
+                attribute_value = mapped_sample_attributes[attribute_tag]["attribute_values"][attribute_value_tag]
+                sample_attribute_by_sample_name[sample_name][attribute_tag].append(attribute_value)
+    
+
     metadata = submission.model_dump()     
     metadata["dataset_attributes"] = mapped_dataset_attributes 
     metadata["samples_attributes"] = mapped_sample_attributes 
+    metadata["samples_attributes_by_sample"] = sample_attribute_by_sample_name
+    metadata["attribute_values_by_tag"] = attribute_values_by_tag
     metadata["attributes"] = mapped_attributes
                             
     return DatasetSubmissionResponseModel(**metadata)

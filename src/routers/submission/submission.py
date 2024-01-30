@@ -26,7 +26,7 @@ from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel, RunListResponseModel
 
 from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator
-from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attributes
+from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata
 from services.json import save_json
 from services.mail import send_email_in_background
 from services.paths.utils import check_dir_exists, join_path
@@ -179,12 +179,12 @@ def get_submission(user : UserModel = Depends(get_user_from_token)):
 
     db = MCDatabase.getDatabase()
     metadata = db.getJSONDatasets()
-    #map_tags_to_attributes(list(metadata.values())[0])
+    #map_tags_to_attribute_in_metadata(list(metadata.values())[0])
     if user.role < UserRolesEnum.CURATOR:
-        return [map_tags_to_attributes(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
+        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
     else:
         #return all if user at least curator
-        return [map_tags_to_attributes(dataset_meta) for dataset_label, dataset_meta in metadata.items()]
+        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items()]
     
 
 

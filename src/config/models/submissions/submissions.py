@@ -127,8 +127,9 @@ class DatasetSubmissionResponseModel(DatasetSubmissionModel):
     ""
     dataset_attributes : Dict[str,List[Union[AttributeValueModel,FeatureModel]]]
     samples_attributes : Dict[str,SampleAttributesResponse]
+    samples_attributes_by_sample : Dict[str, Dict[str,List[Union[AttributeValueModel,FeatureModel]]]]
     attributes : Dict[str,AttributeModel] #The attributes by tags 
-    
+    attribute_values_by_tag : Dict[str,Union[AttributeValueModel,FeatureModel]]
     
 class SubmissionIDResponse(BaseModel):
     """BaseModel for an API ID Submission response"""

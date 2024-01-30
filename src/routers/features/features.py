@@ -4,8 +4,10 @@ import pandas as pd
 from typing import Dict 
 from config.models.user import UserModel
 from config.models.annotations.feature import FeatureDataResponseModel, FeatureModel
+from config.enums.states import SubmissionStates
 from lib.data.annotations.ABCAnnotations import AnnotationDatabase
 from services.users import get_user_from_token
+from services.submission import map_tags_to_attribute_in_metadata
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
 from lib.data.database.ABCDatabase import MCDatabase
@@ -67,26 +69,42 @@ def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from
 
     
     """
+
+    
     db = MCDatabase.getDatabase()
     dataset_labels = db.getDataLabels()
     feature_data_by_dataset_label : Dict[str,pd.DataFrame] = {}
     attributes_sample_by_dataset_label : Dict[str,Dict] = {}
-
+    attribute_samples_by_sample_collection = {}
+    attribute_values_by_tag_collection = {}
+    attributes_collection = {}
     for label in dataset_labels:
         dataset = db.getDataset(label=label)
-        if dataset.hasData():
+        metadata = dataset.getMetaJson()
+        #TODO this is something we could cash as as well? Mapping the tags from the DB to the actual attributes
+        
+        
+        if dataset.hasData() and metadata.state == SubmissionStates.PUBLISHED:
             feature_data, attributes_samples, annotations = FeatureData(dataset).transform(feature_key, add_annotations=True)
+            #print(attributes_samples)
             if not feature_data.empty and isinstance(feature_data,pd.DataFrame):
+                updated_metadata = map_tags_to_attribute_in_metadata(metadata)
                 feature_data_by_dataset_label[label] = feature_data
                 attributes_sample_by_dataset_label[label] = attributes_samples
-
-    return {
+                attribute_samples_by_sample_collection.update(updated_metadata.samples_attributes_by_sample)
+                attribute_values_by_tag_collection.update(updated_metadata.attribute_values_by_tag)
+                attributes_collection.update(updated_metadata.attributes)
+    response_data = {
         "feature_key": feature_key,
         "dataset_labels" : list(feature_data_by_dataset_label.keys()),
         "data" : dict([(data_label,data_frame.reset_index(names="index").to_dict(orient="records")) for data_label, data_frame in feature_data_by_dataset_label.items()]),
-        "attributes_samples" : attributes_sample_by_dataset_label,
-        "annotations" : annotations[feature_key]
+        "samples_attributes" : attributes_sample_by_dataset_label,
+        "attribute_values_by_tag" : attribute_values_by_tag_collection,
+        "samples_attributes_by_sample" : attribute_samples_by_sample_collection,
+        "attributes" : attributes_collection
         }
+    FeatureDataResponseModel(**response_data)
+    return response_data
 
 
 @router.get("/{feature_key}/sequence",
