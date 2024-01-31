@@ -319,7 +319,7 @@ class FeatureDatabase(metaclass=SingletonABCMeta):
     """
 
     @abstractmethod
-    def find(self, values : List[str], proteome_id: str = None, columns : List[str] = None) -> pd.DataFrame:
+    def find(self, values : List[str], proteome_ids: List[str] = None, columns : List[str] = None) -> pd.DataFrame:
         """Finds List[str] values in the List[str] columns defined. Only the values "entry", "proteins" and "genes" are allowed in columns. Columns "proteins" and "genes" are used by default."""
         pass
 
@@ -451,7 +451,7 @@ class PandaFeatureDatabase(FeatureDatabase):
         self._cached_features : Dict[str,pd.DataFrame] = {}  # Dict[str (proteome_id), pd.DataFrame(index=[], columns=["entry", "key", "proteins", "genes", "organism", "aa_length"])]
 
 
-    def find(self, values : List[str], proteome_id: str, columns : List[Literal["entry","proteins","genes"]] = None) -> pd.DataFrame:
+    def find(self, values : List[str], proteome_ids: List[str], columns : List[Literal["entry","proteins","genes","key"]] = None, include_controls : bool = True) -> pd.DataFrame:
         """
         Finds List[str] values in the List[str] columns defined. 
         Only the values "entry", "proteins" and "genes" are allowed in columns. Columns "proteins" and "genes" are used by default.
@@ -477,16 +477,24 @@ class PandaFeatureDatabase(FeatureDatabase):
         """
 
         if columns is None:
-            strs_columns = ["proteins", "genes"]
+            strs_columns = ["proteins", "genes","key"]
         else:
-            strs_columns = [value for value in columns if value in ["entry", "proteins", "genes"]] 
+            strs_columns = [value for value in columns if value in ["key", "proteins", "genes"]] 
 
             if not strs_columns:
                 raise Exception("Columns provided are not allowed. Please use entry, proteins or genes only.")
         #check if proteome_id exists, None will throw an error here. 
-        if proteome_id not in self._cached_features: raise ValueError(f"proteome_id {proteome_id} not found.")
+        proteome_ids_found = [proteome_id for proteome_id in proteome_ids if proteome_id in self._cached_features]
+        if len(proteome_ids_found) == 0: raise ValueError(f"None of the given proteome_ids were found.")
         #results_or = [False] * self._cached_features.shape[0]
-        features = self._cached_features[proteome_id]
+        #features = self._cached_features[proteome_id]
+        if len(proteome_ids) == 1:
+            features = self._cached_features[proteome_ids[0]]
+        else:
+            #if multiple, merge them  
+            features = pd.concat([self._cached_features[proteome_id] for proteome_id in proteome_ids_found])
+        #reset index to export it correctly and to make it searchable.
+        features = features.reset_index(names="key")
         #create regex to search for all values at the same time 
         reg_exp = build_regex_for_search(search_strings=values)
         #bool data frame to store results, default false
@@ -494,15 +502,21 @@ class PandaFeatureDatabase(FeatureDatabase):
                                      dtype=bool, 
                                      index = features.index,
                                      columns = strs_columns)
-        for str_column in strs_columns:
-            # added proteome_id here.
-            search_result.loc[:,str_column] = features[str_column].str.contains(pat=reg_exp,case=False,regex=True)
+        for n,str_column in enumerate(strs_columns):
+            # added proteome_id here. We could exclude rows that already
+            # matched to in a previous column, maybe like this? not sure how much faster this is.
+            # we can also stop the search if more than limit fetures are found already in the first str_column
+            if n > 0:
+                non_matched_index = search_result.loc[~search_result.loc[:,strs_columns[n-1]],:].index
+                search_result.loc[non_matched_index,str_column] = features.loc[non_matched_index,:][str_column].str.contains(pat=reg_exp,case=False,regex=True)
+            else:
+                search_result.loc[:,str_column] = features[str_column].str.contains(pat=reg_exp,case=False,regex=True)
         #check for any match
         results_or = search_result.any(axis=1)
+        
+        return features.loc[results_or,:]
 
-        return self._cached_features[proteome_id].loc[results_or,:]
-
-    def get(self, keys : List[str] = None, proteome_id: str = None, ignoreMissing = False) -> pd.DataFrame:
+    def get(self, keys : List[str] = None, proteome_ids: List[str] = None, ignoreMissing = False) -> pd.DataFrame:
         """
         Returns a Pandas DataFrame of all features if no keys are defined, or items matching the keys. 
         May throws KeyError Exception if key is not in the annotation table. 
@@ -523,7 +537,7 @@ class PandaFeatureDatabase(FeatureDatabase):
             if proteome_id is unknown. 
         """
 
-        if proteome_id is None:
+        if proteome_ids is None or len(proteome_ids) == 0:
             collected_features = pd.DataFrame(index=[],
                                               columns=["entry", "proteins", "genes", "organism", "organism_id", #removing "key" since it is the index? otherwise nan everywhere
                                                        "aa_length", "mass", "proteome_id"])
@@ -546,14 +560,22 @@ class PandaFeatureDatabase(FeatureDatabase):
             return collected_features
         else: 
             #TODO check if proteome_id exists otherwise throw error/warning. Should we only check in cached_features? At the moment they are all loaded. 
-            if proteome_id not in self._cached_features: raise ValueError(f"proteome_id {proteome_id} not found.")
+            proteome_ids_found = [proteome_id for proteome_id in proteome_ids if proteome_id in self._cached_features]
+            if len(proteome_ids_found) == 0: raise ValueError(f"None of the given proteome_ids were found.")
+            #results_or = [False] * self._cached_features.shape[0]
+            #features = self._cached_features[proteome_id]
+            if len(proteome_ids) == 1:
+                features = self._cached_features[proteome_ids[0]]
+            else:
+            #if multiple, merge them  
+                features = pd.concat([self._cached_features[proteome_id] for proteome_id in proteome_ids_found])
             if keys is None:
-                return self._cached_features[proteome_id]
+                return features
             else:
                 if not ignoreMissing:
-                    return self._cached_features[proteome_id].loc[keys]
+                    return features.loc[keys]
                 else:
-                    return self._cached_features[proteome_id].loc[self._cached_features[proteome_id].index.intersection(keys)]
+                    return features.loc[features.index.intersection(keys)]
 
     def getAnnotationFiles(self) -> List[str]:
         """Returns a List[str] of imported annotation files."""

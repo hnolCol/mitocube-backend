@@ -15,7 +15,7 @@ import pandas as pd
 def map_tags(
              attribute : AttributeModel, 
              attr_value_tags : List[str], 
-             proteome_id : str, 
+             proteome_ids : List[str], 
              attribute_values : pd.DataFrame, 
              db_features : PandaFeatureDatabase ) -> List[AttributeValueModel]:
     """_summary_
@@ -31,7 +31,7 @@ def map_tags(
     elif attribute.has_features_value:
             #if it is a feature, then add feature model 
             feature_keys = [attribute_value_tag.split(":")[1].upper() for attribute_value_tag in attr_value_tags]
-            return [FeatureModel(**f, tag = f"{attribute.tag}:{f['key']}") for f in db_features.get(keys=feature_keys, proteome_id=proteome_id).reset_index().to_dict(orient="records")]
+            return [FeatureModel(**f, tag = f"{attribute.tag}:{f['key']}") for f in db_features.get(keys=feature_keys, proteome_ids=proteome_ids).reset_index().to_dict(orient="records")]
             
     elif attribute.has_numeric_input:
             #if a numeric input is there then first check if they are in the attribute_values and if not then extract the value from the tag 
@@ -64,7 +64,8 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     db_attributes = MCAttributes.getAttributeDatabase()
     db_features = PandaFeatureDatabase()
     attributes= db_attributes.getAttributes().set_index("tag")
-    proteome_id = dataset_attributes["att_organism"][0].split(":")[-1]
+    #get the proteome ids as a list (multiple proteome_id possible)
+    proteome_ids = [organism.split(":")[1] for organism in dataset_attributes["att_organism"]]
     attribute_values= db_attributes.getAttributeValues().set_index("tag")
     mapped_dataset_attributes = OrderedDict()
     mapped_attributes = dict()
@@ -72,7 +73,7 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     for attribute_tag, attr_value_tags in dataset_attributes.items():
         attribute = AttributeModel(**attributes.loc[attribute_tag,:].to_dict(), tag=attribute_tag)
         mapped_attributes[attribute_tag] = attribute
-        mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_id,attribute_values,db_features)    
+        mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_ids,attribute_values,db_features)    
         mapped_dataset_attributes[attribute_tag] = mapped_attribute_values
     #map sample attributes 
     mapped_sample_attributes = OrderedDict()
@@ -91,7 +92,7 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
             "values" : sample_attributes.values,
             "attribute_values" : {}
         }
-        mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_id,attribute_values,db_features)
+        mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_ids,attribute_values,db_features)
         for attr_value_tag, mapped_attr_value in zip(attr_value_tags,mapped_attribute_values):
             mapped_sample_attributes[attribute_tag]["attribute_values"][attr_value_tag] = mapped_attr_value
             if attr_value_tag not in attribute_values_by_tag:

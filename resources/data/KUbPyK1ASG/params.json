@@ -1,6 +1,7 @@
 {
     "created_on": 1699947967.057771,
-    "state": 4,
+    "modified_on": 1706699460.749584,
+    "state": 2,
     "label": "KUbPyK1ASG",
     "title": "Torin induced proteome rewiring",
     "user_label": "VpVff4sS",
@@ -130,6 +131,15 @@
         ],
         "att_organism": [
             "att_organism:UP000005640"
+        ],
+        "att_reduction": [
+            "att_reduction:dtt"
+        ],
+        "att_spray_voltage": [
+            "att_spray_voltage:2.4"
+        ],
+        "att_lc_system": [
+            "att_lc_system:e1200"
         ]
     },
     "samples_attributes": {
@@ -220,6 +230,7 @@
             }
         }
     },
+    "samples_genotypes": {},
     "links": [],
     "timeline": {
         "created_on": 1700474964.554945,
@@ -257,6 +268,30 @@
                 "user_label": "VpVff4sS",
                 "state": 4,
                 "comment": "Beautiful data are uploaded. "
+            },
+            {
+                "id": 1,
+                "label": "piPNiAN3UCHTg08lSp3F",
+                "created_on": 1706623021.889129,
+                "user_label": "VpVff4sS",
+                "state": 1,
+                "comment": ""
+            },
+            {
+                "id": 1,
+                "label": "6HYTfIYvtRmDQbtmluDw",
+                "created_on": 1706655295.535261,
+                "user_label": "VpVff4sS",
+                "state": 2,
+                "comment": "asddasd"
+            },
+            {
+                "id": 1,
+                "label": "geSdv7CMcmo2BJ85e6cv",
+                "created_on": 1706699460.753539,
+                "user_label": "VpVff4sS",
+                "state": 2,
+                "comment": "Updated dataset attributes."
             }
         ]
     },

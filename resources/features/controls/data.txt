@@ -1,0 +1,4 @@
+Entry	Entry Name	Mass	Length	Gene Names	Organism	Organism (ID)	Protein names
+P42212	GFP_AEQVI	26886	238	GFP	Aequorea victoria	6100	Green fluorescent protein
+P00722	BGAL_ECOLI	116483	1024	"lacZ, b0344, JW0335"	Escherichia coli (strain K12)	83333	Beta-galactosidase
+SCRAMB	SCR_SCR	0	0	Scr	Unknown	-1	Scramble sequence

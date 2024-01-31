@@ -13,7 +13,7 @@ class OneWayANOVA(DatasetStatistic):
             _description_
         """
         mapped_sample_names, sample_attrs = self._dataset.getSamplesAttributes()
-        ##just for prototyping, TODO: remove
+        ##just for prototyping, TODO: remove, take simply the first sample attribute
         if sample_attribute_name  not in mapped_sample_names.columns:
             sample_attribute_name = list(sample_attrs.keys())[0]
         #sample_attributes = self._metadata.samples_attributes

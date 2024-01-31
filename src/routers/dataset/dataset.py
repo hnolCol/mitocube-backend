@@ -63,7 +63,9 @@ def get_dataset_data(dataset_label : str):
     dataset = db.getDataset(dataset_label)
     metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
     #TODO Check if proteome/organism is there, otherwise cause error 
-    proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[-1].upper()  # should we allow more organism?
+    if "att_organism" not in metadata.dataset_attributes:
+        raise HTTPException(status_code=400,detail="No organism defined for this dataset.")
+    proteome_ids =  [attrValueTag.split(":")[1] for attrValueTag in metadata.dataset_attributes["att_organism"]]  # should we allow more organism?
     datatable = dataset.getDataTable()
     if datatable is None or datatable.empty:
         raise no_data_found
@@ -74,7 +76,7 @@ def get_dataset_data(dataset_label : str):
         pois = metadata.dataset_attributes["att_poi"]
         ids = [poi.split(":")[-1].upper() for poi in pois]
         feature_db = PandaFeatureDatabase()
-        features = feature_db.get(keys=ids,proteome_id=proteome_id).reset_index(names="key")
+        features = feature_db.get(keys=ids,proteome_ids=proteome_ids).reset_index(names="key")
         feature_annotations = features.to_dict(orient="records")
         poi_data = [FeatureData(dataset).transform(id, add_annotations=True) for id in ids if id in datatable.index]
 
@@ -116,7 +118,7 @@ def get_dataset_pca(dataset_label : str, user : UserModel = Depends(get_user_fro
     feature_db = PandaFeatureDatabase()
     dataset = db.getDataset(dataset_label)
     metadata = dataset.getMetaJson()
-    proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[1].upper()
+    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     idcs = NoNaNFilter(dataset).get_indices()
@@ -131,7 +133,7 @@ def get_dataset_pca(dataset_label : str, user : UserModel = Depends(get_user_fro
     
     # add feature information to drivers
     feature_keys = drivers.index 
-    features = feature_db.get(keys=feature_keys.tolist(), proteome_id=proteome_id, ignoreMissing=True)
+    features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
    
     drivers_with_feature_info = pd.concat([drivers,features],axis=1)
     drivers_with_feature_info.reset_index(names="index", inplace=True)

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-
+from typing import List
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
@@ -19,17 +19,8 @@ router = APIRouter(
     tags=["Features"]
     )
 
-#TODO: maybe we add a Database with controls instead of this bs? 
-TYPICAL_CONTROLS = [
-    FeatureModel(key="CTRL", proteins="Ctrl", genes="Ctrl", organism="None", aa_length=900, reviewed=True),
-    FeatureModel(key="GFP", proteins="GFP protein", genes="GFP", organism="None", aa_length=50, reviewed=True),
-    FeatureModel(key="IgG", proteins="IgG Protein", genes="IgG", organism="None", aa_length=50, reviewed=True),
-    FeatureModel(key="scr", genes="scr", proteins="Scrambled feature", organism="None", aa_length=1, reviewed=True)
-]
-
-
 @router.get("")
-def get_features_by_query(proteome_id : str, query : str, max_features : int = 30): #, user : UserModel = Depends(get_user_from_token)
+def get_features_by_query(proteome_ids : str, query : str, max_features : int = 30): #, user : UserModel = Depends(get_user_from_token)
     """_summary_
 
     Parameters
@@ -44,12 +35,14 @@ def get_features_by_query(proteome_id : str, query : str, max_features : int = 3
     _type_
         _description_
     """
+    proteome_ids = proteome_ids.split(";")
     feature_db = PandaFeatureDatabase()
-    features = feature_db.find(values=[query], proteome_id=proteome_id)
+    features = feature_db.find(values=[query], proteome_ids=proteome_ids, columns=["proteins", "genes","key"])
     if features.empty: return []
     if features.index.size > max_features:
+        
         features = features.head(max_features)
-    features = features.reset_index(names="key").to_dict(orient="records")
+    features = features.to_dict(orient="records")
     #features = features.to_dict(orient="records")  # [{'col1': 1, 'col2': 0.5}, {'col1': 2, 'col2': 0.75}]
     return [FeatureModel(**item) for item in features] 
     
@@ -139,8 +132,7 @@ def get_feature_sequence(feature_key : str): #user : UserModel = Depends(get_use
 
     db_annotations = AnnotationDatabase()
     annotations = db_annotations.getAnnotations(feature_key=feature_key, subset=["SequenceAnnotation"])  # ToDo: What return Model is needed by GUI?
-    print(annotations)
-    if len(annotations) == 0: raise HTTPException(status_code=404, detail="No sequene annotations found.")
+    if len(annotations) == 0: raise HTTPException(status_code=404, detail=f"No sequence annotations found for feature key {feature_key}.")
     sequence = list(annotations.values())[0][0]
     #TODO : the key of the sequence annotation is informative but overloaded? what happends if nothing found? 
     return {"feature_key" : feature_key, "sequence" : sequence}

@@ -31,7 +31,7 @@ def get_genotype_by_label(genotype_label : str):
     
 
 @router.get("/genotypes", response_model=List[GenotypeModel])
-def get_genotypes(proteome_id : Optional[str] = None, feature_key : Optional[str] = None):
+def get_genotypes(proteome_ids : Optional[str] = None, feature_key : Optional[str] = None):
     """Returns the genotypes defined using the params: ``proteome_id`` or ``feature_key``. 
     If feature_key is provided, the proteome_id is ingored. If ``proteome_id`` is given, then
     all genotypes that are defined for a given proteome_id is provided. 
@@ -45,7 +45,9 @@ def get_genotypes(proteome_id : Optional[str] = None, feature_key : Optional[str
     """
     db_genotype = MCGenotypes.getGenotypeDatabase()
     try:
-        genotypes = db_genotype.get(proteome_id=proteome_id,feature_key=feature_key)
+        if proteome_ids is not None:
+            proteome_ids = proteome_ids.split(";")
+        genotypes = db_genotype.get(proteome_ids=proteome_ids,feature_key=feature_key)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return genotypes

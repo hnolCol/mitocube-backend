@@ -64,7 +64,7 @@ class PandaFileGenotype(MCGenotypes):
         
         
     
-    def get(self, label : Optional[str] = None, proteome_id : Optional[str] = None, feature_key : Optional[str] = None, feature : Optional[FeatureModel] = None) ->  List[GenotypeModel] | GenotypeModel:
+    def get(self, label : Optional[str] = None, proteome_ids : Optional[List[str]] = None, feature_key : Optional[str] = None, feature : Optional[FeatureModel] = None) ->  List[GenotypeModel] | GenotypeModel:
         """Returns the genotypes. By a proteome_id since genotypes are defined by certain
         features which are define for a proteome. 
         If feature_key is provided, the genotypes for the specific feature_key are returned
@@ -87,13 +87,13 @@ class PandaFileGenotype(MCGenotypes):
             return genotypes_found_by_label[0]
         
         elif feature_key is not None:
-            return [genotype for genotype in self._genotypes if genotype.proteome_id == proteome_id and genotype.feature.key == feature_key]
+            return [genotype for genotype in self._genotypes if genotype.proteome_id in proteome_ids and genotype.feature.key == feature_key]
 
         elif feature is not None:
-            return [genotype for genotype in self._genotypes if genotype.proteome_id == proteome_id and genotype.feature.key == feature.key]
+            return [genotype for genotype in self._genotypes if genotype.proteome_id in proteome_ids and genotype.feature.key == feature.key]
     
-        elif proteome_id is not None:
-            return [genotype for genotype in self._genotypes if genotype.proteome_id == proteome_id]
+        elif proteome_ids is not None:
+            return [genotype for genotype in self._genotypes if genotype.proteome_id in proteome_ids]
         
     def update(self):
         """

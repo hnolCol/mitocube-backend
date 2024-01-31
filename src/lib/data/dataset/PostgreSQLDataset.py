@@ -37,6 +37,7 @@ class PostgreSQLDataset(MCDataset):
                  replicates: typing.Dict = None,
                  attributes_dataset: typing.Dict = None,
                  attributes_samples: typing.Dict = None,
+                 samples_genotypes : typing.Dict = None,
                  instrument: typing.Dict = None,
                  loadFromDatabase: bool = False,
                  load_meta_only :bool = False):  # ToDo: Check DataType Date

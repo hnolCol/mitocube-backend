@@ -117,7 +117,7 @@ class DatasetSubmissionModel(BaseModel):
     metatext : Dict[str,str] = {}
     dataset_attributes : Dict[str,List[str]]
     samples_attributes : Dict[str,SampleAttributeFromDB]
-    samples_genotypes : Optional[Dict[str,List[int]]] = None # the genotype label
+    samples_genotypes : Dict[str,List[int]] = Field(...,default_factory=dict)
     links : List[SubmissionLink] = []
     timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
     runlist : Optional[RunListModel] = None 

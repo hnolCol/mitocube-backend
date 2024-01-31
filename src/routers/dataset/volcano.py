@@ -30,7 +30,7 @@ router = APIRouter(
 
 #volcano plot
 @router.get("/datasets/{dataset_label}/volcano")
-def get_dataset_volcano(dataset_label : str, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute_right_tag : str, sample_attribute_tag : str, user : UserModel = Depends(get_user_from_token)):#)
     """
     Returns the result for a volcano plot
     """
@@ -41,11 +41,13 @@ def get_dataset_volcano(dataset_label : str, user : UserModel = Depends(get_user
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     metadata = dataset.getMetaJson()
     #adjust proteome_id extraction
-    proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[1].upper()
-    stats = Ttest(dataset).get_stats()
+    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
+    stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
+                                     attribute_value_left=attribute_left_tag, 
+                                     attribute_value_right=attribute_right_tag )
    
     feature_db = PandaFeatureDatabase()
-    features = feature_db.get(stats.index,proteome_id,ignoreMissing=True)
+    features = feature_db.get(stats.index,proteome_ids,ignoreMissing=True)
     #join features to the stat results
     stats_and_feature_data = stats.join(features,how="left")
     return stats_and_feature_data.to_dict(orient="records")

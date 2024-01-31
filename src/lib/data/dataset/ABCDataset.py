@@ -34,6 +34,7 @@ class MCDataset(JsonSerializable):
                  replicates: typing.List[int] = [],
                  attributes_dataset: typing.Dict = None,
                  attributes_samples: typing.Dict = None,
+                 samples_genotypes: typing.Dict = None,
                  sample_names : typing.List[str] = [],
                  timeline : typing.Dict = None,
                  runlist : typing.Optional[RunListModel] = None,
@@ -64,6 +65,7 @@ class MCDataset(JsonSerializable):
             self._attributes_dataset = attributes_dataset
             self._attributes_samples = attributes_samples
             self._sample_names = sample_names
+            self._samples_genotypes = samples_genotypes
             #self._instrument = instrument
             self._runlist = runlist
             self._title = title
@@ -226,6 +228,7 @@ class MCDataset(JsonSerializable):
             created_on=self._created_on,
             samples_attributes=self._attributes_samples,
             dataset_attributes=self._attributes_dataset,
+            samples_genotypes=self._samples_genotypes,
             metatext=self._metatexts,
             collaborators=self._collaborators,
             sample_names=self._sample_names,

@@ -32,6 +32,7 @@ class PandaFileDataset(MCDataset):
                  replicates: typing.List[int] = [],
                  attributes_dataset: typing.Dict = None,
                  attributes_samples: typing.Dict = None,
+                 samples_genotypes : typing.Dict = None,
                  sample_names : typing.List[str] = [],
                  timeline : typing.Dict = None,
                  loadFromDatabase: bool = False, 
@@ -51,7 +52,8 @@ class PandaFileDataset(MCDataset):
             urls=urls,
             collaborators=collaborators,
             attributes_dataset=attributes_dataset,
-            attributes_samples=attributes_samples,
+            attributes_samples=attributes_samples, 
+            samples_genotypes = samples_genotypes,
             sample_names = sample_names,
             metatexts=metatexts,
             replicates=replicates,
@@ -114,6 +116,7 @@ class PandaFileDataset(MCDataset):
         self._urls = meta.links
         self._attributes_dataset = meta.dataset_attributes
         self._attributes_samples = meta.samples_attributes
+        self._samples_genotypes = meta.samples_genotypes
         self._sample_names = meta.sample_names
         self._timeline = meta.timeline
         self._runlist = meta.runlist

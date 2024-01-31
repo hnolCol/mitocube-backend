@@ -1,6 +1,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException
-
+from collections import OrderedDict
 
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
@@ -38,19 +38,30 @@ def get_dataset_heatmap(dataset_label : str, n_clusters : int = 8, user : UserMo
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     stats = OneWayANOVA(dataset).get_stats()
     metadata = dataset.getMetaJson()
+    if stats.empty or stats.index.size < 3: raise HTTPException(status_code=400, detail="No or less than 3 significant hits found using ANOVA. Please use a volcano plot.")
     #merge data and sort them after clusters.
     clusters, zscores = HierarchicalClustering(dataset).get_clusters(idcs = stats.index, n_clusters= n_clusters)
-    stats_and_zscores = stats.join([zscores,clusters], how="left").sort_values(by="cluster")
-    
+    stats_and_zscores = zscores.join([stats,clusters], how="left")
     clusters_for_group = clusters.loc[stats_and_zscores.index,:].reset_index() #index is now number, before keys
     grouped_clusters = clusters_for_group.groupby(by="cluster")
-    cluster_indices = [(cluster_idx,cluster_data.index.to_list()) for cluster_idx, cluster_data in grouped_clusters]
- 
+    cluster_indices = OrderedDict([(cluster_idx,cluster_data.index.to_list()) for cluster_idx, cluster_data in grouped_clusters])
+
+    ##annotate features 
+    #adjust proteome_id extraction TODO : ADJUST THIS!!
+    #check if organism is defined
+    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
+    feature_db = PandaFeatureDatabase()
+    features = feature_db.get(stats_and_zscores.index,proteome_ids,ignoreMissing=True)
+    #join features to the stat results
+    #consider adding the features as an extra -> may be used to select features from the heatmap to view the detailed proteomics
+    #data in a feature-centric way. 
+    stats_and_zscores = stats_and_zscores.join(features,how="left")
+    
     return {
         "dataset_label" : dataset_label,
         "data" : stats_and_zscores.reset_index(names="Key").to_dict(orient="records"),
         "value_names" : metadata.sample_names,
-        "label_names" : ["Key"],
+        "label_names" : ["genes"],
         "color_names" : [],
         "cluster_indices" : cluster_indices,
         "n_clusters" : n_clusters

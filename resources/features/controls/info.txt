@@ -1,0 +1,4 @@
+details_source	None
+details_source_Date	2023-01-30
+proteom_id	None
+description Common controls to be used in attributes such as knock down. To not add all the info of the control, we could use this database.
