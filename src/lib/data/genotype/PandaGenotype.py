@@ -83,6 +83,7 @@ class PandaFileGenotype(MCGenotypes):
         ValueError 
             If a label is provided but was not found in the database or multiple were found.
         """
+        self.update()
         if label is not None:
             genotypes_found_by_label = [genotype for genotype in self._genotypes if genotype.label == label]
             if len(genotypes_found_by_label) != 1: raise ValueError("Either the genotype labels are not unique or the label is not found.")

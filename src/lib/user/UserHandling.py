@@ -141,6 +141,7 @@ class UserDB:
 
     def delete_user_by_label(self, user_label : str):
         """"""
+        self._update()
         exists, userInDB = self.get_user_by_label(user_label)
         if exists:
             self.DB = [user for user in self.DB if user.label != userInDB.label]
@@ -148,10 +149,12 @@ class UserDB:
 
     def get_users(self) -> List[UserModel]:
         """"""
+        self._update()
         return self._update()
 
     def get_user_by_id(self, id):
         ""
+        self._update()
         users = [user for user in self.DB if user.id == id]
         if len(users) == 0:
             return False, None
@@ -159,6 +162,7 @@ class UserDB:
     
     def get_user_by_label(self, user_label):
         ""
+        self._update()
         users = [user for user in self.DB if user.label == user_label]
         if len(users) == 0:
             return False, None
@@ -166,12 +170,14 @@ class UserDB:
     
     def get_user_by_email(self, email : str) -> UserModel:
         ""
+        self._update()
         users = [user for user in self.DB if user.email == email]
         if len(users) == 0:
             return False, None
         return True, users[0]
     
     def get_number_of_users(self) -> int:
+        self._update()
         return len(self.DB)
     
 
@@ -201,7 +207,6 @@ class UserDB:
         password : str
             Plain string password.
         """
-        print(password)
         user_props = None
         pw_hash = create_password_hash(password)
         DB = self._update()
