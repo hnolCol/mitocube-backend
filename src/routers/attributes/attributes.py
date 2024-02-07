@@ -81,3 +81,31 @@ def get_attributes(labels : str, count : bool = True, max_attributes : int = 999
     attributes = db_attributes.getAttributes(tags=list(attribute_tags))
     attributes_by_tag = attributes.set_index("tag", drop=False).to_dict(orient="index")
     return {"attribute_tags" : attribute_tags, "submission_count" : submission_count_by_attribute_value_tag, "attributes_by_tag" : attributes_by_tag}
+
+
+
+@router.get("/user", response_model=AttributeResponseModel)
+def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
+    """
+    Returns the stored attribute and attribute value definitions that can be assigned to a user.
+    """
+    db_attributes = MCAttributes.getAttributeDatabase()
+
+    attributes = db_attributes.getAttributes()
+    attributes = attributes.loc[attributes["allow_for_user"], :]
+
+    attribute_values = db_attributes.getAttributeValues()
+    attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
+
+    # Todo: Do not understand what you mean with that.
+    # if user.role == UserRolesEnum.ADMIN:
+    #     # only admin can change the user role
+    #     max_attr_value_id = db.attribute_values["id"].max()
+    #     role_attr = [attr for attr in attrs if attr.tag == "att_user_role"][0]
+    #     user_roles = get_enum_as_dict(UserRolesEnum)
+    #     attrValues.extend([{"id" : max_attr_value_id + 1, "attribute_id" : role_attr.id, "details" : role_name.title(), "name" : role, "tag" : f"att_user_role:{role}"} for n,(role_name, role) in enumerate(user_roles.items())])
+    # else:
+    #     attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
+
+    return AttributeResponseModel(attributes=attributes.to_dict(orient="records"),
+                                  attribute_values=attribute_values.to_dict(orient="records"))

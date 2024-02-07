@@ -18,7 +18,6 @@
                 "att_protein_coding_sequence": [
                     {
                         "key": "Q9Z0V7",
-                        "tag": null,
                         "genes": "Timm17b Tim17b",
                         "proteins": "Mitochondrial import inner membrane translocase subunit Tim17-B",
                         "organism": "Mus musculus (Mouse)",
@@ -33,10 +32,7 @@
                         "text": "Knockout",
                         "tag": "att_gene_engineering:ko",
                         "value": "ko",
-                        "description": "Gene knock out.",
-                        "feature": null,
-                        "attribute_id_tag": "att_gene_engineering",
-                        "attribute_id_name": "Gene engineering"
+                        "description": "Gene knock out."
                     }
                 ],
                 "att_gene_zygosity": [
@@ -46,10 +42,7 @@
                         "text": "Homozygot (-/-)",
                         "tag": "att_gene_zygosity:(-/-)",
                         "value": "(-/-)",
-                        "description": "Homozygous",
-                        "feature": null,
-                        "attribute_id_tag": "att_gene_zygosity",
-                        "attribute_id_name": "Zygosity"
+                        "description": "Homozygous"
                     }
                 ],
                 "att_gene_editing_method": [
@@ -59,10 +52,7 @@
                         "text": "CRISPR-mediated",
                         "tag": "att_gene_editing_method:crispr",
                         "value": "crispr",
-                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA.",
-                        "feature": null,
-                        "attribute_id_tag": "att_gene_editing_method",
-                        "attribute_id_name": "Editing method"
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
                 ],
                 "att_protein_mutation": [
@@ -72,10 +62,7 @@
                         "text": "Frameshift",
                         "tag": "att_protein_mutation:frameshift",
                         "value": "frameshift",
-                        "description": "Frameshift mediated by a double strand break",
-                        "feature": null,
-                        "attribute_id_tag": "att_protein_mutation",
-                        "attribute_id_name": "Protein Mutation"
+                        "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
@@ -86,15 +73,115 @@
                             "text": "Region",
                             "tag": "att_protein_position:region",
                             "value": "region",
-                            "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences.",
-                            "feature": null,
-                            "attribute_id_tag": "att_protein_position",
-                            "attribute_id_name": "Protein Position"
+                            "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
                         "aa_position": [
                             27,
                             36
                         ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "label": "fOUfc",
+        "text": "Dnajc15-KO(-/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "Q78YY6",
+                "genes": "Dnajc15 Dnajd1",
+                "proteins": "DnaJ homolog subfamily C member 15",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 149,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "Q78YY6",
+                        "genes": "Dnajc15 Dnajd1",
+                        "proteins": "DnaJ homolog subfamily C member 15",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 149,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 344,
+                        "attribute_id": 48,
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 347,
+                        "attribute_id": 49,
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 336,
+                        "attribute_id": 47,
+                        "text": "CRISPR-mediated",
+                        "tag": "att_gene_editing_method:crispr",
+                        "value": "crispr",
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
+                    }
+                ],
+                "att_protein_mutation": [
+                    {
+                        "id": 700,
+                        "attribute_id": 86,
+                        "text": "Frameshift",
+                        "tag": "att_protein_mutation:frameshift",
+                        "value": "frameshift",
+                        "description": "Frameshift mediated by a double strand break"
+                    },
+                    {
+                        "id": 702,
+                        "attribute_id": 86,
+                        "text": "HA tag",
+                        "tag": "att_protein_mutation:ha",
+                        "value": "ha",
+                        "description": "HA (YPYDVPDYA) tagged protein "
+                    }
+                ],
+                "att_protein_position": {
+                    "att_protein_mutation:frameshift": {
+                        "attribute_value": {
+                            "id": 713,
+                            "attribute_id": 87,
+                            "text": "Region",
+                            "tag": "att_protein_position:region",
+                            "value": "region",
+                            "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
+                        },
+                        "aa_position": [
+                            85,
+                            94
+                        ]
+                    },
+                    "att_protein_mutation:ha": {
+                        "attribute_value": {
+                            "id": 712,
+                            "attribute_id": 87,
+                            "text": "N-term",
+                            "tag": "att_protein_position:nterm",
+                            "value": "nterm",
+                            "description": "N-terminus of the protein"
+                        }
                     }
                 }
             }

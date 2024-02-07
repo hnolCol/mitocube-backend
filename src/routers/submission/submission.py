@@ -289,8 +289,6 @@ def get_submission_by_query(state : str|int = None,
     
 
 
-
-
 @router.post("/submissions",summary="Add submission to the database")
 def add_submission(background_task : BackgroundTasks ,submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
     """
@@ -385,7 +383,7 @@ def update_submission(background_task : BackgroundTasks,
                                  "state" : SubmissionStates(updated_submission.state).name,
                                  "title" : updated_submission.title,
                                  "submission_label" : submission_label,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}/dataset/{updated_submission.label}"
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}/datasets/{updated_submission.label}"
                              },
                              template_mame=EMAIL_SETTINGS.mail_project_state_template)
 

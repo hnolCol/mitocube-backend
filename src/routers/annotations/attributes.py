@@ -54,13 +54,13 @@ def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> Attr
                                   attribute_values=attribute_values.to_dict(orient="records"))
 
 
-@router.post("/attributes")
-def add_attribute(attribute : AttributeModel) -> List[AttributeModel]:
-    """Adds an attribute and returns the updated list"""
-    #ToDo: implement adding attributes from the GUI. 
-    db_attributes = MCAttributes.getAttributeDatabase()
-    return [AttributeModel(**item) for item in db_attributes.getAttributes().to_dict(orient="records")]
-    # return db_attributes.getAttributes().to_dict(orient="records")  # ToDo: How to cast into a AttributeModel?
+# @router.post("/attributes")
+# def add_attribute(attribute : AttributeModel) -> List[AttributeModel]:
+#     """Adds an attribute and returns the updated list"""
+#     #ToDo: implement adding attributes from the GUI. 
+#     db_attributes = MCAttributes.getAttributeDatabase()
+#     return [AttributeModel(**item) for item in db_attributes.getAttributes().to_dict(orient="records")]
+#     # return db_attributes.getAttributes().to_dict(orient="records")  # ToDo: How to cast into a AttributeModel?
 
 
 # @router.get("/attributes/{attribute_id}")
