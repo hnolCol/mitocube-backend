@@ -60,6 +60,7 @@ class PandaFileGenotype(MCGenotypes):
         bool
             True if the addition of the genotype to the database was successful. 
         """
+        self._import()
         self._genotypes.append(genotype)
         self._save()
         return self._genotypes
