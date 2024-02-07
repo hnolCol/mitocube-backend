@@ -318,28 +318,40 @@ class MCDataset(JsonSerializable):
                 "groupings": json_groupings
                 }
 
-    def getSamplesAttributes(self, map_tags_to : bool = False, tag_mapper : dict = {}) -> Tuple[pd.DataFrame, OrderedDict[str,List[str]]]:
+
+    def getSamplesGenotypes(self) -> Tuple[pd.DataFrame,List[str]]:
+        """_summary_
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        meta_data = self.getMetaJson()
+        sample_names = meta_data.sample_names 
+        samples_genotypes = meta_data.samples_genotypes
+        if len(samples_genotypes) == 0: return pd.DataFrame(), []
+        sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
+        attribute_mapper = value_mapper_from_dict(samples_genotypes) 
+        sample_idces.loc[:,"genotype"] = sample_idces.index.map(attribute_mapper)
+        genotypes = list(meta_data.samples_genotypes.keys())
+        #replace indices with sample names
+        sample_idces.index = sample_names
+        return sample_idces, genotypes
+        
+
+    def getSamplesAttributes(self) -> Tuple[pd.DataFrame, OrderedDict[str,List[str]]]:
         """
         Dataset function that maps the samples attributes to the sample names and is intended to be used in a HTTPResponse. 
         If multiple samples attribute values are assigned to a single sample, the tags are separated by a simple
         sample " ". 
         
         TODO : Should likely be moved to the PandaDataset and PostgreSQLDataset
-
-        Parameters
-        ----------
-        map_tags_to : bool, default False 
-            If yes the attribute value tags (att_<attribute_text>:value) is mapped to any given dict provided in tag_mapper. If
-            the tag is not found, simply the tag is returned.
-        tag_mapper : dict, default {}
-            The mapper to map tags to any value. Likely the text representation of an attribute value. 
-
         Returns
         -------
         samples_idces : pd.DataFrame 
             DataFrame where indices are the sample_names and the each column represents a samples attribute.
-            The column name represent the name. If map_tags_to is ``False``, then the values in each column
-            are the ``attribute values tags``. Otherwise the values of the mapper-dict ``tag_mapper``. 
+            The column name represent the attribute tag. 
         
         sample_attribute_by_name : OrderedDict 
             A dict with samples attribute names as keys and values as List[str] containing the sample attribute value
@@ -352,15 +364,9 @@ class MCDataset(JsonSerializable):
         sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
         sample_attribute_by_name = OrderedDict()
         if not isinstance(samples_attributes,dict): TypeError("attributes_samples must be a dictionary.")
-        for attribute_tag, attributes  in  samples_attributes.items():
-            sample_attribute_name = attributes.name 
-            sample_attribute_values = attributes.values 
-            #switch keys and values to map samples indices
+        for attribute_tag, sample_attribute_values  in  samples_attributes.items():
+            #map sample attributes (attribute_value_tag,List Sample Indices)
             attribute_mapper = value_mapper_from_dict(sample_attribute_values) 
-            if map_tags_to and len(tag_mapper) > 0:
-                #multiple tags are separated currently by a space. Therefore split first.
-                attribute_mapper = OrderedDict([k," ".join(tag_mapper[tag] if tag in tag_mapper else tag for tag in v.split(" "))] for k,v in attribute_mapper.items())
-
             sample_idces.loc[:,attribute_tag] = sample_idces.index.map(attribute_mapper)
             sample_attribute_by_name[attribute_tag] = list(sample_attribute_values.keys())
         #replace indices with sample names

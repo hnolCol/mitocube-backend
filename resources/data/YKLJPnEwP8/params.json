@@ -1,0 +1,108 @@
+{
+    "created_on": 1707172687.569066,
+    "state": 0,
+    "label": "YKLJPnEwP8",
+    "title": "My test project before the start",
+    "user_label": "VpVff4sS",
+    "collaborators": [],
+    "replicates": [
+        1,
+        2,
+        3,
+        4,
+        1,
+        2,
+        3,
+        4,
+        1,
+        2,
+        3,
+        4,
+        1,
+        2,
+        3,
+        4
+    ],
+    "sample_names": [
+        "20240205_YKLJPnEwP8_01_5-Fluorouracil",
+        "20240205_YKLJPnEwP8_02_5-Fluorouracil",
+        "20240205_YKLJPnEwP8_03_5-Fluorouracil",
+        "20240205_YKLJPnEwP8_04_5-Fluorouracil",
+        "20240205_YKLJPnEwP8_05_DMSO",
+        "20240205_YKLJPnEwP8_06_DMSO",
+        "20240205_YKLJPnEwP8_07_DMSO",
+        "20240205_YKLJPnEwP8_08_DMSO",
+        "20240205_YKLJPnEwP8_09_Unstimulated",
+        "20240205_YKLJPnEwP8_10_Unstimulated",
+        "20240205_YKLJPnEwP8_11_Unstimulated",
+        "20240205_YKLJPnEwP8_12_Unstimulated",
+        "20240205_YKLJPnEwP8_13_Anisomycin",
+        "20240205_YKLJPnEwP8_14_Anisomycin",
+        "20240205_YKLJPnEwP8_15_Anisomycin",
+        "20240205_YKLJPnEwP8_16_Anisomycin"
+    ],
+    "n_samples": 16,
+    "metatext": {
+        "metatext:research_aim": "This is a very beatuiful texthis is a very beatuiful texthis is a very beatuiful texthis is a very beatuiful texthis is a very beatuiful text",
+        "metatext:experimental_procedure": "his is a very beatuiful texthis is a very beatuiful texthis is a very beatuiful texthis is a very beatuiful text"
+    },
+    "dataset_attributes": {
+        "att_organism": [
+            "att_organism:UP000000589"
+        ],
+        "att_omics_type": [
+            "att_omics_type:proteomics"
+        ],
+        "att_poi": [
+            "att_poi:Q8BJL1"
+        ],
+        "att_experiment": [
+            "att_experiment:expression_proteome"
+        ]
+    },
+    "samples_attributes": {
+        "att_compound": {
+                "att_compound:5_fluorouracil": [
+                    0,
+                    1,
+                    2,
+                    3
+                ],
+                "att_compound:dmso": [
+                    4,
+                    5,
+                    6,
+                    7
+                ],
+                "att_compound:unstimulated": [
+                    8,
+                    9,
+                    10,
+                    11
+                ],
+                "att_compound:anisomycin": [
+                    12,
+                    13,
+                    14,
+                    15
+                ]
+        }
+    },
+    "samples_genotypes": {},
+    "links": [],
+    "timeline": {
+        "created_on": 1707172687.596249,
+        "modified_on": 1707172687.59625,
+        "label": "hmQAjxFARXxRq2KDMzKR",
+        "entries": [
+            {
+                "id": 0,
+                "label": "3ZDvKupDgdtrlhVn998c",
+                "created_on": 1707172687.596235,
+                "user_label": "VpVff4sS",
+                "state": 0,
+                "comment": "Project created"
+            }
+        ]
+    }
+}

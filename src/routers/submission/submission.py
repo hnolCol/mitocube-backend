@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from typing import List, Annotated
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
+from typing import List, Annotated, Literal, Dict
 from collections import OrderedDict
 
-from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.data.database.ABCDatabase import MCDatabase, MCAttributes, InvalidDatasetLabelError
 from lib.data.runs.runs import RunListCreator
 from lib.user.UserHandling import UserDB
-
+from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
@@ -14,19 +14,19 @@ from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
 from config.enums.states import SubmissionStates
 
-from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, label_not_found_exception, user_role_too_low
+from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, label_not_found_exception, user_role_too_low, user_not_found, user_forbidden
 
 from config.models.attributes import AttributeModel
-from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission
-from config.models.user import UserModel
+from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission, SubmissionQueryResponse
+from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel
+from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel, SubmissionCountResponse
 from config.models.submissions.states import StateResponse, StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
-from config.models.submissions.runs import RunListModel, RunListRequestPropsModel, RunListResponseModel
+from config.models.submissions.runs import RunListRequestPropsModel, RunListResponseModel
 
-from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator
-from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata
+from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator, is_user_admin
+from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata, get_dataset_from_database
 from services.json import save_json
 from services.mail import send_email_in_background
 from services.paths.utils import check_dir_exists, join_path
@@ -69,6 +69,228 @@ def get_project_states(user : UserModel = Depends(get_user_from_token)):
     return StateResponse()
 
 
+@router.post("/submissions/{submission_label}/collaborators")
+def add_collaborators(submission_label : str, collaborators : str, replace : bool = True, user : UserModel = Depends(get_user_from_token)):
+    """_summary_
+
+    Parameters
+    ----------
+    submission_label : str
+        The submission label.
+    collaborators : str
+        user labels of collaborators, for multiple users separate them by a ';'
+    replace : bool, optional
+        If true, the existing collaborators are replaced, if false, the list is extended, by default True
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    db = MCDatabase.getDatabase()
+    dataset = get_dataset_from_database(db,submission_label)
+    metadata = dataset.getMetaJson().model_dump()
+    query_collaborators = [ UserDB.get_user_by_label(user_label=coll_label) for coll_label in collaborators.split(";")]
+    filtered_collaborators = [user for exists,user in query_collaborators if exists and user.allow_login]
+    metadata["collaborators"] = filtered_collaborators
+    return True
+
+
+@router.get("/submissions/{submission_label}/owner", response_model=PublicUser)
+def get_submission_owner(submission_label : str, user :UserModel = Depends(get_user_from_token)):
+    """_summary_
+
+    Parameters
+    ----------
+    submission_label : str
+        The label of the submission the owner should be returned. 
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    PublicUser
+        Public user information.
+
+    Raises
+    ------
+    label_not_found_exception
+       The submission_label was not found.
+    user_not_found
+        If the user is not found in the database.
+    """
+    db = MCDatabase.getDatabase()
+    dataset = get_dataset_from_database(db,submission_label)
+    metadata = dataset.getMetaJson()
+    user_label = metadata.user_label
+    db_user = UserDB
+    exists, user = db_user.get_user_by_label(user_label)
+    if not exists:
+        raise user_not_found
+    return user
+    
+
+@router.post("/submissions/{submission_label}/owner")
+def change_submission_owner(submission_label : str, user_label : str, add_prev_user_to_collaborators : bool = False, user : UserModel = Depends(is_user_admin)):
+    """_summary_
+
+    Parameters
+    ----------
+    submission_label : str
+        The submission label
+    user_label : str
+       The user label that identifies the user. If the user_label does not exists, an user_not_found Exception is raise.
+    add_prev_user_to_collaborators : bool, optional
+        Query parameter that indicated, if the previous user should be added to the collaborators. by default False
+    user : UserModel, optional
+        The user model that is identified by the user. The minim state of the user must be ADMIN (4), by default Depends(is_user_admin)
+
+    API Endpoint
+    ------------
+    POST /api/submissions/{submission_label}/owner.
+
+    Returns
+    -------
+    bool
+        Returns true if not errors occurred.
+
+    Raises
+    ------
+    label_not_found_exception
+        If the submission label does not exist.
+    user_not_found
+        If the user is not found in the database.
+    user_forbidden
+        If the user that is supposed to be the new owner is blocked (not allowed for login)
+    """
+    
+    db = MCDatabase.getDatabase()
+    dataset = get_dataset_from_database(db,submission_label)
+    metadata = dataset.getMetaJson()
+    
+    db_user = UserDB
+    exists, user = db_user.get_user_by_label(user_label)
+    if not exists:
+        raise user_not_found
+    if not user.allow_login:
+        raise user_forbidden
+    
+    metadata = metadata.model_dump()
+    prev_user_label = metadata["user_label"]
+    metadata["user_label"] = user_label
+    metadata["collaborators"] = [coll_label for coll_label in metadata["collaborators"] if coll_label != user_label]
+    if add_prev_user_to_collaborators:
+        metadata["collaborators"].append(prev_user_label)
+    update_submission = DatasetSubmissionModel(**metadata)
+    dataset.write_json(update_submission, update = True)
+    return True
+
+
+@router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
+def get_submissions_by_user_label(labels : str = None ,group : Literal["state","user","attribute_tag","attribute_value_tag","feature","genotype"] = None): #, user : UserModel = Depends(get_user_from_token)
+    """Returns the the number submissions by a property. 
+
+
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    """
+    label_subset = None
+    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    if labels is not None:
+        label_subset = set(labels.split(";"))
+    return db_helper.get_label_count_by(by=group, label_subset=label_subset)
+    #if group is not in Literal => HTTPExcepction 
+
+
+@router.get("/submissions/users", response_model=List)
+def get_submissions_by_user_label(user : UserModel = Depends(get_user_from_token)):
+    """Returns the the number and the labels by user that 
+    are found in the database. 
+
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    """
+    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    return db_helper.get_labels_by_users()
+
+@router.get("/submissions/q", response_model=SubmissionQueryResponse)
+def get_submission_by_query(state : str|int = None,
+                            query : Annotated[str | None, Query(min_length=1)] = None,
+                            feature_key : str = None, 
+                            attribute_value_tag : str = None, 
+                            attribute_tag : str = None, 
+                            genotype_label : str = None, 
+                            user_label : str = None,
+                            max_submissions : int = 50, 
+                            join : Literal["inner","outer"] = "inner",
+                            user : UserModel = Depends(get_user_from_token)
+                            ): #user : UserModel = Depends(get_user_from_token)
+    
+    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    N = db_helper.get_metadata_count()
+    db = MCDatabase.getDatabase()
+    labels = []
+    attribute_search_active = any(search_param is not None for search_param in [feature_key,attribute_tag,attribute_value_tag,genotype_label,state,user_label])
+    attribute_search_labels = db_helper.get_labels(state=state,
+                                                    feature_key=feature_key,
+                                                    attribute_tag=attribute_tag,
+                                                    attribute_value_tag=attribute_value_tag,
+                                                    genotype_label=genotype_label,
+                                                    user_label=user_label,
+                                                    join=join
+                                                    )
+    print(attribute_search_labels)
+    if query is not None:
+        labels_by_query = db_helper.get_labels_by_search_string(query, subset= attribute_search_labels if join == "inner" and attribute_search_active else None)
+        if join == "inner":
+            #the search happened already only in the subset of labels
+            labels = labels_by_query
+        else:
+            labels  = labels_by_query + [label for label in attribute_search_labels if label not in labels_by_query]
+    elif attribute_search_active:
+        #if query is not defined, then the labels are simply the ones from the attribute_search
+        labels = attribute_search_labels
+    else:
+        #otherwise get all 
+        labels = db.getDataLabels()
+        
+    if attribute_search_active and len(labels) == 0: 
+        #empty response
+        return SubmissionQueryResponse(submissions=[],query_count=0,total_count=N,labels=[])
+        
+    metadata = list(db.getJSONDatasets(labels).values())
+    #sort after creation date to show once that are required.
+    metadata.sort(key = lambda x : x.created_on, reverse=True)
+    query_match_count = len(metadata)
+    if len(metadata) > max_submissions:
+        metadata = metadata[:max_submissions]
+
+    metadata = [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_meta in metadata]
+    
+    return {
+        "submissions" : metadata,
+        "labels" : labels,
+        "query_count"  : query_match_count,
+        "total_count" : N
+    }
+    
+    
+
+
+
+
 @router.post("/submissions",summary="Add submission to the database")
 def add_submission(background_task : BackgroundTasks ,submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
     """
@@ -105,7 +327,8 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
                                     "app_name" : GENERAL_SETTINGS.app_name,
                                     "first_name" : user.firstname,
                                     "title" : submission.title,
-                                    "label" : submission.label
+                                    "label" : submission.label,
+                                    "submission_url" : f"{GENERAL_SETTINGS.url}/datasets/{submission.label}"
                                 },
                                 template_mame=EMAIL_SETTINGS.mail_submission_complete_template)
     
@@ -149,7 +372,7 @@ def update_submission(background_task : BackgroundTasks,
     updated_submission = DatasetSubmissionModel(**metadata)
     #update meta data in dataset and write json file.
     
-    dataset.write_json(updated_submission)
+    dataset.write_json(updated_submission, update = True)
     
     if state_change.prev_state != state_change.state:
         send_email_in_background(background_tasks=background_task,
@@ -173,8 +396,9 @@ def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curato
     pass 
 
 
+
 @router.get("/submissions", response_model=List[DatasetSubmissionResponseModel])
-def get_submission(user : UserModel = Depends(get_user_from_token)):
+def get_submission(labels : str = None, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the submissions depending on the user's role. 
     Curators and admins are able to see all submissions
@@ -183,12 +407,13 @@ def get_submission(user : UserModel = Depends(get_user_from_token)):
 
     db = MCDatabase.getDatabase()
     metadata = db.getJSONDatasets()
+    subset =  labels.split(";") if labels is not None else None
     #map_tags_to_attribute_in_metadata(list(metadata.values())[0])
     if user.role < UserRolesEnum.CURATOR:
-        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label] #check if in a list of collaborators ? 
+        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label and (subset is None or dataset_label in subset)] #check if in a list of collaborators ? 
     else:
         #return all if user at least curator
-        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items()]
+        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if subset is None or dataset_label in subset]
     
 
 

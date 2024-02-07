@@ -17,7 +17,7 @@ class PandaFileGenotype(MCGenotypes):
     """ProteoType of Genotype Database 
     ATTENTION
     ---------
-    
+    Returns Singleton.
     Saves the attribute values at the moment, in real life it should save the tags only? 
     
     Parameters
@@ -39,9 +39,11 @@ class PandaFileGenotype(MCGenotypes):
     def _save(self):
         """
         """
+        self._lock.acquire()
         genotype_file_path = DB_SETTINGS.genotype_file
         genotype_data = [genotype.model_dump(exclude_none=True) for genotype in self._genotypes]
         save_json(genotype_data,file_path=genotype_file_path)
+        self._lock.release()
         
     def add(self, genotype : GenotypeModel) -> bool:
         """Addds a genotype to the database. 

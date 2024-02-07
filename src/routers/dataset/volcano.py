@@ -35,6 +35,7 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
     Returns the result for a volcano plot
     """
     db = MCDatabase.getDatabase()
+    db_attributes = MCAttributes.getAttributeDatabase()
     dataset = db.getDataset(dataset_label)
     if dataset is None:
         raise HTTPException(status_code=400,detail="Data not found for given label.")
@@ -46,9 +47,13 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
                                      attribute_value_left=attribute_left_tag, 
                                      attribute_value_right=attribute_right_tag )
    
+    attribute_values = db_attributes.getAttributeValues(tags=[attribute_left_tag,attribute_right_tag]).set_index("tag", drop=False)
+    attribute = db_attributes.getAttributes(tags=[sample_attribute_tag])
+    comparison_suffix = f"{attribute_values.loc[attribute_left_tag,'text']} vs {attribute_values.loc[attribute_right_tag,'text']}"
+    print(comparison_suffix)
     feature_db = PandaFeatureDatabase()
     features = feature_db.get(stats.index,proteome_ids,ignoreMissing=True)
     #join features to the stat results
     stats_and_feature_data = stats.join(features,how="left")
-    return stats_and_feature_data.to_dict(orient="records")
+    return {"stats" : stats_and_feature_data.to_dict(orient="records"), "suffix" : comparison_suffix}
     

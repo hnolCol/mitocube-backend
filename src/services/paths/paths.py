@@ -20,8 +20,8 @@ class Paths:
     def __init__(self, app_root : str, db_settings : DB) -> None:
         self.root = app_root
         self.db_settings = db_settings 
-        self.resource_path = self.__build_path_resources()
-        self.__check_dirs()
+        #self.resource_path = self.__build_path_resources()
+        #self.__check_dirs()
 
     def __build_path_resources(self):
         """"""

@@ -5,7 +5,7 @@ class SubmissionStates(IntEnum):
     Enums that are defined in the frontend which 
     knows what to do with such input types.
     """
-    STOPPED = -2 
+    CANCELED = -2 
     PAUSED = -1
     SUBMITTED = 0 
     PROCESSED = 1 
@@ -16,7 +16,7 @@ class SubmissionStates(IntEnum):
 
 
 class SubmissionStateColors(Enum):
-    STOPPED = "#1e3f49"
+    CANCELED = "#1e3f49"
     PAUSED = "#484848"
     SUBMITTED = "#cfcfcf"
     PROCESSED = "#93b98e" 

@@ -65,18 +65,26 @@ class PandaFileAttributes(MCAttributes):  # PostgreSQLAttributes
         except Exception as err:
             raise Exception("Unable to import attribute JSON file %s. Original Exception: %s" % (attribute_file_path, str(err)))
 
-    def getAttributes(self, sort : bool = True, sort_by : str = "priority") -> pd.DataFrame:
+    def getAttributes(self, sort : bool = True, sort_by : str = "priority", tags : List[str] = None) -> pd.DataFrame:
         """"""
-        if sort:
+        if sort and tags is None:
             #sort attributes according to priority in descending order.
             return self._attributes.sort_values(by=sort_by, ascending=False)
+        elif tags is not None:
+            attribute_subset = self._attributes.loc[self._attributes["tag"].isin(tags),:]
+            if sort:
+                attribute_subset.sort_values(by=sort_by,ascending=False)
+            return attribute_subset
         return self._attributes
 
-    def getAttributeValues(self) -> pd.DataFrame:
+    def getAttributeValues(self, tags : List[str] = None) -> pd.DataFrame:
         """
         Returns the full attribute value table as Panda DataFrame.
         """
+        if tags is not None:
+            return self._attribute_values.loc[self._attribute_values["tag"].isin(tags),:]
         return self._attribute_values
+
 
     def getAttributeTable(self) -> pd.DataFrame:
         """

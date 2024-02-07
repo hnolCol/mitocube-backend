@@ -27,7 +27,7 @@ class FeatureData(DatasetTransform):
         metadata = self._dataset.getMetaJson()
         #TODO: move this somewhere else.. 
         proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[-1].upper()  # should we allow more organism?
-
+        #proteome_ids =  [organism.split(":")[1].upper() for organism in metadata.dataset_attributes["att_organism"]]  # shou
         if feature_key not in data.index:
             if add_annotations:
                 return pd.DataFrame(), {}, {}

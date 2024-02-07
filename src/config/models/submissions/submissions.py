@@ -63,7 +63,7 @@ class NewSubmissionModel(BaseModel):
     title : str 
     datasetAttributeValues : Dict[str,List[Union[AttributeValueModel,FeatureModel]]]
     datasetAttributes : List[AttributeModel]
-    samplesAttributes : List[SampleAttribute]
+    samplesAttributes : List[AttributeModel]
     timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
 
     @field_validator("metatext")
@@ -116,7 +116,7 @@ class DatasetSubmissionModel(BaseModel):
     n_samples : int
     metatext : Dict[str,str] = {}
     dataset_attributes : Dict[str,List[str]]
-    samples_attributes : Dict[str,SampleAttributeFromDB]
+    samples_attributes : Dict[str,Dict[str,List[int]]]
     samples_genotypes : Dict[str,List[int]] = Field(...,default_factory=dict)
     links : List[SubmissionLink] = []
     timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
@@ -126,10 +126,31 @@ class DatasetSubmissionModel(BaseModel):
 class DatasetSubmissionResponseModel(DatasetSubmissionModel):
     ""
     dataset_attributes : Dict[str,List[Union[AttributeValueModel,FeatureModel]]]
-    samples_attributes : Dict[str,SampleAttributesResponse]
+    #samples_attributes : Dict[str,SampleAttributesResponse]
     samples_attributes_by_sample : Dict[str, Dict[str,List[Union[AttributeValueModel,FeatureModel]]]]
     attributes : Dict[str,AttributeModel] #The attributes by tags 
     attribute_values_by_tag : Dict[str,Union[AttributeValueModel,FeatureModel]]
+    genotypes : Dict[str, GenotypeModel]
+    
+
+class SubmissionUserCountResponse(BaseModel):
+    user_label : str
+    submission_labels : List[str]
+    submission_count : int
+class SubmissionCountResponse(BaseModel):
+    submission_labels : List[str]
+    submission_count : int
+
+class SubmissionQueryResponse(BaseModel):
+    submissions : List[DatasetSubmissionResponseModel]
+    labels : List[str]
+    query_count : int
+    total_count : int 
+        
+class SubmissionByUserResponse(BaseModel):
+    user_label : str
+    submission_labels : List[str]
+    submission_count : int
     
 class SubmissionIDResponse(BaseModel):
     """BaseModel for an API ID Submission response"""

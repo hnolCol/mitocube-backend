@@ -1,7 +1,11 @@
 from datetime import datetime
 from collections import OrderedDict
-from lib.data.database.ABCDatabase import MCAttributes
+from lib.data.database.ABCDatabase import MCAttributes, MCDatabase, InvalidDatasetLabelError
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
+from lib.data.genotype.PandaGenotype import PandaFileGenotype
+
+from config.exceptions.HTTPExceptions import label_not_found_exception
+
 from config.enums.states import SubmissionStates
 from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.annotations.feature import FeatureModel
@@ -11,6 +15,26 @@ from config.models.user import UserModel
 from typing import List, Dict
 import pandas as pd 
 
+
+
+def get_dataset_from_database(db : MCDatabase, label : str, force_reload : bool = False):
+    """_summary_
+
+    Parameters
+    ----------
+    db : MCDatabase
+        _description_
+    label : str
+        _description_
+    """
+    try:
+        dataset = db.getDataset(label)
+        if dataset is None:
+            raise label_not_found_exception
+    except InvalidDatasetLabelError:
+        raise label_not_found_exception
+    
+    return dataset
 
 def map_tags(
              attribute : AttributeModel, 
@@ -63,6 +87,7 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     dataset_attributes = submission.dataset_attributes
     db_attributes = MCAttributes.getAttributeDatabase()
     db_features = PandaFeatureDatabase()
+    db_genotypes = PandaFileGenotype()
     attributes= db_attributes.getAttributes().set_index("tag")
     #get the proteome ids as a list (multiple proteome_id possible)
     proteome_ids = [organism.split(":")[1] for organism in dataset_attributes["att_organism"]]
@@ -82,37 +107,42 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     sample_attribute_by_sample_name = OrderedDict([(sample_name, {}) for sample_name in sample_names])
     attribute_values_by_tag = {}
     
-    for attribute_tag, sample_attributes in sample_attributes.items():
+    for attribute_tag, sample_attribute in sample_attributes.items():
         attribute = AttributeModel(**attributes.loc[attribute_tag,:].to_dict(), tag=attribute_tag)
         if attribute_tag not in mapped_attributes:
             mapped_attributes[attribute_tag] = attribute
-        attr_value_tags = sample_attributes.values.keys() 
-        mapped_sample_attributes[attribute_tag] = {
-            "name" : sample_attributes.name,
-            "values" : sample_attributes.values,
-            "attribute_values" : {}
-        }
+        
+        attr_value_tags = sample_attribute.keys() 
+       # mapped_sample_attributes[attribute_tag] = {}
         mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_ids,attribute_values,db_features)
         for attr_value_tag, mapped_attr_value in zip(attr_value_tags,mapped_attribute_values):
-            mapped_sample_attributes[attribute_tag]["attribute_values"][attr_value_tag] = mapped_attr_value
+           # mapped_sample_attributes[attribute_tag]["attribute_values"][attr_value_tag] = mapped_attr_value
             if attr_value_tag not in attribute_values_by_tag:
                 attribute_values_by_tag[attr_value_tag] = mapped_attr_value
             
-        for attribute_value_tag, sampleIndices in sample_attributes.values.items():
+        for attribute_value_tag, sampleIndices in sample_attribute.items():
             for sampleIdx in sampleIndices:
                 sample_name = sample_names[sampleIdx]
                 if attribute_tag not in sample_attribute_by_sample_name[sample_name]:
                     sample_attribute_by_sample_name[sample_name][attribute_tag] = []
-                attribute_value = mapped_sample_attributes[attribute_tag]["attribute_values"][attribute_value_tag]
+                attribute_value = attribute_values_by_tag[attribute_value_tag]
                 sample_attribute_by_sample_name[sample_name][attribute_tag].append(attribute_value)
     
+    samples_genotypes = submission.samples_genotypes
+    genotypes = {}
+    if len(samples_genotypes) > 0:
+        ##map genotypes by the keys
+        genotypes = dict([(label,db_genotypes.get(label)) for label in samples_genotypes.keys()])
+        
+        
 
     metadata = submission.model_dump()     
     metadata["dataset_attributes"] = mapped_dataset_attributes 
-    metadata["samples_attributes"] = mapped_sample_attributes 
     metadata["samples_attributes_by_sample"] = sample_attribute_by_sample_name
     metadata["attribute_values_by_tag"] = attribute_values_by_tag
     metadata["attributes"] = mapped_attributes
+    metadata["genotypes"] = genotypes
+   
                             
     return DatasetSubmissionResponseModel(**metadata)
 
@@ -146,7 +176,7 @@ def check_for_missing_mandatory_attribute(submission : NewSubmissionModel, attri
     if len(attrsNotInDatasetAttributes) > 0:
         #missing mandatory attributes
         #they could still be in the sample attributes
-        sampleAttributesTags = [sampleAttrDict["attribute"].tag for sampleAttrDict in  NewSubmissionModel.samplesAttributes]
+        sampleAttributesTags = [sampleAttr.tag for sampleAttr in  NewSubmissionModel.samplesAttributes]
         attrNotInSamplteAttr = [attribute for attribute in attrsNotInDatasetAttributes if attribute.tag not in sampleAttributesTags]
         return attrNotInSamplteAttr 
     
@@ -208,8 +238,9 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
     
     samplesAttributesJson = {}
     for samplesAttribute in submission.samplesAttributes:
-        sampleAttrTag = samplesAttribute.attribute.tag
-        samplesAttributesJson[sampleAttrTag] = {"name" : samplesAttribute.name, "values" : {}}
+        sampleAttrTag = samplesAttribute.tag
+        samplesAttributesJson[sampleAttrTag] = {}
+        
     for n,sampleAttributeRow in enumerate(submission.attributeTable):
         #sampleName = submission.sampleNames[n]
         for sampleAttrTag, attributeValues in sampleAttributeRow.items():        
@@ -219,9 +250,11 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
                     attributeValuesDict = attributeValue.model_dump(exclude_none=True)
                     attributeValue = FeatureModel(**attributeValuesDict, tag = f"{sampleAttrTag}:{attributeValue.key}")
                 
-                if attributeValue.tag not in samplesAttributesJson[sampleAttrTag]["values"]:
-                    samplesAttributesJson[sampleAttrTag]["values"][attributeValue.tag] = []
-                samplesAttributesJson[sampleAttrTag]["values"][attributeValue.tag].append(n)
+                if attributeValue.tag not in samplesAttributesJson[sampleAttrTag]:
+                    #add a list if not yet added, the list is filled with sample indices
+                    samplesAttributesJson[sampleAttrTag][attributeValue.tag] = []
+                    
+                samplesAttributesJson[sampleAttrTag][attributeValue.tag].append(n)
     json["samples_attributes"] = samplesAttributesJson
     #create timeline
     #overwrite what ever the user cretaed, change? 

@@ -4,7 +4,7 @@ from typing import List, Dict
 from config.exceptions.HTTPExceptions import user_role_too_low
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
-from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel
+from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser
 from services.encryption import decode_token
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
@@ -46,6 +46,36 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Add
                              },
                              template_mame=EMAIL_SETTINGS.mail_account_generated_template)
 
+@router.get("/users/q")
+def query_user_db(query : str = None, max_users : int = 40): #user : UserModel = Depends(get_user_from_token)
+    """Query user in the database. 
+
+    Parameters
+    ----------
+    query : str, optional
+        _description_, by default None
+    max_users : int, optional
+        _description_, by default 40
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    users = UserDB.get_users()
+    total_count = len(users)
+    query = query.lower()
+    filtered_users = [user for user in users if any(query in getattr(user,prop).lower() for prop in ["firstname","lastname","email"] if hasattr(user,prop))]
+    #TODO sort users by the time they have been used for collaboration 
+    query_count = len(filtered_users)
+    if (query_count > max_users):
+        #subset if too many 
+        filtered_users = filtered_users[:max_users]
+        
+    return {"users" : filtered_users, 
+            "user_labels" : [u.label for u in filtered_users], 
+            "query_count" : query_count, 
+            "total_count" : total_count} 
 
 @router.post("/users/pw",summary="Allows users to change the password for themselves.")
 def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
@@ -84,8 +114,6 @@ def update_user(user_props : dict, user : UserModel = Depends(is_user_admin)):
         
     UserDB.update_user_by_label(user_label = user_to_update.label, user_props=user_to_update)
     
-
-
 
 @router.get("/users/full",  response_model=UsersAdminResponse)
 def get_users(user : UserModel = Depends(is_user_admin)):

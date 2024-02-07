@@ -40,11 +40,11 @@ class MCAttributes(metaclass=SingletonABCMeta):
             raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
 
     @abstractmethod
-    def getAttributes(self, sort : bool = True) -> pd.DataFrame:
+    def getAttributes(self, sort : bool = True, sort_by : str = "priority", tags : List[str] = None) -> pd.DataFrame:
         """
         Returns the full attribute table as Panda DataFrame.
         
-        Paramaters
+        Parameters
         ----------
         sort : bool, default True
             If true, the attributes will be sorted by the column priority. 
@@ -57,7 +57,7 @@ class MCAttributes(metaclass=SingletonABCMeta):
         pass
 
     @abstractmethod
-    def getAttributeValues(self) -> pd.DataFrame:
+    def getAttributeValues(self, tags : List[str] = None) -> pd.DataFrame:
         """
         Returns the full attribute value table as Panda DataFrame.
         """

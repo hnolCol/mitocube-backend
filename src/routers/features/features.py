@@ -12,7 +12,7 @@ from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.FeatureData import FeatureData
-
+from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 
 router = APIRouter(
     prefix="/api/features",
@@ -49,7 +49,7 @@ def get_features_by_query(proteome_ids : str, query : str, max_features : int = 
 
 @router.get("/{feature_key}/data",
             response_model=FeatureDataResponseModel)
-def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from_token), max_datasets : int = 200):
+def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserModel = Depends(get_user_from_token)
     """
     Returns the data for a specific feature in all datasets it was detected in. 
     
@@ -71,7 +71,11 @@ def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from
     
     """
     db = MCDatabase.getDatabase()
-    dataset_labels = db.getDataLabels()
+    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    #dataset labels that contain the feature
+    dataset_labels = db_helper.get_labels_by_feature(feature_key)
+    #dataset_labels = db.getDataLabels()
+    
     feature_data_by_dataset_label : Dict[str,pd.DataFrame] = {}
     attributes_sample_by_dataset_label : Dict[str,Dict] = {}
     attribute_samples_by_sample_collection = {}
@@ -89,9 +93,11 @@ def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from
                 #TODO this is something we could cash as as well? Mapping the tags from the DB to the actual attributes
                 feature_data_by_dataset_label[label] = feature_data
                 attributes_sample_by_dataset_label[label] = attributes_samples
+                ##update the attribute/attribute_value details to get the complete set of attributes required
                 attribute_samples_by_sample_collection.update(updated_metadata.samples_attributes_by_sample)
                 attribute_values_by_tag_collection.update(updated_metadata.attribute_values_by_tag)
                 attributes_collection.update(updated_metadata.attributes)
+    
     response_data = {
         "feature_key": feature_key,
         "dataset_labels" : list(feature_data_by_dataset_label.keys()),
@@ -101,7 +107,7 @@ def get_dataset_data(feature_key : str, user : UserModel = Depends(get_user_from
         "samples_attributes_by_sample" : attribute_samples_by_sample_collection,
         "attributes" : attributes_collection
         }
-    FeatureDataResponseModel(**response_data)
+    #FeatureDataResponseModel(**response_data)
     return response_data
 
 

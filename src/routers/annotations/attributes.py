@@ -63,22 +63,22 @@ def add_attribute(attribute : AttributeModel) -> List[AttributeModel]:
     # return db_attributes.getAttributes().to_dict(orient="records")  # ToDo: How to cast into a AttributeModel?
 
 
-@router.get("/attributes/{attribute_id}")
-def get_attribute_by_id(attribute_id : int) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?, ID, these were placeholders from the very beginning, changed them
-    """
-    Returns the attribute by its ID
-    """
-    return {}
+# @router.get("/attributes/{attribute_id}")
+# def get_attribute_by_id(attribute_id : int) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?, ID, these were placeholders from the very beginning, changed them
+#     """
+#     Returns the attribute by its ID
+#     """
+#     return {}
 
-@router.get("/attributes/{attribute_tag}")
-def get_attribute_by_name(attribute_tag : str) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?, the tag, changed. 
-    """
-    Returns a single attribute by its tag
-    """
-    return {}
+# @router.get("/attributes/{attribute_tag}")
+# def get_attribute_by_name(attribute_tag : str) -> AttributeModel:  # ToDo: Do you mean the numerical ID or the tag?, the tag, changed. 
+#     """
+#     Returns a single attribute by its tag
+#     """
+#     return {}
 
-@router.delete("/attributes/{attribute_id}")
-def delete_attribute_by_id(attribute_id : int) -> dict:
-    """Deletes an attribute by ID"""
-    return {}  # ToDo: What should be returned? deleted attributes? Tag or IDs?
+# @router.delete("/attributes/{attribute_id}")
+# def delete_attribute_by_id(attribute_id : int) -> dict:
+#     """Deletes an attribute by ID"""
+#     return {}  # ToDo: What should be returned? deleted attributes? Tag or IDs?
 
