@@ -42,18 +42,22 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     metadata = dataset.getMetaJson()
     #adjust proteome_id extraction
-    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
-    stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
-                                     attribute_value_left=attribute_left_tag, 
-                                     attribute_value_right=attribute_right_tag )
-   
+       
     attribute_values = db_attributes.getAttributeValues(tags=[attribute_left_tag,attribute_right_tag]).set_index("tag", drop=False)
     attribute = db_attributes.getAttributes(tags=[sample_attribute_tag])
     comparison_suffix = f"{attribute_values.loc[attribute_left_tag,'text']} vs {attribute_values.loc[attribute_right_tag,'text']}"
+    
+    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
+    stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
+                                     attribute_value_left=attribute_left_tag, 
+                                     attribute_value_right=attribute_right_tag, suffix = comparison_suffix )
+
+    print(stats)
     print(comparison_suffix)
     feature_db = PandaFeatureDatabase()
     features = feature_db.get(stats.index,proteome_ids,ignoreMissing=True)
     #join features to the stat results
-    stats_and_feature_data = stats.join(features,how="left")
+    stats_and_feature_data = stats.join(features,how="left").reset_index()
+    stats_and_feature_data.rename(columns={"Key":"key"}, inplace=True)
     return {"stats" : stats_and_feature_data.to_dict(orient="records"), "suffix" : comparison_suffix}
     

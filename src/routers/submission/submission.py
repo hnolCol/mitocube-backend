@@ -452,10 +452,15 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
     attributes = MCAttributes.getAttributeDatabase()
     attribute_values = attributes.getAttributeValues()
     attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
-    try: dataset = db.getDataset(label = submission_label) 
-    except: raise label_not_found_exception
+    dataset = get_dataset_from_database(db,submission_label)
     
-    sample_idces, _ = dataset.getSamplesAttributes(map_tags_to=True,tag_mapper=attribute_value_by_tag)
+    sample_idces, _ = dataset.getSamplesAttributes()
+    
+    if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in sample_idces.columns: raise HTTPException(status_code=400,detail="Aggregate on sample attribute tag not found.")
+    #extract the value
+    for columnName in sample_idces.columns:
+        sample_idces[columnName] = ["_".join([attrValueTag.split(":")[-1] for attrValueTag in sample_attrs.split(" ")]) for sample_attrs in sample_idces[columnName].values]
+    print(sample_idces)
     try:
         runlist = RunListCreator(sample_list=sample_idces, 
                                  user = user,

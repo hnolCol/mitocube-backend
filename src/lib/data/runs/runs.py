@@ -55,7 +55,7 @@ class RunListCreator:
         while if ``True`` all runs across plates are scrambled. It defaults to False since some analytical systems can only host a single well plate. 
     
     aggregate_on : str, default None
-        The name of the samples attributes that should be used for aggregating the sample list on. This would mean that you can pool numerous samples together and would result in 
+        The tag of the samples attributes that should be used for aggregating the sample list on. This would mean that you can pool numerous samples together and would result in 
         less runs than samples. As an example, a SILAC based quantification experiment in proteomics could be such an example.
 
     fractionate : bool, default False 

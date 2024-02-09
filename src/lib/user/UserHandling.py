@@ -114,17 +114,18 @@ class UserDB:
         save_json(DB,user_db_file)
 
 
+
     def add_user(self, user_props : UserModelForRegistration):
         """Add user to db - user model for registration contains a randomly generated password."""
-        DB = self._update()
+        self._update()
         #check user email in db, return error
         exists, user = self.get_user_by_email(email=user_props.email)
         if exists : raise user_registration_failed
-        next_id = max([user.id for user in DB])
+        next_id = max([user.id for user in self.DB])
         pw_hash = create_password_hash(user_props.password)
         user_props_from_request = user_props.model_dump(exclude=["password"])
         to_add_user = UserModel(id = next_id+1,password=pw_hash,**user_props_from_request)
-        DB.append(to_add_user)
+        self.DB.append(to_add_user)
         self._save_db()
 
 

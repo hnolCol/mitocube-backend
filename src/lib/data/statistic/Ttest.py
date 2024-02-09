@@ -7,7 +7,8 @@ class Ttest(DatasetStatistic):
                   sample_attribute_tag : str = "att_compound", 
                   attribute_value_left : str = "att_compound:dmso", 
                   attribute_value_right : str = "att_compound:hydroxyurea", 
-                  fdr : float = 0.01) -> pd.DataFrame:
+                  fdr : float = 0.01,
+                  suffix : str = "") -> pd.DataFrame:
         """_summary_
 
         Parameters
@@ -37,12 +38,17 @@ class Ttest(DatasetStatistic):
         X = datatable.loc[:,samples_left]
         Y = datatable.loc[:,samples_right]
         T,p = ttest_ind(X, Y, nan_policy="omit", axis=1)
-        stats = pd.DataFrame({"t-value" : T, "p-value" : p} , columns=["t-value","p-value"], index=datatable.index).dropna(subset="p-value")
-        stats = stats.dropna(subset=["p-value"])
-        stats.loc[:,"-log10 p-value"] = -np.log10(stats.loc[:,"p-value"])
-        stats.loc[:,"fdr"] = false_discovery_control(stats["p-value"].values)
-        stats.loc[:,"significant"] = stats.loc[:,"fdr"] <= fdr
-        stats.loc[:,"log2 FC"] = X.mean(axis=1) - Y.mean(axis=1)
+        p_value_name = f"p-value {suffix}"
+        
+        stats = pd.DataFrame({f"t-value {suffix}" : T, p_value_name : p}, 
+                             columns=[f"t-value {suffix}",p_value_name], 
+                             index=datatable.index).dropna(subset=p_value_name)
+        
+        stats = stats.dropna(subset=[p_value_name])
+        stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
+        stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
+        stats.loc[:,f"significant {suffix }"] = stats.loc[:,f"fdr {suffix}"] <= fdr
+        stats.loc[:,f"log2 FC {suffix}"] = X.mean(axis=1) - Y.mean(axis=1)
         return stats
         # boolIdx, p_adj, _, _ = multipletests(p, alpha=0.05, method=multipleTestMethod)
         # tTestDifference = pd.DataFrame(pd.Series(X1.mean(axis=1) - X2.mean(axis=1), name="x"))
