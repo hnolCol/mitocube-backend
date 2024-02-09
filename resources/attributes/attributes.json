@@ -9673,9 +9673,9 @@
             "id": 736
         },
         {
-            "value": "mitochondria",
+            "value": "mitochondriapk",
             "attribute_tag": "att_subcellular_compartment",
-            "tag": "att_subcellular_compartment:mitochondria",
+            "tag": "att_subcellular_compartment:mitochondriapk",
             "keyword": null,
             "text": "Membrane Fraction + Proteinase K",
             "description": "Membrane fraction (Mitochondria, ER) with Proteinase K digestion.",
