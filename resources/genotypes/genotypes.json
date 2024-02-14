@@ -186,5 +186,90 @@
                 }
             }
         ]
+    },
+    {
+        "label": "HI087",
+        "text": "Mgme1(-/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "Q9CXC3",
+                "genes": "Mgme1",
+                "proteins": "Mitochondrial genome maintenance exonuclease 1 (EC 3.1.-.-)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 338,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "Q9CXC3",
+                        "genes": "Mgme1",
+                        "proteins": "Mitochondrial genome maintenance exonuclease 1 (EC 3.1.-.-)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 338,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 342,
+                        "attribute_id": 48,
+                        "text": "Deletion",
+                        "tag": "att_gene_engineering:deletion",
+                        "value": "deletion",
+                        "description": "Gene deletion"
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 348,
+                        "attribute_id": 49,
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 335,
+                        "attribute_id": 47,
+                        "text": "Homologous recombination (loxP-sites)",
+                        "tag": "att_gene_editing_method:homologrecombination",
+                        "value": "homologrecombination",
+                        "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
+                    }
+                ],
+                "att_protein_mutation": [
+                    {
+                        "id": 706,
+                        "attribute_id": 88,
+                        "text": "Frameshift",
+                        "tag": "att_protein_mutation:frameshift",
+                        "value": "frameshift",
+                        "description": "Frameshift mediated by a double strand break"
+                    }
+                ],
+                "att_protein_position": {
+                    "att_protein_mutation:frameshift": {
+                        "attribute_value": {
+                            "id": 719,
+                            "attribute_id": 89,
+                            "text": "Region",
+                            "tag": "att_protein_position:region",
+                            "value": "region",
+                            "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
+                        },
+                        "aa_position": [
+                            143,
+                            153
+                        ]
+                    }
+                }
+            }
+        ]
     }
 ]
