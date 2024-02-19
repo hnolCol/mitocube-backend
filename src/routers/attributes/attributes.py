@@ -35,15 +35,17 @@ def get_attributes(user : UserModel = Depends(get_user_from_token)) -> Attribute
 
 
 @router.get("/attribute_values/q")
-def get_attribute_values(labels : str, attribute_value_tag : str = None, attribute_tag : str = None, count : bool = True, max_attributes : int = 999999):
+def get_attribute_values(labels : str = None, attribute_value_tag : str = None, attribute_tag : str = None, count : bool = True, max_attributes : int = 999999):
     
     db_helper = MCDatabaseHelper.getDatabaseHelper()
     db_attributes = MCAttributes.getAttributeDatabase() 
+    if labels is None:
+        labels = ";".join(db_helper.get_all_labels())
     attribute_value_tags, submission_count_by_attribute_value_tag = db_helper.get_attribute_value_tags_by_labels(labels,count=count, attribute_value_subset=attribute_value_tag, attribute_subset = attribute_tag)
     attribute_values = db_attributes.getAttributeValues(tags=list(attribute_value_tags))
     proteome_ids, count = db_helper.get_organisms_by_label(labels)
     attribute_values_by_tag = attribute_values.set_index("tag", drop=False).to_dict(orient="index")
-    #check if size is okay because numeric input and features are not in here 
+    #check if size is okay because numeric input and features are not in here and we have to create them.
     missing_attribute_value_tags = [attribute_value_tag for attribute_value_tag in attribute_value_tags if attribute_value_tag  not in attribute_values_by_tag]
     
     if len(missing_attribute_value_tags) > 0:
@@ -68,7 +70,6 @@ def get_attribute_values(labels : str, attribute_value_tag : str = None, attribu
                                           attribute_values=attribute_values, 
                                           db_features=db_feature)
             for n,missing_attribute_value_tag in enumerate(missing_attribute_value_tags):
-                
                 attribute_values_by_tag[missing_attribute_value_tag] = missing_attributes[n]
     
     return {"attribute_value_tags" : attribute_value_tags, "submission_count" : submission_count_by_attribute_value_tag, "attribute_values_by_tag" : attribute_values_by_tag}

@@ -68,6 +68,7 @@ def login_for_access_token(background_task : BackgroundTasks,
         subject="Token Verification",
         email_to=[user.email],
         cc = [],
+        include_setting_cc=False,
         body={
             "app_name" : GENERAL_SETTINGS.app_name,
             "first_name" : user.firstname,

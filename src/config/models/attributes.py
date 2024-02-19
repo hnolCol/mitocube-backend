@@ -132,6 +132,7 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
     """
     id : int
     attribute_id : int
+    attribute_tag : Optional[str] = None 
     text : str
     tag : str 
     #value : float  # ToDo: str or float or int? or more flexible? :: The excel table says attribute_value, value is not a float then, maybe like

@@ -17,6 +17,23 @@ import pandas as pd
 
 
 
+def add_timeline_entry_to_metadata(metadata : dict, timelineEntry : TimeLineEntryModel):
+    """Adds a timeline to the timeline. 
+    Importantly, it is required to call .dump_model() before on the metadata
+
+    Parameters
+    ----------
+    metadata : dict
+        _description_
+    timelineEntry : TimeLineEntryModel
+        _description_
+    """
+    time_line = metadata["timeline"].copy()
+    updated_entries = time_line["entries"] + [timelineEntry.model_dump()]
+    time_line["entries"] = updated_entries
+    metadata["timeline"] = TimeLineModel(**time_line)
+    return metadata
+
 def get_dataset_from_database(db : MCDatabase, label : str, force_reload : bool = False):
     """_summary_
 

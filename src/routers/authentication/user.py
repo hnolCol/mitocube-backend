@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.exceptions import HTTPException
 from typing import List, Dict
-from config.exceptions.HTTPExceptions import user_role_too_low
+from config.exceptions.HTTPExceptions import user_role_too_low, user_not_found
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser
@@ -42,9 +42,11 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Add
                              body={
                                  "app_name" : GENERAL_SETTINGS.app_name,
                                  "first_name" : user_to_add.firstname,
-                                 "password" : user_to_add.password
+                                 "password" : user_to_add.password,
+                                 "url" : GENERAL_SETTINGS.url
                              },
                              template_mame=EMAIL_SETTINGS.mail_account_generated_template)
+
 
 @router.get("/users/q")
 def query_user_db(query : str = None, max_users : int = 40): #user : UserModel = Depends(get_user_from_token)
@@ -141,12 +143,20 @@ def get_user_roles(user : UserModel = Depends(get_user_from_token)):
     return UseRoleReponseModel()
 
 
+@router.get("/users/{user_label}", summary="Returns the public user information of a user by its label.", response_model=PublicUser)
+def delete_user(user_label : str, user : UserModel = Depends(get_user_from_token)):
+    """Deletes specific user. Returns an error if token does not belong to admin"""
+    exists, user = UserDB.get_user_by_label(user_label)
+    if not exists : raise user_not_found
+    return user
+
+
 @router.delete("/users/{user_label}", summary="Deletes a user. Requires admin rights.")
 def delete_user(user_label : str, user : UserModel = Depends(is_user_admin)):
     """Deletes specific user. Returns an error if token does not belong to admin"""
     UserDB.delete_user_by_label(user_label)
 
-## inconsistent!  - change
+## inconsistent!  - change to have user_label in url 
 
 @router.post("/users/user/block", summary="Block a user. Requires admin rights.")
 def block_user(user_props : UserLabel, user : UserModel = Depends(is_user_admin)):

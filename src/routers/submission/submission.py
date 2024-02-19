@@ -1,6 +1,8 @@
+import time 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from typing import List, Annotated, Literal, Dict
 from collections import OrderedDict
+from urllib.parse import urljoin
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes, InvalidDatasetLabelError
 from lib.data.runs.runs import RunListCreator
@@ -26,7 +28,7 @@ from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.submissions.runs import RunListRequestPropsModel, RunListResponseModel
 
 from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator, is_user_admin
-from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata, get_dataset_from_database
+from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata, get_dataset_from_database, add_timeline_entry_to_metadata
 from services.json import save_json
 from services.mail import send_email_in_background
 from services.paths.utils import check_dir_exists, join_path
@@ -176,13 +178,21 @@ def change_submission_owner(submission_label : str, user_label : str, add_prev_u
         raise user_not_found
     if not user.allow_login:
         raise user_forbidden
-    
+    metadata.modified_on
     metadata = metadata.model_dump()
     prev_user_label = metadata["user_label"]
+    metadata["modified_on"] = time.time()
     metadata["user_label"] = user_label
     metadata["collaborators"] = [coll_label for coll_label in metadata["collaborators"] if coll_label != user_label]
     if add_prev_user_to_collaborators:
         metadata["collaborators"].append(prev_user_label)
+    metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Project owner changed.", state = metadata["state"]))
+    #  time_line = metadata["timeline"].copy()
+    # updated_entries = time_line["entries"] + [TimeLineEntryModel(id=1,user_label=user.label,comment=state_change.comment,state=state_change.state).model_dump()]
+    # time_line["entries"] = updated_entries
+    # metadata["timeline"] = TimeLineModel(**time_line)
+    
+        
     update_submission = DatasetSubmissionModel(**metadata)
     dataset.write_json(update_submission, update = True)
     return True
@@ -251,7 +261,6 @@ def get_submission_by_query(state : str|int = None,
                                                     user_label=user_label,
                                                     join=join
                                                     )
-    print(attribute_search_labels)
     if query is not None:
         labels_by_query = db_helper.get_labels_by_search_string(query, subset= attribute_search_labels if join == "inner" and attribute_search_active else None)
         if join == "inner":
@@ -326,7 +335,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
                                     "first_name" : user.firstname,
                                     "title" : submission.title,
                                     "label" : submission.label,
-                                    "submission_url" : f"{GENERAL_SETTINGS.url}/datasets/{submission.label}"
+                                    "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.label}"
                                 },
                                 template_mame=EMAIL_SETTINGS.mail_submission_complete_template)
     
@@ -351,12 +360,17 @@ def update_submission(background_task : BackgroundTasks,
     dataset = db.getDataset(submission_label)
     submission_state = state_change.state
     metadata = dataset.getMetaJson()
+    submission_user_label = metadata.user_label 
+    exists, submission_user = UserDB.get_user_by_label(user_label=submission_user_label)
+    if not exists:
+        raise HTTPException(status_code=404,details="The submission user label has not been found. Please change the owner of this submission first.")
     # dump the model to a dict to modify it.
     metadata = metadata.model_dump()
     # update state using the State enumerater 
     metadata["state"] =  submission_state
     metadata["modified_on"] = datasetAttributes.modified_on 
-    ## TODO : - mpve to service function
+    
+    ## TODO : - move to service function
     time_line = metadata["timeline"].copy()
     updated_entries = time_line["entries"] + [TimeLineEntryModel(id=1,user_label=user.label,comment=state_change.comment,state=state_change.state).model_dump()]
     time_line["entries"] = updated_entries
@@ -375,15 +389,15 @@ def update_submission(background_task : BackgroundTasks,
     if state_change.prev_state != state_change.state:
         send_email_in_background(background_tasks=background_task,
                              subject=f"Project {updated_submission.title} ({updated_submission.label}) state updated.",
-                             email_to=[user.email],
+                             email_to=[submission_user.email, user.email],
                              include_setting_cc=True,
                              body={
                                  "app_name" : GENERAL_SETTINGS.app_name,
-                                 "first_name" : user.firstname,
+                                 "first_name" : submission_user.firstname,
                                  "state" : SubmissionStates(updated_submission.state).name,
                                  "title" : updated_submission.title,
                                  "submission_label" : submission_label,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}/datasets/{updated_submission.label}"
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{updated_submission.label}" #pydanitc HttpUrl (url) returns www.__.com/  
                              },
                              template_mame=EMAIL_SETTINGS.mail_project_state_template)
 
@@ -457,10 +471,9 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
     sample_idces, _ = dataset.getSamplesAttributes()
     
     if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in sample_idces.columns: raise HTTPException(status_code=400,detail="Aggregate on sample attribute tag not found.")
-    #extract the value
+    #extract the value of the sample attributes which is used to label the runnames. 
     for columnName in sample_idces.columns:
         sample_idces[columnName] = ["_".join([attrValueTag.split(":")[-1] for attrValueTag in sample_attrs.split(" ")]) for sample_attrs in sample_idces[columnName].values]
-    print(sample_idces)
     try:
         runlist = RunListCreator(sample_list=sample_idces, 
                                  user = user,
