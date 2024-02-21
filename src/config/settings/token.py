@@ -31,10 +31,10 @@ class ShareToken(BaseSettings):
         extra = "ignore"
 
 
-@lru_cache
+@lru_cache()
 def get_user_token_settings():
     return UserToken()
 
-@lru_cache
+@lru_cache()
 def get_share_token_settings():
     return ShareToken()

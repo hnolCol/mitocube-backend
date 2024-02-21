@@ -30,6 +30,7 @@ class FeatureDataResponseModel(BaseModel):
     """
     feature_key : str
     samples_attributes : Dict[str, Dict[str,List[str]]]
+    title_by_label : Dict[str,str] #the title of the dataset
     dataset_labels : List[str]  # labels of datasets
     data : Dict[str, List[Dict]]  # data key - dataset_label
     samples_attributes_by_sample : Dict[str, Dict[str,List[Union[AttributeValueModel,FeatureModel]]]]

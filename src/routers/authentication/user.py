@@ -162,6 +162,22 @@ def delete_user(user_label : str, user : UserModel = Depends(is_user_admin)):
 def block_user(user_props : UserLabel, user : UserModel = Depends(is_user_admin)):
     """Blocks the user. Limited to admin users."""
     UserDB.block_user_by_label(user_props.label)
+    
+    
+@router.post("/users/{user_label}/useterms", summary="Accept useterms. Can only be done by the user itself.")
+def accept_use_terms(user_label : str, accept : bool, user : UserModel = Depends(get_user_from_token)):
+    """_summary_
+
+    Parameters
+    ----------
+    user_label : str
+        _description_
+    accept : bool
+        _description_
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+    """
+    #TODO add functionality to UserDB.
 
 # @router.post("/")
 # def add_user(user : UserModel = Depends(is_user_admin)):
