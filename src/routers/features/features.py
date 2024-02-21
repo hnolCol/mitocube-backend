@@ -92,6 +92,7 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
     attribute_samples_by_sample_collection = {}
     attribute_values_by_tag_collection = {}
     attributes_collection = {}
+    title_by_label = {}
     for label in dataset_labels:
         dataset = db.getDataset(label=label)
         metadata = dataset.getMetaJson()
@@ -108,9 +109,11 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
                 attribute_samples_by_sample_collection.update(updated_metadata.samples_attributes_by_sample)
                 attribute_values_by_tag_collection.update(updated_metadata.attribute_values_by_tag)
                 attributes_collection.update(updated_metadata.attributes)
+                title_by_label[label] = metadata.title
     
     response_data = {
         "feature_key": feature_key,
+        "title_by_label" : title_by_label,
         "dataset_labels" : list(feature_data_by_dataset_label.keys()),
         "data" : dict([(data_label,data_frame.reset_index(names="index").to_dict(orient="records")) for data_label, data_frame in feature_data_by_dataset_label.items()]),
         "samples_attributes" : attributes_sample_by_dataset_label,

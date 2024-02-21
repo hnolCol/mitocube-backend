@@ -5,7 +5,7 @@ from pydantic import SecretStr
 from pydantic import field_validator
 from pydantic import field_serializer, model_serializer
 from datetime import datetime
-from typing import List 
+from typing import List, Optional
 import time 
 
 from config.settings.general import get_general_settings
@@ -42,12 +42,12 @@ class UserModel(BasicUserWithEmail):
     """BaseModel for a user"""
     id : int = None
     updated_on : float = None
+    agreed_to_terms : Optional[bool] = None
     expires_after : float = None
     password : SecretStr = None
     allow_login : bool = True 
     role : UserRolesEnum = UserRolesEnum.STANDARD
     salt : str = None
-    # image : bytearray = None
 
     
 class UserModelForRegistration(BasicUserWithEmail):
@@ -62,7 +62,19 @@ class UserModelForRegistration(BasicUserWithEmail):
 
 
 class AddUserPropsModel(BaseModel):
-    
+    """BaseModel that handles the 
+    attribute based user input. Upon sterilization (model_dump())
+    a UserModel is created which automatically validates the input. 
+
+    Parameters
+    ----------
+    att_user_firstname 
+    att_user_lastname
+    att_user_institute
+    att_user_research_group
+    att_user_email 
+    att_user_role 
+    """
     att_user_firstname : str 
     att_user_lastname : str 
     att_user_institute : AttributeValueModel
