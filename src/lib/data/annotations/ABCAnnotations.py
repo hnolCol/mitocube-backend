@@ -319,13 +319,18 @@ class FeatureDatabase(metaclass=SingletonABCMeta):
     """
 
     @abstractmethod
-    def find(self, values : List[str], proteome_ids: List[str] = None, columns : List[str] = None) -> pd.DataFrame:
+    def find(self, values : List[str], proteome_ids: List[str] = None, columns : List[Literal["entry","proteins","genes","key"]] = None, include_controls : bool = True) -> pd.DataFrame:
         """Finds List[str] values in the List[str] columns defined. Only the values "entry", "proteins" and "genes" are allowed in columns. Columns "proteins" and "genes" are used by default."""
         pass
 
     @abstractmethod
     def get(self, keys : List[str] = None, proteome_id: str = None, ignoreMissing = False) -> pd.DataFrame:
         """Returns a Pandas DataFrame of all Feature Settings if no keys are defined, or items matching the keys. May throws KeyError Exception if key is not in the annotation table. Set ignoreMissing to true to return only matching rows. Returns multiple rows if key is not unique."""
+        pass
+
+    @abstractmethod
+    def get_feature_ids(self) -> List[str]:
+        """Returns a list of all feature ids that were imported and are available to the user."""
         pass
 
     @abstractmethod
@@ -447,11 +452,11 @@ class PandaFeatureDatabase(FeatureDatabase):
         """Singleton Constructor"""
         self._lock = Lock()  # Synchronization primitive to make it multi-threading safe
 
-        self._featureFiles : List[str] = [] #list of paths? 
-        self._cached_features : Dict[str,pd.DataFrame] = {}  # Dict[str (proteome_id), pd.DataFrame(index=[], columns=["entry", "key", "proteins", "genes", "organism", "aa_length"])]
+        self._featureFiles : List[str] = []  # list of paths?
+        self._cached_features : Dict[str, pd.DataFrame] = {}  # Dict[str (proteome_id), pd.DataFrame(index=[], columns=["entry", "key", "proteins", "genes", "organism", "aa_length"])]
 
 
-    def find(self, values : List[str], proteome_ids: List[str], columns : List[Literal["entry","proteins","genes","key"]] = None, include_controls : bool = True) -> pd.DataFrame:
+    def find(self, values : List[str], proteome_ids: List[str] = None, columns : List[Literal["entry","proteins","genes","key"]] = None, include_controls : bool = True) -> pd.DataFrame:
         """
         Finds List[str] values in the List[str] columns defined. 
         Only the values "entry", "proteins" and "genes" are allowed in columns. Columns "proteins" and "genes" are used by default.
@@ -483,16 +488,26 @@ class PandaFeatureDatabase(FeatureDatabase):
 
             if not strs_columns:
                 raise Exception("Columns provided are not allowed. Please use entry, proteins or genes only.")
-        #check if proteome_id exists, None will throw an error here. 
-        proteome_ids_found = [proteome_id for proteome_id in proteome_ids if proteome_id in self._cached_features]
-        if len(proteome_ids_found) == 0: raise ValueError(f"None of the given proteome_ids were found.")
+
+        #check if proteome_id exists, None will throw an error here.
+
+        if proteome_ids is None:
+            proteome_ids_found = self._cached_features.keys()
+        else:
+            proteome_ids_found = [proteome_id for proteome_id in proteome_ids if proteome_id in self._cached_features]
+
+        if len(proteome_ids_found) == 0:
+            raise ValueError(f"None of the given proteome_ids were found.")
+
         #results_or = [False] * self._cached_features.shape[0]
         #features = self._cached_features[proteome_id]
+
         if len(proteome_ids) == 1:
             features = self._cached_features[proteome_ids[0]]
         else:
             #if multiple, merge them  
             features = pd.concat([self._cached_features[proteome_id] for proteome_id in proteome_ids_found])
+
         #reset index to export it correctly and to make it searchable.
         features = features.reset_index(names="key")
         #create regex to search for all values at the same time 
@@ -527,7 +542,7 @@ class PandaFeatureDatabase(FeatureDatabase):
         ----------
         keys : List[str]
             Feature keys (Uniprot ids)
-        proteome_id : str, default None
+        proteome_ids : str, default None
             Uniprot Reference Proteome ID. If provided only features of the proteome is provided.
         ignoreMissing : bool, default False #TODO rename to match proteome_id style? 
             If true missing keys are simply ignore, otherwise an Exception is thrown. 
@@ -542,7 +557,7 @@ class PandaFeatureDatabase(FeatureDatabase):
                                               columns=["entry", "proteins", "genes", "organism", "organism_id", #removing "key" since it is the index? otherwise nan everywhere
                                                        "aa_length", "mass", "proteome_id"])
             if keys is None:
-                for proteome_id_loop, item in self._cached_features.items(): 
+                for proteome_id_loop, item in self._cached_features.items():
                     #item should be named features? In update item is dir and the values of the dict are called features.
                     item = self._cached_features[proteome_id_loop].copy()
                     item["proteome_id"] = proteome_id_loop
@@ -576,6 +591,10 @@ class PandaFeatureDatabase(FeatureDatabase):
                     return features.loc[keys]
                 else:
                     return features.loc[features.index.intersection(keys)]
+
+    def get_feature_ids(self) -> List[str]:
+        """Returns a list of all feature ids that were imported and are available to the user."""
+        return self._cached_features.keys()
 
     def getAnnotationFiles(self) -> List[str]:
         """Returns a List[str] of imported annotation files."""
