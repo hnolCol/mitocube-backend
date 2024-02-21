@@ -20,12 +20,16 @@ router = APIRouter(
     )
 
 @router.get("")
-def get_features_by_query(proteome_ids : str, query : str, max_features : int = 30): #, user : UserModel = Depends(get_user_from_token)
+def get_features_by_query(query : str, proteome_ids : List[str] = None, max_features : int = 30):  #, user : UserModel = Depends(get_user_from_token)
     """_summary_
 
     Parameters
     ----------
     query : str
+        _description_
+    proteome_ids : UserModel, optional
+        _description_
+    max_features : UserModel, optional
         _description_
     user : UserModel, optional
         _description_, by default Depends(get_user_from_token)
@@ -35,13 +39,20 @@ def get_features_by_query(proteome_ids : str, query : str, max_features : int = 
     _type_
         _description_
     """
-    proteome_ids = proteome_ids.split(";")
     feature_db = PandaFeatureDatabase()
+
+    if proteome_ids is None or len(proteome_ids) == 0:
+        proteome_ids = list(feature_db.get_feature_ids())
+    else:
+        proteome_ids = proteome_ids.split(";")
+
     features = feature_db.find(values=[query], proteome_ids=proteome_ids, columns=["proteins", "genes","key"])
+
     if features.empty: return []
+
     if features.index.size > max_features:
-        
         features = features.head(max_features)
+
     features = features.to_dict(orient="records")
     #features = features.to_dict(orient="records")  # [{'col1': 1, 'col2': 0.5}, {'col1': 2, 'col2': 0.75}]
     return [FeatureModel(**item) for item in features] 
