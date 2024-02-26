@@ -4,7 +4,7 @@ import pandas as pd
 
 class OneWayANOVA(DatasetStatistic):
     
-    def get_stats(self, sample_attribute_name : str = "Treatment", fdr : float = 0.01) -> pd.DataFrame:
+    def get_stats(self, sample_attribute_name : str = "Treatment", fdr : float = 0.01, dropna : bool = True) -> pd.DataFrame:
         """_summary_
 
         Parameters
@@ -21,6 +21,9 @@ class OneWayANOVA(DatasetStatistic):
             grouped_samples = mapped_sample_names.groupby(by=sample_attribute_name)
             grouped_sample_names = [group_data.index for _, group_data in grouped_samples]
             datatable = self._dataset.getDataTable()
+            if dropna:
+                datatable = datatable.dropna()
+            if datatable.empty: raise ValueError("Nan filtering resulted in an empty datatable.")
             data_for_test = [datatable.loc[:,column_names].values for column_names in grouped_sample_names]
             #returns F-value and p-values
             F,p = f_oneway(*data_for_test,axis=1)

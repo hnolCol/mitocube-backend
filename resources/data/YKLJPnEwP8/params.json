@@ -106,81 +106,192 @@
         ]
     },
     "runlist": {
-        "created_at": 1707482901.862814,
+        "created_at": 1708519002.8094022,
         "user_label": "VpVff4sS",
         "dataset_label": "YKLJPnEwP8",
-        "n_runs": 4,
-        "n_plates": 1,
+        "n_runs": 16,
+        "n_plates": 2,
         "fractionated": false,
         "n_fractions": 0,
         "scrambled": true,
         "scrambled_across_plates": false,
         "runs": [
             {
-                "name": "20240209_YKLJPnEwP8_HeEm_04_anisomycin_samples-12-13-14-15_7tuM",
-                "label": "7tuM",
+                "name": "20240221_YKLJPnEwP8_HeEm_09_Unstimulated_AHmT",
+                "label": "AHmT",
                 "index": 0,
                 "measurement_index": 0,
                 "plate_index": 0,
-                "column_index": 3,
-                "row_index": 0,
-                "position_label": "A4",
-                "aggregated_samples": [
-                    12,
-                    13,
-                    14,
-                    15
-                ]
+                "column_index": 0,
+                "row_index": 1,
+                "position_label": "B1",
+                "aggregated_samples": []
             },
             {
-                "name": "20240209_YKLJPnEwP8_HeEm_01_5_fluorouracil_samples-00-01-02-03_32m3",
-                "label": "32m3",
+                "name": "20240221_YKLJPnEwP8_HeEm_16_Anisomycin_TQ7h",
+                "label": "TQ7h",
                 "index": 1,
                 "measurement_index": 1,
                 "plate_index": 0,
-                "column_index": 0,
-                "row_index": 0,
-                "position_label": "A1",
-                "aggregated_samples": [
-                    0,
-                    1,
-                    2,
-                    3
-                ]
+                "column_index": 7,
+                "row_index": 1,
+                "position_label": "B8",
+                "aggregated_samples": []
             },
             {
-                "name": "20240209_YKLJPnEwP8_HeEm_03_unstimulated_samples-08-09-10-11_wn73",
-                "label": "wn73",
+                "name": "20240221_YKLJPnEwP8_HeEm_02_5-Fluorouracil_FlYi",
+                "label": "FlYi",
                 "index": 2,
                 "measurement_index": 2,
-                "plate_index": 0,
-                "column_index": 2,
-                "row_index": 0,
-                "position_label": "A3",
-                "aggregated_samples": [
-                    8,
-                    9,
-                    10,
-                    11
-                ]
-            },
-            {
-                "name": "20240209_YKLJPnEwP8_HeEm_02_dmso_samples-04-05-06-07_EGuD",
-                "label": "EGuD",
-                "index": 3,
-                "measurement_index": 3,
                 "plate_index": 0,
                 "column_index": 1,
                 "row_index": 0,
                 "position_label": "A2",
-                "aggregated_samples": [
-                    4,
-                    5,
-                    6,
-                    7
-                ]
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_15_Anisomycin_eQRt",
+                "label": "eQRt",
+                "index": 3,
+                "measurement_index": 3,
+                "plate_index": 0,
+                "column_index": 6,
+                "row_index": 1,
+                "position_label": "B7",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_12_Unstimulated_91gN",
+                "label": "91gN",
+                "index": 4,
+                "measurement_index": 4,
+                "plate_index": 0,
+                "column_index": 3,
+                "row_index": 1,
+                "position_label": "B4",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_03_5-Fluorouracil_R82o",
+                "label": "R82o",
+                "index": 5,
+                "measurement_index": 5,
+                "plate_index": 0,
+                "column_index": 2,
+                "row_index": 0,
+                "position_label": "A3",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_04_5-Fluorouracil_7tJU",
+                "label": "7tJU",
+                "index": 6,
+                "measurement_index": 6,
+                "plate_index": 0,
+                "column_index": 3,
+                "row_index": 0,
+                "position_label": "A4",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_10_Unstimulated_aMn3",
+                "label": "aMn3",
+                "index": 7,
+                "measurement_index": 7,
+                "plate_index": 0,
+                "column_index": 1,
+                "row_index": 1,
+                "position_label": "B2",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_07_DMSO_lIaG",
+                "label": "lIaG",
+                "index": 8,
+                "measurement_index": 8,
+                "plate_index": 0,
+                "column_index": 6,
+                "row_index": 0,
+                "position_label": "A7",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_06_DMSO_RG40",
+                "label": "RG40",
+                "index": 9,
+                "measurement_index": 9,
+                "plate_index": 0,
+                "column_index": 5,
+                "row_index": 0,
+                "position_label": "A6",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_14_Anisomycin_qa7w",
+                "label": "qa7w",
+                "index": 10,
+                "measurement_index": 10,
+                "plate_index": 0,
+                "column_index": 5,
+                "row_index": 1,
+                "position_label": "B6",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_11_Unstimulated_m7mB",
+                "label": "m7mB",
+                "index": 11,
+                "measurement_index": 11,
+                "plate_index": 0,
+                "column_index": 2,
+                "row_index": 1,
+                "position_label": "B3",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_13_Anisomycin_f0YU",
+                "label": "f0YU",
+                "index": 12,
+                "measurement_index": 12,
+                "plate_index": 0,
+                "column_index": 4,
+                "row_index": 1,
+                "position_label": "B5",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_05_DMSO_aMXJ",
+                "label": "aMXJ",
+                "index": 13,
+                "measurement_index": 13,
+                "plate_index": 0,
+                "column_index": 4,
+                "row_index": 0,
+                "position_label": "A5",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_01_5-Fluorouracil_FULx",
+                "label": "FULx",
+                "index": 14,
+                "measurement_index": 14,
+                "plate_index": 0,
+                "column_index": 0,
+                "row_index": 0,
+                "position_label": "A1",
+                "aggregated_samples": []
+            },
+            {
+                "name": "20240221_YKLJPnEwP8_HeEm_08_DMSO_lk2a",
+                "label": "lk2a",
+                "index": 15,
+                "measurement_index": 15,
+                "plate_index": 0,
+                "column_index": 7,
+                "row_index": 0,
+                "position_label": "A8",
+                "aggregated_samples": []
             }
-        ],
-        "aggregated_on": "att_compound"
+        ]
     }
 }

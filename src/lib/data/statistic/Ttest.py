@@ -1,34 +1,58 @@
 from lib.data.statistic.ABCStatistic import DatasetStatistic
+from lib.data.imputation.StandardImputation import StandardImputation
 from scipy.stats import ttest_ind, false_discovery_control
 import pandas as pd 
 import numpy as np 
 class Ttest(DatasetStatistic):
+    
     def get_stats(self, 
-                  sample_attribute_tag : str = "att_compound", 
-                  attribute_value_left : str = "att_compound:dmso", 
-                  attribute_value_right : str = "att_compound:hydroxyurea", 
+                  sample_attribute_tag : str, 
+                  attribute_value_left : str, 
+                  attribute_value_right : str, 
+                  within_sample_attribute_tag : str = None,
+                  within_sample_attribute_value_tag : str = None,
                   fdr : float = 0.01,
-                  suffix : str = "") -> pd.DataFrame:
+                  suffix : str = "", impute : bool = False) -> pd.DataFrame:
         """_summary_
 
         Parameters
         ----------
-        sample_attribute_name : str, optional
-            _description_, by default "Treatment"
-        attribute_value_left : _type_, optional
-            _description_, by default "att_compound:dmso"
-        attribute_value_right : _type_, optional
-            _description_, by default "att_compound:hydroxyurea"
+        sample_attribute_tag : str
+            _description_
+        attribute_value_left : str
+            _description_
+        attribute_value_right : str
+            _description_
+        within_sample_attribute_tag : str, optional
+            _description_, by default None
+        within_sample_attribute_value_tag : str, optional
+            _description_, by default None
         fdr : float, optional
             _description_, by default 0.01
+        suffix : str, optional
+            _description_, by default ""
+        impute : bool, optional
+            _description_, by default False
 
         Returns
         -------
         pd.DataFrame
             _description_
         """
-        datatable = self._dataset.getDataTable()
+        
+        if impute:
+            datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
+                                                                         within_sample_attribute_tag=within_sample_attribute_tag, 
+                                                                         within_sample_attribute_value_tag=within_sample_attribute_value_tag,
+                                                                         subset_attribute_value_tags=[attribute_value_left,attribute_value_right])
+        else:
+            datatable = self._dataset.getDataTable()
+        
         mapped_sample_names, _ = self._dataset.getSamplesAttributes()
+        #check if there is a within grouping, then subset the mapped sample names first
+        if within_sample_attribute_value_tag is not None and within_sample_attribute_value_tag is not None:
+            bool_within = mapped_sample_names.loc[:,within_sample_attribute_tag] == within_sample_attribute_value_tag
+            mapped_sample_names = mapped_sample_names.loc[bool_within]
         boolIdx = mapped_sample_names.loc[:,sample_attribute_tag].isin([attribute_value_left,attribute_value_right])
         subset_mapped_sample_names = mapped_sample_names.loc[boolIdx]
         #get the sample names (e.g. column names in the datatable)
@@ -50,9 +74,5 @@ class Ttest(DatasetStatistic):
         stats.loc[:,f"significant {suffix }"] = stats.loc[:,f"fdr {suffix}"] <= fdr
         stats.loc[:,f"log2 FC {suffix}"] = X.mean(axis=1) - Y.mean(axis=1)
         return stats
-        # boolIdx, p_adj, _, _ = multipletests(p, alpha=0.05, method=multipleTestMethod)
-        # tTestDifference = pd.DataFrame(pd.Series(X1.mean(axis=1) - X2.mean(axis=1), name="x"))
-        # tTestDifference["y"] = (-1)*np.log10(p)
-        # tTestDifference["s"] = boolIdx
-        # return tTestDifference
+        
         

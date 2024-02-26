@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pydantic_settings import BaseSettings
 
 
@@ -16,3 +17,6 @@ class KeyFigures(BaseSettings):
     number_users : bool = True
     turnover_time : bool = True
     
+@lru_cache()
+def get_key_figure_settings():
+    return KeyFigures()

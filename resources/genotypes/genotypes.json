@@ -271,5 +271,118 @@
                 }
             }
         ]
+    },
+    {
+        "label": "a1ecK",
+        "text": "CGAS",
+        "proteome_id": "UP000005640",
+        "features": [
+            {
+                "key": "Q8N884",
+                "genes": "CGAS C6orf150 MB21D1",
+                "proteins": "Cyclic GMP-AMP synthase (cGAMP synthase) (cGAS) (h-cGAS) (EC 2.7.7.86) (2'3'-cGAMP synthase) (Mab-21 domain-containing protein 1)",
+                "organism": "Homo sapiens (Human)",
+                "aa_length": 522,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "Q8N884",
+                        "genes": "CGAS C6orf150 MB21D1",
+                        "proteins": "Cyclic GMP-AMP synthase (cGAMP synthase) (cGAS) (h-cGAS) (EC 2.7.7.86) (2'3'-cGAMP synthase) (Mab-21 domain-containing protein 1)",
+                        "organism": "Homo sapiens (Human)",
+                        "aa_length": 522,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 343,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Inducible Expression",
+                        "tag": "att_gene_engineering:inducible_expression",
+                        "value": "inducible_expression",
+                        "description": "Inducible gene expression. "
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 350,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Unknown/Random",
+                        "tag": "att_gene_zygosity:unknown",
+                        "value": "unknown",
+                        "description": "Unknown. Examples: virus- or biggy-bag expression."
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 336,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "BiggyBac transposon",
+                        "tag": "att_gene_editing_method:biggybac",
+                        "value": "biggybac",
+                        "description": "The PiggyBac (PB) transposon is a mobile genetic element that efficiently transposes between vectors and chromosomes via a 'cut and paste' mechanism. During transposition, the PB transposase recognizes transposon-specific inverted terminal repeat sequences (ITRs) located on both ends of the transposon vector and efficiently moves the contents from the original sites and integrates them into TTAA chromosomal sites"
+                    }
+                ],
+                "att_protein_mutation": [
+                    {
+                        "id": 713,
+                        "attribute_id": 89,
+                        "attribute_tag": "att_protein_mutation",
+                        "text": "Amino acid substitution",
+                        "tag": "att_protein_mutation:substitution",
+                        "value": "substitution",
+                        "description": "Amino acid exchange on a single amino acid position."
+                    },
+                    {
+                        "id": 705,
+                        "attribute_id": 89,
+                        "attribute_tag": "att_protein_mutation",
+                        "text": "Flag tag",
+                        "tag": "att_protein_mutation:flag",
+                        "value": "flag",
+                        "description": "Flag (DYKDDDDK) tagged protein "
+                    }
+                ],
+                "att_protein_position": {
+                    "att_protein_mutation:substitution": {
+                        "attribute_value": {
+                            "id": 716,
+                            "attribute_id": 90,
+                            "attribute_tag": "att_protein_position",
+                            "text": "AA position",
+                            "tag": "att_protein_position:aa",
+                            "value": "aa",
+                            "description": "Specific amino acid position"
+                        },
+                        "aa_position": [
+                            197
+                        ],
+                        "substitution": "T",
+                        "aa": [
+                            "K"
+                        ]
+                    },
+                    "att_protein_mutation:flag": {
+                        "attribute_value": {
+                            "id": 717,
+                            "attribute_id": 90,
+                            "attribute_tag": "att_protein_position",
+                            "text": "C-term",
+                            "tag": "att_protein_position:cterm",
+                            "value": "cterm",
+                            "description": "C-terminus of the protein"
+                        }
+                    }
+                }
+            }
+        ]
     }
 ]

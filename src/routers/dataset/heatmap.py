@@ -36,7 +36,10 @@ def get_dataset_heatmap(dataset_label : str, n_clusters : int = 8, user : UserMo
     if dataset is None:
         raise HTTPException(status_code=400,detail="Data not found for given label.")
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
-    stats = OneWayANOVA(dataset).get_stats()
+    try:
+        stats = OneWayANOVA(dataset).get_stats(dropna=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error in one way anova " + str(e))
     metadata = dataset.getMetaJson()
     if stats.empty or stats.index.size < 3: raise HTTPException(status_code=400, detail="No or less than 3 significant hits found using ANOVA. Please use a volcano plot.")
     #merge data and sort them after clusters.

@@ -27,7 +27,7 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         self._updated_timestamp = None 
         self._stale_time_s = 120 #2 minutes stale time (not updating even if there are new files.)
         self._last_update = {}
-        self._labels_by_feature = None #which feature is found in the datatable
+        self._labels_by_feature = None #key feature_key -> values (set of dataset labels)
         self._labels_by_attribute_tag = None #find datasets which have the attribute assigned 
         self._labels_by_attribute_value_tag = None
         self._labels_by_genotype = None
@@ -38,13 +38,18 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         self._organism_by_label = None
         self._attribute_value_tags_by_label = None
         self._attribute_tags_by_label = None
-        
+        self._scaled_variance_by_feature = None
+        self._mean_abundance_by_feature = None 
+        self._labels = set() # all submission/dataset labels 
         self._instruments = set()
+        self._labels_with_data_table = set() #all labels that have a datatable.
+        self._number_samples_by_instrument = None
         self._turnover_time = None #the time a projects takes from submission 
-        self._labels = set()
-        self._labels_with_data_table = set()
         self._instrument_attribute_tag = instrument_attribute_tag
-        
+        self._instrument_first_use = None
+        self._labels_by_instrument = None
+        self._features_by_label = None
+                
     def _add_value(self, d : Dict, k : str, label : str):
         """_summary_
 
@@ -170,6 +175,7 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                         file_stamps[filePath] = {
                             "st_mtime" : os.stat(filePath).st_mtime, 
                             "label" : os.path.basename(root), 
+                            "param_file" : os.path.join(root,"params.json"),
                             "is_param" : isMetaData}
                     # print(os.stat(filePath))
                     # print("=====")
@@ -195,16 +201,50 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         files_modified : Dict
             _description_
         """
+        if self._mean_abundance_by_feature is None:
+            self._mean_abundance_by_feature = {} 
+        if self._scaled_variance_by_feature is None:
+            self._scaled_variance_by_feature = {}
+        if self._features_by_label is None:
+            self._features_by_label = {}
+            
         feature_keys = []
         for filePath, fileProps in files_modified.items():
             if not fileProps["is_param"]:
                 try:
-                    d = pd.read_csv(filePath, sep="\t", usecols=["Key"], index_col="Key")
+                    d = pd.read_csv(filePath, sep="\t", index_col="Key") #use_cols = "Key"
                 except:
                     print("error loading file: ",filePath," Missing 'Key' column?")
                 d["label"] = fileProps["label"]
-                feature_keys.append(d)
+                feature_keys.append(d.loc[:,["label"]])
                 self._labels_with_data_table.add(fileProps["label"])
+                self._features_by_label[fileProps["label"]] = d.index
+                #add mean 
+                try:
+                    metadata = DatasetSubmissionModel(**read_json(fileProps["param_file"]))
+                except Exception as e:
+                    print(e,filePath)
+                sample_names = metadata.sample_names
+                self._mean_abundance_by_feature[fileProps["label"]] = d.loc[:,sample_names].mean(axis=1).to_dict()
+                # load meta to calculate variances 
+                    
+                total_variance = d.loc[:,sample_names].var(axis=1)
+                
+                sample_attributes = metadata.samples_attributes
+                vars = dict([(attribute_tag,pd.DataFrame(index=d.index)) for attribute_tag in sample_attributes.keys()])
+                for attribute_tag, sample_attrs in sample_attributes.items():
+                    
+                    for sample_att_value_tag,sample_indices in sample_attrs.items():
+                        sample_names_attrs = [sample_names[sample_idx] for sample_idx in sample_indices]
+                        variance = d.loc[:,sample_names_attrs].var(axis=1)
+                        vars[attribute_tag].loc[d.index,sample_att_value_tag] = total_variance / variance
+                    vars[attribute_tag] = vars[attribute_tag].max(axis=1)
+                
+                #concat relative variances
+                max_relative_vars = pd.concat(list(vars.values()),axis=1).max(axis=1).to_dict()
+                self._scaled_variance_by_feature[fileProps["label"]] = max_relative_vars
+
+                              
         if len(feature_keys) == 0: return
         merged_features = pd.concat(feature_keys)
         if self._labels_by_feature is None:
@@ -215,8 +255,32 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                 if feature_key in self._labels_by_feature:
                     ## very heavy from computation time, TODO : adapt this. 
                     labels = feature_data["label"].values
+                    # The code `self._labels_by_feature` is likely creating or accessing a variable
+                    # named `_labels_by_feature` within a Python class or object. This variable may be
+                    # used to store labels associated with specific features or attributes.
                     self._labels_by_feature[feature_key].update(labels)
                     
+    def _handle_instrument_attribute(self, attribute_value_tag : str, metadata : DatasetSubmissionModel):
+        
+        self._instruments.add(attribute_value_tag)
+        if attribute_value_tag not in self._number_samples_by_instrument:
+            self._number_samples_by_instrument[attribute_value_tag] = []
+        self._number_samples_by_instrument[attribute_value_tag].append(len(metadata.sample_names)) 
+        if attribute_value_tag not in self._instrument_first_use:
+            self._instrument_first_use[attribute_value_tag] = metadata.created_on        
+        elif self._instrument_first_use[attribute_value_tag] > metadata.created_on:
+            self._instrument_first_use[attribute_value_tag] = metadata.created_on
+            
+        if attribute_value_tag not in self._labels_by_instrument:
+            self._labels_by_instrument[attribute_value_tag] = []
+        # TODO naming is conistent with labels_by_instrument since it does not return the labels but rather a small summary.. is this required??
+        self._labels_by_instrument[attribute_value_tag].append({"label" : metadata.label, 
+                                                                "create_on" : metadata.created_on, 
+                                                                "title" : metadata.title, 
+                                                                "user_label" : metadata.user_label,
+                                                                "number_samples" : metadata.n_samples,
+                                                                "number_features" : np.nan if metadata.label not in self._features_by_label else self._features_by_label[metadata.label].size})
+            
     def _load_metadata(self, files_modified : Dict) -> None:
         """_summary_
 
@@ -245,6 +309,13 @@ class PandaDatabaseHelper(MCDatabaseHelper):
             self._labels_by_organism = {}
         if self._organism_by_label is None:
             self._organism_by_label = {}
+        if self._number_samples_by_instrument is None:
+            self._number_samples_by_instrument = {}
+        if self._instrument_first_use is None:
+            self._instrument_first_use = {}
+        if self._labels_by_instrument is None:
+            self._labels_by_instrument = {}
+        
         
         for filePath, fileProps in files_modified.items():
             if fileProps["is_param"]:
@@ -268,8 +339,13 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                         self._add_value(self._attribute_value_tags_by_label,metadata.label,attribute_value_tag)
                         ### save instrument 
                         if attribute_tag == self._instrument_attribute_tag:
-                            self._instruments.update(attribute_value_tag)
-                        ### save organism, TODO make organism tag definable. 
+                            self._handle_instrument_attribute(attribute_value_tag,metadata)
+                            # 
+                            
+                            # if attribute_value_tag not in self._number_samples_by_instrument:
+                            #     self._number_samples_by_instrument[attribute_value_tag] = []
+                            # self._number_samples_by_instrument[attribute_value_tag].append(len(metadata.sample_names))
+                        ### save organism, TODO make organism tag definable in the constructor. 
                         if attribute_tag == "att_organism":
                             self._add_value(self._labels_by_organism,attribute_value_tag,metadata.label)
                             self._add_value(self._organism_by_label,metadata.label,attribute_value_tag)
@@ -281,7 +357,7 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                     self._add_value(self._attribute_tags_by_label,metadata.label,attribute_tag)
                     for sample_attribute_value_tag in sample_attribute.keys():
                         if attribute_tag == self._instrument_attribute_tag:
-                            self._instruments.update(sample_attribute_value_tag)
+                            self._handle_instrument_attribute(sample_attribute_value_tag,metadata)
                         # add organism here? 
                         self._add_value(self._labels_by_attribute_value_tag,sample_attribute_value_tag,metadata.label)
                         self._add_value(self._attribute_value_tags_by_label,metadata.label,sample_attribute_value_tag)
@@ -361,13 +437,13 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         return attribute_tags, counts
         
     def get_metadata_count(self):
-        """_summary_
+        """Provides the number of metadata in the database.
         """
         self.update()
         return len(self._labels)
 
     def get_datatable_count(self):
-        """_summary_
+        """Provides the number of datatables (e.g. published)
         """
         self.update()
         return len(self._labels_with_data_table)
@@ -375,6 +451,36 @@ class PandaDatabaseHelper(MCDatabaseHelper):
     def get_instruments(self):
         self.update() 
         return self._instruments
+    
+    def get_instrument_first_use(self, instrument_tag : str = None) -> float|Dict[str,float]:
+        self.update()
+        if instrument_tag is not None:
+            if instrument_tag not in self._instrument_first_use: raise ValueError("Instrument tag not found.")
+            return self._instrument_first_use[instrument_tag]
+        
+        return self._instrument_first_use
+        
+    def get_number_features(self) -> int:
+        """Returns the number of unique features in the database.
+
+        Returns
+        -------
+        int
+            The total number of features in the database.
+        """
+        self.update()
+        return len(self._labels_by_feature)
+    
+    def get_sample_number_by_instrument(self) -> Dict[str,List[int]]:
+        """Returns the number of samples per instrument. 
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        self.update()
+        return self._number_samples_by_instrument
         
     def get_labels(self, state : int|str = None, user_label : str = None, feature_key : str = None, attribute_tag : str = None, attribute_value_tag : str = None, genotype_label : str = None, join : Literal["inner","outer"] = "inner") -> set:
         
@@ -417,7 +523,14 @@ class PandaDatabaseHelper(MCDatabaseHelper):
             counts = self._get_count(self._labels_by_organism,k_subset=organism_value_tags)
             
         return organism_value_tags, counts
-            
+    
+    def get_labels_by_instrument(self, instrument_tag : str) -> List[Dict]:
+        
+        self.update()
+        if instrument_tag not in self._labels_by_instrument: return []
+        return self._labels_by_instrument[instrument_tag]
+        
+                    
     def get_labels_by_organism(self, organism_tag : str):
         """"""
         self.update() 
@@ -568,6 +681,55 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         elif by == "attribute_tag": return self.get_label_count_by_attribute_tag(k_subset,label_subset)
         elif by == "genotype": return self.get_label_count_by_genotype(k_subset,label_subset) 
         
+
+    def get_rel_variance_by_feature(self, feature_key : str, labels : str = None) -> pd.DataFrame:
+        """_summary_
+
+        Parameters
+        ----------
+        feature_key : str
+            _description_
+        labels : str, optional
+            _description_, by default None
+        """
+        self.update()
+        if labels is None:
+            labels = self.get_all_labels()
+        scaled_variance = []
+        for label in labels:
+            if label in self._scaled_variance_by_feature and feature_key in self._scaled_variance_by_feature[label]:
+                scaled_feature_var = self._scaled_variance_by_feature[label][feature_key]
+                scaled_variance.append((label,scaled_feature_var))
+        df = pd.DataFrame(scaled_variance,columns=["label","scaled_variance"])
+        return df
+    
+    def get_abundance_by_feature(self,feature_key : str, labels : str = None) -> pd.DataFrame:
+        """_summary_
+
+        Parameters
+        ----------
+        feature_key : str
+            _description_
+        labels : str, optional
+            _description_, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        self.update()
+        if labels is None:
+            labels = self.get_all_labels()
+        mean_abundances = []
+        for label in labels:
+            if label in self._mean_abundance_by_feature and feature_key in self._mean_abundance_by_feature[label]:
+                abundance = self._mean_abundance_by_feature[label][feature_key]
+                mean_abundances.append((label,abundance))
+        df = pd.DataFrame(mean_abundances,columns=["label","abundance"])
+        return df
+        
+
     def update(self):
         """_summary_
         """

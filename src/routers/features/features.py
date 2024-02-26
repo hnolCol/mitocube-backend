@@ -125,6 +125,39 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
     return response_data
 
 
+
+@router.get("/{feature_key}/variance")
+def get_feature_variance(feature_key : str, labels : str = None):
+    """_summary_
+
+    Parameters
+    ----------
+    feature_key : str
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    if labels is not None:
+        labels = labels.split(";")
+    df = db_helper.get_rel_variance_by_feature(feature_key)
+    return df.to_dict(orient="records")
+    
+    
+
+@router.get("/{feature_key}/abundance")
+def get_feature_variance(feature_key : str, labels : str = None):
+    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    if labels is not None:
+        labels = labels.split(";")
+    df = db_helper.get_abundance_by_feature(feature_key)
+    return df.to_dict(orient="records")
+    
+
+
 @router.get("/{feature_key}/sequence",
             summary="Returns the stored sequence in the annotation database.")
 def get_feature_sequence(feature_key : str): #user : UserModel = Depends(get_user_from_token)

@@ -25,9 +25,10 @@ from routers.annotations import annotations
 from routers.features import features
 from routers.genotypes import genotypes
 from routers.attributes import attributes
+from routers.instruments import instruments
 # from routers import play  # route to test things during development ###########################################################
 
-router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes]
+router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments]
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
