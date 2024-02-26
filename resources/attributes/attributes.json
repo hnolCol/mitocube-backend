@@ -1848,15 +1848,15 @@
             "has_features_value": false,
             "has_numeric_input": false,
             "group_tag": "sample_prep",
-            "min_state": 0,
+            "min_state": 1,
             "mandatory_for_submission": false,
             "mandatory_for_active": false,
             "allow_as_filter": true,
             "allow_for_user": false,
-            "allow_for_genotype": true,
+            "allow_for_genotype": false,
             "allow_for_qc": false,
-            "allow_for_dataset": false,
-            "allow_for_sample": false,
+            "allow_for_dataset": true,
+            "allow_for_sample": true,
             "id": 92,
             "parent_id": null
         },
@@ -6233,9 +6233,9 @@
             "id": 380
         },
         {
-            "value": "opentrons",
+            "value": "opentronsot2",
             "attribute_tag": "att_liquid_handler",
-            "tag": "att_liquid_handler:opentrons",
+            "tag": "att_liquid_handler:opentronsot2",
             "keyword": "opentrons",
             "text": "Opentrons OT-2",
             "description": "Opentrons OT-2",
@@ -10533,26 +10533,6 @@
             "id": 810
         },
         {
-            "value": "biochem",
-            "attribute_tag": "att_user_institute",
-            "tag": "att_user_institute:biochem",
-            "keyword": null,
-            "text": "Institute of Biochemistry",
-            "description": "University of Cologne, Z\u00fclpicher Str. 47, 50931 Cologne",
-            "attribute_id": 112.0,
-            "id": 811
-        },
-        {
-            "value": "cecad",
-            "attribute_tag": "att_user_institute",
-            "tag": "att_user_institute:cecad",
-            "keyword": null,
-            "text": "CECAD Institute",
-            "description": "Joseph-Stelzmann-Strasse 26, 50931 Cologne",
-            "attribute_id": 112.0,
-            "id": 812
-        },
-        {
             "value": "mitoprotea",
             "attribute_tag": "att_user_research_group",
             "tag": "att_user_research_group:mitoprotea",
@@ -10560,7 +10540,7 @@
             "text": "Department of Mitochondrial Proteostasis",
             "description": "Department Langer",
             "attribute_id": 114.0,
-            "id": 813
+            "id": 811
         },
         {
             "value": "molageing",
@@ -10570,7 +10550,7 @@
             "text": "Molecular Genetics of Ageing",
             "description": "Department Antebi",
             "attribute_id": 114.0,
-            "id": 814
+            "id": 812
         },
         {
             "value": "ProtFa",
@@ -10580,7 +10560,7 @@
             "text": "CECAD Proteomics Facility",
             "description": "CECAD Proteomics facility",
             "attribute_id": 114.0,
-            "id": 815
+            "id": 813
         },
         {
             "value": "frezza",
@@ -10590,7 +10570,7 @@
             "text": "Department Frezza",
             "description": "Metabolomics in Aging",
             "attribute_id": 114.0,
-            "id": 816
+            "id": 814
         },
         {
             "value": "krueger",
@@ -10600,7 +10580,7 @@
             "text": "Department Krueger",
             "description": "Institute for Genetics",
             "attribute_id": 114.0,
-            "id": 817
+            "id": 815
         },
         {
             "value": "rugarli",
@@ -10610,7 +10590,7 @@
             "text": "Department Rugali",
             "description": "Institute for Genetics",
             "attribute_id": 114.0,
-            "id": 818
+            "id": 816
         },
         {
             "value": "trifunovic",
@@ -10620,7 +10600,7 @@
             "text": "Department Trifunovic",
             "description": "Institute for Mitochondrial Diseases and Aging",
             "attribute_id": 114.0,
-            "id": 819
+            "id": 817
         },
         {
             "value": "niessen",
@@ -10630,7 +10610,7 @@
             "text": "Department Niessen",
             "description": "CECAD Institute",
             "attribute_id": 114.0,
-            "id": 820
+            "id": 818
         },
         {
             "value": "gloeckner",
@@ -10640,7 +10620,7 @@
             "text": "Department Gloeckner",
             "description": "Center for Biochemistry",
             "attribute_id": 114.0,
-            "id": 821
+            "id": 819
         },
         {
             "value": "bazzi",
@@ -10650,7 +10630,7 @@
             "text": "Department Bazzi",
             "description": "Polyclinic of Dermatology and Venereology",
             "attribute_id": 114.0,
-            "id": 822
+            "id": 820
         },
         {
             "value": "hallek",
@@ -10660,7 +10640,7 @@
             "text": "Department Hallek",
             "description": "Clinic of Internal Medicine I",
             "attribute_id": 114.0,
-            "id": 823
+            "id": 821
         },
         {
             "value": "benzing",
@@ -10670,7 +10650,7 @@
             "text": "Department Benzing",
             "description": "Clinic of Internal Medicine II, UKK",
             "attribute_id": 114.0,
-            "id": 824
+            "id": 822
         },
         {
             "value": "hennies",
@@ -10680,7 +10660,7 @@
             "text": "Department Hennies",
             "description": "Cologne Center for Genomics, UoC",
             "attribute_id": 114.0,
-            "id": 825
+            "id": 823
         },
         {
             "value": "vonkarstedt",
@@ -10690,7 +10670,7 @@
             "text": "Department vonKarstedt",
             "description": "Dept. of Translational Genomics",
             "attribute_id": 114.0,
-            "id": 826
+            "id": 824
         },
         {
             "value": "laessig",
@@ -10700,7 +10680,7 @@
             "text": "Department Laessig",
             "description": "Institute for Biological Physics,UoC",
             "attribute_id": 114.0,
-            "id": 827
+            "id": 825
         },
         {
             "value": "hoppe",
@@ -10710,7 +10690,7 @@
             "text": "Department Hoppe",
             "description": "Institute for Genetics, UoC",
             "attribute_id": 114.0,
-            "id": 828
+            "id": 826
         },
         {
             "value": "garcia",
@@ -10720,7 +10700,7 @@
             "text": "Department Garcia",
             "description": "Institute for Genetics, UoC",
             "attribute_id": 114.0,
-            "id": 829
+            "id": 827
         },
         {
             "value": "khaskar",
@@ -10730,7 +10710,7 @@
             "text": "Department Kashkar",
             "description": "Institute for Medical Microbiology  Immunology and Hygiene, UKK",
             "attribute_id": 114.0,
-            "id": 830
+            "id": 828
         },
         {
             "value": "krieg",
@@ -10740,7 +10720,7 @@
             "text": "Department Krieg",
             "description": "Translational Matrix Biology, UKK",
             "attribute_id": 114.0,
-            "id": 831
+            "id": 829
         },
         {
             "value": "wd",
@@ -10750,7 +10730,7 @@
             "text": "Western Diet",
             "description": "A \"Western\" Diet for rodents based on AIN-93G,\u00a0providing 30% of fat from lard, 30% from butterfat,\u00a030% from Crisco (hydrogenated vegetable oil), and,\u00a0for EFA, 7% from soybean oil and 3% from corn oil.\u00a0Approximate energy (kcal) from fat 40%,\u00a0carbohydrate 44%, protein 16%.",
             "attribute_id": 116.0,
-            "id": 832
+            "id": 830
         },
         {
             "value": "sd",
@@ -10760,7 +10740,7 @@
             "text": "Standard Diet",
             "description": null,
             "attribute_id": 116.0,
-            "id": 833
+            "id": 831
         },
         {
             "value": "veg",
@@ -10770,7 +10750,7 @@
             "text": "Vegeterian Diet",
             "description": "A vegetarian fixed formulation diet for Laboratory Rats and Mice, free of any meat or fish products.",
             "attribute_id": 116.0,
-            "id": 834
+            "id": 832
         },
         {
             "value": "hg",
@@ -10780,7 +10760,7 @@
             "text": "High Gluten Diet",
             "description": "Die to keep gluten intake/levels high.",
             "attribute_id": 116.0,
-            "id": 835
+            "id": 833
         },
         {
             "value": "hfd",
@@ -10790,7 +10770,7 @@
             "text": "High Fat Diet",
             "description": "Diet with more than 60% coloric intake from fat.",
             "attribute_id": 116.0,
-            "id": 836
+            "id": 834
         },
         {
             "value": "lps",
@@ -10800,7 +10780,7 @@
             "text": "LPS",
             "description": "Lipopolysaccharide",
             "attribute_id": 20.0,
-            "id": 837
+            "id": 835
         },
         {
             "value": "r848",
@@ -10810,7 +10790,7 @@
             "text": "R848",
             "description": "R848 (Resiquimod) - TLR7/TLR8 Agonist",
             "attribute_id": 20.0,
-            "id": 838
+            "id": 836
         },
         {
             "value": "mdc",
@@ -10820,7 +10800,7 @@
             "text": "Myeloid DC (mDCs)",
             "description": "Myeloid Dendritic Cells (mDCs)",
             "attribute_id": 6.0,
-            "id": 839
+            "id": 837
         },
         {
             "value": "mtregs",
@@ -10830,7 +10810,7 @@
             "text": "Memory Regulatory T cells (mTregs)",
             "description": "Memory regulatory T cells (mTregs)",
             "attribute_id": 6.0,
-            "id": 840
+            "id": 838
         },
         {
             "value": "pdc",
@@ -10840,7 +10820,7 @@
             "text": "Plasmacytoid DC (pDCs)",
             "description": "Plasmacytoid Dendritic Cells (pDCs)",
             "attribute_id": 6.0,
-            "id": 841
+            "id": 839
         },
         {
             "value": "attregs",
@@ -10850,7 +10830,7 @@
             "text": "Natural Regulatory T cells (nTregs)",
             "description": "Natural T regulatory lymphocytes (tTregs, nTregs)",
             "attribute_id": 6.0,
-            "id": 842
+            "id": 840
         },
         {
             "value": "infdc",
@@ -10860,7 +10840,7 @@
             "text": "Inflammatory DC (infDCs)",
             "description": "Inflammatory Dendritic Cells (infDCs)",
             "attribute_id": 6.0,
-            "id": 843
+            "id": 841
         },
         {
             "value": "itgres",
@@ -10870,7 +10850,7 @@
             "text": "Induced Regulatory T cells (iTregs)",
             "description": "Induced (peripheral) T regulatory cells (iTregs, pTregs)",
             "attribute_id": 6.0,
-            "id": 844
+            "id": 842
         },
         {
             "value": "dendritic",
@@ -10880,7 +10860,7 @@
             "text": "Dendritic cell",
             "description": "Dendritic cell (DC)",
             "attribute_id": 6.0,
-            "id": 845
+            "id": 843
         },
         {
             "value": "ememcell",
@@ -10890,7 +10870,7 @@
             "text": "effector Memory Cell",
             "description": "CD45RA+ effector memory cell",
             "attribute_id": 6.0,
-            "id": 846
+            "id": 844
         },
         {
             "value": "supernatant",
@@ -10900,7 +10880,7 @@
             "text": "Supernatant",
             "description": "Cellular fraction; a volume of supernatant liquid",
             "attribute_id": 119.0,
-            "id": 847
+            "id": 845
         },
         {
             "value": "leftatrium",
@@ -10910,7 +10890,7 @@
             "text": "Left atrium",
             "description": "Left atrium:\u00a0one of the four chambers of the heart. The left atrium receives blood full of oxygen from the lungs and then empties the blood into the left ventricle.",
             "attribute_id": 120.0,
-            "id": 848
+            "id": 846
         },
         {
             "value": "rightatrium",
@@ -10920,7 +10900,7 @@
             "text": "Right atrium",
             "description": "Right atrium:\u00a0one of the four chambers of the heart. The right atrium receives blood low in oxygen from the body and then empties the blood into the right ventricle.",
             "attribute_id": 120.0,
-            "id": 849
+            "id": 847
         },
         {
             "value": "leftchamber",
@@ -10930,7 +10910,7 @@
             "text": "Left Chamber",
             "description": "A\u00a0ventricle\u00a0is one of two large chambers located toward the bottom of the\u00a0heart\u00a0that collect and expel\u00a0blood\u00a0towards the peripheral beds within the body and lungs.\u00a0",
             "attribute_id": 120.0,
-            "id": 850
+            "id": 848
         },
         {
             "value": "rightchamber",
@@ -10940,7 +10920,7 @@
             "text": "Right Chamber",
             "description": "A\u00a0ventricle\u00a0is one of two large chambers located toward the bottom of the\u00a0heart\u00a0that collect and expel\u00a0blood\u00a0towards the peripheral beds within the body and lungs.\u00a0",
             "attribute_id": 120.0,
-            "id": 851
+            "id": 849
         }
     ]
 }

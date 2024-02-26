@@ -30,6 +30,22 @@ class MCGenotypes(metaclass=SingletonABCMeta):
         """"""    
     
     @abstractmethod
+    def delete(self, label : str) -> bool:
+        """_summary_
+
+        Parameters
+        ----------
+        label : str
+            _description_
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+        
+    
+    @abstractmethod
     def update(self):
         """
         Triggers a reload of the database.

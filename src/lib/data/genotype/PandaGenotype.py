@@ -98,6 +98,19 @@ class PandaFileGenotype(MCGenotypes):
     
         elif proteome_ids is not None:
             return [genotype for genotype in self._genotypes if genotype.proteome_id in proteome_ids]
+        else:
+            return self._genotypes
+        
+    def delete(self,label : str) -> bool:
+        #calls update and raise error if not found 
+        self.update()
+        gs = len(self._genotypes)
+        self._genotypes = [genotype for genotype in self._genotypes if genotype.label != label]
+        if gs != len(self._genotypes):
+            self._save()
+            return True 
+        return False 
+        
         
     def update(self):
         """

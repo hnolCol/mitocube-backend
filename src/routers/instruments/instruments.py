@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
 from lib.data.database.ABCDatabase import MCAttributes
-from services.users import is_user_admin
+from services.users import is_user_admin, get_user_from_token
 
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 
@@ -18,7 +18,7 @@ router = APIRouter(
 
 
 @router.get("/", response_model=List[AttributeValueModel])
-def get_instruments():
+def get_instruments(user : UserModel = Depends(get_user_from_token)):
     """Returns all the instruments as an attribute value model that 
     were used in the database and are annotated in one or more submissions. 
     Hence it is different from get all attribute values for the attribute tag
@@ -42,7 +42,7 @@ def get_instruments():
     
     
 @router.get("/{instrument_tag}/stats")
-def get_instrument_by_tag(instrument_tag : str):
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
     ""
     db_helper = MCDatabaseHelper.getDatabaseHelper()
     instruments = db_helper.get_instruments()

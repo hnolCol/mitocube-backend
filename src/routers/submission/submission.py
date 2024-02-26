@@ -101,7 +101,7 @@ def add_collaborators(submission_label : str, collaborators : str, replace : boo
 
 
 @router.get("/submissions/{submission_label}/owner", response_model=PublicUser)
-def get_submission_owner(submission_label : str, user :UserModel = Depends(get_user_from_token)):
+def get_submission_owner(submission_label : str, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters
@@ -135,7 +135,10 @@ def get_submission_owner(submission_label : str, user :UserModel = Depends(get_u
     
 
 @router.post("/submissions/{submission_label}/owner")
-def change_submission_owner(submission_label : str, user_label : str, add_prev_user_to_collaborators : bool = False, user : UserModel = Depends(is_user_admin)):
+def change_submission_owner(submission_label : str, 
+                            user_label : str, 
+                            add_prev_user_to_collaborators : bool = False, 
+                            user : UserModel = Depends(is_user_admin)):
     """_summary_
 
     Parameters
@@ -199,7 +202,7 @@ def change_submission_owner(submission_label : str, user_label : str, add_prev_u
 
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
-def get_submissions_by_user_label(labels : str = None ,group : Literal["state","user","attribute_tag","attribute_value_tag","feature","genotype"] = None): #, user : UserModel = Depends(get_user_from_token)
+def get_submissions_by_user_label(labels : str = None, group : Literal["state","user","attribute_tag","attribute_value_tag","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token)):
     """Returns the the number submissions by a property. 
 
 
@@ -341,7 +344,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     
 
 
-@router.patch("/submissions/{submission_label}/datasetattributes", summary = "Updates a submissions dataset attributes")
+@router.patch("/submissions/{submission_label}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 
                       submission_label : str,
                       state_change : StateChangeModel,  
@@ -431,7 +434,7 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
 
 
 @router.post("/submissions/{submission_label}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
-def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(get_user_from_token)): #
+def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(is_user_at_least_curator)): #
     """
     Creates a runlist for a specific dataset. 
     A run is defined as the actual run and the number can be different from the number samples since

@@ -6,6 +6,8 @@ from config.models.user import UserModel
 
 from config.models.genotype import GenotypeModel
 
+from services.users import is_user_admin
+
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
@@ -38,10 +40,10 @@ def get_genotypes(proteome_ids : Optional[str] = None, feature_key : Optional[st
 
     Parameters
     ----------
-    proteome_id : Optional[str], optional
-        _description_, by default None
-    feature_key : _type_, optional
-        _description_, by default Optional[str]=None
+    proteome_ids : Optional[str], optional
+        Multiple proteome ids should be provided by using ';' as a separator., by default None
+    feature_key : Optional[str], optional
+        The feature key can be used to access genotypes that affect a certain feature_key, by default Optional[str]=None
     """
     db_genotype = MCGenotypes.getGenotypeDatabase()
     try:
@@ -60,7 +62,28 @@ def add_genotype(genotype : GenotypeModel):
     Parameters
     ----------
     genotype : GenotypeModel
-        _description_
+        The defined genotype.
     """
     db_genotype = MCGenotypes.getGenotypeDatabase()
     db_genotype.add(genotype=genotype)
+    return True 
+
+@router.delete("/genotypes/{genotype_label}")
+def delete_genotype_by_label(genotype_label : str): #user : UserModel = Depends(is_user_admin)
+    """_summary_
+
+    Parameters
+    ----------
+    genotype_label : str
+        _description_
+
+    Returns
+    -------
+    bool
+        If the deletion was successful. If genotype_label is unknown, false is returned otherwise true.
+    """
+    try:
+        db_genotype = MCGenotypes.getGenotypeDatabase()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return db_genotype.delete(label=genotype_label)
