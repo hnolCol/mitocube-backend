@@ -118,8 +118,9 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
         mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_ids,attribute_values,db_features)    
         mapped_dataset_attributes[attribute_tag] = mapped_attribute_values
     #map sample attributes 
-    mapped_sample_attributes = OrderedDict()
+    
     sample_attributes = submission.samples_attributes
+   
     sample_names = submission.sample_names
     sample_attribute_by_sample_name = OrderedDict([(sample_name, {}) for sample_name in sample_names])
     attribute_values_by_tag = {}
@@ -150,7 +151,7 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     if len(samples_genotypes) > 0:
         ##map genotypes by the keys
         genotypes = dict([(label,db_genotypes.get(label)) for label in samples_genotypes.keys()])
-        
+        mapped_attributes["att_genotype"] = AttributeModel(**attributes.loc["att_genotype",:].to_dict(), tag="att_genotype")
         
 
     metadata = submission.model_dump()     

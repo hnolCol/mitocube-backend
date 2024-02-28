@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union, Any
 from config.models.attributes import AttributeModel, AttributeValueModel
 class FeatureModel(BaseModel):
     """Base Model for a Feature"""
@@ -36,4 +36,5 @@ class FeatureDataResponseModel(BaseModel):
     samples_attributes_by_sample : Dict[str, Dict[str,List[Union[AttributeValueModel,FeatureModel]]]]
     attributes : Dict[str,AttributeModel] #The attributes by tags 
     attribute_values_by_tag : Dict[str,Union[AttributeValueModel,FeatureModel]]
+    genotypes_by_label : Dict = None
     #annotations : Dict[str, List[str]]

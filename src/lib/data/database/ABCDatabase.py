@@ -252,6 +252,19 @@ class MCDatabase(metaclass=SingletonABCMeta):
         else:
             raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
 
+    @staticmethod
+    def getDatasetObject() -> MCDataset:
+        if DB_SETTINGS.db_handler == "postgresql":
+            from lib.data.dataset.PostgreSQLDataset import PostgreSQLDataset
+            return PostgreSQLDataset
+        elif DB_SETTINGS.db_handler == "pandafiles":
+            from lib.data.dataset.PandaDataset import PandaFileDataset
+            return PandaFileDataset
+        else:
+            raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
+
+
+
     @abstractmethod
     @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
     def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
@@ -288,6 +301,18 @@ class MCDatabase(metaclass=SingletonABCMeta):
         """
         # Todo: Write documentation
         pass
+
+    def insert_meta(self, obj: MCDataset,  meta : DatasetSubmissionModel, update : bool = False):
+        """Inserts metadata in the database. 
+        It is mandatory to call this before you can insert a 
+        dataset when using the panda file database.
+
+        Parameters
+        ----------
+        meta : DatasetSubmissionModel
+            _description_
+        """
+        obj.write_json(meta=meta, update=update)
 
     def insert(self, obj: MCDataset):
         """

@@ -8,7 +8,7 @@ from deprecated import deprecated
 from lib.data.dataset.ABCDataset import MCDataset 
 
 from services.json import save_json, read_json
-
+from services.paths.utils import check_dir_exists
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.settings.db import get_db_settings
 
@@ -82,6 +82,17 @@ class PandaFileDataset(MCDataset):
             self._data_uploaded = True
        
         self._read_meta()
+    
+    def _read_from_dataframe(self, datatable : pd.DataFrame):
+        """_summary_
+
+        Parameters
+        ----------
+        datatable : pd.DataFrame
+            _description_
+        """
+        self._cached_data_table = datatable 
+    
 
     def _read_meta(self, meta : Optional[DatasetSubmissionModel] = None) -> None:
         """
@@ -106,6 +117,7 @@ class PandaFileDataset(MCDataset):
             meta = DatasetSubmissionModel(**meta_file)
         if meta is None: raise Exception("Dataset seems to be missing params.", self._label)
         self._state = meta.state
+        self._label = meta.label
         self._user_label = meta.user_label
         self._title = meta.title
         self._collaborators = meta.collaborators
@@ -154,14 +166,16 @@ class PandaFileDataset(MCDataset):
         """"""
         # Todo: Write documentation
         str_dir = os.path.join(DB_SETTINGS.db_datadir,self._label)
-        if not os.path.exists(str_dir):
-            os.mkdir(str_dir)
+        exists, path = check_dir_exists(str_dir)
+        if exists:
             meta_path = os.path.join(str_dir,"params.json")
-            self._cached_data_table.to_csv(path_or_buf=str_dir+"data.txt",
-                                           sep="\t", index_col="Key")
+            if isinstance(self._cached_data_table,pd.DataFrame):
+                self._cached_data_table = self._cached_data_table.reset_index(names="Key")
+                self._cached_data_table.to_csv(path_or_buf=os.path.join(str_dir,"data.txt"),
+                                           sep="\t", index=False)
             save_json(self.getMetaJson().model_dump(exclude_none=True),meta_path)
         else:
-            raise Exception(f"A dataset with id {self._id} already exists.")
+            raise Exception(f"A dataset with id {self._id} {self._label} already exists or the folder couldn't be created.")
 
 
     def write_json(self, meta : DatasetSubmissionModel, update : bool = True):

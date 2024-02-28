@@ -20,7 +20,7 @@ router = APIRouter(
     )
 
 @router.get("")
-def get_features_by_query(query : str, proteome_ids : List[str] = None, max_features : int = 30):  #, user : UserModel = Depends(get_user_from_token)
+def get_features_by_query(query : str, proteome_ids : str = None, max_features : int = 30):  #, user : UserModel = Depends(get_user_from_token)
     """_summary_
 
     Parameters
@@ -40,7 +40,6 @@ def get_features_by_query(query : str, proteome_ids : List[str] = None, max_feat
         _description_
     """
     feature_db = PandaFeatureDatabase()
-
     if proteome_ids is None or len(proteome_ids) == 0:
         proteome_ids = list(feature_db.get_feature_ids())
     else:
@@ -92,6 +91,7 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
     attribute_samples_by_sample_collection = {}
     attribute_values_by_tag_collection = {}
     attributes_collection = {}
+    genotypes_by_dataset_label = {}
     title_by_label = {}
     for label in dataset_labels:
         dataset = db.getDataset(label=label)
@@ -105,12 +105,12 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
                 #TODO this is something we could cash as as well? Mapping the tags from the DB to the actual attributes
                 feature_data_by_dataset_label[label] = feature_data
                 attributes_sample_by_dataset_label[label] = attributes_samples
+                genotypes_by_dataset_label[label] = updated_metadata.genotypes
                 ##update the attribute/attribute_value details to get the complete set of attributes required
                 attribute_samples_by_sample_collection.update(updated_metadata.samples_attributes_by_sample)
                 attribute_values_by_tag_collection.update(updated_metadata.attribute_values_by_tag)
                 attributes_collection.update(updated_metadata.attributes)
                 title_by_label[label] = metadata.title
-    
     response_data = {
         "feature_key": feature_key,
         "title_by_label" : title_by_label,
@@ -119,7 +119,8 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
         "samples_attributes" : attributes_sample_by_dataset_label,
         "attribute_values_by_tag" : attribute_values_by_tag_collection,
         "samples_attributes_by_sample" : attribute_samples_by_sample_collection,
-        "attributes" : attributes_collection
+        "attributes" : attributes_collection,
+        "genotypes_by_label" : genotypes_by_dataset_label
         }
     #FeatureDataResponseModel(**response_data)
     return response_data

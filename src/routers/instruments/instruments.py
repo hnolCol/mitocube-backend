@@ -17,7 +17,7 @@ router = APIRouter(
     )
 
 
-@router.get("/", response_model=List[AttributeValueModel])
+@router.get("", response_model=List[AttributeValueModel])
 def get_instruments(user : UserModel = Depends(get_user_from_token)):
     """Returns all the instruments as an attribute value model that 
     were used in the database and are annotated in one or more submissions. 

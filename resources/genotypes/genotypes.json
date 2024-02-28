@@ -186,5 +186,161 @@
                 }
             }
         ]
+    },
+    {
+        "label": "AQPJB",
+        "text": "Nme6.KO.T102fs.(-/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "O88425",
+                "genes": "Nme6",
+                "proteins": "Nucleoside diphosphate kinase 6 (NDK 6) (NDP kinase 6) (EC 2.7.4.6) (nm23-M6)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 189,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "O88425",
+                        "genes": "Nme6",
+                        "proteins": "Nucleoside diphosphate kinase 6 (NDK 6) (NDP kinase 6) (EC 2.7.4.6) (nm23-M6)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 189,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 345,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 348,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 337,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "CRISPR-mediated",
+                        "tag": "att_gene_editing_method:crispr",
+                        "value": "crispr",
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
+                    }
+                ],
+                "att_protein_mutation": [
+                    {
+                        "id": 708,
+                        "attribute_id": 90,
+                        "attribute_tag": "att_protein_mutation",
+                        "text": "Frameshift",
+                        "tag": "att_protein_mutation:frameshift",
+                        "value": "frameshift",
+                        "description": "Frameshift mediated by a double strand break"
+                    }
+                ],
+                "att_protein_position": {
+                    "att_protein_mutation:frameshift": {
+                        "attribute_value": {
+                            "id": 721,
+                            "attribute_id": 91,
+                            "attribute_tag": "att_protein_position",
+                            "text": "Region",
+                            "tag": "att_protein_position:region",
+                            "value": "region",
+                            "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
+                        },
+                        "aa_position": [
+                            102,
+                            117
+                        ],
+                        "aa": [
+                            "T",
+                            "G"
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "label": "Ec0Cf",
+        "text": "Nme6.KO.(+/+)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "O88425",
+                "genes": "Nme6",
+                "proteins": "Nucleoside diphosphate kinase 6 (NDK 6) (NDP kinase 6) (EC 2.7.4.6) (nm23-M6)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 189,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "O88425",
+                        "genes": "Nme6",
+                        "proteins": "Nucleoside diphosphate kinase 6 (NDK 6) (NDP kinase 6) (EC 2.7.4.6) (nm23-M6)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 189,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 345,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 349,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Wildtype (+/+)",
+                        "tag": "att_gene_zygosity:(+/+)",
+                        "value": "(+/+)",
+                        "description": "Wildtype"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 337,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "CRISPR-mediated",
+                        "tag": "att_gene_editing_method:crispr",
+                        "value": "crispr",
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
+                    }
+                ]
+            }
+        ]
     }
 ]

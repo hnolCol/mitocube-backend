@@ -2,7 +2,7 @@
 
 import pandas as pd 
 import typing
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from pydantic import BaseModel, Field, field_serializer
 
 from abc import abstractmethod
@@ -12,7 +12,6 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.submissions.runs import RunListModel
 import random
 from lib.DesignPatterns import JsonSerializable
-import random
 from collections import OrderedDict
 from services.transforms import value_mapper_from_dict
 
@@ -93,7 +92,7 @@ class MCDataset(JsonSerializable):
         self._load_meta_only = False
         self._readFromDatabase()
         self._loadedFromDatabase = True
-
+        
     @abstractmethod
     def hasData(self):
         """Checks if dataset has data"""
@@ -103,9 +102,21 @@ class MCDataset(JsonSerializable):
         """"""
         # Todo: Write documentation
         pass
+    
+    @abstractmethod
+    def _read_from_dataframe(self, datatable : pd.DataFrame):
+        """Reads databale from a dataframe. Required
+        to insert a datatable. 
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        pass 
 
     @abstractmethod
-    def _read_meta(self, label = None):
+    def _read_meta(self, meta : Optional[DatasetSubmissionModel] = None):
         """"""
         pass 
 
@@ -340,7 +351,7 @@ class MCDataset(JsonSerializable):
         return sample_idces, genotypes
         
 
-    def getSamplesAttributes(self) -> Tuple[pd.DataFrame, OrderedDict[str,List[str]]]:
+    def getSamplesAttributes(self, add_genotype : bool = True) -> Tuple[pd.DataFrame, OrderedDict[str,List[str]]]:
         """
         Dataset function that maps the samples attributes to the sample names and is intended to be used in a HTTPResponse. 
         If multiple samples attribute values are assigned to a single sample, the tags are separated by a simple
@@ -360,7 +371,9 @@ class MCDataset(JsonSerializable):
         meta_data = self.getMetaJson()
         sample_names = meta_data.sample_names 
         samples_attributes = meta_data.samples_attributes #attributeTag -> sampleName Index
-    
+        genotypes = meta_data.samples_genotypes
+        
+            
         sample_idces = pd.DataFrame(index = list(range(meta_data.n_samples)))
         sample_attribute_by_name = OrderedDict()
         if not isinstance(samples_attributes,dict): TypeError("attributes_samples must be a dictionary.")
@@ -369,6 +382,11 @@ class MCDataset(JsonSerializable):
             attribute_mapper = value_mapper_from_dict(sample_attribute_values) 
             sample_idces.loc[:,attribute_tag] = sample_idces.index.map(attribute_mapper)
             sample_attribute_by_name[attribute_tag] = list(sample_attribute_values.keys())
+            
+        if add_genotype and len(genotypes) > 0:
+            genotype_mapper = value_mapper_from_dict(genotypes)
+            sample_idces.loc[:,"att_genotype"] = sample_idces.index.map(genotype_mapper)
+            sample_attribute_by_name["att_genotype"] = list(genotypes.keys())
         #replace indices with sample names
         sample_idces.index = sample_names
         return sample_idces, sample_attribute_by_name

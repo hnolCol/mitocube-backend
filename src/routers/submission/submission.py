@@ -2,7 +2,8 @@ import time
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from typing import List, Annotated, Literal, Dict
 from collections import OrderedDict
-from urllib.parse import urljoin
+
+import pandas as pd 
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes, InvalidDatasetLabelError
 from lib.data.runs.runs import RunListCreator
@@ -299,8 +300,7 @@ def get_submission_by_query(state : str|int = None,
     }
     
     
-
-
+    
 @router.post("/submissions",summary="Add submission to the database")
 def add_submission(background_task : BackgroundTasks ,submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
     """
@@ -317,18 +317,38 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
 
     if len(missing_mand_attributes) > 0: return mandatory_dataset_attrs_not_found_exception.add_note(f"Missing : {[attr.tag for attr in missing_mand_attributes]}")
     json_data = submission_to_json(submission,user)
-
+   
     data_dir = DB_SETTINGS.db_datadir
     dataset_dir = join_path(data_dir,submission.label)
     exists, dataset_dir = check_dir_exists(dataset_dir)
+    
+        
+    
     if exists:
-        params_path = join_path(dataset_dir,"params.json")
+        #params_path = join_path(dataset_dir,"params.json")
         #store json in resource
-        save_json(DatasetSubmissionModel(**json_data).model_dump(exclude_none=True),params_path)
+       # save_json(metadata.model_dump(exclude_none=True),params_path)
+        
         #check if users are actually in DB and allowed
         #This information is not in the PublicUser and we need to get the user from the userDB
+        if submission.includes_data:   
+            json_data["state"] = SubmissionStates.DONE
+        metadata = DatasetSubmissionModel(**json_data)
+        datasetObj = db.getDatasetObject()(label = metadata.label) #initiate dataset 
+        datasetObj._read_meta(meta = metadata)
+        #save metadata first. TODO : Implement in insert? Or insert_metadata? 
+        db.insert_meta(obj=datasetObj,meta=metadata)
+        
+        if submission.includes_data:    
+            #TODO Check -> features (index to be in the annotation database with the selected database.?)
+            sample_names = metadata.sample_names 
+            datatable = pd.DataFrame(data = submission.data_array, columns=sample_names, index=submission.data_index)
+           # datatable.to_csv(dataset_path, sep="\t")
+            datasetObj._read_from_dataframe(datatable)
+            db.insert(datasetObj)
+            
         check_collaborators = are_public_users_allowed(submission.collaborators)
-
+            
         send_email_in_background(background_tasks=background_task,
                                 subject=f"Submission Complete : {submission.title} ({submission.label})",
                                 email_to=[user.email],
@@ -342,6 +362,7 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
                                 },
                                 template_mame=EMAIL_SETTINGS.mail_submission_complete_template)
     
+        
 
 
 @router.patch("/submissions/{submission_label}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")

@@ -9,6 +9,7 @@ from config.models.submissions.runs import RunListModel, RunListRequestPropsMode
 from config.models.annotations.feature import FeatureModel
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
@@ -39,6 +40,9 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
     db = MCDatabase.getDatabase()
     db_attributes = MCAttributes.getAttributeDatabase()
     feature_db = PandaFeatureDatabase()
+    genotype_db = MCGenotypes.getGenotypeDatabase()
+    
+    
     dataset = db.getDataset(dataset_label)
     if dataset is None:
         raise HTTPException(status_code=400,detail="Data not found for given label.")
@@ -48,8 +52,11 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
     proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     attribute_values = db_attributes.getAttributeValues(tags=[attribute_left_tag,attribute_right_tag,within_sample_attribute_value_tag]).set_index("tag", drop=False)
     attribute = db_attributes.getAttributes(tags=[sample_attribute_tag,within_sample_attribute_tag]).set_index("tag")
-    
-    if attribute_left_tag not in attribute_values.index or attribute_right_tag not in attribute_values.index:
+    if sample_attribute_tag == "genotype":
+        genotype_left = genotype_db.get(label = attribute_left_tag)
+        genotype_right = genotype_db.get(label = attribute_right_tag)
+        comparison_suffix = f"{genotype_left.text} vs {genotype_right.text}"
+    elif attribute_left_tag not in attribute_values.index or attribute_right_tag not in attribute_values.index:
         comparison_suffix = f"{attribute_left_tag} vs {attribute_right_tag}"
     else:
         comparison_suffix = f"{attribute_values.loc[attribute_left_tag,'text']} vs {attribute_values.loc[attribute_right_tag,'text']}"

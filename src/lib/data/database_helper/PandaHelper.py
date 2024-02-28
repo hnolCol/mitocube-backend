@@ -15,6 +15,8 @@ import time
 
 from config.settings.db import get_db_settings
 from config.enums.states import SubmissionStates
+
+
 DB_SETTINGS = get_db_settings()
 
 class PandaDatabaseHelper(MCDatabaseHelper):
@@ -215,6 +217,7 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                     d = pd.read_csv(filePath, sep="\t", index_col="Key") #use_cols = "Key"
                 except:
                     print("error loading file: ",filePath," Missing 'Key' column?")
+                    continue
                 d["label"] = fileProps["label"]
                 feature_keys.append(d.loc[:,["label"]])
                 self._labels_with_data_table.add(fileProps["label"])
@@ -231,8 +234,10 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                 total_variance = d.loc[:,sample_names].var(axis=1)
                 
                 sample_attributes = metadata.samples_attributes
-                vars = dict([(attribute_tag,pd.DataFrame(index=d.index)) for attribute_tag in sample_attributes.keys()])
-                for attribute_tag, sample_attrs in sample_attributes.items():
+                sample_genotypes = metadata.samples_genotypes
+                samples_attrs_genotype = {**{"genotype" : sample_genotypes}, **sample_attributes}
+                vars = dict([(attribute_tag,pd.DataFrame(index=d.index)) for attribute_tag in samples_attrs_genotype.keys()])
+                for attribute_tag, sample_attrs in samples_attrs_genotype.items():
                     
                     for sample_att_value_tag,sample_indices in sample_attrs.items():
                         sample_names_attrs = [sample_names[sample_idx] for sample_idx in sample_indices]
