@@ -68,7 +68,7 @@ class NewSubmissionModel(BaseModel):
     includes_data : bool = False 
     data_array : List[List[float|None]] = None 
     data_sample_names : List[str] = None
-    data_index : List[str] = None 
+    data_index : List[str|None] = None 
  
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):

@@ -343,6 +343,9 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
             #TODO Check -> features (index to be in the annotation database with the selected database.?)
             sample_names = metadata.sample_names 
             datatable = pd.DataFrame(data = submission.data_array, columns=sample_names, index=submission.data_index)
+            datatable = datatable.dropna(how="all")
+            non_nan_index = datatable.index.dropna()
+            datatable = datatable.loc[non_nan_index,:]
            # datatable.to_csv(dataset_path, sep="\t")
             datasetObj._read_from_dataframe(datatable)
             db.insert(datasetObj)
