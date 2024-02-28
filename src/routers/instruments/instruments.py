@@ -44,6 +44,7 @@ def get_instruments(user : UserModel = Depends(get_user_from_token)):
 @router.get("/{instrument_tag}/stats")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
     ""
+    measuring_submission = {}
     db_helper = MCDatabaseHelper.getDatabaseHelper()
     instruments = db_helper.get_instruments()
     if instrument_tag not in instruments: raise HTTPException(status_code=404,detail="The instrument was not found.")

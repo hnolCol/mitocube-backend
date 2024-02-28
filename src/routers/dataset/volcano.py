@@ -52,7 +52,7 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
     proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     attribute_values = db_attributes.getAttributeValues(tags=[attribute_left_tag,attribute_right_tag,within_sample_attribute_value_tag]).set_index("tag", drop=False)
     attribute = db_attributes.getAttributes(tags=[sample_attribute_tag,within_sample_attribute_tag]).set_index("tag")
-    if sample_attribute_tag == "genotype":
+    if sample_attribute_tag == "att_genotype":
         genotype_left = genotype_db.get(label = attribute_left_tag)
         genotype_right = genotype_db.get(label = attribute_right_tag)
         comparison_suffix = f"{genotype_left.text} vs {genotype_right.text}"
