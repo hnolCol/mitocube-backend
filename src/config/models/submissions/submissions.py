@@ -59,7 +59,7 @@ class NewSubmissionModel(BaseModel):
     metatext : Dict[str,str]
     links : List[SubmissionLink]
     genotypes : Optional[List[List[GenotypeModel]]] = None
-    label : str = Field(...,min_length=10, max_length=10)
+    label : str = Field(...,min_length=10, max_length=12)
     title : str 
     datasetAttributeValues : Dict[str,List[Union[AttributeValueModel,FeatureModel]]]
     datasetAttributes : List[AttributeModel]
