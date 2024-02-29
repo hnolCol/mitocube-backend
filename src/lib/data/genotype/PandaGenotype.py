@@ -90,7 +90,7 @@ class PandaFileGenotype(MCGenotypes):
             if len(genotypes_found_by_label) != 1: 
                 if ignore_missing:
                     return None 
-                
+
                 raise ValueError("Either the genotype labels are not unique or the label is not found.")
             return genotypes_found_by_label[0]
         
@@ -114,6 +114,13 @@ class PandaFileGenotype(MCGenotypes):
             self._save()
             return True 
         return False 
+        
+        
+    def find(self, query : str) -> List[GenotypeModel]:
+        self.update() 
+        return [genotype for genotype in self._genotypes if query in genotype.text 
+                or any(query in feature.genes or query in feature.key or query in feature.proteins for feature in genotype.features)]
+        
         
         
     def update(self):

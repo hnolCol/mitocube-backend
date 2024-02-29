@@ -476,6 +476,11 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         self.update()
         return len(self._labels_by_feature)
     
+    def get_number_genotypes(self) -> int:
+        
+        self.update()
+        return len(self._labels_by_genotype)
+    
     def get_sample_number_by_instrument(self) -> Dict[str,List[int]]:
         """Returns the number of samples per instrument. 
 

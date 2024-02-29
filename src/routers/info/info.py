@@ -11,6 +11,8 @@ from config.settings.keyfigures import get_key_figure_settings
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 from lib.user.UserHandling import UserDB
 
+from config.enums.states import SubmissionStates
+
 GENERAL_SETTINGS  = get_general_settings()
 KEY_FIGURE_SETTINGS = get_key_figure_settings()
 
@@ -44,14 +46,19 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     user : UserModel, optional
         the user that is inferred from the token, by default Depends(get_user_from_token)
     """
+    
     db_helper = MCDatabaseHelper.getDatabaseHelper()
     key_figures = OrderedDict()
+    
     if KEY_FIGURE_SETTINGS.number_submissions:
         key_figures["Submissions"] = len(db_helper.get_all_labels())
     if KEY_FIGURE_SETTINGS.number_published_datasets:
-        key_figures["Published Data"] = db_helper.get_datatable_count()
+        published_datasets = db_helper.get_label_count_by_state(k_subset=set([SubmissionStates.PUBLISHED]))[SubmissionStates.PUBLISHED]["submission_count"]
+        key_figures["Published Data"] = published_datasets
     if KEY_FIGURE_SETTINGS.number_proteins:
         key_figures["Proteins"] = db_helper.get_number_features()
+    if KEY_FIGURE_SETTINGS.number_genotypes:
+        key_figures["Genotypes"] = db_helper.get_number_genotypes()
     if KEY_FIGURE_SETTINGS.number_users:
         key_figures["Users"] = UserDB.get_number_of_users()
     return [{"label" : k, "metric" : v} for k,v in key_figures.items()]

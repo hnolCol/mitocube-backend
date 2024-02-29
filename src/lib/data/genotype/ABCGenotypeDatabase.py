@@ -6,6 +6,7 @@ from abc import abstractmethod
 
 from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
 from config.settings.db import get_db_settings
+from config.models.genotype import GenotypeModel
 
 DB_SETTTINGS = get_db_settings()
 
@@ -25,8 +26,24 @@ class MCGenotypes(metaclass=SingletonABCMeta):
     @abstractmethod
     def add(self) -> bool:
         """"""
+    
     @abstractmethod
-    def get(self) -> List:
+    def find(self,query : str) -> List[GenotypeModel]:
+        """_summary_
+
+        Parameters
+        ----------
+        query : str
+            A string that searches in the text prop of the GenotypeModel
+
+        Returns
+        -------
+        List[GenotypeModel]
+            _description_
+        """
+    
+    @abstractmethod
+    def get(self) -> List[GenotypeModel]|GenotypeModel:
         """"""    
     
     @abstractmethod

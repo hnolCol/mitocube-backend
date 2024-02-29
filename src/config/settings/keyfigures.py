@@ -14,6 +14,7 @@ class KeyFigures(BaseSettings):
     number_proteins : bool = True
     number_submissions : bool = True
     number_published_datasets : bool = True
+    number_genotypes : bool = True
     number_users : bool = True
     turnover_time : bool = True
     

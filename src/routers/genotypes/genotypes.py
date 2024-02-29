@@ -21,6 +21,15 @@ router = APIRouter(
 )
 
 
+
+@router.get("/genotypes/q")
+def get_genotype_by_query(query : str) -> List[GenotypeModel]:
+    """"""
+    db_genotype = MCGenotypes.getGenotypeDatabase()
+    return db_genotype.find(query=query)
+
+
+
 @router.get("/genotypes/{genotype_label}")
 def get_genotype_by_label(genotype_label : str):
     """_summary_
@@ -87,3 +96,5 @@ def delete_genotype_by_label(genotype_label : str): #user : UserModel = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return db_genotype.delete(label=genotype_label)
+
+
