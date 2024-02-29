@@ -65,17 +65,19 @@ def get_dataset_volcano(dataset_label : str, attribute_left_tag : str, attribute
         within_attribute_text = ""
         within_attribute_value_text = ""
         if within_sample_attribute_tag not in attribute.index: raise HTTPException(status_code=404,detail="Within attribute tag not found")
-        
         within_attribute_text = attribute.loc[within_sample_attribute_tag,"text"]
-        if attribute.loc[within_sample_attribute_tag,"has_features_value"]:
+        if within_sample_attribute_tag == "att_genotype":
+            genotype_within = genotype_db.get(label = within_sample_attribute_value_tag)
+            within_attribute_value_text = genotype_within.text
+        elif attribute.loc[within_sample_attribute_tag,"has_features_value"]:
             feature = feature_db.get(keys=[within_sample_attribute_value_tag.split(":")[1]],ignoreMissing=True)
             within_attribute_value_text = feature.loc[:,"genes"].values[0].split(" ")[0]
-        elif attribute.loc[within_sample_attribute_tag,"has_numeric_value"]:
+        elif attribute.loc[within_sample_attribute_tag,"has_numeric_input"]:
             within_attribute_value_text = within_sample_attribute_tag.split(":")[-1]
         elif within_sample_attribute_value_tag in attribute_values.index:
             within_attribute_value_text = attribute_values.loc[within_sample_attribute_value_tag,"text"]
-        
-        comparison_suffix += f"({within_attribute_text}:{within_attribute_value_text})"
+            
+        comparison_suffix += f"({within_attribute_text}: {within_attribute_value_text})"
         
     stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
                                      attribute_value_left=attribute_left_tag, 

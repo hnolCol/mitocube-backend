@@ -134,7 +134,7 @@ class DatasetSubmissionResponseModel(DatasetSubmissionModel):
     samples_attributes_by_sample : Dict[str, Dict[str,List[Union[AttributeValueModel,FeatureModel]]]]
     attributes : Dict[str,AttributeModel] #The attributes by tags 
     attribute_values_by_tag : Dict[str,Union[AttributeValueModel,FeatureModel]]
-    genotypes : Dict[str, GenotypeModel]
+    genotypes : Dict[str, GenotypeModel] = Field(..., default_factory = {})
     
 
 class SubmissionUserCountResponse(BaseModel):

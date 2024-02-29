@@ -67,7 +67,7 @@ class PandaFileGenotype(MCGenotypes):
         
         
     
-    def get(self, label : Optional[str] = None, proteome_ids : Optional[List[str]] = None, feature_key : Optional[str] = None, feature : Optional[FeatureModel] = None) ->  List[GenotypeModel] | GenotypeModel:
+    def get(self, label : Optional[str] = None, proteome_ids : Optional[List[str]] = None, feature_key : Optional[str] = None, feature : Optional[FeatureModel] = None, ignore_missing : bool = True) ->  List[GenotypeModel] | GenotypeModel:
         """Returns the genotypes. By a proteome_id since genotypes are defined by certain
         features which are define for a proteome. 
         If feature_key is provided, the genotypes for the specific feature_key are returned
@@ -87,7 +87,11 @@ class PandaFileGenotype(MCGenotypes):
         self.update()
         if label is not None:
             genotypes_found_by_label = [genotype for genotype in self._genotypes if genotype.label == label]
-            if len(genotypes_found_by_label) != 1: raise ValueError("Either the genotype labels are not unique or the label is not found.")
+            if len(genotypes_found_by_label) != 1: 
+                if ignore_missing:
+                    return None 
+                
+                raise ValueError("Either the genotype labels are not unique or the label is not found.")
             return genotypes_found_by_label[0]
         
         elif feature_key is not None:

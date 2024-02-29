@@ -342,5 +342,129 @@
                 ]
             }
         ]
+    },
+    {
+        "label": "SioAE",
+        "text": "AFG3L2.KO.(-/-)",
+        "proteome_id": "UP000005640",
+        "features": [
+            {
+                "key": "Q9Y4W6",
+                "genes": "AFG3L2",
+                "proteins": "AFG3-like protein 2 (EC 3.4.24.-) (Paraplegin-like protein)",
+                "organism": "Homo sapiens (Human)",
+                "aa_length": 797,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "Q9Y4W6",
+                        "genes": "AFG3L2",
+                        "proteins": "AFG3-like protein 2 (EC 3.4.24.-) (Paraplegin-like protein)",
+                        "organism": "Homo sapiens (Human)",
+                        "aa_length": 797,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 345,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 348,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 337,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "CRISPR-mediated",
+                        "tag": "att_gene_editing_method:crispr",
+                        "value": "crispr",
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "PXPUr",
+        "text": "AFG3L2.KO.(+/+)",
+        "proteome_id": "UP000005640",
+        "features": [
+            {
+                "key": "Q9Y4W6",
+                "genes": "AFG3L2",
+                "proteins": "AFG3-like protein 2 (EC 3.4.24.-) (Paraplegin-like protein)",
+                "organism": "Homo sapiens (Human)",
+                "aa_length": 797,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "Q9Y4W6",
+                        "genes": "AFG3L2",
+                        "proteins": "AFG3-like protein 2 (EC 3.4.24.-) (Paraplegin-like protein)",
+                        "organism": "Homo sapiens (Human)",
+                        "aa_length": 797,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 345,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 349,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Wildtype (+/+)",
+                        "tag": "att_gene_zygosity:(+/+)",
+                        "value": "(+/+)",
+                        "description": "Wildtype"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 337,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "CRISPR-mediated",
+                        "tag": "att_gene_editing_method:crispr",
+                        "value": "crispr",
+                        "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
+                    }
+                ]
+            }
+        ]
     }
 ]

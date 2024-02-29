@@ -150,7 +150,8 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     genotypes = {}
     if len(samples_genotypes) > 0:
         ##map genotypes by the keys
-        genotypes = dict([(label,db_genotypes.get(label)) for label in samples_genotypes.keys()])
+        genotypes_by_label = [(label,db_genotypes.get(label, ignore_missing=True)) for label in samples_genotypes.keys()] #missing genotypes will be none 
+        genotypes = dict([(label,genotype) for label,genotype in genotypes_by_label if genotype is not None])
         mapped_attributes["att_genotype"] = AttributeModel(**attributes.loc["att_genotype",:].to_dict(), tag="att_genotype")
         
 
