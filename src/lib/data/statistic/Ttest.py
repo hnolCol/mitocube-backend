@@ -71,7 +71,7 @@ class Ttest(DatasetStatistic):
         stats = stats.dropna(subset=[p_value_name])
         stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
         stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
-        stats.loc[:,f"significant {suffix }"] = stats.loc[:,f"fdr {suffix}"] <= fdr
+        stats.loc[:,f"Significant {suffix }"] = stats.loc[:,f"fdr {suffix}"] <= fdr
         stats.loc[:,f"log2 FC {suffix}"] = X.mean(axis=1) - Y.mean(axis=1)
         return stats
         

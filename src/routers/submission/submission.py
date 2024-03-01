@@ -58,6 +58,29 @@ def get_submission_id():
     """
     return SubmissionIDResponse()
 
+
+@router.patch("/submissions/{submission_label}/metatext", summary="Update the metatext of a submission.")
+def post_meta_text(submission_label : str, metatext : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
+    print(metatext)
+    
+    
+    db = MCDatabase.getDatabase()
+    dataset = get_dataset_from_database(db,submission_label)
+    metadata = dataset.getMetaJson()
+    if user.role < UserRolesEnum.CURATOR and metadata.user_label != user.label:
+        raise HTTPException(status_code=403,detail="Metatexts can only be modified by the owner or a user that is at least curator.")
+    metadata = metadata.model_dump()
+
+    metadata["modified_on"] = time.time()
+    metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Metatext updated.", state = metadata["state"]))
+    metadata["metatext"] = metatext
+    print(dataset)
+    update_submission = DatasetSubmissionModel(**metadata)
+    dataset.write_json(update_submission, update = True)
+    return True 
+    
+
+
 @router.get("/submissions/metatext",
             summary="Returns the metatext information that can be used to describe a submission.",
             response_model=MetaTextSubmissionResponse)
@@ -182,7 +205,6 @@ def change_submission_owner(submission_label : str,
         raise user_not_found
     if not user.allow_login:
         raise user_forbidden
-    metadata.modified_on
     metadata = metadata.model_dump()
     prev_user_label = metadata["user_label"]
     metadata["modified_on"] = time.time()

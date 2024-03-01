@@ -18,8 +18,8 @@ def build_regex_for_search(search_strings : List[str]) -> str:
     """
     reg_exp = r'' #init reg ex
     for n,search_string in enumerate(search_strings):
-        if n == 0:
-            reg_exp += r'(?:{})|'.format(search_string)
+        if n == 0: #avoid extract group warning.
+            reg_exp += r'(?:{})|'.format(search_string) 
         else:
             reg_exp += r'({})|'.format(search_string)
     reg_exp = reg_exp[:-1] #strip of last |
