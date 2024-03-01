@@ -11,6 +11,7 @@ from services.json import save_json, read_json
 from services.paths.utils import check_dir_exists
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.settings.db import get_db_settings
+import time 
 
 DB_SETTINGS = get_db_settings()
 
@@ -132,6 +133,7 @@ class PandaFileDataset(MCDataset):
         self._sample_names = meta.sample_names
         self._timeline = meta.timeline
         self._runlist = meta.runlist
+        self._last_meta_load = time.time()
         
     @deprecated("Please use getMetaJson from the MCDataset abstract class.")
     def get_meta_data(self) -> DatasetSubmissionModel:

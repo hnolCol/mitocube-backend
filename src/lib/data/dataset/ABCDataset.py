@@ -8,12 +8,17 @@ from pydantic import BaseModel, Field, field_serializer
 from abc import abstractmethod
 from deprecated import deprecated
 from lib.DesignPatterns import JsonSerializable
+from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.submissions.runs import RunListModel
 import random
 from lib.DesignPatterns import JsonSerializable
 from collections import OrderedDict
 from services.transforms import value_mapper_from_dict
+import time 
+import os 
+
+DB_SETTINGS = get_db_settings()
 
 class MCDataset(JsonSerializable):
     """Replacement for the Data.Dataset"""
@@ -45,6 +50,7 @@ class MCDataset(JsonSerializable):
         self._label = label
         self._load_meta_only = load_meta_only
         self._cached_data_table = None
+        self._last_meta_load = None
 
         if loadFromDatabase:
             self._refresh()
@@ -79,12 +85,30 @@ class MCDataset(JsonSerializable):
 
         # ToDo: Add Self stated updated / read date?
 
+    def _check_reload(self) -> bool:
+        
+        if self._last_meta_load  is None :
+            return True
+        path_dataset = os.path.join(DB_SETTINGS.db_datadir,self._label) # TO DO: CHange this, 
+        path_meta = os.path.join(path_dataset,"params.json")
+        if os.path.exists(path_meta):
+            reload_file = os.stat(path_meta).st_mtime >= self._last_meta_load
+            return reload_file
+        return False 
+
+    def _isMetaLoaded(self) -> bool:
+        ""
+        return self._state is not None 
+        
+    def _isDataTableLoaded(self) -> bool:
+        "" 
+        return self._cached_data_table is not None
+        
     def _isLoaded(self) -> bool:
         """"""
         # Todo: Write documentation
-        return self._cached_data_table is not None and \
-            self._attributes_dataset is not None and \
-            self._attributes_samples is not None
+        #data table is not required as a dataset can also only load meta data? 
+        return  self._attributes_dataset is not None and self._attributes_samples is not None
 
     def _refresh(self):
         """"""
@@ -203,7 +227,7 @@ class MCDataset(JsonSerializable):
             If dataset does not have a data table yet, None is returned. 
             Check with dataset.hasData() if data are available.
         """
-        if not self._isLoaded():
+        if not self._isDataTableLoaded():
             self._refresh()
 
         return self._cached_data_table
@@ -213,7 +237,7 @@ class MCDataset(JsonSerializable):
         # Todo: Write documentation
         return self._label
 
-    def getMetaJson(self, force_reload : bool = False) -> DatasetSubmissionModel:
+    def getMetaJson(self, force_reload : bool = False, check_file : bool = True) -> DatasetSubmissionModel:
         """Returns the meta data. 
         
         Parameters
@@ -221,13 +245,18 @@ class MCDataset(JsonSerializable):
         force_reload : bool, default False
             If True reloads the data using the function _read_meta() even if the data were loaded before.
         
+        check_file : bool, default True 
+            If true, checks if the file has been modified after the recent load. Only useful for 
+            pandasfile database configuration. 
+        
         Returns
         -------
         DatasetSubmissionModel
             The meta data. 
         """
-       
-        if not self._isLoaded() or force_reload:
+        if DB_SETTINGS.db_handler == "pandafiles" and check_file and self._check_reload():
+            self._read_meta() 
+        elif not self._isMetaLoaded() or force_reload:
             self._read_meta() 
         return DatasetSubmissionModel(
             title=self._title,

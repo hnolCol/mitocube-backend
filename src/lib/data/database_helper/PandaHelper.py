@@ -23,11 +23,11 @@ class PandaDatabaseHelper(MCDatabaseHelper):
     """
     Database Helper 
     """
-    def __init__(self, instrument_attribute_tag : str = "att_ms_name") -> None:
+    def __init__(self, instrument_attribute_tag : str = "att_ms_name", stale_time : int = 10) -> None:
         super().__init__()
         self._lock = Lock()  # Synchronization primitive to make it multi-threading safe
         self._updated_timestamp = None 
-        self._stale_time_s = 120 #2 minutes stale time (not updating even if there are new files.)
+        self._stale_time_s = stale_time #10 second stale time (not updating even if there are new files.)
         self._last_update = {}
         self._labels_by_feature = None #key feature_key -> values (set of dataset labels)
         self._labels_by_attribute_tag = None #find datasets which have the attribute assigned 

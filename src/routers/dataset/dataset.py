@@ -17,7 +17,8 @@ from lib.data.filter.NoMissingValues import NoNaNFilter
 from config.exceptions.HTTPExceptions import no_data_found
 
 from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attribute_in_metadata
+from services.submission import map_tags_to_attribute_in_metadata, get_dataset_from_database
+
 import pandas as pd 
 
 
@@ -100,7 +101,8 @@ def get_dataset_params(dataset_label : str, user : UserModel = Depends(get_user_
     Returns the metadata associated to the dataset
     """
     db = MCDatabase.getDatabase()
-    metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    dataset = get_dataset_from_database(db,dataset_label)
+    metadata : DatasetSubmissionModel = dataset.getMetaJson()
     
     return map_tags_to_attribute_in_metadata(metadata)
 
