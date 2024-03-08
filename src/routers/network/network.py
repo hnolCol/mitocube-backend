@@ -20,14 +20,18 @@ router = APIRouter(
     )
 
 NETWORK_SETTINGS = get_network_settings()
-SOURCE_loc = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","localiztation.json")
+SOURCE_loc = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","localization.json")
 SOURCE_P = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","pathway.json")
-
-with open(SOURCE_loc,"r") as f:
-    loc_pos = json.load(f)
-with open(SOURCE_P,"r") as f:
-    loc_path = json.load(f)
-
+#TODO create network database, just for testing!! 
+try:
+    with open(SOURCE_loc,"r") as f:
+        loc_pos = json.load(f)
+    with open(SOURCE_P,"r") as f:
+        loc_path = json.load(f)
+except:
+    loc_path = {}
+    loc_pos = {}
+    
 @router.get("/mitocarta")
 def get_network(type : Literal["pathway","localization"]):
     if type == "localization": return loc_pos

@@ -466,5 +466,129 @@
                 ]
             }
         ]
+    },
+    {
+        "label": "8VSIe",
+        "text": "Yme1l1.KO.(-/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "O88967",
+                "genes": "Yme1l1",
+                "proteins": "ATP-dependent zinc metalloprotease YME1L1 (EC 3.4.24.-) (ATP-dependent metalloprotease FtsH1) (YME1-like protein 1)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 715,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "O88967",
+                        "genes": "Yme1l1",
+                        "proteins": "ATP-dependent zinc metalloprotease YME1L1 (EC 3.4.24.-) (ATP-dependent metalloprotease FtsH1) (YME1-like protein 1)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 715,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 346,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 349,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 336,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "Homologous recombination (loxP-sites)",
+                        "tag": "att_gene_editing_method:homologrecombination",
+                        "value": "homologrecombination",
+                        "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "5s9r1",
+        "text": "Yme1l1.KO.(+/+)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "O88967",
+                "genes": "Yme1l1",
+                "proteins": "ATP-dependent zinc metalloprotease YME1L1 (EC 3.4.24.-) (ATP-dependent metalloprotease FtsH1) (YME1-like protein 1)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 715,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "O88967",
+                        "genes": "Yme1l1",
+                        "proteins": "ATP-dependent zinc metalloprotease YME1L1 (EC 3.4.24.-) (ATP-dependent metalloprotease FtsH1) (YME1-like protein 1)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 715,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 346,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 350,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Wildtype (+/+)",
+                        "tag": "att_gene_zygosity:(+/+)",
+                        "value": "(+/+)",
+                        "description": "Wildtype"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 336,
+                        "attribute_id": 48,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "Homologous recombination (loxP-sites)",
+                        "tag": "att_gene_editing_method:homologrecombination",
+                        "value": "homologrecombination",
+                        "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
+                    }
+                ]
+            }
+        ]
     }
 ]

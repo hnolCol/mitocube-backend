@@ -228,17 +228,16 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                 except Exception as e:
                     print(e,filePath)
                 sample_names = metadata.sample_names
+                
                 self._mean_abundance_by_feature[fileProps["label"]] = d.loc[:,sample_names].mean(axis=1).to_dict()
                 # load meta to calculate variances 
                     
                 total_variance = d.loc[:,sample_names].var(axis=1)
-                
                 sample_attributes = metadata.samples_attributes
                 sample_genotypes = metadata.samples_genotypes
-                samples_attrs_genotype = {**{"genotype" : sample_genotypes}, **sample_attributes}
+                samples_attrs_genotype = {**{"att_genotype" : sample_genotypes}, **sample_attributes}
                 vars = dict([(attribute_tag,pd.DataFrame(index=d.index)) for attribute_tag in samples_attrs_genotype.keys()])
                 for attribute_tag, sample_attrs in samples_attrs_genotype.items():
-                    
                     for sample_att_value_tag,sample_indices in sample_attrs.items():
                         sample_names_attrs = [sample_names[sample_idx] for sample_idx in sample_indices]
                         variance = d.loc[:,sample_names_attrs].var(axis=1)

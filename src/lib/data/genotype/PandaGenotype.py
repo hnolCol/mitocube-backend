@@ -118,8 +118,9 @@ class PandaFileGenotype(MCGenotypes):
         
     def find(self, query : str) -> List[GenotypeModel]:
         self.update() 
-        return [genotype for genotype in self._genotypes if query in genotype.text 
-                or any(query in feature.genes or query in feature.key or query in feature.proteins for feature in genotype.features)]
+        query_low = query.lower()
+        return [genotype for genotype in self._genotypes if query_low  in genotype.text.lower()
+                or any(query_low in feature.genes.lower() or query_low in feature.key.lower() or query_low in feature.proteins.lower() for feature in genotype.features)]
         
         
         
