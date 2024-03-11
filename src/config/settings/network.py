@@ -9,6 +9,9 @@ class Network(BaseSettings):
     
     network_dir : DirectoryPath =  "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/network"  
     
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
     
 @lru_cache()
 def get_network_settings():

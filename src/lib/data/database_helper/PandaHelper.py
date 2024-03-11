@@ -400,7 +400,28 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                                            count : bool = True, 
                                            attribute_value_subset : str = None, 
                                            attribute_subset : str = None) -> Tuple[set,Dict[str|int,SubmissionCountResponse]]:
-        
+        """Returns the attribute values that are available in a set of labels (e.g. datasets)
+
+        Parameters
+        ----------
+        labels : str
+            _description_
+        split_string : str, optional
+            _description_, by default ";"
+        join : _type_, optional
+            _description_, by default Literal["inner","outer"]
+        count : bool, optional
+            _description_, by default True
+        attribute_value_subset : str, optional
+            _description_, by default None
+        attribute_subset : str, optional
+            _description_, by default None
+
+        Returns
+        -------
+        Tuple[set,Dict[str|int,SubmissionCountResponse]]
+            _description_
+        """
         counts = {}
         self.update() 
         attribute_value_tags = self._get_value(self._attribute_value_tags_by_label,labels,split_string,join)
@@ -412,7 +433,7 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         if attribute_subset is not None:
             #subset the attributes before counting.
             attribute_subset = attribute_subset.split(split_string)
-            attribute_value_tags = [attribute_value_tag for attribute_value_tag in attribute_value_tags if any(attribute_value_tag.startswith(attribute_tag) for attribute_tag in attribute_subset)]
+            attribute_value_tags = [attribute_value_tag for attribute_value_tag in attribute_value_tags if any(attribute_value_tag.startswith(f"{attribute_tag}:") for attribute_tag in attribute_subset)]
        
         if count:
             label_subset = set(labels.split(split_string))

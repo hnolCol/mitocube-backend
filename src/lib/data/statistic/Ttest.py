@@ -3,16 +3,18 @@ from lib.data.imputation.StandardImputation import StandardImputation
 from scipy.stats import ttest_ind, false_discovery_control
 import pandas as pd 
 import numpy as np 
+from typing import List
 class Ttest(DatasetStatistic):
     
     def get_stats(self, 
                   sample_attribute_tag : str, 
                   attribute_value_left : str, 
                   attribute_value_right : str, 
-                  within_sample_attribute_tag : str = None,
-                  within_sample_attribute_value_tag : str = None,
+                  within_attribute_tag : List[str] = None,
+                  within_attribute_value_tag : List[str] = None,
                   fdr : float = 0.01,
-                  suffix : str = "", impute : bool = False) -> pd.DataFrame:
+                  suffix : str = "",
+                  impute : bool = False) -> pd.DataFrame:
         """_summary_
 
         Parameters
@@ -23,9 +25,9 @@ class Ttest(DatasetStatistic):
             _description_
         attribute_value_right : str
             _description_
-        within_sample_attribute_tag : str, optional
+        within_attribute_tag : str, optional
             _description_, by default None
-        within_sample_attribute_value_tag : str, optional
+        within_attribute_value_tag : str, optional
             _description_, by default None
         fdr : float, optional
             _description_, by default 0.01
@@ -42,23 +44,25 @@ class Ttest(DatasetStatistic):
         
         if impute:
             datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
-                                                                         within_sample_attribute_tag=within_sample_attribute_tag, 
-                                                                         within_sample_attribute_value_tag=within_sample_attribute_value_tag,
+                                                                         within_attribute_tag=within_attribute_tag, 
+                                                                         within_attribute_value_tag=within_attribute_value_tag,
                                                                          subset_attribute_value_tags=[attribute_value_left,attribute_value_right])
         else:
             datatable = self._dataset.getDataTable()
         
         mapped_sample_names, _ = self._dataset.getSamplesAttributes()
         #check if there is a within grouping, then subset the mapped sample names first
-        if within_sample_attribute_value_tag is not None and within_sample_attribute_value_tag is not None:
-            bool_within = mapped_sample_names.loc[:,within_sample_attribute_tag] == within_sample_attribute_value_tag
-            mapped_sample_names = mapped_sample_names.loc[bool_within]
+        if within_attribute_value_tag is not None and within_attribute_value_tag is not None:
+            for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):
+                bool_within = mapped_sample_names.loc[:,within_attr_tag] == within_attr_value_tag
+                mapped_sample_names = mapped_sample_names.loc[bool_within]
         boolIdx = mapped_sample_names.loc[:,sample_attribute_tag].isin([attribute_value_left,attribute_value_right])
         subset_mapped_sample_names = mapped_sample_names.loc[boolIdx]
         #get the sample names (e.g. column names in the datatable)
         samples_left = subset_mapped_sample_names.loc[subset_mapped_sample_names[sample_attribute_tag] == attribute_value_left].index.values
         samples_right = subset_mapped_sample_names.loc[subset_mapped_sample_names[sample_attribute_tag] == attribute_value_right].index.values
         # X1, X2 = X.loc[:,columNamesGroup1], X.loc[:,columNamesGroup2]
+
         X = datatable.loc[:,samples_left]
         Y = datatable.loc[:,samples_right]
         T,p = ttest_ind(X, Y, nan_policy="omit", axis=1)

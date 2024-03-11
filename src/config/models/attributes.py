@@ -21,7 +21,7 @@ class AttributeModel(BaseModel):
     parent_tag : str, optional, default None
         Tag tag of the parent attribute. 
     group_tag : str 
-        Specifiying the type of attribute. 
+        Specifying the type of attribute. 
     mandatory_for_submission : bool, default False
         If true, the attribute must be defined upon submission of a new project.
     mandatory_for_active : bool, default False 
@@ -32,7 +32,7 @@ class AttributeModel(BaseModel):
         If true, the attribute can be defined by a simple numeric value (e.g. attribute_value). 
     min_state : int, default 0
         The minimal state defined in ``SubmissionStates`` the submission must be in to allow the attribute
-        to be defined. For example, upon changung the prohect to ``MEASURING`` the mass spectrometer should be defined. 
+        to be defined. For example, upon changing the submission to ``MEASURING`` the mass spectrometer should be defined. 
         But this information is not yet available at submission. 
     allow_as_qc : bool, default False
         Allow the attribute for quality control 
