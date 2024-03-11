@@ -21,7 +21,7 @@ class AttributeModel(BaseModel):
     parent_tag : str, optional, default None
         Tag tag of the parent attribute. 
     group_tag : str 
-        Specifying the type of attribute. 
+        Specifying the type of attribute. This is used to visualize the attribute based filtering. 
     mandatory_for_submission : bool, default False
         If true, the attribute must be defined upon submission of a new project.
     mandatory_for_active : bool, default False 
