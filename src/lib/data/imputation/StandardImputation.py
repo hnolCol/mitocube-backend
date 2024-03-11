@@ -10,11 +10,11 @@ class StandardImputation(DatasetImputation):
     Imputes data by first filtering for full quantification in at least on
     samples attribute. Then replaces the missing data. 
     """
-    
+   
     def get_imputation(self, 
                        sample_attribute_tag : str, 
-                       within_sample_attribute_tag : str = None, 
-                       within_sample_attribute_value_tag : str = None, 
+                       within_attribute_tag : str = None, 
+                       within_attribute_value_tag : List[str] = None, 
                        downshift : float = 1.8, 
                        width : float = 0.3, 
                        nan_threshold : float = 1.0,
@@ -29,9 +29,9 @@ class StandardImputation(DatasetImputation):
         ----------
         sample_attribute_tag : str
            The attribute tag for which the nan threshold should be checked. 
-        within_sample_attribute_tag : str, optional
+        within_attribute_tag : str, optional
             An attribute tag for the within group, by default None
-        within_sample_attribute_value_tag : str, optional
+        within_attribute_value_tag : str, optional
             A attribute value tag to consider for the imputation. , by default None
         downshift : float, optional
             The downshift of the gaussian distribution from the sample distribution in standard 
@@ -65,10 +65,12 @@ class StandardImputation(DatasetImputation):
         mapped_sample_names, sample_attrs = self._dataset.getSamplesAttributes()
         if sample_attribute_tag not in mapped_sample_names: raise ValueError("The sample attribute is not found in the dataset metadata.")    
 
-        if within_sample_attribute_tag is not None and within_sample_attribute_tag not in mapped_sample_names: raise ValueError("Within sample attribute tag not found in the dataset metadata")
-        if within_sample_attribute_tag is not None and within_sample_attribute_value_tag is not None:
-            within_subset_bool = mapped_sample_names.loc[:,within_sample_attribute_tag] == within_sample_attribute_value_tag
-            mapped_sample_names = mapped_sample_names.loc[within_subset_bool]
+        #if within_attribute_tag is not None and 
+        if within_attribute_value_tag is not None and within_attribute_value_tag is not None:
+            for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):
+                if within_attr_tag not in mapped_sample_names: raise ValueError("Within sample attribute tag not found in the dataset metadata")
+                bool_within = mapped_sample_names.loc[:,within_attr_tag] == within_attr_value_tag
+                mapped_sample_names = mapped_sample_names.loc[bool_within]
             
         if subset_attribute_value_tags is not None:
             mapped_sample_names.loc[:,sample_attribute_tag].isin(subset_attribute_value_tags)

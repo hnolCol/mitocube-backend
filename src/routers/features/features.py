@@ -20,7 +20,7 @@ router = APIRouter(
     )
 
 @router.get("")
-def get_features_by_query(query : str, proteome_ids : str = None, max_features : int = 30):  #, user : UserModel = Depends(get_user_from_token)
+def get_features_by_query(query : str, proteome_ids : str = None, max_features : int = 30):
     """_summary_
 
     Parameters
@@ -59,7 +59,7 @@ def get_features_by_query(query : str, proteome_ids : str = None, max_features :
 
 @router.get("/{feature_key}/data",
             response_model=FeatureDataResponseModel)
-def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserModel = Depends(get_user_from_token)
+def get_dataset_data(feature_key : str, max_datasets : int = 200, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the data for a specific feature in all datasets it was detected in. 
     
@@ -111,6 +111,7 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200): #user : UserM
                 attribute_values_by_tag_collection.update(updated_metadata.attribute_values_by_tag)
                 attributes_collection.update(updated_metadata.attributes)
                 title_by_label[label] = metadata.title
+    
     response_data = {
         "feature_key": feature_key,
         "title_by_label" : title_by_label,

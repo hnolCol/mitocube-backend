@@ -14,7 +14,8 @@ class Ttest(DatasetStatistic):
                   within_attribute_value_tag : List[str] = None,
                   fdr : float = 0.01,
                   suffix : str = "",
-                  impute : bool = False) -> pd.DataFrame:
+                  impute : bool = False,
+                  equal_variance : bool = False) -> pd.DataFrame:
         """_summary_
 
         Parameters
@@ -41,6 +42,7 @@ class Ttest(DatasetStatistic):
         pd.DataFrame
             _description_
         """
+        print(impute)
         
         if impute:
             datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
@@ -56,6 +58,7 @@ class Ttest(DatasetStatistic):
             for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):
                 bool_within = mapped_sample_names.loc[:,within_attr_tag] == within_attr_value_tag
                 mapped_sample_names = mapped_sample_names.loc[bool_within]
+                
         boolIdx = mapped_sample_names.loc[:,sample_attribute_tag].isin([attribute_value_left,attribute_value_right])
         subset_mapped_sample_names = mapped_sample_names.loc[boolIdx]
         #get the sample names (e.g. column names in the datatable)
@@ -65,12 +68,14 @@ class Ttest(DatasetStatistic):
 
         X = datatable.loc[:,samples_left]
         Y = datatable.loc[:,samples_right]
-        T,p = ttest_ind(X, Y, nan_policy="omit", axis=1)
+        T,p = ttest_ind(X, Y, nan_policy="omit", axis=1, equal_var=equal_variance)
         p_value_name = f"p-value {suffix}"
+        
         
         stats = pd.DataFrame({f"t-value {suffix}" : T, p_value_name : p}, 
                              columns=[f"t-value {suffix}",p_value_name], 
-                             index=datatable.index).dropna(subset=p_value_name)
+                             index=datatable.index)
+        
         
         stats = stats.dropna(subset=[p_value_name])
         stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
