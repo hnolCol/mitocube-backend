@@ -388,9 +388,6 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
                                     "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.label}"
                                 },
                                 template_mame=EMAIL_SETTINGS.mail_submission_complete_template)
-    
-        
-
 
 @router.patch("/submissions/{submission_label}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 

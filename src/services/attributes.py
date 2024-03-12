@@ -20,6 +20,11 @@ def get_suffix_from_attributes_and_attribute_tags(
         genotype_left = genotype_db.get(label = attribute_value_tag_left)
         genotype_right = genotype_db.get(label = attribute_value_tag_right)
         comparison_suffix = f"{genotype_left.text} vs {genotype_right.text}"
+    elif attribute.loc[sample_attribute_tag,"has_features_value"]:
+        feature_keys = [attribute_value_tag_left .split(":")[1],attribute_value_tag_right.split(":")[1]]
+        features = feature_db.get(keys = feature_keys, ignoreMissing = True)
+        gene_names = [gene.split(" ")[0] for gene in features.loc[feature_keys,"genes"].values]
+        comparison_suffix = f"{gene_names[0]} vs {gene_names[1]}"
     elif attribute_value_tag_left not in attribute_values.index or attribute_value_tag_right not in attribute_values.index:
         comparison_suffix = f"{attribute_value_tag_left} vs {attribute_value_tag_right}"
     else:
