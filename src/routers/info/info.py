@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends
 from typing import List
 from collections import OrderedDict
+import json 
 
 from services.users import is_user_admin, get_user_from_token
+from services.json import read_json 
 
 from config.models.user import UserModel
 from config.models.info.info import InfoResponse
@@ -62,3 +64,11 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     if KEY_FIGURE_SETTINGS.number_users:
         key_figures["Users"] = UserDB.get_number_of_users()
     return [{"label" : k, "metric" : v} for k,v in key_figures.items()]
+
+
+
+@router.get("/info/terms")
+def get_terms_of_use(user : UserModel = Depends(get_user_from_token)):
+    path_to_file = GENERAL_SETTINGS.use_terms_file 
+    use_of_terms = read_json(path_to_file)
+    return use_of_terms

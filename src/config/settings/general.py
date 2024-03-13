@@ -1,7 +1,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings 
-from pydantic import EmailStr, DirectoryPath, HttpUrl
+from pydantic import EmailStr, DirectoryPath, HttpUrl, FilePath
 
 from typing import List
 
@@ -20,6 +20,8 @@ class General(BaseSettings):
 
     frontend_build : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-frontend/dist"
     frontend_build_assets : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-frontend/dist/assets"
+    
+    use_terms_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/terms/usage.json"
     
     class Config:
          env_file = ".env"

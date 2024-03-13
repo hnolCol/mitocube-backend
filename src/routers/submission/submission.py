@@ -366,8 +366,8 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
             non_nan_index = datatable.index.dropna()
             datatable = datatable.loc[non_nan_index,:]
             #no duplicates in index 
-            non_duplicates = datatable.index.drop_duplicates()
-            datatable = datatable.loc[non_duplicates,:]
+            non_duplicates = datatable.index.duplicated(keep="first")
+            datatable = datatable.loc[~non_duplicates,:]
            # datatable.to_csv(dataset_path, sep="\t")
            #TODO add filtering for features that are in the database? 
            #Lets discuss Andreas, as uniprot such as XADSD2-2 are somehow lost. 
