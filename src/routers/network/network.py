@@ -28,17 +28,30 @@ router = APIRouter(
     )
 
 NETWORK_SETTINGS = get_network_settings()
-SOURCE_loc = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","localization.json")
-SOURCE_P = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","pathway.json")
+SOURCE_loc_human = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","localization.json")
+SOURCE_P_human = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_human","pathway.json")
+SOURCE_loc_mouse = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_mouse","localization.json")
+SOURCE_P_mouse = os.path.join(NETWORK_SETTINGS.network_dir,"mitocarta_mouse","pathway.json")
 #TODO create network database, just for testing!! 
 try:
-    with open(SOURCE_loc,"r") as f:
-        loc_pos = json.load(f)
-    with open(SOURCE_P,"r") as f:
-        loc_path = json.load(f)
+    with open(SOURCE_loc_human,"r") as f:
+        loc_pos_human = json.load(f)
+    with open(SOURCE_P_human,"r") as f:
+        loc_path_human = json.load(f)
 except:
-    loc_path = {}
-    loc_pos = {}
+    loc_path_human = {}
+    loc_pos_human = {}
+    
+try:
+    with open(SOURCE_loc_mouse,"r") as f:
+        loc_pos_mouse = json.load(f)
+    with open(SOURCE_P_mouse,"r") as f:
+        loc_path_mouse = json.load(f)
+except:
+    loc_path_mouse = {}
+    loc_pos_mouse = {}
+    
+NETWORKS = {"UP000000589" : {"localization" : loc_pos_mouse, "pathway" : loc_path_mouse}, "UP000005640" : {"localization" : loc_pos_human, "pathway" : loc_path_human}}
     
 def map_nodes(node,stats,stat_name):
     if "key" not in node: return None 
@@ -66,14 +79,15 @@ def get_network(dataset_label : str,
     feature_db = PandaFeatureDatabase()
     genotype_db = MCGenotypes.getGenotypeDatabase()
     stats = pd.DataFrame() 
-    
+    dataset = get_dataset_from_database(db,label=dataset_label)
+    metadata = dataset.getMetaJson()
     within_attribute_tag = within_attribute_tag.split(split_string) if within_attribute_tag is not None else []
     within_attribute_value_tag = within_attribute_value_tag.split(split_string) if within_attribute_value_tag is not None else []
+    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     
     if all(attr is not None for attr in [sample_attribute_tag,attribute_value_tag_left,attribute_value_tag_right]):
-        dataset = get_dataset_from_database(db,label=dataset_label)
-        metadata = dataset.getMetaJson()
-        proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
+        
+        
         #attribute_values = db_attributes.getAttributeValues(tags=[attribute_value_tag_left,attribute_value_tag_right,within_sample_attribute_value_tag]).set_index("tag", drop=False)
         #attribute = db_attributes.getAttributes(tags=[sample_attribute_tag,within_sample_attribute_tag]).set_index("tag")
         
@@ -86,6 +100,17 @@ def get_network(dataset_label : str,
                                      impute = impute,
                                      within_attribute_tag=within_attribute_tag,
                                      within_attribute_value_tag=within_attribute_value_tag)     
+    proteome_id = [proteome_id for proteome_id in proteome_ids if proteome_id in NETWORKS]
+    if len(proteome_id) == 0: raise HTTPException(status_code=404, detail = "No network found for this organism.")
+    
+    network_props = NETWORKS[proteome_ids[0]][network_type]
+    if not stats.empty:
+       
+        stat_name = f"log2 FC {comparison_suffix}"
+        nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in network_props["nodes"]]
+        network_props["nodes"] = nodes
+        network_props["value_keyName"] = stat_name
+    return network_props
         
     if network_type == "localization":
         ll = {**loc_pos}
