@@ -5,3 +5,4 @@ SCRAMB	SCR_SCR	0	0	Scr	Unknown	-1	Scrambled control sequence
 UNTREAT	CTRL_UNTREATED	0	0	Untreated	Unknown	-1	Knock down control experiment (no transfection).
 P08659	LUCI_PHOPY	60745	550	FLUC	Photinus pyralis (Common eastern firefly) (Lampyris pyralis)	7054	Luciferin 4-monooxygenase (esiRNA/siRNA control)
 P27652	LUCI_RENRE	36022	311	RLUC	Renilla reniformis (Sea pansy)	6136	Coelenterazine h 2-monooxygenase
+IGGCTR	IGG_IGG	0	0	IgG	Unknown	-1	IgG Immunoprecipitation Control
