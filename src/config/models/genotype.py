@@ -19,8 +19,8 @@ class GenotypeModel(BaseModel):
     attributes : List[Dict[str, Union[List[Union[FeatureModel,AttributeValueModel]],Dict[str,MutationPositionModel]]]]#Union[List[Union[FeatureModel,AttributeValueModel]],MutationPositionModel]]]
     
     
-    @field_validator("proteome_id")
-    def check_proteome_id(v : str) -> str:
+    @field_validator("proteome_id",mode="before")
+    def check_proteome_id(cls, v : str) -> str:
         if not v.startswith("UP"):
             return ValueError("proteome_id must start with UP following Uniprot's reference proteome labeling.")
         return v 

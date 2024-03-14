@@ -368,6 +368,9 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
             #no duplicates in index 
             non_duplicates = datatable.index.duplicated(keep="first")
             datatable = datatable.loc[~non_duplicates,:]
+            #check for only nan columns 
+            if datatable.dropna(axis=1, how='all').columns.size != datatable.columns.size:
+                raise HTTPException(status_code=500,detail="A selected column contained only NaN. Please remove the column and submit the data again.")
            # datatable.to_csv(dataset_path, sep="\t")
            #TODO add filtering for features that are in the database? 
            #Lets discuss Andreas, as uniprot such as XADSD2-2 are somehow lost. 

@@ -26,7 +26,7 @@ class FeatureData(DatasetTransform):
         data = self._dataset.getDataTable()
         metadata = self._dataset.getMetaJson()
         #TODO: move this somewhere else.. 
-        proteome_id =  metadata.dataset_attributes["att_organism"][0].split(":")[-1].upper()  # should we allow more organism?
+        proteome_id =  [proteome_id for proteome_id in metadata.dataset_attributes["att_organism"] if "control" not in proteome_id][0].split(":")[-1].upper()  # should we allow more organism?
         #proteome_ids =  [organism.split(":")[1].upper() for organism in metadata.dataset_attributes["att_organism"]]  # shou
         if feature_key not in data.index:
             if add_annotations:

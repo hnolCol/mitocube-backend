@@ -3181,5 +3181,220 @@
                 }
             }
         ]
+    },
+    {
+        "label": "enHhd",
+        "text": "Notch2.KO.(-/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "O35516",
+                "genes": "Notch2",
+                "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 2473,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "O35516",
+                        "genes": "Notch2",
+                        "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 2473,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 361,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 364,
+                        "attribute_id": 51,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "KmODc",
+        "text": "Notch2.KI.(+/+)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "O35516",
+                "genes": "Notch2",
+                "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 2473,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "O35516",
+                        "genes": "Notch2",
+                        "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 2473,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 360,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockin",
+                        "tag": "att_gene_engineering:knockin",
+                        "value": "knockin",
+                        "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 365,
+                        "attribute_id": 51,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Wildtype (+/+)",
+                        "tag": "att_gene_zygosity:(+/+)",
+                        "value": "(+/+)",
+                        "description": "Wildtype"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "eAOGV",
+        "text": "Fcgr4.KO.(-/-)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "A0A0B4J1G0",
+                "genes": "Fcgr4 Fcgr3a",
+                "proteins": "Low affinity immunoglobulin gamma Fc region receptor III-A (IgG Fc receptor III-A) (CD16-2) (FcgammaRIV) (CD antigen CD16a)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 249,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "A0A0B4J1G0",
+                        "genes": "Fcgr4 Fcgr3a",
+                        "proteins": "Low affinity immunoglobulin gamma Fc region receptor III-A (IgG Fc receptor III-A) (CD16-2) (FcgammaRIV) (CD antigen CD16a)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 249,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 361,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 364,
+                        "attribute_id": 51,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Homozygot (-/-)",
+                        "tag": "att_gene_zygosity:(-/-)",
+                        "value": "(-/-)",
+                        "description": "Homozygous"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "label": "KCAVG",
+        "text": "Ndufs6.KO.(+/+)",
+        "proteome_id": "UP000000589",
+        "features": [
+            {
+                "key": "P52503",
+                "genes": "Ndufs6 Ip13",
+                "proteins": "NADH dehydrogenase [ubiquinone] iron-sulfur protein 6, mitochondrial (Complex I-13kD-A) (CI-13kD-A) (NADH-ubiquinone oxidoreductase 13 kDa-A subunit)",
+                "organism": "Mus musculus (Mouse)",
+                "aa_length": 116,
+                "reviewed": true
+            }
+        ],
+        "attributes": [
+            {
+                "att_protein_coding_sequence": [
+                    {
+                        "key": "P52503",
+                        "genes": "Ndufs6 Ip13",
+                        "proteins": "NADH dehydrogenase [ubiquinone] iron-sulfur protein 6, mitochondrial (Complex I-13kD-A) (CI-13kD-A) (NADH-ubiquinone oxidoreductase 13 kDa-A subunit)",
+                        "organism": "Mus musculus (Mouse)",
+                        "aa_length": 116,
+                        "reviewed": true
+                    }
+                ],
+                "att_gene_engineering": [
+                    {
+                        "id": 361,
+                        "attribute_id": 50,
+                        "attribute_tag": "att_gene_engineering",
+                        "text": "Knockout",
+                        "tag": "att_gene_engineering:ko",
+                        "value": "ko",
+                        "description": "Gene knock out."
+                    }
+                ],
+                "att_gene_zygosity": [
+                    {
+                        "id": 365,
+                        "attribute_id": 51,
+                        "attribute_tag": "att_gene_zygosity",
+                        "text": "Wildtype (+/+)",
+                        "tag": "att_gene_zygosity:(+/+)",
+                        "value": "(+/+)",
+                        "description": "Wildtype"
+                    }
+                ],
+                "att_gene_editing_method": [
+                    {
+                        "id": 352,
+                        "attribute_id": 49,
+                        "attribute_tag": "att_gene_editing_method",
+                        "text": "BiggyBac transposon",
+                        "tag": "att_gene_editing_method:biggybac",
+                        "value": "biggybac",
+                        "description": "The PiggyBac (PB) transposon is a mobile genetic element that efficiently transposes between vectors and chromosomes via a 'cut and paste' mechanism. During transposition, the PB transposase recognizes transposon-specific inverted terminal repeat sequences (ITRs) located on both ends of the transposon vector and efficiently moves the contents from the original sites and integrates them into TTAA chromosomal sites"
+                    }
+                ]
+            }
+        ]
     }
 ]
