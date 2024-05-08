@@ -11,11 +11,17 @@ from services.read_text import tsv_string_to_dataframe
 from services.regex import get_cursor_from_header_link
 from pydantic import BaseModel
 import pandas as pd 
+import zipfile 
+import gzip
+import zlib
+from io import StringIO, BytesIO
 #https://rest.uniprot.org/uniprotkb/search?compressed=true&fields=accession%2Creviewed%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Clength%2Cgo_p%2Cgo_c%2Cgo_f&format=tsv&query=%28%28proteome%3AUP000005640%29%29&size=500
 
 def download_proteome_annotations(annotationUrl : str,
-                                  proteome : ProteomeModel,
-                                  apiParamModel : BaseModel = API_UniprotAnnotationsModel) -> pd.DataFrame:
+                                  proteome_ids : List[str],
+                                  apiParamModel : BaseModel = API_UniprotAnnotationsModel,
+                                  add_proteome_callback = None,
+                                  chunc_callback = None) -> pd.DataFrame:
     """
     Download annotations from Uniprot Server using proteome upid. 
     The function utilizes pagination (e.g. downloads sets of 500 entries per API get request)
@@ -29,36 +35,44 @@ def download_proteome_annotations(annotationUrl : str,
     :apiParamModel ```BaseModel```
         holding the API param for the get request. 
     """
-    upid = proteome.upid
-    apiParams = apiParamModel(query=f"(proteome:{upid})")
-    result = [] 
-    rr = requests.get(annotationUrl,params=apiParams.model_dump())
-    rr.raise_for_status()
-    result.append(tsv_string_to_dataframe(rr.content))
-    while "Link" in rr.headers: #if there is no link in the response, last page is reached.
-        print("Walking through the pages...")
-        headers = rr.headers
-        #get pointer from headers
-        try:
-            pointerFromHeaderLink = get_cursor_from_header_link(headers["link"])
-        except Exception as e:
-            raise Exception(f"There was an error extracting the cursor from header link.  {headers['link']}. "+str(e))
-            
-        updatedApiParams = apiParams.model_copy(update={"cursor" : pointerFromHeaderLink})
-        #get cursor for next link
-        print(updatedApiParams)
-        rr = requests.get(annotationUrl,params=updatedApiParams.model_dump())
-        result.append(tsv_string_to_dataframe(rr.content))
+    N = 0
+    ##get proteome information 
+    #check proteome exists 
+    for proteome_id in proteome_ids:
+        proteome_info = requests.get(f"https://www.ebi.ac.uk/proteins/api/proteomes?offset=0&size=1&upid={proteome_id}")
+        uniprot_proteome_info = proteome_info.json()
+        if len(uniprot_proteome_info) == 0:
+            raise ValueError("The proteome was not found in the Uniprot database. ")
+        elif add_proteome_callback is not None:
+            add_proteome_callback(proteome_id, uniprot_proteome_info[0])
         
-    if len(result) > 1: #incase of a single proteome
-        proteomeAnnotations = pd.concat(result,ignore_index=True)
-    else:
-        proteomeAnnotations = result[0]
-    return proteomeAnnotations
-
-
-
-
+        apiParams = apiParamModel(query=f"((proteome:{proteome_id}) AND (reviewed:true))")
+        rr = requests.get(annotationUrl,params=apiParams.model_dump())
+        rr.raise_for_status()
+        # Extract the zip file
+        proteome_entries = tsv_string_to_dataframe(gzip.decompress(rr.content))
+        chunc_callback(proteome_entries,proteome_id)
+        N += proteome_entries.index.size
+    # result.append(tsv_string_to_dataframe(gzip.decompress(rr.content)))
+        while "Link" in rr.headers: #if there is no link in the response, last page is reached.
+            print("Found link, going to next page.")
+            headers = rr.headers
+            #get pointer from headers
+            try:
+                pointerFromHeaderLink = get_cursor_from_header_link(headers["link"])
+            except Exception as e:
+                raise Exception(f"There was an error extracting the cursor from header link.  {headers['link']}. "+str(e))
+                
+            updatedApiParams = apiParams.model_copy(update={"cursor" : pointerFromHeaderLink})
+            #get cursor for next link
+            rr = requests.get(annotationUrl,params=updatedApiParams.model_dump())
+            
+            if chunc_callback is not None:
+                proteome_entries = tsv_string_to_dataframe(gzip.decompress(rr.content))
+                chunc_callback(proteome_entries, proteome_id)
+                N += proteome_entries.index.size
+            print(f"{N} proteins added.")
+    return N
 
 
 def downloadRecentProteomeFasta(proteome : ProteomeModel,

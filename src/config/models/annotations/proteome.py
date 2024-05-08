@@ -8,7 +8,7 @@ class ProteomeModel(BaseModel):
     domain : Literal["Bacteria", "Archaea", "Eukaryota"]
     name : str 
 
-    @field_validator("upid", pre=True)
+    @field_validator("upid")
     @classmethod
     def check_UPID(cls, value : str) -> str:
         if not value.startswith("UP"):

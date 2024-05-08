@@ -1,7 +1,7 @@
 from pydantic_settings import BaseSettings 
 from pydantic import BaseModel 
 from typing import List, Dict
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 
 class MetaText(BaseModel):
     """"""
@@ -57,11 +57,11 @@ class MetaTexts(BaseSettings):
         "Liquid Chromatography and Mass Spectrometry" : "metatext:lcms"
     }
     allowed_for_state : Dict[str,int] = {
-        "metatext:research_aim" : SubmissionStates.SUBMITTED,
-        "metatext:experimental_procedure" : SubmissionStates.SUBMITTED,
-        "metatext:add_info" : SubmissionStates.SUBMITTED,
-        "metatext:protein_digestion" : SubmissionStates.PROCESSED,
-        "metatext:lcms" : SubmissionStates.MEASURING,
+        "metatext:research_aim" : SubmissionStatesEnums.SUBMITTED,
+        "metatext:experimental_procedure" : SubmissionStatesEnums.SUBMITTED,
+        "metatext:add_info" : SubmissionStatesEnums.SUBMITTED,
+        "metatext:protein_digestion" : SubmissionStatesEnums.PROCESSED,
+        "metatext:lcms" : SubmissionStatesEnums.MEASURING,
     }
 
 

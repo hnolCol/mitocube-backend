@@ -11,6 +11,16 @@ class FeatureModel(BaseModel):
     aa_length : int
     reviewed : Optional[bool] = True 
 
+class FeatureNeoModel(BaseModel):
+    """Base Model for a Feature"""
+    key : Optional[str] = None
+    tag : str
+    gene_name : str 
+    gene_names : str = None
+    protein_name : str
+    proteome_id : str
+    aa_length : int = None
+    reviewed : Optional[bool] = True 
 class FeatureDataResponseModel(BaseModel):
     """
     Response model for feature data.

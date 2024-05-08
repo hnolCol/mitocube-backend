@@ -115,11 +115,11 @@ class PandaFileDataset(MCDataset):
         
         if os.path.exists(path_meta) and meta is None:
             meta_file = read_json(path_meta)
-            meta = DatasetSubmissionModel(**meta_file)
+            meta = DatasetSubmissionModel(**meta_file, tag = meta_file["label"], user_tag=meta_file["user_label"])
         if meta is None: raise Exception("Dataset seems to be missing params.", self._label)
         self._state = meta.state
         self._label = meta.label
-        self._user_label = meta.user_label
+        self._user_label = meta.user_tag
         self._title = meta.title
         self._collaborators = meta.collaborators
         self._replicates = meta.replicates

@@ -1,16 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from collections import OrderedDict
-from typing import Optional, List
+from typing import Optional, List, Dict
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
+from config.models.parameter import APIParamString
+from config.models.genotype import GenotypeModel, MinimalGenotypeModel
 
-from config.models.genotype import GenotypeModel
-
-from services.users import is_user_admin
+from services.users import is_user_admin, get_user_from_token
 
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
-
+from lib.data.database.Database import Database
+DB = Database.DB()
 
 
 
@@ -23,11 +24,9 @@ router = APIRouter(
 
 
 @router.get("/genotypes/q")
-def get_genotype_by_query(query : str) -> List[GenotypeModel]:
+def get_genotype_by_query(query : str) -> List[MinimalGenotypeModel]:
     """"""
-    db_genotype = MCGenotypes.getGenotypeDatabase()
-    return db_genotype.find(query=query)
-
+    return DB.genotype.find(query)
 
 
 @router.get("/genotypes/{genotype_label}")
@@ -41,8 +40,8 @@ def get_genotype_by_label(genotype_label : str):
     """
     
 
-@router.get("/genotypes", response_model=List[GenotypeModel])
-def get_genotypes(proteome_ids : Optional[str] = None, feature_key : Optional[str] = None):
+@router.get("/genotypes", response_model=List[MinimalGenotypeModel])
+def get_genotypes(proteome_ids : Optional[str] = None, feature_tag : Optional[str] = None, user : UserModel = Depends(get_user_from_token)):
     """Returns the genotypes defined using the params: ``proteome_id`` or ``feature_key``. 
     If feature_key is provided, the proteome_id is ingored. If ``proteome_id`` is given, then
     all genotypes that are defined for a given proteome_id is provided. 
@@ -54,18 +53,23 @@ def get_genotypes(proteome_ids : Optional[str] = None, feature_key : Optional[st
     feature_key : Optional[str], optional
         The feature key can be used to access genotypes that affect a certain feature_key, by default Optional[str]=None
     """
+    r = DB.genotype.get(
+        proteome_ids=APIParamString(param = proteome_ids).param, 
+        protein_tags=APIParamString(param = feature_tag).param
+        )
+    return r 
     db_genotype = MCGenotypes.getGenotypeDatabase()
     try:
         if proteome_ids is not None:
             proteome_ids = proteome_ids.split(";")
-        genotypes = db_genotype.get(proteome_ids=proteome_ids,feature_key=feature_key)
+        genotypes = db_genotype.get(proteome_ids=proteome_ids,feature_key=feature_tag)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return genotypes
 
 
 @router.post("/genotypes")
-def add_genotype(genotype : GenotypeModel):
+def add_genotype(genotype : GenotypeModel, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters
@@ -73,12 +77,12 @@ def add_genotype(genotype : GenotypeModel):
     genotype : GenotypeModel
         The defined genotype.
     """
-    db_genotype = MCGenotypes.getGenotypeDatabase()
-    db_genotype.add(genotype=genotype)
+    DB.genotype.add(genotype, user_tag = user.tag)
+    
     return True 
 
 @router.delete("/genotypes/{genotype_label}")
-def delete_genotype_by_label(genotype_label : str): #user : UserModel = Depends(is_user_admin)
+def delete_genotype_by_label(genotype_label : str, user : UserModel = Depends(is_user_admin)): #
     """_summary_
 
     Parameters

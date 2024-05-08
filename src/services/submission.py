@@ -4,17 +4,20 @@ from lib.data.database.ABCDatabase import MCAttributes, MCDatabase, InvalidDatas
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.genotype.PandaGenotype import PandaFileGenotype
 
-from config.exceptions.HTTPExceptions import label_not_found_exception
+from config.exceptions.HTTPExceptions import tag_not_found
 
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.annotations.feature import FeatureModel
 from config.models.submissions.submissions import NewSubmissionModel, DatasetSubmissionModel, DatasetSubmissionResponseModel
 from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
 from config.models.user import UserModel
-from typing import List, Dict
-import pandas as pd 
+from config.models.prefix import PrefixModel
 
+from config.enums.units import TimeUnitToSecondsEnum, PrefixEnum
+
+from typing import List, Dict, Literal
+import pandas as pd 
 
 
 def add_timeline_entry_to_metadata(metadata : dict, timelineEntry : TimeLineEntryModel):
@@ -47,9 +50,9 @@ def get_dataset_from_database(db : MCDatabase, label : str, force_reload : bool 
     try:
         dataset = db.getDataset(label)
         if dataset is None:
-            raise label_not_found_exception
+            raise tag_not_found
     except InvalidDatasetLabelError:
-        raise label_not_found_exception
+        raise tag_not_found
     
     return dataset
 
@@ -107,12 +110,16 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     db_genotypes = PandaFileGenotype()
     attributes= db_attributes.getAttributes().set_index("tag")
     #get the proteome ids as a list (multiple proteome_id possible)
-    proteome_ids = [organism.split(":")[1] for organism in dataset_attributes["att_organism"]]
+    prot_id = dataset_attributes["att_organism"] if "att_organism" in dataset_attributes else dataset_attributes["att_proteome"]
+    print(dataset_attributes)
+    proteome_ids = [organism.split(":")[1] for organism in prot_id]
     attribute_values= db_attributes.getAttributeValues().set_index("tag")
     mapped_dataset_attributes = OrderedDict()
     mapped_attributes = dict()
     #map dataset attributes
     for attribute_tag, attr_value_tags in dataset_attributes.items():
+        if attribute_tag == "att_organism":
+            attribute_tag = "att_proteome"
         attribute = AttributeModel(**attributes.loc[attribute_tag,:].to_dict(), tag=attribute_tag)
         mapped_attributes[attribute_tag] = attribute
         mapped_attribute_values = map_tags(attribute,attr_value_tags,proteome_ids,attribute_values,db_features)    
@@ -126,6 +133,8 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
     attribute_values_by_tag = {}
     
     for attribute_tag, sample_attribute in sample_attributes.items():
+        if attribute_tag == "att_organism":
+            attribute_tag = "att_proteome"
         attribute = AttributeModel(**attributes.loc[attribute_tag,:].to_dict(), tag=attribute_tag)
         if attribute_tag not in mapped_attributes:
             mapped_attributes[attribute_tag] = attribute
@@ -195,7 +204,7 @@ def check_for_missing_mandatory_attribute(submission : NewSubmissionModel, attri
     if len(attrsNotInDatasetAttributes) > 0:
         #missing mandatory attributes
         #they could still be in the sample attributes
-        sampleAttributesTags = [sampleAttr.tag for sampleAttr in  NewSubmissionModel.samplesAttributes]
+        sampleAttributesTags = [sampleAttr.tag for sampleAttr in  submission.samplesAttributes]
         attrNotInSamplteAttr = [attribute for attribute in attrsNotInDatasetAttributes if attribute.tag not in sampleAttributesTags]
         return attrNotInSamplteAttr 
     
@@ -222,10 +231,10 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
     json = {}
     json["created_on"] = submission.created_on
     json["created_on_dt"] = datetime.fromtimestamp(submission.created_on).strftime("%m/%d/%Y, %H:%M:%S")
-    json["state"] = SubmissionStates.SUBMITTED
-    json["label"] = submission.label 
+    json["state"] = SubmissionStatesEnums.SUBMITTED
+    json["tag"] = submission.tag
     json["title"] = submission.title 
-    json["user_label"] = user.label 
+    json["user_tag"] = user.tag
     json["collaborators"] = [user.label for user in submission.collaborators]
     json["n_samples"] = len(submission.sampleNames) 
     json["links"] = [link.model_dump() for link in  submission.links]
@@ -249,12 +258,13 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
         samples_genotypes = OrderedDict()
         for n,selected_genotypes in enumerate(submission.genotypes):
             for genotype in selected_genotypes:
-                if genotype.label not in samples_genotypes:
-                    samples_genotypes[genotype.label] = []
-                samples_genotypes[genotype.label].append(n)
+                genotype_tag = genotype.tag 
+                if genotype_tag not in samples_genotypes:
+                    samples_genotypes[genotype_tag] = []
+                samples_genotypes[genotype_tag].append(n)
                 
         json["samples_genotypes"] = samples_genotypes
-    
+    ## sample attributes 
     samplesAttributesJson = {}
     for samplesAttribute in submission.samplesAttributes:
         sampleAttrTag = samplesAttribute.tag
@@ -275,7 +285,53 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
                     
                 samplesAttributesJson[sampleAttrTag][attributeValue.tag].append(n)
     json["samples_attributes"] = samplesAttributesJson
+    ## sample attribute input 
+    user_input = {}
+    if submission.samplesAttributesInput is not None:
+        
+        for attribute_tag, sample_attr_input in submission.samplesAttributesInput.items():
+            if attribute_tag not in samplesAttributesJson: continue
+            user_input[attribute_tag] = []
+            for sample_index,i in enumerate(sample_attr_input):
+                for attribute_value_tag, sample_attr_value_input in i.items():
+                    #check if the unit matches a given sample attribute, otherwise simply continue and ignore
+                    if attribute_value_tag not in samplesAttributesJson[attribute_tag] or sample_index not in samplesAttributesJson[attribute_tag][attribute_value_tag]: continue
+                    props = [{
+                        "unit_tag" : unit_tag, 
+                        "value" : input_value_to_standard_unit(value = float(input["value"]), 
+                                                               prefix = input["prefix"] if "prefix" in input else "NA", 
+                                                               is_time=unit_tag == "time", 
+                                                               time_unit = input["time_unit"]),
+                       } for unit_tag, input in sample_attr_value_input.items()] 
+                    
+                    user_input[attribute_tag].append(
+                        {
+                        "attribute_value_tag" : attribute_value_tag,
+                        "sample_index" : sample_index,
+                        "input" : props
+                    })  
+        
+    json["samples_attributes_input"] = user_input
+
+    
+    
+    
     #create timeline
     #overwrite what ever the user cretaed, change? 
-    json["timeline"] = TimeLineModel(entries=[TimeLineEntryModel(id=0,comment="Project created", state=SubmissionStates.SUBMITTED, user_label=user.label)])
+    json["timeline"] = TimeLineModel(entries=[TimeLineEntryModel(id=0,comment="Project created", state=SubmissionStatesEnums.SUBMITTED, user_tag=user.tag)])
     return json 
+
+
+
+def input_value_to_standard_unit(value, prefix = "NA", is_time : bool = False, time_unit : Literal["s","min","h","d","w","a"] = None):
+    ""
+    #get the multiplier from Prefix Model 
+    
+    prefix_multiplier = PrefixEnum[prefix].value
+    print(prefix_multiplier)
+    if not is_time:
+        return value * prefix_multiplier
+    else:
+        time_unit_multiplier = TimeUnitToSecondsEnum[time_unit].value
+        print(time_unit_multiplier)
+        return value * prefix_multiplier * time_unit_multiplier

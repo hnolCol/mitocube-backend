@@ -7,24 +7,21 @@ from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentia
 from config.models.user import UserModel, UserRolesEnum, PublicUser
 
 from lib.user.UserHandling import UserDB
+from lib.data.database.Database import Database
+DB = Database.DB()
 
-
-
-def get_users_from_user_labels(user_labels : List[str]) -> List[Tuple[bool,UserModel]]:
-    """Returns the list of emails"""
-    return [UserDB.get_user_by_label(user_label) for user_label in user_labels]
 
 def are_public_users_allowed(users : List[PublicUser]) -> List[bool]:
-    """"""
-    user_labels = [u.label for u in users]
-    users_from_db = get_users_from_user_labels(user_labels)
-    return [u[1].allow_login for u in users_from_db if u[0]]
+    """Checks if a list of Users are allowed to login."""
+    user_tags = [u.tag for u in users]
+    users_from_db = DB.user.get_users_by_tags(tags = user_tags)
+    return [u.allow_login for u in users_from_db if u is not None]
 
 def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends()) -> UserModel:
     """Returns the user from a login"""
-    user_exists, user_in_db  = UserDB.get_user_by_email(form_data.username)
+    user  = DB.user.get_user_by_email(form_data.username)
     #user verification check
-    user_in_db = check_user_allowed(user_exists,user_in_db)
+    user_in_db = check_user_allowed(user is not None,user)
 
     if not verify_password(form_data.password, user_in_db.password.get_secret_value()):
         raise credentials_exception
@@ -69,8 +66,8 @@ def get_user_from_token(token = Depends(check_token_verified)) -> UserModel:
     """Extracts the user from a token"""
     #DB.get_user_by_id()
     if "label" not in token : token_not_valid_exception
-    user_exists, user_in_db = UserDB.get_user_by_label(token["label"])
-    user  = check_user_allowed(user_exists,user_in_db)
+    user_in_db = DB.user.get_user_by_tag(tag = token["tag"])
+    user  = check_user_allowed(user_in_db is not None,user_in_db)
     return user 
 
 def is_user_at_least_curator(user : UserModel = Depends(get_user_from_token)) -> UserModel:

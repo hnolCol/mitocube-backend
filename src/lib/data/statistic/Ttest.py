@@ -53,6 +53,7 @@ class Ttest(DatasetStatistic):
             datatable = self._dataset.getDataTable()
         
         mapped_sample_names, _ = self._dataset.getSamplesAttributes()
+        print(mapped_sample_names)
         #check if there is a within grouping, then subset the mapped sample names first
         if within_attribute_value_tag is not None and within_attribute_value_tag is not None:
             for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):

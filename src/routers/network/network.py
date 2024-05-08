@@ -12,7 +12,7 @@ from config.settings.db import get_db_settings
 from config.settings.network import get_network_settings
 from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 from lib.user.UserHandling import UserDB
 
 

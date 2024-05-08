@@ -14,7 +14,7 @@ import time
 
 
 from config.settings.db import get_db_settings
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 
 
 DB_SETTINGS = get_db_settings()
@@ -224,9 +224,11 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                 self._features_by_label[fileProps["label"]] = d.index
                 #add mean 
                 try:
-                    metadata = DatasetSubmissionModel(**read_json(fileProps["param_file"]))
+                    json = read_json(fileProps["param_file"])
+                    metadata = DatasetSubmissionModel(**json, tag =json["label"])
                 except Exception as e:
                     print(e,filePath)
+                    continue
                 sample_names = metadata.sample_names
                 
                 self._mean_abundance_by_feature[fileProps["label"]] = d.loc[:,sample_names].mean(axis=1).to_dict()
@@ -278,12 +280,12 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         if attribute_value_tag not in self._labels_by_instrument:
             self._labels_by_instrument[attribute_value_tag] = []
         # TODO naming is conistent with labels_by_instrument since it does not return the labels but rather a small summary.. is this required??
-        self._labels_by_instrument[attribute_value_tag].append({"label" : metadata.label, 
+        self._labels_by_instrument[attribute_value_tag].append({"label" : metadata.tag, 
                                                                 "create_on" : metadata.created_on, 
                                                                 "title" : metadata.title, 
-                                                                "user_label" : metadata.user_label,
+                                                                "user_tag" : metadata.user_tag,
                                                                 "number_samples" : metadata.n_samples,
-                                                                "number_features" : np.nan if metadata.label not in self._features_by_label else self._features_by_label[metadata.label].size})
+                                                                "number_features" : np.nan if metadata.tag not in self._features_by_label else self._features_by_label[metadata.tag].size})
             
     def _load_metadata(self, files_modified : Dict) -> None:
         """_summary_
@@ -324,23 +326,25 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         for filePath, fileProps in files_modified.items():
             if fileProps["is_param"]:
                 try:
-                    metadata = DatasetSubmissionModel(**read_json(filePath))
+                    json = read_json(filePath)
+                    metadata = DatasetSubmissionModel(**json, tag = json["label"], user_tag=json["user_label"])
                 except Exception as e:
                     print(e,filePath)
-                if fileProps["label"] != metadata.label:
+                    continue
+                if fileProps["label"] != metadata.tag:
                     continue 
                 
                 ### save label
-                self._labels.add(metadata.label)
+                self._labels.add(metadata.tag)
                 ### add dataset attributes
                 dataset_attributes = metadata.dataset_attributes
                 for attribute_tag in dataset_attributes.keys():
-                    self._add_value(self._labels_by_attribute_tag,attribute_tag,metadata.label)
-                    self._add_value(self._attribute_tags_by_label,metadata.label,attribute_tag)
+                    self._add_value(self._labels_by_attribute_tag,attribute_tag,metadata.tag)
+                    self._add_value(self._attribute_tags_by_label,metadata.tag,attribute_tag)
                     
                     for attribute_value_tag in dataset_attributes[attribute_tag]:
-                        self._add_value(self._labels_by_attribute_value_tag,attribute_value_tag,metadata.label)
-                        self._add_value(self._attribute_value_tags_by_label,metadata.label,attribute_value_tag)
+                        self._add_value(self._labels_by_attribute_value_tag,attribute_value_tag,metadata.tag)
+                        self._add_value(self._attribute_value_tags_by_label,metadata.tag,attribute_value_tag)
                         ### save instrument 
                         if attribute_tag == self._instrument_attribute_tag:
                             self._handle_instrument_attribute(attribute_value_tag,metadata)
@@ -351,41 +355,41 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                             # self._number_samples_by_instrument[attribute_value_tag].append(len(metadata.sample_names))
                         ### save organism, TODO make organism tag definable in the constructor. 
                         if attribute_tag == "att_organism":
-                            self._add_value(self._labels_by_organism,attribute_value_tag,metadata.label)
-                            self._add_value(self._organism_by_label,metadata.label,attribute_value_tag)
+                            self._add_value(self._labels_by_organism,attribute_value_tag,metadata.tag)
+                            self._add_value(self._organism_by_label,metadata.tag,attribute_value_tag)
                         
                         
                 ### add sample attributes 
                 for attribute_tag, sample_attribute in metadata.samples_attributes.items():
-                    self._add_value(self._labels_by_attribute_tag,attribute_tag,metadata.label)
-                    self._add_value(self._attribute_tags_by_label,metadata.label,attribute_tag)
+                    self._add_value(self._labels_by_attribute_tag,attribute_tag,metadata.tag)
+                    self._add_value(self._attribute_tags_by_label,metadata.tag,attribute_tag)
                     for sample_attribute_value_tag in sample_attribute.keys():
                         if attribute_tag == self._instrument_attribute_tag:
                             self._handle_instrument_attribute(sample_attribute_value_tag,metadata)
                         # add organism here? 
-                        self._add_value(self._labels_by_attribute_value_tag,sample_attribute_value_tag,metadata.label)
-                        self._add_value(self._attribute_value_tags_by_label,metadata.label,sample_attribute_value_tag)
+                        self._add_value(self._labels_by_attribute_value_tag,sample_attribute_value_tag,metadata.tag)
+                        self._add_value(self._attribute_value_tags_by_label,metadata.tag,sample_attribute_value_tag)
                         
 
                 ### add genotypes 
                 samples_genotypes = metadata.samples_genotypes
                 for genotype_label in samples_genotypes.keys():
-                    self._add_value(self._labels_by_genotype,genotype_label,metadata.label)
+                    self._add_value(self._labels_by_genotype,genotype_label,metadata.tag)
                 
                 ###add_search_string
-                if metadata.label not in self._labels_by_string_search:
-                    self._labels_by_string_search[metadata.label] = OrderedDict()
-                    for n,text in enumerate([metadata.title, metadata.label] + list(metadata.metatext.values())):
-                        self._labels_by_string_search[metadata.label][n] = text.lower() 
+                if metadata.tag not in self._labels_by_string_search:
+                    self._labels_by_string_search[metadata.tag] = OrderedDict()
+                    for n,text in enumerate([metadata.title, metadata.tag] + list(metadata.metatext.values())):
+                        self._labels_by_string_search[metadata.tag][n] = text.lower() 
                      
                 ##add states 
-                self._add_value(self._labels_by_state,metadata.state,metadata.label)
+                self._add_value(self._labels_by_state,metadata.state,metadata.tag)
                 
                 ###add users
-                self._add_value(self._labels_by_user,metadata.user_label,metadata.label)
+                self._add_value(self._labels_by_user,metadata.user_tag,metadata.tag)
                 if len(metadata.collaborators) > 0:
                     for user_label in metadata.collaborators:
-                        self._add_value(self._labels_by_user,user_label,metadata.label)
+                        self._add_value(self._labels_by_user,user_label,metadata.tag)
         
     def get_all_labels(self):
         """_summary_

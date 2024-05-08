@@ -97,7 +97,7 @@ class UserDB:
                             template_mame=EMAIL_SETTINGS.mail_account_generated_template,
                             include_setting_cc=True))                    
         else:
-            self.DB = [UserModel(**user_props) for user_props in read_json(user_db_file)]
+            self.DB = [UserModel(**user_props, tag = user_props["label"]) for user_props in read_json(user_db_file)]
     
 
     def _update(self) -> List[UserModel]:

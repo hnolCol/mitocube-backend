@@ -4,7 +4,7 @@
     "state": 5,
     "label": "VSTFFlpDMyDG",
     "title": "Proteomics changes based on CLPB disaggregase ablation in whole brain.",
-    "user_label": "60QMSfdT",
+    "user_tag": "60QMSfdT",
     "collaborators": [],
     "replicates": [
         1,
@@ -146,7 +146,7 @@
                 "id": 0,
                 "label": "bcptD3YxSj6kGCVjx5Vl",
                 "created_on": 1709293756.7204018,
-                "user_label": "fOtsqZCP",
+                "user_tag": "fOtsqZCP",
                 "state": 0,
                 "comment": "Project created"
             },
@@ -154,7 +154,7 @@
                 "id": 1,
                 "label": "TPHYRXATzZhHMfPsdikc",
                 "created_on": 1709294087.8217995,
-                "user_label": "fOtsqZCP",
+                "user_tag": "fOtsqZCP",
                 "state": 5,
                 "comment": "Dataset transferred from the old MitoCube version. The dataset_label remains the same, but the timeline is not imported."
             },
@@ -162,7 +162,7 @@
                 "id": 1,
                 "label": "FdxNV5sm8KMLqayeMwc6",
                 "created_on": 1709294224.7990053,
-                "user_label": "fOtsqZCP",
+                "user_tag": "fOtsqZCP",
                 "state": 5,
                 "comment": "Updated dataset attributes."
             },
@@ -170,7 +170,7 @@
                 "id": 1,
                 "label": "ASf7QlkV4F3SxJzNnKKe",
                 "created_on": 1709294256.0954423,
-                "user_label": "60QMSfdT",
+                "user_tag": "60QMSfdT",
                 "state": 5,
                 "comment": "Project owner changed."
             }

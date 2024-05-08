@@ -3,9 +3,10 @@
     "state": 5,
     "label": "BuXOSlIl6G",
     "title": "Knockdown of JC15 JC19 TImm17a in HeLa and treatments",
-    "user_label": "VpVff4sS",
+    "user_tag": "VpVff4sS",
     "collaborators": [
-        "EGYpku60"
+        "EGYpku60",
+        "DsuV8w4t"
     ],
     "replicates": [
         1,
@@ -344,7 +345,7 @@
                 "id": 0,
                 "label": "qTuReQ9Qgp9E0t3k9fA8",
                 "created_on": 1700669191.474221,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 0,
                 "comment": "Project created"
             },
@@ -352,7 +353,7 @@
                 "id": 1,
                 "label": "i9yW7099pSVLulh1mdzI",
                 "created_on": 1700669987.624363,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 1,
                 "comment": "digest and cleanup"
             },
@@ -360,7 +361,7 @@
                 "id": 1,
                 "label": "9LBcNXh09H8RBWnRs6Wr",
                 "created_on": 1700758686.452954,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 2,
                 "comment": ""
             },
@@ -368,7 +369,7 @@
                 "id": 1,
                 "label": "cjb2bUv63eLgs2fdiFcR",
                 "created_on": 1704807050.1173792,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 1,
                 "comment": "Re processing of samples like a boss. "
             },
@@ -376,7 +377,7 @@
                 "id": 1,
                 "label": "DxhsbcAlt9W2KFCSM7pf",
                 "created_on": 1704807176.4122722,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 2,
                 "comment": "Re measuring the coolest samples ever. "
             },
@@ -384,7 +385,7 @@
                 "id": 1,
                 "label": "ZXc3UK4aY5CRm4xf3ERZ",
                 "created_on": 1704807246.0808582,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 1,
                 "comment": "Assad"
             },
@@ -392,7 +393,7 @@
                 "id": 1,
                 "label": "SjEb0LftOVqYy11aUiug",
                 "created_on": 1704807347.034975,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 2,
                 "comment": "Super measuring"
             },
@@ -400,7 +401,7 @@
                 "id": 1,
                 "label": "osubnM84XbEynrXSVGKr",
                 "created_on": 1704808564.1496582,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 1,
                 "comment": "Cool thing"
             },
@@ -408,7 +409,7 @@
                 "id": 1,
                 "label": "9WstJ9uf5nuuAqPtCDmU",
                 "created_on": 1706201692.877012,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 5,
                 "comment": "Updated dataset attributes."
             }
@@ -416,7 +417,7 @@
     },
     "runlist": {
         "created_at": 1704896878.6818821,
-        "user_label": "VpVff4sS",
+        "user_tag": "VpVff4sS",
         "dataset_label": "BuXOSlIl6G",
         "n_runs": 60,
         "n_plates": 1,

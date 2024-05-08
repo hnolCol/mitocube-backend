@@ -1,78 +1,127 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Optional, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
 from config.models.annotations.feature import FeatureDataResponseModel, FeatureModel
 from config.models.attributes import AttributeModel
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 from lib.data.annotations.ABCAnnotations import AnnotationDatabase
 from services.users import get_user_from_token
 from services.submission import map_tags_to_attribute_in_metadata
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.database.ABCDatabase import MCAttributes
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel
+from config.models.parameter import APIParamString
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 from services.submission import map_tags
 
+from lib.data.database.Database import Database
+
+from config.models.prefix import PrefixModel
+
+DB = Database.DB()
 
 router = APIRouter(
     prefix="/api/attributes",
     tags=["Attributes"]
     )
 
-@router.get("", response_model=AttributeResponseModel)
-def get_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
+@router.get("") #AttributeResponseModel
+def get_attributes(search_string : Optional[str] = None, 
+                   min_state : SubmissionStatesEnums = None, 
+                   param_name : Literal["allow_for_dataset","mandatory_for_submission","allow_as_filter","allow_for_genotype","allow_for_measurement","allow_as_qc","mandatory_for_submission","mandatory_for_active"] = None, 
+                   user : UserModel = Depends(get_user_from_token)) :
     """
     Returns the stored attribute and attribute values.
     """
+    if search_string is not None:
+        return DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name )
+    
     db_attributes = MCAttributes.getAttributeDatabase()
 
     return AttributeResponseModel(attributes=db_attributes.getAttributes().to_dict(orient="records"),
                                   attribute_values=db_attributes.getAttributeValues().to_dict(orient="records"))
 
+@router.get("/values")
+def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel]:
+    ""
+    r = DB.attributes.get_attribute_values_by_attribute_tag(tags = [tag])
+    if len(r) == 0: return r 
+    return r[0][1]
+
+
+@router.get("/units")
+def get_attribute_value_units(tag : str):
+    ""     
+    r = DB.attributes.unit(tags = APIParamString(param=tag).param)
+    
+    if len(r) == 0: return {"units" : [], "prefixes" : PrefixModel()}
+    return {"units" : r, "prefixes" : PrefixModel()}
+
+
+@router.get("/mandatory")
+def get_mandatory_attributes(user : UserModel = Depends(get_user_from_token)) -> List[AttributeModel]:
+    """Returns the mandatory attributes for a submissions. E.g. the attributes that must be 
+    defined by the user.
+
+    Parameters
+    ----------
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    List[AttributeModel]
+        _description_
+    """
+    return DB.attributes.get_mandatory_attributes()
+
+@router.get("/dataset")
+def get_dataset_attributes(user : UserModel = Depends(get_user_from_token), min_state : Optional[SubmissionStatesEnums] = None) -> List[AttributeModel]:
+    
+    return DB.attributes.get_dataset_attributes(min_state=min_state)
 
 @router.get("/attribute_values/q")
-def get_attribute_values(labels : str = None, attribute_value_tag : str = None, attribute_tag : str = None, count : bool = True, max_attributes : int = 999999):
+def get_attribute_values(tags : str = None, attribute_value_tag : str = None, attribute_tag : str = None, count : bool = True, max_attributes : int = 999999):
+    """Returns a list of attribute values that are present in the given dataset labels. 
+    Use the attribute_value_tag and attribute_tag params to return a subset of attribute_tags. 
+
+    Parameters
+    ----------
+    tags : str, optional
+        _description_, by default None
+    attribute_value_tag : str, optional
+        _description_, by default None
+    attribute_tag : str, optional
+        _description_, by default None
+    count : bool, optional
+        _description_, by default True
+    max_attributes : int, optional
+        _description_, by default 999999
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    db_attributes = MCAttributes.getAttributeDatabase() 
-    if labels is None:
-        labels = ";".join(db_helper.get_all_labels())
-    attribute_value_tags, submission_count_by_attribute_value_tag = db_helper.get_attribute_value_tags_by_labels(labels,count=count, attribute_value_subset=attribute_value_tag, attribute_subset = attribute_tag)
-    attribute_values = db_attributes.getAttributeValues(tags=list(attribute_value_tags))
-    proteome_ids, count = db_helper.get_organisms_by_label(labels)
-    attribute_values_by_tag = attribute_values.set_index("tag", drop=False).to_dict(orient="index")
-    #check if size is okay because numeric input and features are not in here and we have to create them.
-    missing_attribute_value_tags = [attribute_value_tag for attribute_value_tag in attribute_value_tags if attribute_value_tag  not in attribute_values_by_tag]
+    # db_helper = MCDatabaseHelper.getDatabaseHelper()
+    if tags is None:
+        tags = DB.get_dataset_tags()
     
-    if len(missing_attribute_value_tags) > 0:
-        missing_attributes = {}
-        for attribute_value_tag in missing_attribute_value_tags:
-            attribute_tag = attribute_value_tag.split(":")[0]
-            if attribute_tag not in missing_attributes:
-                missing_attributes[attribute_tag] = []
-            missing_attributes[attribute_tag].append(attribute_value_tag)
-            
-        db_feature = PandaFeatureDatabase()
-        attribute_values = db_attributes.getAttributeValues()
-        attribute_tags = [attribute_value_tag.split(":")[0] for attribute_value_tag in missing_attribute_value_tags]
-        
-        attributes = db_attributes.getAttributes(tags=list(attribute_tags)).set_index("tag")
-        for attribute_tag, missing_attribute_value_tags in missing_attributes.items():
-            attribute = attributes.loc[attribute_tag,:].to_dict()
-            attr = AttributeModel(**attribute, tag = attribute_tag)
-            missing_attributes = map_tags(attribute=attr, 
-                                          attr_value_tags=missing_attribute_value_tags, 
-                                          proteome_ids=[tag.split(":")[1] for tag in proteome_ids], 
-                                          attribute_values=attribute_values, 
-                                          db_features=db_feature)
-            for n,missing_attribute_value_tag in enumerate(missing_attribute_value_tags):
-                attribute_values_by_tag[missing_attribute_value_tag] = missing_attributes[n]
+    attribute_values_by_dataset = DB.attributes.get_attribute_values_by_dataset_tags(
+        dataset_tags = APIParamString(param=tags).param,
+        attribute_tags = APIParamString(param=attribute_tag).param,
+        attribute_value_tags = APIParamString(param=attribute_value_tag).param)
     
-    return {"attribute_value_tags" : attribute_value_tags, "submission_count" : submission_count_by_attribute_value_tag, "attribute_values_by_tag" : attribute_values_by_tag}
+    attribute_value_tags = [av.attribute_value.tag for av in attribute_values_by_dataset]
+    submission_count_by_attribute_value_tag= dict([(av.attribute_value.tag, {"count" : av.count, "tags" : av.tags}) for av in attribute_values_by_dataset])
+    attribute_values_by_tag = dict([(av.attribute_value.tag,av.attribute_value) for av in attribute_values_by_dataset])
+
+    return {"attribute_value_tags" : attribute_value_tags, "count" : submission_count_by_attribute_value_tag, "attribute_values_by_tag" : attribute_values_by_tag}
     
 @router.get("/q")
 def get_attributes(labels : str, count : bool = True, max_attributes : int = 999999):

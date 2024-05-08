@@ -10,7 +10,7 @@ env/
 *.so
 
 /resources/users/users.json
-
+/resources/data
 # Distribution / packaging
 .Python
 build/

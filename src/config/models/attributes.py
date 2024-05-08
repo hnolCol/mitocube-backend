@@ -3,6 +3,7 @@ from pydantic import BaseModel, field_validator, field_serializer
 from typing import Any, Optional, List, Union, Literal
 import numpy as np 
 
+
 # from services.random_generators import get_random_string
 
 class AttributeModel(BaseModel):
@@ -31,7 +32,7 @@ class AttributeModel(BaseModel):
     has_numeric_input : bool, default False 
         If true, the attribute can be defined by a simple numeric value (e.g. attribute_value). 
     min_state : int, default 0
-        The minimal state defined in ``SubmissionStates`` the submission must be in to allow the attribute
+        The minimal state defined in ``SubmissionStatesEnums`` the submission must be in to allow the attribute
         to be defined. For example, upon changing the submission to ``MEASURING`` the mass spectrometer should be defined. 
         But this information is not yet available at submission. 
     allow_as_qc : bool, default False
@@ -42,6 +43,12 @@ class AttributeModel(BaseModel):
         If True, the attribute can be used to define a dataset. 
     allow_for_user : bool, default False 
         If true, the attribute can be used to define a user. 
+        
+    has_unit : bool, default False
+        If true, the user can define a unit for the attribute.
+    
+    unit : Literal["weight","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"], default None
+        The unit type
     """
     id : int
     tag : str 
@@ -50,6 +57,7 @@ class AttributeModel(BaseModel):
     parent_id : Optional[int] = None  # parent attribute should be Attribute type
     parent_tag : Optional[str] = None  # parent tag
     group_tag : str  # attribute grouping
+    s : Optional[str] = None
     mandatory_for_submission : bool = False  # must be defined by an attribute value for a submission
     mandatory_for_active : bool = False  # must be defined by an attribute value for an active (published) state
     has_features_value : bool = False  # if true, features (e.g. proteins) can be selected for this attribute
@@ -61,8 +69,22 @@ class AttributeModel(BaseModel):
     allow_for_genotype : bool = False  # attributes that are allowed for specifying a genotype.
     allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
     allow_for_user : bool = False
+    has_unit : bool = False 
+    unit : Optional[List[Literal["weight","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"]]] = None # ToDo: define units like this? 
 
-    unit : Optional[Literal["length","concentration","weight","time"]] = None # ToDo: define units like this? 
+
+    @field_validator('s', mode="before")
+    def check_search(cls, v : List[str]|str, field):
+        ""
+        if v is None: return ""
+        if isinstance(v,str): return v 
+        return " ".join([str(s).lower() for s in v if s is not None])
+        
+    @field_validator('unit', mode="before")
+    def check_unit(cls, v : str|List[str], field):
+        if isinstance(v,str): return v.split(";")
+        if isinstance(v,list): return v 
+        return None 
 
     @field_validator('parent_id', mode="before")
     def change_nan_to_none(cls, v, field):  # ToDo: cls or self? @classmethod
@@ -130,29 +152,40 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
     description : str, optional, default ""
         Description of the attribute value. 
     """
-    id : int
-    attribute_id : int
+    #id : int
+    #attribute_id : int
     attribute_tag : Optional[str] = None 
     text : str
     tag : str 
+    unit_value : Optional[float] = None # The value associated with the attribute value, often None, for some we can define a certain unit value such as concentration 
     #value : float  # ToDo: str or float or int? or more flexible? :: The excel table says attribute_value, value is not a float then, maybe like
-    value : Union[float,str,int] #maybe like this? #changed the excel header attribute_value to value since attribute_id referece to the attribute not the attribute value
+    #value : Optional[Union[float,str,int]] #maybe like this? #changed the excel header attribute_value to value since attribute_id referece to the attribute not the attribute value
     description : Optional[str] = ""
-    feature : Optional[str] = None #feature_key 
+    s : str = None #The search param 
+    #feature : Optional[str] = None #feature_key 
     
    # feature : str # i dont understand feature here, in my view the attribute_value becomes the feature ID, but I we probably dont need this anymore and we should use the FeatureModel instead. 
-    
+    @field_validator('s', mode="before")
+    def check_search(cls, v : List[str]|str, field):
+        ""
+        if v is None: return ""
+        if isinstance(v,str): return v 
+        return " ".join([str(s).lower() for s in v if s is not None])
+        
+        
     @field_validator("tag")  # ToDo, issue with return type?
     @classmethod
     def check_tag(cls, v : str) -> str:
         """Checks tags to contain att_ and a :"""
-        if not v.startswith("att_"):
-            raise ValueError("AttributeValue Tags must start 'att_'. Example : 'att_organism")
-        if ":" not in v and not v.endswith(":"):  # make sure tag is not empty after :
-            raise ValueError("AttributeValue tags must follow the the pattern <attribute_tag>:<attribute_value>")
-        if len(v.split(":")) != 2:
-            raise ValueError("Tag must contain exactly one ':'")
-        return v #changed from v.lower() this otherwise for uniprotIDs and proteome_ids  .upper() must be called, okay?
+        if ":" in v:  return v.split(":")[-1]
+        return v 
+        # if not v.startswith("att_"):
+        #     raise ValueError("AttributeValue Tags must start 'att_'. Example : 'att_organism")
+        # if ":" not in v and not v.endswith(":"):  # make sure tag is not empty after :
+        #     raise ValueError("AttributeValue tags must follow the the pattern <attribute_tag>:<attribute_value>")
+        # if len(v.split(":")) != 2:
+        #     raise ValueError("Tag must contain exactly one ':'")
+        # return v #changed from v.lower() this otherwise for uniprotIDs and proteome_ids  .upper() must be called, okay?
     
     @field_validator("text", mode="before")  # ToDo, issue with return type?
     @classmethod
@@ -176,3 +209,24 @@ class AttributeResponseModel(BaseModel):
     """
     attributes : List[AttributeModel]
     attribute_values : List[AttributeValueModel]
+
+
+class SampleAttributes(BaseModel):
+    """Model that describes the sample attributes 
+
+    Parameters
+    ----------
+    BaseModel : _type_
+        _description_
+    """
+    
+    attribute_tags : List[str] 
+
+class AttributeUnitModel(BaseModel):
+    tag : str 
+    text : str     
+    unit : str  
+
+class AttributeUnitResponseModel(BaseModel):
+    attribute : AttributeModel
+    units : List[AttributeUnitModel]

@@ -31,6 +31,7 @@ class Email(BaseSettings):
     mail_project_state_template : str = "state_changed.html"
     mail_submission_complete_template : str = "submission_complete.html"
     mail_account_generated_template : str = "account_generated.html"
+    mail_proteome_added_template : str = "proteome_added.html"
     
     class Config:
         env_file = ".env"

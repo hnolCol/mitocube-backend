@@ -11,6 +11,7 @@ from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase, AnnotationDatabase
 from lib.data.database.ABCDatabase import MCAttributes
+from lib.data.database.Database import Database
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 ### import services
@@ -27,15 +28,20 @@ from routers.genotypes import genotypes
 from routers.attributes import attributes
 from routers.instruments import instruments
 from routers.network import network
+from routers.filter import filter
+from routers.rc import rc
+from routers.proteomes import proteomes
 # from routers import play  # route to test things during development ###########################################################
 
-router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments, network]
+router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments, network, filter, rc, proteomes]
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
 DB_SETTINGS = get_db_settings()
 ROOT_PATH = get_absolute_path_to_dir(__file__)
 
+DB = Database.DB()
+print(DB)
 
 origins = [
     "http://localhost:5000",
@@ -90,4 +96,4 @@ app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_asset
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, port = 5000, proxy_headers=True)
+    uvicorn.run(app, port = 5002, proxy_headers=True)

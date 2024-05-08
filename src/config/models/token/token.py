@@ -25,7 +25,7 @@ class TokenResponse(BaseModel):
     
     verified : bool = False
     role : UserRolesEnum = 0
-    label : Optional[str] = None
+    tag : Optional[str] = None
     firstname : Optional[str] = None
     lastname : Optional[str]  = None
     msg : Optional[str] = None 
@@ -38,4 +38,4 @@ class TokenValidResponse(BaseModel):
     verified : bool = False
     firstname : str 
     lastname : str 
-    label : str
+    tag : str

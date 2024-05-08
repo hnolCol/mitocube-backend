@@ -12,9 +12,11 @@ from services.mail import send_email_in_background
 from services.random_generators import get_random_string
 from services.users import get_user_from_login, check_user_allowed, is_user_admin, get_user_from_token
 from services.encryption import create_access_token, check_for_verification_code_in_token, check_share_token_password
-from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect
+from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked
 
 from lib.user.UserHandling import UserDB
+from lib.data.database.Database import Database
+DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
@@ -58,7 +60,7 @@ def login_for_access_token(background_task : BackgroundTasks,
     """
     #create jwt token with just the id and the verification code
     jwt_token = create_access_token(user.model_dump(),
-                                    key_subset=["label"],
+                                    key_subset=["tag"],
                                     add_dict={
                                         "verification_code" : verification_code,
                                         })
@@ -102,7 +104,7 @@ def check_token(user : UserModel = Depends(get_user_from_token)):
         verified = True, 
         firstname=user.firstname, 
         lastname=user.lastname, 
-        label=user.label)
+        tag=user.tag)
 
 @router.post("/verify", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
@@ -116,16 +118,17 @@ def verify_token_by_code(verification : TokenVerificationCode,
     if verification.verification_code != decoded_token["verification_code"]:
         raise verification_code_incorrect
     #get user by id 
-    user_label = decoded_token["label"]
-    user_exists, user_in_db = UserDB.get_user_by_label(user_label)
-    user : UserModel = check_user_allowed(user_exists, user_in_db)
+    user_tag = decoded_token["tag"]
+    
+    allowed, user  = DB.user.is_user_allowed(tag = user_tag)
+    if not allowed: raise user_blocked
 
     jwt_token = create_access_token(user.model_dump(),
-                                    key_subset=["label"],
+                                    key_subset=["tag"],
                                     add_dict={"verified" : True, 
                                               "verified_at" : get_time_stamp()})
     
-    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role, firstname = user.firstname, lastname=user.lastname, label=user.label)
+    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role, firstname = user.firstname, lastname=user.lastname, tag=user.tag)
 
 ### Share Token
 

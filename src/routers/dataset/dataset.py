@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+import pandas as pd 
 
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
@@ -9,6 +10,7 @@ from config.models.submissions.runs import RunListModel, RunListRequestPropsMode
 from config.models.annotations.feature import FeatureModel
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.data.database.Database import Database
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
@@ -19,7 +21,7 @@ from config.exceptions.HTTPExceptions import no_data_found
 from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import map_tags_to_attribute_in_metadata, get_dataset_from_database
 
-import pandas as pd 
+DB = Database.DB()
 
 
 router = APIRouter(
@@ -62,11 +64,11 @@ def get_dataset_data(dataset_label : str):
     db = MCDatabase.getDatabase()
 
     dataset = db.getDataset(dataset_label)
-    metadata : DatasetSubmissionModel = db.getJSONDatasets(labels=[dataset_label])[dataset_label]
+    metadata : DatasetSubmissionModel = dataset.getMetaJson()
     #TODO Check if proteome/organism is there, otherwise cause error 
     if "att_organism" not in metadata.dataset_attributes:
         raise HTTPException(status_code=400,detail="No organism defined for this dataset.")
-    proteome_ids =  [attrValueTag.split(":")[1] for attrValueTag in metadata.dataset_attributes["att_organism"]]  # should we allow more organism?
+    proteome_ids =  [attrValueTag.split(":")[1] for attrValueTag in metadata.dataset_attributes["att_organism"]] 
     datatable = dataset.getDataTable()
     if datatable is None or datatable.empty:
         raise no_data_found
@@ -112,21 +114,18 @@ def get_dataset_params(dataset_label : str, user : UserModel = Depends(get_user_
             response_model=DatasetPCAResponse,
             tags=["Dimensional reduction","PCA"])
 
-def get_dataset_pca(dataset_label : str, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_pca(dataset_label : str, scale : bool = True, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the result of a Principal component anaylsis (PCA).
     """
     db = MCDatabase.getDatabase()
-    feature_db = PandaFeatureDatabase()
     dataset = db.getDataset(dataset_label)
-    metadata = dataset.getMetaJson()
-    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
-    
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     idcs = NoNaNFilter(dataset).get_indices()
     
     projected_data, drivers, variance_explained, samples_attributes = PCATransform(dataset=dataset,
-                                        n_components=4, #get from settings!
+                                        n_components=4,
+                                        scale = scale,
                                         subset_index=idcs).transform()
     
     
@@ -135,7 +134,8 @@ def get_dataset_pca(dataset_label : str, user : UserModel = Depends(get_user_fro
     
     # add feature information to drivers
     feature_keys = drivers.index 
-    features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
+    features = DB.feature.get_protein_by_tags(tags = feature_keys.tolist(), as_data_frame=True)
+    #features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
    
     drivers_with_feature_info = pd.concat([drivers,features],axis=1)
     drivers_with_feature_info.reset_index(names="index", inplace=True)

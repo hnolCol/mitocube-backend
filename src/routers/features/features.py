@@ -4,15 +4,18 @@ import pandas as pd
 from typing import Dict 
 from config.models.user import UserModel
 from config.models.annotations.feature import FeatureDataResponseModel, FeatureModel
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 from lib.data.annotations.ABCAnnotations import AnnotationDatabase
 from services.users import get_user_from_token
 from services.submission import map_tags_to_attribute_in_metadata
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
-
+from config.models.parameter import APIParamString
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+from lib.data.database.Database import Database
+DB = Database.DB()
+
 
 router = APIRouter(
     prefix="/api/features",
@@ -20,7 +23,7 @@ router = APIRouter(
     )
 
 @router.get("")
-def get_features_by_query(query : str, proteome_ids : str = None, max_features : int = 30):
+def get_features_by_query(query : str, proteome_ids : str = None, limit : int = 30):
     """_summary_
 
     Parameters
@@ -29,8 +32,8 @@ def get_features_by_query(query : str, proteome_ids : str = None, max_features :
         _description_
     proteome_ids : UserModel, optional
         _description_
-    max_features : UserModel, optional
-        _description_
+    limit : int, optional
+        The maximum number of features to be returned.
     user : UserModel, optional
         _description_, by default Depends(get_user_from_token)
 
@@ -39,22 +42,8 @@ def get_features_by_query(query : str, proteome_ids : str = None, max_features :
     _type_
         _description_
     """
-    feature_db = PandaFeatureDatabase()
-    if proteome_ids is None or len(proteome_ids) == 0:
-        proteome_ids = list(feature_db.get_feature_ids())
-    else:
-        proteome_ids = proteome_ids.split(";")
-
-    features = feature_db.find(values=[query], proteome_ids=proteome_ids, columns=["proteins", "genes","key"])
-
-    if features.empty: return []
-
-    if features.index.size > max_features:
-        features = features.head(max_features)
-
-    features = features.to_dict(orient="records")
-    #features = features.to_dict(orient="records")  # [{'col1': 1, 'col2': 0.5}, {'col1': 2, 'col2': 0.75}]
-    return [FeatureModel(**item) for item in features] 
+    return DB.feature.find_feature(query, proteome_id = APIParamString(param=proteome_ids).param, limit = limit)
+    
     
 
 @router.get("/{feature_key}/data",
@@ -97,7 +86,7 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200, user : UserMod
         dataset = db.getDataset(label=label)
         metadata = dataset.getMetaJson()
         
-        if dataset.hasData() and metadata.state == SubmissionStates.PUBLISHED:
+        if dataset.hasData() and metadata.state == SubmissionStatesEnums.ACTIVE:
             feature_data, attributes_samples, annotations = FeatureData(dataset).transform(feature_key, add_annotations=True)
 
             if not feature_data.empty and isinstance(feature_data,pd.DataFrame):
@@ -184,7 +173,10 @@ def get_feature_sequence(feature_key : str): #user : UserModel = Depends(get_use
     Please use the api endpoint /annotations to submit a list of feature_ids to 
     retrieve annotations efficiently. 
     """
-
+    print(DB.feature.get_protein_sequence(tags = APIParamString(param=feature_key).param))
+    return DB.feature.get_protein_sequence(tags = APIParamString(param=feature_key).param)
+    
+    
     db_annotations = AnnotationDatabase()
     annotations = db_annotations.getAnnotations(feature_key=feature_key, subset=["SequenceAnnotation"])  # ToDo: What return Model is needed by GUI?
     if len(annotations) == 0: raise HTTPException(status_code=404, detail=f"No sequence annotations found for feature key {feature_key}.")

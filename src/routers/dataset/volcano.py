@@ -33,7 +33,9 @@ router = APIRouter(
 #volcano plot
 @router.get("/datasets/{dataset_label}/volcano")
 def get_dataset_volcano(dataset_label : str, attribute_value_tag_left : str, attribute_value_tag_right : str, sample_attribute_tag : str, within_attribute_tag : str = None,
-                  within_attribute_value_tag : str = None, impute : bool = True, split_string : str = ";"):# user : UserModel = Depends(get_user_from_token)):#)
+                  within_attribute_value_tag : str = None, impute : bool = True, split_string : str = ";",
+                  filter_tag : str = None, 
+                  user : UserModel = Depends(get_user_from_token)):# ):#)
     """
     Returns the result for a volcano plot
     """

@@ -1,9 +1,8 @@
 from enum import IntEnum, Enum
 
-class SubmissionStates(IntEnum):
+class SubmissionStatesEnums(IntEnum):
     """
-    Enums that are defined in the frontend which 
-    knows what to do with such input types.
+    Enumerate of the submission states
     """
     CANCELED = -2 
     PAUSED = -1
@@ -12,7 +11,7 @@ class SubmissionStates(IntEnum):
     MEASURING = 2
     ANALYSIS = 3 
     DONE = 4 
-    PUBLISHED = 5
+    ACTIVE = 5
 
 
 class SubmissionStateColors(Enum):
@@ -23,4 +22,4 @@ class SubmissionStateColors(Enum):
     MEASURING = "#558ba4"
     ANALYSIS = "#dbae57" 
     DONE = "#eb6a47" 
-    PUBLISHED = "#ac3e30"
+    ACTIVE = "#ac3e30"

@@ -2,22 +2,24 @@ import time
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from typing import List, Annotated, Literal, Dict
 from collections import OrderedDict
-
+from neo4j.exceptions import ConstraintError
 import pandas as pd 
 
 from lib.data.database.ABCDatabase import MCDatabase, MCAttributes, InvalidDatasetLabelError
 from lib.data.runs.runs import RunListCreator
 from lib.user.UserHandling import UserDB
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+from lib.data.database.Database import Database
 
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 from config.settings.metatexts import MetaTexts
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
-from config.enums.states import SubmissionStates
-
-from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, label_not_found_exception, user_role_too_low, user_not_found, user_forbidden
+from config.enums.states import SubmissionStatesEnums
+from config.models.parameter import APIParamString, APIParamInt
+from config.models.searches import FulltextSearchResult
+from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
 from config.models.attributes import AttributeModel
 from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission, SubmissionQueryResponse
@@ -35,7 +37,7 @@ from services.mail import send_email_in_background
 from services.paths.utils import check_dir_exists, join_path
 
 
-
+DB = Database.DB()
 
 
 
@@ -138,7 +140,7 @@ def get_submission_owner(submission_label : str, user : UserModel = Depends(get_
 
     Raises
     ------
-    label_not_found_exception
+    tag_not_found
        The submission_label was not found.
     user_not_found
         If the user is not found in the database.
@@ -154,17 +156,17 @@ def get_submission_owner(submission_label : str, user : UserModel = Depends(get_
     return user
     
 
-@router.post("/submissions/{submission_label}/owner")
-def change_submission_owner(submission_label : str, 
-                            user_label : str, 
+@router.post("/submissions/{submission_tag}/owner")
+def change_submission_owner(submission_tag : str, 
+                            user_tag : str, 
                             add_prev_user_to_collaborators : bool = False, 
                             user : UserModel = Depends(is_user_admin)):
     """_summary_
 
     Parameters
     ----------
-    submission_label : str
-        The submission label
+    submission_tag : str
+        The submission tag
     user_label : str
        The user label that identifies the user. If the user_label does not exists, an user_not_found Exception is raise.
     add_prev_user_to_collaborators : bool, optional
@@ -183,7 +185,7 @@ def change_submission_owner(submission_label : str,
 
     Raises
     ------
-    label_not_found_exception
+    tag_not_found
         If the submission label does not exist.
     user_not_found
         If the user is not found in the database.
@@ -191,37 +193,15 @@ def change_submission_owner(submission_label : str,
         If the user that is supposed to be the new owner is blocked (not allowed for login)
     """
     
-    db = MCDatabase.getDatabase()
-    dataset = get_dataset_from_database(db,submission_label)
-    metadata = dataset.getMetaJson()
+    if not DB.user.exists(tag = user_tag): raise user_not_found 
+    if not DB.dataset_exists(tag = submission_tag): raise tag_not_found
     
-    db_user = UserDB
-    exists, user = db_user.get_user_by_label(user_label)
-    if not exists:
-        raise user_not_found
-    if not user.allow_login:
-        raise user_forbidden
-    metadata = metadata.model_dump()
-    prev_user_label = metadata["user_label"]
-    metadata["modified_on"] = time.time()
-    metadata["user_label"] = user_label
-    metadata["collaborators"] = [coll_label for coll_label in metadata["collaborators"] if coll_label != user_label]
-    if add_prev_user_to_collaborators:
-        metadata["collaborators"].append(prev_user_label)
-    metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Project owner changed.", state = metadata["state"]))
-    #  time_line = metadata["timeline"].copy()
-    # updated_entries = time_line["entries"] + [TimeLineEntryModel(id=1,user_label=user.label,comment=state_change.comment,state=state_change.state).model_dump()]
-    # time_line["entries"] = updated_entries
-    # metadata["timeline"] = TimeLineModel(**time_line)
-    
-        
-    update_submission = DatasetSubmissionModel(**metadata)
-    dataset.write_json(update_submission, update = True)
-    return True
+    ok = DB.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
+    return 
 
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
-def get_submissions_by_user_label(labels : str = None, group : Literal["state","user","attribute_tag","attribute_value_tag","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token)):
+def get_submissions_by_user_label(tags : str = None, group : Literal["state","user","attribute","attribute_value","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token)):
     """Returns the the number submissions by a property. 
 
 
@@ -233,29 +213,35 @@ def get_submissions_by_user_label(labels : str = None, group : Literal["state","
     Raises
     ------
     """
-    label_subset = None
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    if labels is not None:
-        label_subset = set(labels.split(";"))
-    return db_helper.get_label_count_by(by=group, label_subset=label_subset)
-    #if group is not in Literal => HTTPExcepction 
+    
+    counts = DB.submission_filter.get_counts(by = group, tags = APIParamString(param=tags).param)
+    return counts.to_dict(orient="index")
+   
+
+# @router.get("/submissions/users", response_model=List)
+# def get_submissions_by_user_label(user : UserModel = Depends(get_user_from_token)):
+#     """Returns the the number and the labels by user that 
+#     are found in the database. 
+
+#     Returns
+#     -------
+#     _type_
+#         _description_
+
+#     Raises
+#     ------
+#     """
+#     db_helper = MCDatabaseHelper.getDatabaseHelper()
+#     return db_helper.get_labels_by_users()
 
 
-@router.get("/submissions/users", response_model=List)
-def get_submissions_by_user_label(user : UserModel = Depends(get_user_from_token)):
-    """Returns the the number and the labels by user that 
-    are found in the database. 
+@router.get("/submission/ftquery")
+def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)] = None, user : UserModel = Depends(get_user_from_token)):
+    "Filters submisson by full text searches"
+    matches : List[FulltextSearchResult] = DB.submission_filter.full_dataset_text_search(query)
+    print(matches)
 
-    Returns
-    -------
-    _type_
-        _description_
 
-    Raises
-    ------
-    """
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    return db_helper.get_labels_by_users()
 
 @router.get("/submissions/q", response_model=SubmissionQueryResponse)
 def get_submission_by_query(state : str|int = None,
@@ -263,59 +249,67 @@ def get_submission_by_query(state : str|int = None,
                             feature_key : str = None, 
                             attribute_value_tag : str = None, 
                             attribute_tag : str = None, 
-                            genotype_label : str = None, 
-                            user_label : str = None,
+                            genotype_tag : str = None, 
+                            user_tag : str = None,
                             max_submissions : int = 50, 
-                            join : Literal["inner","outer"] = "inner",
                             user : UserModel = Depends(get_user_from_token)
-                            ): #user : UserModel = Depends(get_user_from_token)
-    
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    N = db_helper.get_metadata_count()
-    db = MCDatabase.getDatabase()
-    labels = []
-    attribute_search_active = any(search_param is not None for search_param in [feature_key,attribute_tag,attribute_value_tag,genotype_label,state,user_label])
-    attribute_search_labels = db_helper.get_labels(state=state,
-                                                    feature_key=feature_key,
-                                                    attribute_tag=attribute_tag,
-                                                    attribute_value_tag=attribute_value_tag,
-                                                    genotype_label=genotype_label,
-                                                    user_label=user_label,
-                                                    join=join
-                                                    )
-    if query is not None:
-        labels_by_query = db_helper.get_labels_by_search_string(query, subset= attribute_search_labels if join == "inner" and attribute_search_active else None)
-        if join == "inner":
-            #the search happened already only in the subset of labels
-            labels = labels_by_query
-        else:
-            labels  = labels_by_query + [label for label in attribute_search_labels if label not in labels_by_query]
-    elif attribute_search_active:
-        #if query is not defined, then the labels are simply the ones from the attribute_search
-        labels = attribute_search_labels
-    else:
-        #otherwise get all 
-        labels = db.getDataLabels()
-        
-    if attribute_search_active and len(labels) == 0: 
-        #empty response
-        return SubmissionQueryResponse(submissions=[],query_count=0,total_count=N,labels=[])
-        
-    metadata = list(db.getJSONDatasets(labels).values())
-    #sort after creation date to show once that are required.
-    metadata.sort(key = lambda x : x.created_on, reverse=True)
-    query_match_count = len(metadata)
-    if len(metadata) > max_submissions:
-        metadata = metadata[:max_submissions]
+                            ): 
+    """Counting the submissions based on various filter criteria. 
 
-    metadata = [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_meta in metadata]
+    Parameters
+    ----------
+    state : str | int, optional
+        _description_, by default None
+    query : Annotated[str  |  None, Query, optional
+        _description_, by default 1)]=None
+    feature_key : str, optional
+        _description_, by default None
+    attribute_value_tag : str, optional
+        _description_, by default None
+    attribute_tag : str, optional
+        _description_, by default None
+    genotype_tag : str, optional
+        _description_, by default None
+    user_tag : str, optional
+        _description_, by default None
+    max_submissions : int, optional
+        _description_, by default 50
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    SubmissionQueryResponse
+        Summarizes the result with the following keys:
+            - 'submission' (List[Dict]) : Minimal information about a submission.
+            - 'tags' (List[str]) : List of submission tags 
+            - 'query_count' : The number of submissions that match the filtering ignoring
+            the provided limit.
+            - 'total_count' (int) : The number of all submissions in the dataset. 
+    """
+
+    N = DB.get_submission_count()    
+    tags = DB.submission_filter.get(
+            state = APIParamInt(param = state).param, 
+            attribute_tag=APIParamString(param=attribute_tag).param,
+            attribute_value_tag=APIParamString(param=attribute_value_tag).param,
+            protein_tag=APIParamString(param=feature_key).param,
+            user_tag=APIParamString(param=user_tag).param,
+            genotype_tag = APIParamString(param=genotype_tag).param,
+            limit = max_submissions
+            )
+    if len(tags) == 0: 
+        #empty response
+        return SubmissionQueryResponse(submissions=[],query_count=0,total_count=N,tags=[])
     
-    return {
-        "submissions" : metadata,
-        "labels" : labels,
-        "query_count"  : query_match_count,
+    meta_data = DB.meta.get(tags = tags)
+    d = {
+        "submissions" : meta_data,
+        "tags" : tags,
+        "query_count"  : len(tags),
         "total_count" : N
     }
+    return SubmissionQueryResponse(**d)
     
     
     
@@ -325,72 +319,77 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     Adds a submission to the database
     """
     
-    db  = MCDatabase.getDatabase()
-    
-    if submission.label in db.getDataLabels():
-        raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update a submission.")
-    
-    mandatory_attributes = db.getMandatorySubmissionAttributes()
-    missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
+    if DB.dataset_values.tag_exists(tag = submission.tag):
+        raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update the submission tag.")
 
-    if len(missing_mand_attributes) > 0: return mandatory_dataset_attrs_not_found_exception.add_note(f"Missing : {[attr.tag for attr in missing_mand_attributes]}")
+    mandatory_attributes = DB.attributes.get_mandatory_attributes()
+    missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
+    print(missing_mand_attributes)
+    if len(missing_mand_attributes) > 0:
+        exception = mandatory_dataset_attrs_not_found_exception
+        raise exception
+    
     json_data = submission_to_json(submission,user)
-   
-    data_dir = DB_SETTINGS.db_datadir
-    dataset_dir = join_path(data_dir,submission.label)
-    exists, dataset_dir = check_dir_exists(dataset_dir)
+
+    if submission.includes_data:   
+        json_data["state"] = SubmissionStatesEnums.DONE
+    metadata = DatasetSubmissionModel(**json_data)
+    save_json(metadata.model_dump(),"MODEL.json")
+    try:
+        DB.insert_meta(meta_data=metadata)
+    except ConstraintError:
+        #should not happen, since it is controlled before, delete?
+        raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update a submission.")
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="An unknown error occured.")
+    check_collaborators = are_public_users_allowed(submission.collaborators)
+    send_email_in_background(background_tasks=background_task,
+                        subject=f"Submission Complete : {submission.title} ({submission.tag})",
+                        email_to=[user.email],
+                        cc=[u.email for idx,u in enumerate(submission.collaborators) if check_collaborators[idx]],
+                        body={
+                            "app_name" : GENERAL_SETTINGS.app_name,
+                            "first_name" : user.firstname,
+                            "title" : submission.title,
+                            "tag" : submission.tag,
+                            "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.tag}"
+                        },
+                        template_mame=EMAIL_SETTINGS.mail_submission_complete_template)    
+
+    return 
+
     
+    
+    
+    datasetObj = db.getDatasetObject()(label = metadata.label) #initiate dataset 
+    datasetObj._read_meta(meta = metadata)
+    #save metadata first. TODO : Implement in insert? Or insert_metadata? 
+    db.insert_meta(obj=datasetObj,meta=metadata)
+    
+    if submission.includes_data:    
+        #TODO Check -> features (index to be in the annotation database with the selected database.?)
+        sample_names = metadata.sample_names 
+        datatable = pd.DataFrame(data = submission.data_array, columns=sample_names, index=submission.data_index)
+        datatable = datatable.dropna(how="all")
+        #no nan in index
+        non_nan_index = datatable.index.dropna()
+        datatable = datatable.loc[non_nan_index,:]
+        #no duplicates in index 
+        non_duplicates = datatable.index.duplicated(keep="first")
+        datatable = datatable.loc[~non_duplicates,:]
+        #check for only nan columns 
+        if datatable.dropna(axis=1, how='all').columns.size != datatable.columns.size:
+            raise HTTPException(status_code=500,detail="A selected column contained only NaN. Please remove the column and submit the data again.")
+        # datatable.to_csv(dataset_path, sep="\t")
+        #TODO add filtering for features that are in the database? 
+        #Lets discuss Andreas, as uniprot such as XADSD2-2 are somehow lost. 
+        datasetObj._read_from_dataframe(datatable)
+        db.insert(datasetObj)
+        
+    check_collaborators = are_public_users_allowed(submission.collaborators)
         
     
-    if exists:
-        #params_path = join_path(dataset_dir,"params.json")
-        #store json in resource
-       # save_json(metadata.model_dump(exclude_none=True),params_path)
-        
-        #check if users are actually in DB and allowed
-        #This information is not in the PublicUser and we need to get the user from the userDB
-        if submission.includes_data:   
-            json_data["state"] = SubmissionStates.DONE
-        metadata = DatasetSubmissionModel(**json_data)
-        datasetObj = db.getDatasetObject()(label = metadata.label) #initiate dataset 
-        datasetObj._read_meta(meta = metadata)
-        #save metadata first. TODO : Implement in insert? Or insert_metadata? 
-        db.insert_meta(obj=datasetObj,meta=metadata)
-        
-        if submission.includes_data:    
-            #TODO Check -> features (index to be in the annotation database with the selected database.?)
-            sample_names = metadata.sample_names 
-            datatable = pd.DataFrame(data = submission.data_array, columns=sample_names, index=submission.data_index)
-            datatable = datatable.dropna(how="all")
-            #no nan in index
-            non_nan_index = datatable.index.dropna()
-            datatable = datatable.loc[non_nan_index,:]
-            #no duplicates in index 
-            non_duplicates = datatable.index.duplicated(keep="first")
-            datatable = datatable.loc[~non_duplicates,:]
-            #check for only nan columns 
-            if datatable.dropna(axis=1, how='all').columns.size != datatable.columns.size:
-                raise HTTPException(status_code=500,detail="A selected column contained only NaN. Please remove the column and submit the data again.")
-           # datatable.to_csv(dataset_path, sep="\t")
-           #TODO add filtering for features that are in the database? 
-           #Lets discuss Andreas, as uniprot such as XADSD2-2 are somehow lost. 
-            datasetObj._read_from_dataframe(datatable)
-            db.insert(datasetObj)
-            
-        check_collaborators = are_public_users_allowed(submission.collaborators)
-            
-        send_email_in_background(background_tasks=background_task,
-                                subject=f"Submission Complete : {submission.title} ({submission.label})",
-                                email_to=[user.email],
-                                cc=[u.email for idx,u in enumerate(submission.collaborators) if check_collaborators[idx]],
-                                body={
-                                    "app_name" : GENERAL_SETTINGS.app_name,
-                                    "first_name" : user.firstname,
-                                    "title" : submission.title,
-                                    "label" : submission.label,
-                                    "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.label}"
-                                },
-                                template_mame=EMAIL_SETTINGS.mail_submission_complete_template)
 
 @router.patch("/submissions/{submission_label}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 
@@ -406,7 +405,7 @@ def update_submission(background_task : BackgroundTasks,
     """
     
     db = MCDatabase.getDatabase()
-    if not db.doesLabelExists(submission_label): return label_not_found_exception
+    if not db.doesLabelExists(submission_label): return tag_not_found
     # get submission from database 
     dataset = db.getDataset(submission_label)
     submission_state = state_change.state
@@ -445,7 +444,7 @@ def update_submission(background_task : BackgroundTasks,
                              body={
                                  "app_name" : GENERAL_SETTINGS.app_name,
                                  "first_name" : submission_user.firstname,
-                                 "state" : SubmissionStates(updated_submission.state).name,
+                                 "state" : SubmissionStatesEnums(updated_submission.state).name,
                                  "title" : updated_submission.title,
                                  "submission_label" : submission_label,
                                  "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{updated_submission.label}" #pydanitc HttpUrl (url) returns www.__.com/  
@@ -549,7 +548,7 @@ def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPr
 def get_submission_runlist(submission_label : str, user : UserModel = Depends(get_user_from_token)) -> RunListResponseModel:
     db = MCDatabase.getDatabase()
     try: dataset = db.getDataset(label = submission_label) 
-    except: raise label_not_found_exception
+    except: raise tag_not_found
     metadata = dataset.getMetaJson()
     runlist = metadata.runlist
     if runlist is not None: 

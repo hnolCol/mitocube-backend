@@ -7,7 +7,7 @@ import time
 import numpy as np 
 import pandas as pd 
 from config.models.submissions.submissions import DatasetSubmissionModel
-from config.models.submissions.states import SubmissionStates
+from config.models.submissions.states import SubmissionStatesEnums
 from config.settings.metatexts import MetaTexts
 from services.enums import get_inversed_enum_as_dict, get_enum_as_dict
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
@@ -22,7 +22,7 @@ metatextsSettings = MetaTexts()
 
 def migrate_from_folder(submission_dir = "/Users/hnolte/Desktop/data/dynamic/submissions", user_label = "VpVff4sS", output_dir = "/Users/hnolte/Desktop/data/attribute_migration"):
     dirList = [l for l in os.listdir(submission_dir) if os.path.isdir(os.path.join(submission_dir,l))]
-    states = get_enum_as_dict(enum=SubmissionStates)
+    states = get_enum_as_dict(enum=SubmissionStatesEnums)
     if not os.path.exists(output_dir):
         os.mkdir(output_dir )
     # "Organism": "Mus musculus (Mouse)",

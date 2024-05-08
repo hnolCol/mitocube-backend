@@ -20,7 +20,8 @@ GENERAL_SETTINGS = get_general_settings()
 
 class BasicUser(BaseModel):
     """The very basic user information"""
-    label : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
+    #label : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
+    tag : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
     firstname : str 
     lastname : str 
     institute : str 
@@ -40,19 +41,19 @@ class BasicUserWithEmail(BasicUser):
 
 class UserModel(BasicUserWithEmail):
     """BaseModel for a user"""
-    id : int = None
     updated_on : float = None
     agreed_to_terms : Optional[bool] = None
     expires_after : float = None
     password : SecretStr = None
     allow_login : bool = True 
     role : UserRolesEnum = UserRolesEnum.STANDARD
-    salt : str = None
+    #salt : str = None
+
 
     
 class UserModelForRegistration(BasicUserWithEmail):
     """"""
-    password : str = Field(default_factory=lambda : get_random_string(10)) #generate a random password upon generation, will be send via email to user
+    password : SecretStr = Field(default_factory=lambda : get_random_string(10)) #generate a random password upon generation, will be send via email to user
     role : UserRolesEnum = UserRolesEnum.STANDARD
 
     @field_validator("role",mode="before")
@@ -107,7 +108,7 @@ class UserModelForUpdate(BaseModel):
 
 class AdminUserView(BasicUser):
     """"""
-    id : int
+    #id : int
     email : EmailStr 
     allow_login : bool
     role : UserRolesEnum
@@ -124,7 +125,7 @@ class PublicUser(BaseModel):
     To distinguish them, the API deadend for those is /api/collaborators
     while api/users is restricted to admin rights. 
     """
-    label : str
+    tag : str = None
     firstname : str
     lastname : str 
     research_group : str 

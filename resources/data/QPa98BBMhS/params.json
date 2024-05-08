@@ -4,7 +4,7 @@
     "state": 2,
     "label": "QPa98BBMhS",
     "title": "Beatuful projet with genotypes",
-    "user_label": "VpVff4sS",
+    "user_tag": "VpVff4sS",
     "collaborators": [],
     "replicates": [
         1,
@@ -75,7 +75,7 @@
                 "id": 0,
                 "label": "vbGVt4MTjDTsRmrr2bgO",
                 "created_on": 1706698744.5967722,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 0,
                 "comment": "Project created"
             },
@@ -83,7 +83,7 @@
                 "id": 1,
                 "label": "E5sgVCYSdAwCgCM4iSm6",
                 "created_on": 1706698853.837025,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 1,
                 "comment": "Submission state changed to processing."
             },
@@ -91,7 +91,7 @@
                 "id": 1,
                 "label": "PL9Sw3dhpsBiNbpoT5D6",
                 "created_on": 1706699037.611836,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 2,
                 "comment": ""
             },
@@ -99,7 +99,7 @@
                 "id": 1,
                 "label": "EgHZJigPrOpjrcNGy9oK",
                 "created_on": 1708942173.9539788,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 2,
                 "comment": "Updated dataset attributes."
             },
@@ -107,7 +107,7 @@
                 "id": 1,
                 "label": "P4Wg9WVeqAhGChMcrDPG",
                 "created_on": 1709288524.126414,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 2,
                 "comment": "Metatext updated."
             }

@@ -7,7 +7,7 @@ from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 
 from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel
-from config.enums.states import SubmissionStates
+from config.enums.states import SubmissionStatesEnums
 from lib.user.UserHandling import UserDB
 
 import numpy as np 
@@ -54,15 +54,15 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
     instrument_dataset_labels = db_helper.get_labels_by_attribute_value_tag(instrument_tag)
     submissions = db_helper.get_labels_by_instrument(instrument_tag)
     for submission in submissions:
-        exists, user = UserDB.get_user_by_label(submission["user_label"])
+        exists, user = UserDB.get_user_by_label(submission["user_tag"])
         if exists:
             submission["user"] = user
         
     states_for_instrument_labels = db_helper.get_label_count_by_state(label_subset=instrument_dataset_labels)
-    is_measuring = SubmissionStates.MEASURING in states_for_instrument_labels
+    is_measuring = SubmissionStatesEnums.MEASURING in states_for_instrument_labels
     if is_measuring:
         #there should be only one measuring. 
-        is_measuring_label = list(states_for_instrument_labels[SubmissionStates.MEASURING]["submission_labels"])[0]
+        is_measuring_label = list(states_for_instrument_labels[SubmissionStatesEnums.MEASURING]["submission_labels"])[0]
         measuring_submission = [submission for submission in submissions if submission["label"] == is_measuring_label][0]
     #get the total number of datasets that have an instrument annotation
     #calculate the fraction that the instrument measured.
@@ -71,7 +71,7 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
     first_use = db_helper.get_instrument_first_use(instrument_tag)
     
    
-    published_datasets_found = SubmissionStates.PUBLISHED in states_for_instrument_labels
+    published_datasets_found = SubmissionStatesEnums.ACTIVE in states_for_instrument_labels
     
     return {
         "is_measuring" : is_measuring,
@@ -80,7 +80,7 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
         "first_use" : first_use,
         "submissions" : submissions,
         "number_datasets" : len(instrument_dataset_labels), 
-        "number_datasets_published" : 0 if not published_datasets_found else states_for_instrument_labels[SubmissionStates.PUBLISHED]["submission_count"],
+        "number_datasets_published" : 0 if not published_datasets_found else states_for_instrument_labels[SubmissionStatesEnums.ACTIVE]["submission_count"],
         "relative_number_datasets" : len(instrument_dataset_labels)/len(total_dataset_labels_with_instrument)}
 
     

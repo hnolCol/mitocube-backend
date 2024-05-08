@@ -11,7 +11,8 @@ templates = [email_settings.mail_verification_template,
              email_settings.mail_confirmation_template,
              email_settings.mail_project_state_template,
              email_settings.mail_submission_complete_template,
-             email_settings.mail_account_generated_template]
+             email_settings.mail_account_generated_template,
+             email_settings.mail_proteome_added_template]
 
 MAIL_CONFIG = ConnectionConfig(
                 MAIL_USERNAME=email_settings.mail_username,

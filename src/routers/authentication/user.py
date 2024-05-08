@@ -5,13 +5,15 @@ from config.exceptions.HTTPExceptions import user_role_too_low, user_not_found
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser
+from config.models.parameter import APIParamString
 from services.encryption import decode_token
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 from services.enums import get_enum_as_dict
 from lib.user.UserHandling import UserDB
 from config.settings.general import get_general_settings
-
+from lib.data.database.Database import Database
+DB = Database.DB()
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
 
@@ -27,13 +29,20 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Add
     """
     Adds a user to the database. Currently requires admin rights.
     """
+    #user_props = AddUserPropsModel(**user_props)
     #TO DO: should find another solution for this renmaing, also in patch 
     user_props = user_props.model_dump(exclude_none=True)
     try:
         user_to_add = UserModelForRegistration(**user_props )
     except Exception as e:
         raise HTTPException(status_code=422,detail=str(e))
-    UserDB.add_user(user_props=user_to_add) #throws ane exception if there is a problem
+    try:
+        DB.user.add_user(user_to_add)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail = str(e))
+        return 
+    
+    #UserDB.add_user(user_props=user_to_add) #throws ane exception if there is a problem
 
     send_email_in_background(background_tasks=background_task,
                              subject="Account generated.",
@@ -49,7 +58,7 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Add
 
 
 @router.get("/users/q")
-def query_user_db(query : str = None, max_users : int = 40): #user : UserModel = Depends(get_user_from_token)
+def query_user_db(query : str = None, max_users : int = 40, user : UserModel = Depends(get_user_from_token)):
     """Query user in the database. 
 
     Parameters
@@ -64,18 +73,13 @@ def query_user_db(query : str = None, max_users : int = 40): #user : UserModel =
     _type_
         _description_
     """
-    users = UserDB.get_users()
-    total_count = len(users)
-    query = query.lower()
-    filtered_users = [user for user in users if any(query in getattr(user,prop).lower() for prop in ["firstname","lastname","email"] if hasattr(user,prop))]
-    #TODO sort users by the time they have been used for collaboration 
+    
+    filtered_users = DB.user.find_user(query, limit=max_users)
+    total_count = DB.user.count()
     query_count = len(filtered_users)
-    if (query_count > max_users):
-        #subset if too many 
-        filtered_users = filtered_users[:max_users]
-        
+   
     return {"users" : filtered_users, 
-            "user_labels" : [u.label for u in filtered_users], 
+            "user_tags" : [u.tag for u in filtered_users], 
             "query_count" : query_count, 
             "total_count" : total_count} 
 
@@ -123,18 +127,19 @@ def get_users(user : UserModel = Depends(is_user_admin)):
     Returns a list of users, requires admin rights.
     Full indicates that the full information of a user is provided.
     """
-    users = UserDB.get_users()
+    users = DB.user.get_users()
     return {"users" : users}
 
 
-@router.get("/users/public", response_model=CollaboratorsResponseModel)
-def get_collaborators(user : UserModel = Depends(get_user_from_token)):
+
+@router.get("/users/public", response_model=List[PublicUser])
+def get_collaborators(tags : str = None, user : UserModel = Depends(get_user_from_token)):
     """
     Returns collaborators, which is essential Users with a different response model (e.g. non sensitive information.)
     The response model defines the information that the API returns
     """
-    users = UserDB.get_users()
-    return {"users" : users}
+    return DB.user.get_users_by_tags(tags=APIParamString(param=tags).param)
+    
 
 
 @router.get("/users/roles", summary="Returns the available user roles and names", response_model=UseRoleReponseModel)
@@ -143,25 +148,26 @@ def get_user_roles(user : UserModel = Depends(get_user_from_token)):
     return UseRoleReponseModel()
 
 
-@router.get("/users/{user_label}", summary="Returns the public user information of a user by its label.", response_model=PublicUser)
-def delete_user(user_label : str, user : UserModel = Depends(get_user_from_token)):
+@router.get("/users/{user_tag}", summary="Returns the public user information of a user by its label.", response_model=PublicUser)
+def get_user(user_tag : str, user : UserModel = Depends(get_user_from_token)):
     """Deletes specific user. Returns an error if token does not belong to admin"""
-    exists, user = UserDB.get_user_by_label(user_label)
-    if not exists : raise user_not_found
-    return user
+    user_from_db = DB.user.get_user_by_tag(user_tag)
+    if user_from_db is None : raise user_not_found
+    return user_from_db
 
 
-@router.delete("/users/{user_label}", summary="Deletes a user. Requires admin rights.")
-def delete_user(user_label : str, user : UserModel = Depends(is_user_admin)):
+@router.delete("/users/{user_tag}", summary="Deletes a user. Requires admin rights.")
+def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Deletes specific user. Returns an error if token does not belong to admin"""
-    UserDB.delete_user_by_label(user_label)
+    UserDB.delete_user_by_label(user_tag)
 
 ## inconsistent!  - change to have user_label in url 
 
-@router.post("/users/user/block", summary="Block a user. Requires admin rights.")
-def block_user(user_props : UserLabel, user : UserModel = Depends(is_user_admin)):
+@router.post("/users/{user_tag}/block", summary="Block a user. Requires admin rights.")
+def block_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Blocks the user. Limited to admin users."""
-    UserDB.block_user_by_label(user_props.label)
+    DB.user.block_user_by_tag(tag = user_tag)
+    #UserDB.block_user_by_label(user_props.label)
     
     
 @router.post("/users/{user_label}/useterms", summary="Accept useterms. Can only be done by the user itself.")

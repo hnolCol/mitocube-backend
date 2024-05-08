@@ -3,7 +3,7 @@
     "state": 0,
     "label": "YKLJPnEwP8",
     "title": "My test project before the start",
-    "user_label": "VpVff4sS",
+    "user_tag": "VpVff4sS",
     "collaborators": [],
     "replicates": [
         1,
@@ -99,7 +99,7 @@
                 "id": 0,
                 "label": "3ZDvKupDgdtrlhVn998c",
                 "created_on": 1707172687.596235,
-                "user_label": "VpVff4sS",
+                "user_tag": "VpVff4sS",
                 "state": 0,
                 "comment": "Project created"
             }
@@ -107,7 +107,7 @@
     },
     "runlist": {
         "created_at": 1708519002.8094022,
-        "user_label": "VpVff4sS",
+        "user_tag": "VpVff4sS",
         "dataset_label": "YKLJPnEwP8",
         "n_runs": 16,
         "n_plates": 2,

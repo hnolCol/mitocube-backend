@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np 
 
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import scale
 
 from lib.data.dataset.ABCDataset import MCDataset
 from lib.data.transform.ABCTransform import DatasetTransform
@@ -11,7 +12,7 @@ from lib.data.annotate.samples.SampleAttributes import SampleAttributeAnnotation
 
 
 class PCATransform(DatasetTransform):
-    def __init__(self, dataset: MCDataset, n_components : int = 3, subset_index : pd.Index = None) -> None:
+    def __init__(self, dataset: MCDataset, n_components : int = 3, scale : bool = True, subset_index : pd.Index = None) -> None:
         """Principal Component Analysis for the datatable of a dataset. 
 
         Parameters
@@ -27,6 +28,7 @@ class PCATransform(DatasetTransform):
         super().__init__(dataset)
         self._n_components = n_components
         self._subset_index = subset_index 
+        self._scale = scale 
 
     def transform(self) -> Tuple[pd.DataFrame,pd.DataFrame, np.ndarray, OrderedDict[str,List[str]]]:
         """Transforms the data into a lower dimensional dataset using a Principal Component Analysis.
@@ -48,8 +50,10 @@ class PCATransform(DatasetTransform):
             data = data.loc[self._subset_index,:]
         if data.empty : raise Exception("Subset index based subsetting resulted in an empty dataset or the dataset is empty.")      
 
-        #TO DO: scale?
         X = data.to_numpy()
+        
+        if self._scale:
+            X = scale(X)
 
         pca = PCA(n_components=self._n_components)  
         pca.fit(X)

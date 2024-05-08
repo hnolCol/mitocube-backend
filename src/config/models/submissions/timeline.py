@@ -1,7 +1,7 @@
 from typing import Optional, List
 from time import time 
 from pydantic import BaseModel, Field
-from config.models.submissions.states import SubmissionStates
+from config.models.submissions.states import SubmissionStatesEnums
 from services.random_generators import get_random_string
 
 class TimeLineEntryModel(BaseModel):
@@ -12,8 +12,9 @@ class TimeLineEntryModel(BaseModel):
     id : int 
     label : str = Field(...,default_factory=get_random_string)
     created_on : float = Field(..., default_factory=time)
-    user_label : str 
-    state : SubmissionStates
+    user_tag : str  = None
+    user_label : str = None
+    state : SubmissionStatesEnums
     comment : Optional[str] = None 
 
 class TimeLineModel(BaseModel):

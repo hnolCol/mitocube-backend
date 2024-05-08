@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from collections import OrderedDict
 
+from lib.data.database.Database import Database
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
@@ -13,7 +14,7 @@ from config.models.user import UserModel
 
 from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import map_tags_to_attribute_in_metadata
-
+DB = Database.DB()
 
 
 
@@ -24,7 +25,10 @@ router = APIRouter(
 #heatmap endpoints 
 @router.get("/datasets/{dataset_label}/heatmap",
             tags=["Heatmap"])
-def get_dataset_heatmap(dataset_label : str, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_heatmap(dataset_label : str, 
+                        n_clusters : int = 8, 
+                        filter_tag : str = None,
+                        user : UserModel = Depends(get_user_from_token)):
     """
     Returns data to feed into a heatmap for visualization.
     
@@ -54,17 +58,20 @@ def get_dataset_heatmap(dataset_label : str, n_clusters : int = 8, user : UserMo
     #check if organism is defined
     proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     feature_db = PandaFeatureDatabase()
-    features = feature_db.get(stats_and_zscores.index,proteome_ids,ignoreMissing=True)
+   # features = feature_db.get(stats_and_zscores.index,proteome_ids,ignoreMissing=True)
+    #print(features)
+    features = DB.feature.get_protein_by_tags(stats_and_zscores.index.values.tolist())
+    print(features,"NEO4J")
     #join features to the stat results
     #consider adding the features as an extra -> may be used to select features from the heatmap to view the detailed proteomics
     #data in a feature-centric way. 
     stats_and_zscores = stats_and_zscores.join(features,how="left")
-    
+    print(stats_and_zscores)
     return {
         "dataset_label" : dataset_label,
         "data" : stats_and_zscores.reset_index(names="Key").to_dict(orient="records"),
         "value_names" : metadata.sample_names,
-        "label_names" : ["genes"],
+        "label_names" : ["gene_name"],
         "color_names" : [],
         "cluster_indices" : cluster_indices,
         "n_clusters" : n_clusters

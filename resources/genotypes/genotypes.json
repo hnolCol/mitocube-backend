@@ -30,7 +30,7 @@
                         "id": 344,
                         "attribute_id": 48,
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -40,7 +40,7 @@
                         "id": 348,
                         "attribute_id": 49,
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -50,7 +50,7 @@
                         "id": 336,
                         "attribute_id": 47,
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -60,18 +60,18 @@
                         "id": 700,
                         "attribute_id": 86,
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 713,
                             "attribute_id": 87,
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -115,7 +115,7 @@
                         "id": 344,
                         "attribute_id": 48,
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -125,7 +125,7 @@
                         "id": 347,
                         "attribute_id": 49,
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -135,7 +135,7 @@
                         "id": 336,
                         "attribute_id": 47,
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -145,18 +145,18 @@
                         "id": 700,
                         "attribute_id": 86,
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 713,
                             "attribute_id": 87,
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -200,7 +200,7 @@
                         "id": 342,
                         "attribute_id": 48,
                         "text": "Inducible Expression",
-                        "tag": "att_gene_engineering:inducible_expression",
+                        "tag": "inducible_expression",
                         "value": "inducible_expression",
                         "description": "Inducible gene expression. "
                     }
@@ -210,7 +210,7 @@
                         "id": 349,
                         "attribute_id": 49,
                         "text": "Unknown/Random",
-                        "tag": "att_gene_zygosity:unknown",
+                        "tag": "unknown",
                         "value": "unknown",
                         "description": "Unknown. Examples: virus- or biggy-bag expression."
                     }
@@ -220,7 +220,7 @@
                         "id": 335,
                         "attribute_id": 47,
                         "text": "BiggyBac transposon",
-                        "tag": "att_gene_editing_method:biggybac",
+                        "tag": "biggybac",
                         "value": "biggybac",
                         "description": "The PiggyBac (PB) transposon is a mobile genetic element that efficiently transposes between vectors and chromosomes via a 'cut and paste' mechanism. During transposition, the PB transposase recognizes transposon-specific inverted terminal repeat sequences (ITRs) located on both ends of the transposon vector and efficiently moves the contents from the original sites and integrates them into TTAA chromosomal sites"
                     }
@@ -259,7 +259,7 @@
                         "id": 345,
                         "attribute_id": 48,
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -269,7 +269,7 @@
                         "id": 348,
                         "attribute_id": 49,
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -279,7 +279,7 @@
                         "id": 335,
                         "attribute_id": 47,
                         "text": "Homologous recombination (loxP-sites)",
-                        "tag": "att_gene_editing_method:homologrecombination",
+                        "tag": "homologrecombination",
                         "value": "homologrecombination",
                         "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
                     }
@@ -289,7 +289,7 @@
                         "id": 706,
                         "attribute_id": 88,
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     },
@@ -297,18 +297,18 @@
                         "id": 714,
                         "attribute_id": 88,
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 89,
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -317,12 +317,12 @@
                             168
                         ]
                     },
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 89,
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -366,7 +366,7 @@
                         "id": 345,
                         "attribute_id": 48,
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -376,7 +376,7 @@
                         "id": 349,
                         "attribute_id": 49,
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -386,7 +386,7 @@
                         "id": 335,
                         "attribute_id": 47,
                         "text": "Homologous recombination (loxP-sites)",
-                        "tag": "att_gene_editing_method:homologrecombination",
+                        "tag": "homologrecombination",
                         "value": "homologrecombination",
                         "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
                     }
@@ -426,7 +426,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Deletion",
-                        "tag": "att_gene_engineering:deletion",
+                        "tag": "deletion",
                         "value": "deletion",
                         "description": "Gene deletion"
                     }
@@ -437,7 +437,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -448,7 +448,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -459,19 +459,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Amino acid deletion",
-                        "tag": "att_protein_mutation:deletion",
+                        "tag": "deletion",
                         "value": "deletion",
                         "description": "Deletion of a single amino acid"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:deletion": {
+                    "deletion": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -516,7 +516,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Deletion",
-                        "tag": "att_gene_engineering:deletion",
+                        "tag": "deletion",
                         "value": "deletion",
                         "description": "Gene deletion"
                     }
@@ -527,7 +527,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -538,7 +538,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -549,19 +549,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Amino acid deletion",
-                        "tag": "att_protein_mutation:deletion",
+                        "tag": "deletion",
                         "value": "deletion",
                         "description": "Deletion of a single amino acid"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:deletion": {
+                    "deletion": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -614,7 +614,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -625,7 +625,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -636,7 +636,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -647,19 +647,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -687,7 +687,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -698,7 +698,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -709,7 +709,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -720,19 +720,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -785,7 +785,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -796,7 +796,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -807,7 +807,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -818,19 +818,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -858,7 +858,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -869,7 +869,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -880,7 +880,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -891,19 +891,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "None",
-                        "tag": "att_protein_mutation:none",
+                        "tag": "none",
                         "value": "none",
                         "description": "Wildtype form of protein."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:none": {
+                    "none": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -948,7 +948,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -959,7 +959,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -970,7 +970,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -981,19 +981,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1038,7 +1038,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -1049,7 +1049,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -1060,7 +1060,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -1071,19 +1071,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "None",
-                        "tag": "att_protein_mutation:none",
+                        "tag": "none",
                         "value": "none",
                         "description": "Wildtype form of protein."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:none": {
+                    "none": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1128,7 +1128,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -1139,7 +1139,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -1150,7 +1150,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -1161,19 +1161,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1218,7 +1218,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -1229,7 +1229,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -1240,7 +1240,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -1251,19 +1251,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "None",
-                        "tag": "att_protein_mutation:none",
+                        "tag": "none",
                         "value": "none",
                         "description": "Wildtype form of protein."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:none": {
+                    "none": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1308,7 +1308,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
+                        "tag": "knockin",
                         "value": "knockin",
                         "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
                     }
@@ -1319,7 +1319,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Heterezygot (+/-)",
-                        "tag": "att_gene_zygosity:(+/-)",
+                        "tag": "(+/-)",
                         "value": "(+/-)",
                         "description": "Heterozygous"
                     }
@@ -1330,7 +1330,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRSPR+HDR mediated",
-                        "tag": "att_gene_editing_method:crispr_hdr",
+                        "tag": "crispr_hdr",
                         "value": "crispr_hdr",
                         "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest."
                     }
@@ -1341,19 +1341,19 @@
                         "attribute_id": 89,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 90,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1398,7 +1398,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -1409,7 +1409,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -1420,7 +1420,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -1431,19 +1431,19 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 722,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1492,7 +1492,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -1503,7 +1503,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -1514,7 +1514,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -1525,19 +1525,19 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 722,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1594,7 +1594,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -1605,7 +1605,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -1616,7 +1616,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -1627,19 +1627,19 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 722,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1671,7 +1671,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Stable Expression ",
-                        "tag": "att_gene_engineering:stable_expression",
+                        "tag": "stable_expression",
                         "value": "stable_expression",
                         "description": "Stable gene expression."
                     }
@@ -1682,7 +1682,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Unknown/Random",
-                        "tag": "att_gene_zygosity:unknown",
+                        "tag": "unknown",
                         "value": "unknown",
                         "description": "Unknown. Examples: virus- or biggy-bag expression."
                     }
@@ -1693,7 +1693,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "Lenti Viral",
-                        "tag": "att_gene_editing_method:lentiviral",
+                        "tag": "lentiviral",
                         "value": "lentiviral",
                         "description": "Lentivirus based genome integration."
                     }
@@ -1704,7 +1704,7 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Myc tag",
-                        "tag": "att_protein_mutation:myc",
+                        "tag": "myc",
                         "value": "myc",
                         "description": "Myc (EQKLISEEDL) tagged protein "
                     },
@@ -1713,30 +1713,30 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Flag tag",
-                        "tag": "att_protein_mutation:flag",
+                        "tag": "flag",
                         "value": "flag",
                         "description": "Flag (DYKDDDDK) tagged protein "
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:myc": {
+                    "myc": {
                         "attribute_value": {
                             "id": 720,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "C-term",
-                            "tag": "att_protein_position:cterm",
+                            "tag": "cterm",
                             "value": "cterm",
                             "description": "C-terminus of the protein"
                         }
                     },
-                    "att_protein_mutation:flag": {
+                    "flag": {
                         "attribute_value": {
                             "id": 720,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "C-term",
-                            "tag": "att_protein_position:cterm",
+                            "tag": "cterm",
                             "value": "cterm",
                             "description": "C-terminus of the protein"
                         }
@@ -1785,7 +1785,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -1796,7 +1796,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -1807,7 +1807,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -1818,19 +1818,19 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 722,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -1862,7 +1862,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Stable Expression ",
-                        "tag": "att_gene_engineering:stable_expression",
+                        "tag": "stable_expression",
                         "value": "stable_expression",
                         "description": "Stable gene expression."
                     }
@@ -1873,7 +1873,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Unknown/Random",
-                        "tag": "att_gene_zygosity:unknown",
+                        "tag": "unknown",
                         "value": "unknown",
                         "description": "Unknown. Examples: virus- or biggy-bag expression."
                     }
@@ -1884,7 +1884,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "Lenti Viral",
-                        "tag": "att_gene_editing_method:lentiviral",
+                        "tag": "lentiviral",
                         "value": "lentiviral",
                         "description": "Lentivirus based genome integration."
                     }
@@ -1895,7 +1895,7 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Amino acid substitution",
-                        "tag": "att_protein_mutation:substitution",
+                        "tag": "substitution",
                         "value": "substitution",
                         "description": "Amino acid exchange on a single amino acid position."
                     },
@@ -1904,7 +1904,7 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Myc tag",
-                        "tag": "att_protein_mutation:myc",
+                        "tag": "myc",
                         "value": "myc",
                         "description": "Myc (EQKLISEEDL) tagged protein "
                     },
@@ -1913,19 +1913,19 @@
                         "attribute_id": 91,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Flag tag",
-                        "tag": "att_protein_mutation:flag",
+                        "tag": "flag",
                         "value": "flag",
                         "description": "Flag (DYKDDDDK) tagged protein "
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:substitution": {
+                    "substitution": {
                         "attribute_value": {
                             "id": 719,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "AA position",
-                            "tag": "att_protein_position:aa",
+                            "tag": "aa",
                             "value": "aa",
                             "description": "Specific amino acid position"
                         },
@@ -1937,24 +1937,24 @@
                             "H"
                         ]
                     },
-                    "att_protein_mutation:myc": {
+                    "myc": {
                         "attribute_value": {
                             "id": 720,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "C-term",
-                            "tag": "att_protein_position:cterm",
+                            "tag": "cterm",
                             "value": "cterm",
                             "description": "C-terminus of the protein"
                         }
                     },
-                    "att_protein_mutation:flag": {
+                    "flag": {
                         "attribute_value": {
                             "id": 720,
                             "attribute_id": 92,
                             "attribute_tag": "att_protein_position",
                             "text": "C-term",
-                            "tag": "att_protein_position:cterm",
+                            "tag": "cterm",
                             "value": "cterm",
                             "description": "C-terminus of the protein"
                         }
@@ -1995,7 +1995,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2006,7 +2006,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -2017,7 +2017,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2057,7 +2057,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2068,7 +2068,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -2079,7 +2079,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2119,7 +2119,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2130,7 +2130,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -2141,7 +2141,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2152,7 +2152,7 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     },
@@ -2161,19 +2161,19 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 733,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -2186,13 +2186,13 @@
                             "E"
                         ]
                     },
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 730,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "AA position",
-                            "tag": "att_protein_position:aa",
+                            "tag": "aa",
                             "value": "aa",
                             "description": "Specific amino acid position"
                         },
@@ -2239,7 +2239,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2250,7 +2250,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -2261,7 +2261,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2272,7 +2272,7 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Truncation",
-                        "tag": "att_protein_mutation:truncation",
+                        "tag": "truncation",
                         "value": "truncation",
                         "description": "Deletion of a region in the amino acid sequence."
                     },
@@ -2281,19 +2281,19 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:truncation": {
+                    "truncation": {
                         "attribute_value": {
                             "id": 733,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -2306,13 +2306,13 @@
                             "E"
                         ]
                     },
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 730,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "AA position",
-                            "tag": "att_protein_position:aa",
+                            "tag": "aa",
                             "value": "aa",
                             "description": "Specific amino acid position"
                         },
@@ -2359,7 +2359,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2370,7 +2370,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -2381,7 +2381,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "Homologous recombination (loxP-sites)",
-                        "tag": "att_gene_editing_method:homologrecombination",
+                        "tag": "homologrecombination",
                         "value": "homologrecombination",
                         "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
                     }
@@ -2421,7 +2421,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2432,7 +2432,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -2443,7 +2443,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "Homologous recombination (loxP-sites)",
-                        "tag": "att_gene_editing_method:homologrecombination",
+                        "tag": "homologrecombination",
                         "value": "homologrecombination",
                         "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
                     }
@@ -2483,7 +2483,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2494,7 +2494,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -2505,7 +2505,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "Homologous recombination (loxP-sites)",
-                        "tag": "att_gene_editing_method:homologrecombination",
+                        "tag": "homologrecombination",
                         "value": "homologrecombination",
                         "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
                     }
@@ -2516,19 +2516,19 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Amino acid deletion",
-                        "tag": "att_protein_mutation:deletion",
+                        "tag": "deletion",
                         "value": "deletion",
                         "description": "Deletion of a single amino acid"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:deletion": {
+                    "deletion": {
                         "attribute_value": {
                             "id": 733,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         }
@@ -2569,7 +2569,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2580,7 +2580,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -2591,7 +2591,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "Homologous recombination (loxP-sites)",
-                        "tag": "att_gene_editing_method:homologrecombination",
+                        "tag": "homologrecombination",
                         "value": "homologrecombination",
                         "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse."
                     }
@@ -2602,19 +2602,19 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "None",
-                        "tag": "att_protein_mutation:none",
+                        "tag": "none",
                         "value": "none",
                         "description": "Wildtype form of protein."
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:none": {
+                    "none": {
                         "attribute_value": {
                             "id": 733,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         }
@@ -2655,7 +2655,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2666,7 +2666,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -2677,7 +2677,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2688,19 +2688,19 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 733,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -2748,7 +2748,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2759,7 +2759,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -2770,7 +2770,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2781,19 +2781,19 @@
                         "attribute_id": 92,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 733,
                             "attribute_id": 93,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -2841,7 +2841,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2852,7 +2852,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -2863,7 +2863,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2874,19 +2874,19 @@
                         "attribute_id": 95,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 741,
                             "attribute_id": 96,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -2935,7 +2935,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -2946,7 +2946,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -2957,7 +2957,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -2968,19 +2968,19 @@
                         "attribute_id": 95,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 741,
                             "attribute_id": 96,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -3028,7 +3028,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -3039,7 +3039,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
+                        "tag": "(-/-)",
                         "value": "(-/-)",
                         "description": "Homozygous"
                     }
@@ -3050,7 +3050,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -3061,19 +3061,19 @@
                         "attribute_id": 95,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 741,
                             "attribute_id": 96,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -3121,7 +3121,7 @@
                         "attribute_id": 49,
                         "attribute_tag": "att_gene_engineering",
                         "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
+                        "tag": "ko",
                         "value": "ko",
                         "description": "Gene knock out."
                     }
@@ -3132,7 +3132,7 @@
                         "attribute_id": 50,
                         "attribute_tag": "att_gene_zygosity",
                         "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
+                        "tag": "(+/+)",
                         "value": "(+/+)",
                         "description": "Wildtype"
                     }
@@ -3143,7 +3143,7 @@
                         "attribute_id": 48,
                         "attribute_tag": "att_gene_editing_method",
                         "text": "CRISPR-mediated",
-                        "tag": "att_gene_editing_method:crispr",
+                        "tag": "crispr",
                         "value": "crispr",
                         "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA."
                     }
@@ -3154,19 +3154,19 @@
                         "attribute_id": 95,
                         "attribute_tag": "att_protein_mutation",
                         "text": "Frameshift",
-                        "tag": "att_protein_mutation:frameshift",
+                        "tag": "frameshift",
                         "value": "frameshift",
                         "description": "Frameshift mediated by a double strand break"
                     }
                 ],
                 "att_protein_position": {
-                    "att_protein_mutation:frameshift": {
+                    "frameshift": {
                         "attribute_value": {
                             "id": 741,
                             "attribute_id": 96,
                             "attribute_tag": "att_protein_position",
                             "text": "Region",
-                            "tag": "att_protein_position:region",
+                            "tag": "region",
                             "value": "region",
                             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences."
                         },
@@ -3179,221 +3179,6 @@
                         ]
                     }
                 }
-            }
-        ]
-    },
-    {
-        "label": "enHhd",
-        "text": "Notch2.KO.(-/-)",
-        "proteome_id": "UP000000589",
-        "features": [
-            {
-                "key": "O35516",
-                "genes": "Notch2",
-                "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
-                "organism": "Mus musculus (Mouse)",
-                "aa_length": 2473,
-                "reviewed": true
-            }
-        ],
-        "attributes": [
-            {
-                "att_protein_coding_sequence": [
-                    {
-                        "key": "O35516",
-                        "genes": "Notch2",
-                        "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
-                        "organism": "Mus musculus (Mouse)",
-                        "aa_length": 2473,
-                        "reviewed": true
-                    }
-                ],
-                "att_gene_engineering": [
-                    {
-                        "id": 361,
-                        "attribute_id": 50,
-                        "attribute_tag": "att_gene_engineering",
-                        "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
-                        "value": "ko",
-                        "description": "Gene knock out."
-                    }
-                ],
-                "att_gene_zygosity": [
-                    {
-                        "id": 364,
-                        "attribute_id": 51,
-                        "attribute_tag": "att_gene_zygosity",
-                        "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
-                        "value": "(-/-)",
-                        "description": "Homozygous"
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "label": "KmODc",
-        "text": "Notch2.KI.(+/+)",
-        "proteome_id": "UP000000589",
-        "features": [
-            {
-                "key": "O35516",
-                "genes": "Notch2",
-                "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
-                "organism": "Mus musculus (Mouse)",
-                "aa_length": 2473,
-                "reviewed": true
-            }
-        ],
-        "attributes": [
-            {
-                "att_protein_coding_sequence": [
-                    {
-                        "key": "O35516",
-                        "genes": "Notch2",
-                        "proteins": "Neurogenic locus notch homolog protein 2 (Notch 2) (Motch B) [Cleaved into: Notch 2 extracellular truncation; Notch 2 intracellular domain]",
-                        "organism": "Mus musculus (Mouse)",
-                        "aa_length": 2473,
-                        "reviewed": true
-                    }
-                ],
-                "att_gene_engineering": [
-                    {
-                        "id": 360,
-                        "attribute_id": 50,
-                        "attribute_tag": "att_gene_engineering",
-                        "text": "Knockin",
-                        "tag": "att_gene_engineering:knockin",
-                        "value": "knockin",
-                        "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. "
-                    }
-                ],
-                "att_gene_zygosity": [
-                    {
-                        "id": 365,
-                        "attribute_id": 51,
-                        "attribute_tag": "att_gene_zygosity",
-                        "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
-                        "value": "(+/+)",
-                        "description": "Wildtype"
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "label": "eAOGV",
-        "text": "Fcgr4.KO.(-/-)",
-        "proteome_id": "UP000000589",
-        "features": [
-            {
-                "key": "A0A0B4J1G0",
-                "genes": "Fcgr4 Fcgr3a",
-                "proteins": "Low affinity immunoglobulin gamma Fc region receptor III-A (IgG Fc receptor III-A) (CD16-2) (FcgammaRIV) (CD antigen CD16a)",
-                "organism": "Mus musculus (Mouse)",
-                "aa_length": 249,
-                "reviewed": true
-            }
-        ],
-        "attributes": [
-            {
-                "att_protein_coding_sequence": [
-                    {
-                        "key": "A0A0B4J1G0",
-                        "genes": "Fcgr4 Fcgr3a",
-                        "proteins": "Low affinity immunoglobulin gamma Fc region receptor III-A (IgG Fc receptor III-A) (CD16-2) (FcgammaRIV) (CD antigen CD16a)",
-                        "organism": "Mus musculus (Mouse)",
-                        "aa_length": 249,
-                        "reviewed": true
-                    }
-                ],
-                "att_gene_engineering": [
-                    {
-                        "id": 361,
-                        "attribute_id": 50,
-                        "attribute_tag": "att_gene_engineering",
-                        "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
-                        "value": "ko",
-                        "description": "Gene knock out."
-                    }
-                ],
-                "att_gene_zygosity": [
-                    {
-                        "id": 364,
-                        "attribute_id": 51,
-                        "attribute_tag": "att_gene_zygosity",
-                        "text": "Homozygot (-/-)",
-                        "tag": "att_gene_zygosity:(-/-)",
-                        "value": "(-/-)",
-                        "description": "Homozygous"
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "label": "KCAVG",
-        "text": "Ndufs6.KO.(+/+)",
-        "proteome_id": "UP000000589",
-        "features": [
-            {
-                "key": "P52503",
-                "genes": "Ndufs6 Ip13",
-                "proteins": "NADH dehydrogenase [ubiquinone] iron-sulfur protein 6, mitochondrial (Complex I-13kD-A) (CI-13kD-A) (NADH-ubiquinone oxidoreductase 13 kDa-A subunit)",
-                "organism": "Mus musculus (Mouse)",
-                "aa_length": 116,
-                "reviewed": true
-            }
-        ],
-        "attributes": [
-            {
-                "att_protein_coding_sequence": [
-                    {
-                        "key": "P52503",
-                        "genes": "Ndufs6 Ip13",
-                        "proteins": "NADH dehydrogenase [ubiquinone] iron-sulfur protein 6, mitochondrial (Complex I-13kD-A) (CI-13kD-A) (NADH-ubiquinone oxidoreductase 13 kDa-A subunit)",
-                        "organism": "Mus musculus (Mouse)",
-                        "aa_length": 116,
-                        "reviewed": true
-                    }
-                ],
-                "att_gene_engineering": [
-                    {
-                        "id": 361,
-                        "attribute_id": 50,
-                        "attribute_tag": "att_gene_engineering",
-                        "text": "Knockout",
-                        "tag": "att_gene_engineering:ko",
-                        "value": "ko",
-                        "description": "Gene knock out."
-                    }
-                ],
-                "att_gene_zygosity": [
-                    {
-                        "id": 365,
-                        "attribute_id": 51,
-                        "attribute_tag": "att_gene_zygosity",
-                        "text": "Wildtype (+/+)",
-                        "tag": "att_gene_zygosity:(+/+)",
-                        "value": "(+/+)",
-                        "description": "Wildtype"
-                    }
-                ],
-                "att_gene_editing_method": [
-                    {
-                        "id": 352,
-                        "attribute_id": 49,
-                        "attribute_tag": "att_gene_editing_method",
-                        "text": "BiggyBac transposon",
-                        "tag": "att_gene_editing_method:biggybac",
-                        "value": "biggybac",
-                        "description": "The PiggyBac (PB) transposon is a mobile genetic element that efficiently transposes between vectors and chromosomes via a 'cut and paste' mechanism. During transposition, the PB transposase recognizes transposon-specific inverted terminal repeat sequences (ITRs) located on both ends of the transposon vector and efficiently moves the contents from the original sites and integrates them into TTAA chromosomal sites"
-                    }
-                ]
             }
         ]
     }

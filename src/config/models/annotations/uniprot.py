@@ -15,6 +15,9 @@ class API_UniprotAnnotationsModel(BaseModel):
         "gene_names",
         "gene_synonym",
         "length",
+        "gene_primary",
+        "sequence",
+        "sequence_version",
         "go_c",
         "go_p",
         "go_f",
@@ -25,8 +28,9 @@ class API_UniprotAnnotationsModel(BaseModel):
         "ft_domain",
         "organism_id",
         ]
+    #reviewed : bool = True
     cursor : Optional[str] = None
-    compressed : Optional[bool] = False
+    compressed : Optional[bool] = True
 
     @field_serializer('fields')
     def serialize_fields(self,fields : list,*args,**kwargs):
