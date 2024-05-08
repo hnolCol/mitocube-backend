@@ -219,6 +219,10 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                     print("error loading file: ",filePath," Missing 'Key' column?")
                     continue
                 d["label"] = fileProps["label"]
+                
+                print(filePath)
+                print(fileProps)
+                
                 feature_keys.append(d.loc[:,["label"]])
                 self._labels_with_data_table.add(fileProps["label"])
                 self._features_by_label[fileProps["label"]] = d.index
@@ -227,9 +231,17 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                     metadata = DatasetSubmissionModel(**read_json(fileProps["param_file"]))
                 except Exception as e:
                     print(e,filePath)
+                    print(")))))")
+                    continue
                 sample_names = metadata.sample_names
-                
-                self._mean_abundance_by_feature[fileProps["label"]] = d.loc[:,sample_names].mean(axis=1).to_dict()
+                try:
+                    self._mean_abundance_by_feature[fileProps["label"]] = d.loc[:,sample_names].mean(axis=1).to_dict()
+                except:
+                    print(metadata)
+                    print(d)
+                    print(sample_names)
+                    print(d.columns)
+                    raise ValueError()
                 # load meta to calculate variances 
                     
                 total_variance = d.loc[:,sample_names].var(axis=1)
@@ -324,10 +336,13 @@ class PandaDatabaseHelper(MCDatabaseHelper):
         for filePath, fileProps in files_modified.items():
             if fileProps["is_param"]:
                 try:
-                    metadata = DatasetSubmissionModel(**read_json(filePath))
+                    meta = read_json(filePath)
+                    metadata = DatasetSubmissionModel(**meta)
                 except Exception as e:
                     print(e,filePath)
+                    continue
                 if fileProps["label"] != metadata.label:
+                
                     continue 
                 
                 ### save label

@@ -300,11 +300,12 @@ class AnnotationDatabase(metaclass=SingletonABCMeta):
                     if annotationSet.contains(feature_key):
                         identifiedAnnotations[annotationSet.getDescriptionalTag()] = annotationSet.getAnnotations(feature_key)
         else:
-            for annotationSet in self._cached_annotations[proteome_id]:
-                if subset is not None and not annotationSet.getAnnotationType() in subset:
-                        continue
-                if annotationSet.contains(feature_key):
-                    identifiedAnnotations[annotationSet.getDescriptionalTag()] = annotationSet.getAnnotations(feature_key)
+            if proteome_id in self._cached_annotations:
+                for annotationSet in self._cached_annotations[proteome_id]:
+                    if subset is not None and not annotationSet.getAnnotationType() in subset:
+                            continue
+                    if annotationSet.contains(feature_key):
+                        identifiedAnnotations[annotationSet.getDescriptionalTag()] = annotationSet.getAnnotations(feature_key)
 
         return identifiedAnnotations
 
