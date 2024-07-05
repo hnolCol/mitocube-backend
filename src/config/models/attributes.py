@@ -62,7 +62,7 @@ class AttributeModel(BaseModel):
     allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
     allow_for_user : bool = False
 
-    unit : Optional[Literal["length","concentration","weight","time"]] = None # ToDo: define units like this? 
+    unit : Optional[Literal["length","concentration","weight","time","volume","voltage","arbitrary","flow"]] = None # ToDo: define units like this? 
 
     @field_validator('parent_id', mode="before")
     def change_nan_to_none(cls, v, field):  # ToDo: cls or self? @classmethod
