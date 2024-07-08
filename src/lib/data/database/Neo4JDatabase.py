@@ -12,11 +12,11 @@ from config.enums.users.roles import UserRolesEnum
 from config.settings.db import get_db_settings
 from config.settings.proteomes.annotations import UniprotAnnotationSettings
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeUnitResponseModel #, AttributeValuesByDatasetModel
-from config.models.annotations.feature import FeatureNeoModel
+from config.models.feature import FeatureNeoModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModel, UserModelForRegistration
 from config.models.parameter import APIParamString
-from config.models.annotations.feature import FeatureNeoModel
+from config.models.feature import FeatureNeoModel
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel
 from config.models.searches import FulltextSearchResult
 from config.models.filter import Filter
@@ -946,13 +946,13 @@ class Neo4JSubmissionFilter():
         return [ri.value() for ri in r] 
     
     def get(self, 
-                        state : List[int] = None, 
-                        attribute_value_tag : List[str] = None, 
-                        attribute_tag : List[str]= None, 
-                        user_tag : List[str] = None, 
-                        protein_tag : List[str] = None, 
-                        genotype_tag : List[str] = None,
-                        limit : int = 10) -> List[str]:
+            state : List[int] = None, 
+            attribute_value_tag : List[str] = None, 
+            attribute_tag : List[str]= None, 
+            user_tag : List[str] = None, 
+            protein_tag : List[str] = None, 
+            genotype_tag : List[str] = None,
+            limit : int = 10) -> List[str]:
         ""
         
         tags = None 
@@ -1550,28 +1550,28 @@ class Neo4JMetaHandler(MetaABC):
             r = session.run(query) 
             
             
-    def add_owner(self, user_tag : str, dataset_tag : str):
+    def add_owner(self, tag : str, user_tag : str):
         ""
         query = (
             "MATCH (u:User) "
             "WHERE u.tag = $user_tag "
             "MATCH (d:Dataset) "
-            "WHERE d.tag = $dataset_tag "
+            "WHERE d.tag = $tag "
             "MERGE (u)-[r:OWNS]-(d) "
             "SET r.created_at = timestamp() "
         )
         
-        self._driver.execute_query(query, user_tag = user_tag, dataset_tag = dataset_tag, routing_ = "w", database_ = "neo4j")
+        self._driver.execute_query(query, user_tag = user_tag, tag = tag, routing_ = "w", database_ = "neo4j")
 
 
             
-    def add_collaborators(self, user_tags : List[str], dataset_tag : str):
+    def add_collaborators(self, tag : str, user_tags : List[str]):
         ""
         query = (
             "MATCH (u:User) "
             "WHERE u.tag in $user_tags "
             "MATCH (d:Dataset) "
-            "WHERE d.tag = $dataset_tag "
+            "WHERE d.tag = $tag "
             "MERGE (u)-[r:IS_PART]-(d) "
             "SET r.created_at = timestamp() "
             "WITH u,d "
@@ -1581,7 +1581,7 @@ class Neo4JMetaHandler(MetaABC):
             
         )
         
-        r,_,_ = self._driver.execute_query(query, user_tags = user_tags, dataset_tag = dataset_tag, routing_ = "w", database_ = "neo4j")
+        r,_,_ = self._driver.execute_query(query, user_tags = user_tags, tag = tag, routing_ = "w", database_ = "neo4j")
 
 
     def update_owner(self, dataset_tag: str, user_tag: str):

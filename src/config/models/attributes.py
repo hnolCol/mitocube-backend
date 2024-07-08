@@ -2,8 +2,7 @@ from pydantic import BaseModel, field_validator, field_serializer
 # from pydantic import Field
 from typing import Any, Optional, List, Union, Literal
 import numpy as np 
-
-
+from config.models.feature import FeatureNeoModel
 # from services.random_generators import get_random_string
 
 class AttributeModel(BaseModel):
@@ -195,6 +194,13 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
             return str(v)
         else:
             return v
+
+
+class AttributeValuesByDatasetModel(BaseModel):
+    attribute_value : AttributeValueModel|FeatureNeoModel
+    tags : List[str]
+    count : int 
+
 
 class AttributeResponseModel(BaseModel):
     """

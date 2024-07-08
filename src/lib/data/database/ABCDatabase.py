@@ -2,27 +2,24 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from collections import OrderedDict
-# from datetime import timedelta
-from typing import List, Dict, Optional, Tuple, Literal  # , Any
+
+from typing import List, Dict, Optional, Tuple, Literal 
 from deprecated import deprecated
-from neo4j import Driver 
 
 import pandas as pd
 
 from lib.data.dataset.ABCDataset import MCDataset
-from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
+from lib.DesignPatterns import SingletonABCMeta 
 
 from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeUnitResponseModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModel 
-from config.models.annotations.feature import FeatureNeoModel
 from config.models.filter import Filter
 
 DB_SETTINGS = get_db_settings()
 
 ## load database 
-
 class DatabaseABC(ABC):
     meta : MetaABC = None 
     user : UserABC = None 
@@ -64,8 +61,8 @@ class DatabaseABC(ABC):
         if self.attributes is None:
             raise NotImplementedError("A database class must have the attributes class attribute defined.")
         
-        if not isinstance(self.user, UserABC):
-            raise TypeError("The attribute user must be an instance of UserABC")
+        if not isinstance(self.user, AttributesABC):
+            raise TypeError("The attribute class must be an instance of AttributesABC")
         
         if self.filters is None:
             raise NotImplementedError("A database class must have the filter attribute defined.")

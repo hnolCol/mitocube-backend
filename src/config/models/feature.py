@@ -1,6 +1,6 @@
 from deprecated import deprecated
 from pydantic import BaseModel  # , field_serializer, field_validator, root_validator
-from typing import List, Dict  # , Any
+from typing import List, Dict, Optional  # , Any
 # from collections import OrderedDict
 # import pandas as pd
 
@@ -15,3 +15,14 @@ class FeatureDataResponseModel(BaseModel):
     dataset_labels : List[str]  # labels of datasets
     data : Dict[str,List[Dict]]  # data key - dataset_label
 
+
+class FeatureNeoModel(BaseModel):
+    """Base Model for a Feature"""
+    key : Optional[str] = None
+    tag : str
+    gene_name : str 
+    gene_names : str = None
+    protein_name : str
+    proteome_id : str
+    aa_length : int = None
+    reviewed : Optional[bool] = True 

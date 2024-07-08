@@ -13,8 +13,9 @@ from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
 from config.models.submissions.runs import RunListModel
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel
-from config.models.annotations.feature import FeatureModel, FeatureNeoModel
+from config.models.annotations.feature import FeatureModel
 from config.models.unit import UserUnitInput, InputModel
+from config.models.feature import FeatureNeoModel
 
 from config.settings.metatexts import MetaTexts
 from config.enums.states import SubmissionStatesEnums

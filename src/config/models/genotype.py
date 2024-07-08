@@ -2,8 +2,9 @@ from pydantic import BaseModel, field_validator
 
 
 from typing import Optional, Union, List, Dict 
-from config.models.annotations.feature import FeatureModel, FeatureNeoModel
+from config.models.annotations.feature import FeatureModel
 from config.models.attributes import AttributeValueModel
+from config.models.feature import FeatureNeoModel
 
 class MutationPositionModel(BaseModel):
     attribute_value : AttributeValueModel

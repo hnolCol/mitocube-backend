@@ -11,6 +11,7 @@ class Database:
     
     @staticmethod
     def DB() -> DatabaseABC:
-        if DB_SETTINGS.db_handler == "neo4j" or DB_SETTINGS.db_handler =="pandafiles":
+        if DB_SETTINGS.db_handler == "neo4j":
             from lib.data.database.Neo4JDatabase import DB as Neo4JDB
             return Neo4JDB
+        
