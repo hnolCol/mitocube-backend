@@ -199,7 +199,7 @@ def check_for_missing_mandatory_attribute(submission : NewSubmissionModel, attri
         attrNotInSamplteAttr = [attribute for attribute in attrsNotInDatasetAttributes if attribute.tag not in sampleAttributesTags]
         return attrNotInSamplteAttr 
     
-    return attrsNotInDatasetAttributes
+    return []
 
 def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dict:
     """
