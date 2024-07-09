@@ -12,8 +12,8 @@ from lib.data.dataset.ABCDataset import MCDataset
 from lib.DesignPatterns import SingletonABCMeta 
 
 from config.settings.db import get_db_settings
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel
-from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel
+from config.models.submissions.submissions import DatasetSubmissionModel, MinimalMetadataResponseModel
 from config.models.user import UserModel 
 from config.models.filter import Filter
 
@@ -25,6 +25,8 @@ class DatabaseABC(ABC):
     user : UserABC = None 
     attributes : AttributesABC = None
     filters : FilterABC = None
+    features : FeaturesABC = None 
+    
     def __init__(self):
         """The abstract database class that defines
         all the required methods as abstractmethod in order
@@ -73,6 +75,8 @@ class DatabaseABC(ABC):
         if self.features is None:
             raise NotImplementedError("A database class must have the features attribute defined. ")
         
+        if not isinstance(self.features, FeaturesABC):
+            raise TypeError("The attribute filters must be an instance of FeaturesABC")
         
     @abstractmethod
     def dataset_exists(self, tag : str) -> bool:
@@ -90,6 +94,11 @@ class DatabaseABC(ABC):
             If the tag is associated with a dataset/submission.
         """
         
+    @abstractmethod
+    def dataset_has_data(self, tag : str) -> bool:
+        """Checks if the dataset has data (e.g. quantitative data)
+
+        Parameters
         ----------
         tag : str
             The tag associated with a submission/dataset
@@ -97,18 +106,35 @@ class DatabaseABC(ABC):
         Returns
         -------
         bool
+            If data exists (e.g. quantitative values for proteins)
+        """
+        
     @abstractmethod
     def get_dataset_tags(self) -> List[str]:
         ""
         
+    @abstractmethod
+    def get_dataset_table(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
+        """Returns the protein data table
+
+        Parameters
+        ----------
+        tag : str
+            _description_
         filter_tag : str
             The tag associated with an implemented filter set (list of proteins). 
 
         Returns
+        -------
+        pd.DataFrame
+            The datatable characterized by:
+                - index (str) : the protein tag (Uniprot ID)
+                - columns : The index of the column 
+         """
+        
     @abstractmethod
     def get_meta_data(self, tag : str) -> DatasetSubmissionModel:
         ""
-    
     
     @abstractmethod
     def insert_dataset(self, data_table : pd.DataFrame, tag : str):
@@ -190,25 +216,27 @@ class SubmissionFilterABC(ABC):
         attribute_value_tag : List[str], optional
             List of attribute_value_tags that are used to filter the submissions, by default None
         attribute_tag : List[str], optional
-            _description_, by default None
+            Setting the 'attribute_tag' returns submissions that have an attribute_value
+            for the given tag (e.g. the attribute is defined), by default None
         user_tag : List[str], optional
             User filter, provide the tags of users that must be either owner or collaborator, by default None
         protein_tag : List[str], optional
             The protein tags for which the dataset must a) have data table (e.g. state > 4) and b) have a quantitative value 
+            for the provided protein_tag list, by default None
         genotype_tag : List[str], optional
+            Genotype filter, returns only submissions that have used the given genotype, by default None
         limit : int, optional
-            _description_, by default 10
             The number of max. submissions to be returned, by default 10
 
         Returns
         -------
         List[str]
-            _description_
+            List of submission_tag
 
         Raises
         ------
         Exception
-            _description_
+            If the database query returns an error. 
         """
 
 class AttributesABC(ABC):
@@ -238,6 +266,8 @@ class AttributesABC(ABC):
     @abstractmethod
     def get_values(self, tags : List[str] = None, dataset_tag : str = None) -> List[AttributeValueModel|FeatureNeoModel]:
         """Returns the attribute values
+
+        Parameters
         ----------
         tags : List[str]
             _description_
@@ -245,6 +275,12 @@ class AttributesABC(ABC):
             Returns the attribute values matching the given tags. 
             
 
+        Returns
+        -------
+        List[AttributeValueModel|FeatureNeoModel]
+            The attribute values matching the tags that might be a standard attribute value
+            or a feature (e.g. protein)
+        """
         
     @abstractmethod
     def get_mandatory_attributes(self)->List[AttributeModel]:
@@ -283,6 +319,11 @@ class AttributesABC(ABC):
         """
         
     
+
+class FeaturesABC(ABC):
+    
+    @abstractmethod
+    def get_protein_sequence(self, tags : str) -> List[str]:
         """Returns the protein sequences for the given tags
 
         Parameters
@@ -291,6 +332,54 @@ class AttributesABC(ABC):
             Feature/protein tags
 
         Returns
+        -------
+        List[str]
+            Protein sequences in a list.
+        """
+        
+    @abstractmethod
+    def  get_protein_by_tags(self, tags : List[str], as_data_frame : bool = True) -> List[FeatureNeoModel]|pd.DataFrame:
+        """Returns the protein information from the database
+
+        Parameters
+        ----------
+        tags : List[str]
+            The protein tags
+        as_data_frame : bool, optional
+            If the data should be returned as a pandas data frame, by default True
+
+        Returns
+        -------
+        List[FeatureNeoModel]|pd.DataFrame
+            if as_data_frame is True, then a pandas data frame is returned, otherwise a list of FeatureModel is returned
+        """
+    
+    @abstractmethod
+    def insert_uniprot_proteome(self, 
+                                proteome_id : List[str] = ["UP000005640"], 
+                                reviewed : bool = True, 
+                                user_tag : str = None) -> int:
+        """Insert the data from the Uniprot Database for a reference proteome. 
+
+        Parameters
+        ----------
+        proteome_id : List[str], optional
+            _description_, by default ["UP000005640"]
+        reviewed : bool, optional
+            _description_, by default True
+        user_tag : str, optional
+            _description_, by default None
+
+        Returns
+        -------
+        int
+            The number of proteins added to the database. 
+
+        Raises
+        ------
+        Exception
+            If the database insertion throws an Exception. 
+        """
 class UserABC(ABC):
     
     @abstractmethod
@@ -366,8 +455,9 @@ class MetaABC(ABC):
     
     def __init__(self, *args, **kwargs) -> None:
         ""
-        
-    def get(self, tags : List[str]) -> List[Dict]:
+    
+    @abstractmethod
+    def get(self, tags : List[str]) -> List[MinimalMetadataResponseModel]:
         """Retrieve the minimal information about a dataset. 
 
         Parameters
@@ -385,8 +475,9 @@ class MetaABC(ABC):
         Exception
             If the database throws an Exception
         """
-    
-    def update_owner(self, dataset_tag : str, user_tag : str):
+        
+    @abstractmethod
+    def get_metatext(self, tags : List[str]) -> pd.DataFrame:
         """Returns the metatext associated with the provided tags (dataset tags)
 
         Parameters
@@ -394,6 +485,111 @@ class MetaABC(ABC):
         tags : List[str]
             The dataset/submission tags. 
 
+        Returns
+        -------
+        pd.DataFrame
+            The metatext with the following columns
+                - tag (str) - The metatext tag 
+                - title (str) - The metatext title 
+                - dataset_tag (str) - The dataset tags 
+                - content (str) - The metatext content (e.g. text)
+            The dataset is sorted by priority. The priority of meta text can be defined 
+            in the settings (config/settings/submission/metatext)
+        """
+        
+    @abstractmethod
+    def get_sample_attributes_and_genotypes(self, tag : str, as_sample_map : bool = True) -> Tuple[Dict[str,Dict[str,int]],pd.DataFrame]|Dict[str,Dict[str,int]]:
+        """Returns the attributes and genotypes per sample. 
+
+        Parameters
+        ----------
+        tag : str
+            _description_
+        as_sample_map : bool, optional
+            If True, a sample map (pd.DataFrame) is returned that has the following props/columns
+                - index (int) - the sample index 
+                - attribute_tags as columns 
+            , by default True
+
+        Returns
+        -------
+        Tuple[Dict[str,Dict[str,int]],pd.DataFrame]|Dict[str,Dict[str,int]]
+            If as_sample_map, a tuple is returned with 
+            
+                a) Dict with:
+                    - keys (str) - attribute_tag (example: att_compound)
+                    - values (Dict[str,List[int]])
+                        - keys : attribute_value_tag (example dmso, Uniprot id)
+                        - values : list of sample index that were annotated with the attribute_value
+                b) pd.DataFrame with 
+                    - index (int) - the sample index 
+                    - attribute_tags as columns 
+                    
+            else:
+                a) Dict with:
+                    - keys (str) - attribute_tag (example: att_compound)
+                    - values (Dict[str,List[int]])
+                        - keys : attribute_value_tag (example dmso, Uniprot id)
+                        - values : list of sample index that were annotated with the attribute_value
+            
+        Example
+        ------- 
+        
+        """
+        
+    @abstractmethod
+    def get_owner(self, dataset_tag : str) -> UserModel:
+        """Returns the owner (user) for a given dataset tag. 
+
+        Parameters
+        ----------
+        dataset_tag : str
+            _description_
+
+        Returns
+        -------
+        UserModel
+            The owner of the dataset
+        """
+        
+        
+    @abstractmethod
+    def get_users(self, dataset_tag : str) -> List[UserModel]:
+        """Get all users (owner and collaborators) that are 
+        associated with a dataset/submission tag 
+
+        Parameters
+        ----------
+        dataset_tag : str
+            Tag associated with a submission/dataset
+
+        Returns
+        -------
+        List[UserModel]
+            The users associated with the dataset/submission. 
+        """
+        
+    @abstractmethod
+    def add_metatext(self, dataset_tag : str, user_tag : str, meta_texts : Dict[str,str]):
+        """Adds metatext to the database 
+
+        Parameters
+        ----------
+        dataset_tag : str
+            The dataset/submission tag
+        user_tag : str
+            The user tag that added the metatext information.
+        meta_texts : Dict[str,str]
+            - keys (str) - Metatext tag 
+            - values (str) - Metatext content 
+            Please see also the metatext settings (config/settings/submission/metatext)
+            to modify the required metatext, the priority. If a metatext tag is not defined 
+            in the settings it should not be added to the database. 
+        """
+        
+        
+    @abstractmethod
+    def update_owner(self, dataset_tag : str, user_tag : str) -> bool:
         """Updates the ownership of data submission/dataset.
 
         Parameters
@@ -405,8 +601,8 @@ class MetaABC(ABC):
 
         Returns
         -------
-        _type_
-            _description_
+        bool
+            If the update of the owner was successful. 
 
         Raises
         ------
@@ -453,22 +649,33 @@ class FilterABC(ABC):
     def exists(self, tag : str) -> bool:
         """Check if a filter exists with the given tag.
 
+        Parameters
+        ----------
         tag : str
             _description_
 
         Returns
         -------
+        bool
+            _description_
+        """
     
     @abstractmethod
-    def get(self, tag : str = None) -> List[Filter]:
+    def get(self, tag : str = None, proteome_ids : List[str] = None, feature_tag : str = None) -> List[Filter]:
         """Returns the available filters/protein sets
-        from the database
+        from the database b using the tag for the filter.
+        A list of proteome_ids (Uniprot) or a specific feature_tag
 
         Parameters
         ----------
         tag : str
             The filter tag
+        proteome_ids : List[str]
+            The proteome ids for which all filters should be returned.
             Ignored of tag is provided. 
+        feature_tag : str 
+            The feature tag for which the available filters should be returned. 
+            Ignored if tag or proteome_ids are provided. 
         
         Returns
         -------
@@ -826,8 +1033,6 @@ class DatasetABC(ABC):
 
 
 
-class InvalidDatasetLabelError(Exception):
-    pass
 
 class MCAttributes(metaclass=SingletonABCMeta):
     """"""

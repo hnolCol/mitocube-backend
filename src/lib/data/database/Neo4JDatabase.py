@@ -11,6 +11,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.enums.users.roles import UserRolesEnum
 from config.settings.db import get_db_settings
 from config.settings.proteomes.annotations import UniprotAnnotationSettings
+from config.settings.metatexts import MetaTexts
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeUnitResponseModel #, AttributeValuesByDatasetModel
 from config.models.feature import FeatureNeoModel
 from config.models.submissions.submissions import DatasetSubmissionModel
@@ -200,7 +201,6 @@ attribute_value_models = [AttributeValueModel(**k, s = [str(k["text"]),k["descri
 #print(attribute_value_models)
 
 
-mitocarta3 = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/filter/human_mitocarta/data.txt",sep="\t")
 #mitocarta3 = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/filter/human_mitocarta/data.txt",sep="\t")
 #print(mitocarta3)
 
@@ -217,7 +217,6 @@ class Neo4JConstructor:
     
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
-        self.feature = Neo4JFeatures(driver=driver)
         self.features = Neo4JFeatures(driver=driver)
         self.factory = Neo4JFactory(driver=driver)
         
