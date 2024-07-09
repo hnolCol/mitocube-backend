@@ -33,7 +33,7 @@ def get_proteomes(user : UserModel = Depends(is_user_admin)):
 
 
 @router.post("")
-def add_protein_by_proteome_id(background_task : BackgroundTasks, proteome_id : str, user : UserModel = Depends(is_user_admin)):
+def add_protein_by_proteome_id(background_task : BackgroundTasks, proteome_id : str, reviewed : bool = True, user : UserModel = Depends(is_user_admin)):
     """Adds proteins from Uniprot
     including the annotations and sequence information.
 
@@ -45,7 +45,7 @@ def add_protein_by_proteome_id(background_task : BackgroundTasks, proteome_id : 
         _description_, by default Depends(is_user_admin)
     """
     try:
-        N = DB.feature.insert_uniprot_proteome(proteome_id=APIParamString(param=proteome_id).param, user_tag = user.tag)
+        N = DB.features.insert_uniprot_proteome(proteome_id=APIParamString(param=proteome_id).param, reviewed  = reviewed, user_tag = user.tag)
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500,detail="There was an error when retrieving data from Uniprot.")

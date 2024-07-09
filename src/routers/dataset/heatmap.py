@@ -9,7 +9,7 @@ from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.statistic.ANOVA import OneWayANOVA
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 
-from config.exceptions.HTTPExceptions import no_data_found
+from config.exceptions.HTTPExceptions import no_data_found_http_exception, filter_tag_does_not_exist_exception
 from config.models.user import UserModel
 
 from services.users import get_user_from_token, is_user_at_least_curator
@@ -27,7 +27,7 @@ router = APIRouter(
             tags=["Heatmap"])
 def get_dataset_heatmap(dataset_label : str, 
                         n_clusters : int = 8, 
-                        filter_tag : str = None,
+                        filter_tag : str = "mitocarta_3.0",
                         user : UserModel = Depends(get_user_from_token)):
     """
     Returns data to feed into a heatmap for visualization.
@@ -35,32 +35,37 @@ def get_dataset_heatmap(dataset_label : str,
     Requires the definition of a statistical test to show a subset of the data. 
 
     """
-    db = MCDatabase.getDatabase()
-    dataset = db.getDataset(dataset_label)
-    if dataset is None:
-        raise HTTPException(status_code=400,detail="Data not found for given label.")
-    if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
+    dataset_tag = dataset_label
+    
+    data_exist = DB.dataset_has_data(tag = dataset_tag)
+    if not data_exist: return no_data_found_http_exception
+    
+    if filter_tag is not None:
+        if not DB.filters.exists(tag = filter_tag):
+            raise filter_tag_does_not_exist_exception
+    
+    datatable = DB.get_dataset_table(tag = dataset_tag, filter_tag = filter_tag)
+    print(datatable)
+    _, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)  
+    
     try:
-        stats = OneWayANOVA(dataset).get_stats(dropna=True)
+        stats = OneWayANOVA(datatable=datatable, sample_attribute_map=sample_map).get_stats(dropna=True)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error in one way anova " + str(e))
-    metadata = dataset.getMetaJson()
+    
     if stats.empty or stats.index.size < 3: raise HTTPException(status_code=400, detail="No or less than 3 significant hits found using ANOVA. Please use a volcano plot.")
     #merge data and sort them after clusters.
-    clusters, zscores = HierarchicalClustering(dataset).get_clusters(idcs = stats.index, n_clusters= n_clusters)
+    
+    print(stats,"stats")
+    clusters, zscores = HierarchicalClustering(datatable).get_clusters(idcs=stats.index, n_clusters= n_clusters)
     stats_and_zscores = zscores.join([stats,clusters], how="left")
     clusters_for_group = clusters.loc[stats_and_zscores.index,:].reset_index() #index is now number, before keys
     grouped_clusters = clusters_for_group.groupby(by="cluster")
     cluster_indices = OrderedDict([(cluster_idx,cluster_data.index.to_list()) for cluster_idx, cluster_data in grouped_clusters])
 
     ##annotate features 
-    #adjust proteome_id extraction TODO : ADJUST THIS!!
-    #check if organism is defined
-    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
-    feature_db = PandaFeatureDatabase()
-   # features = feature_db.get(stats_and_zscores.index,proteome_ids,ignoreMissing=True)
     #print(features)
-    features = DB.feature.get_protein_by_tags(stats_and_zscores.index.values.tolist())
+    features = DB.features.get_protein_by_tags(stats_and_zscores.index.values.tolist())
     print(features,"NEO4J")
     #join features to the stat results
     #consider adding the features as an extra -> may be used to select features from the heatmap to view the detailed proteomics
@@ -70,7 +75,7 @@ def get_dataset_heatmap(dataset_label : str,
     return {
         "dataset_label" : dataset_label,
         "data" : stats_and_zscores.reset_index(names="Key").to_dict(orient="records"),
-        "value_names" : metadata.sample_names,
+        "value_names" : datatable.columns.to_list(),
         "label_names" : ["gene_name"],
         "color_names" : [],
         "cluster_indices" : cluster_indices,

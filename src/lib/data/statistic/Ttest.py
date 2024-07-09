@@ -1,9 +1,12 @@
 from lib.data.statistic.ABCStatistic import DatasetStatistic
+from lib.data.database.Database import Database
 from lib.data.imputation.StandardImputation import StandardImputation
 from scipy.stats import ttest_ind, false_discovery_control
 import pandas as pd 
 import numpy as np 
 from typing import List
+
+DB = Database.DB()
 class Ttest(DatasetStatistic):
     
     def get_stats(self, 
@@ -42,31 +45,31 @@ class Ttest(DatasetStatistic):
         pd.DataFrame
             _description_
         """
-        print(impute)
         
-        if impute:
-            datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
-                                                                         within_attribute_tag=within_attribute_tag, 
-                                                                         within_attribute_value_tag=within_attribute_value_tag,
-                                                                         subset_attribute_value_tags=[attribute_value_left,attribute_value_right])
-        else:
-            datatable = self._dataset.getDataTable()
+        # if impute:
+        #     datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
+        #                                                                  within_attribute_tag=within_attribute_tag, 
+        #                                                                  within_attribute_value_tag=within_attribute_value_tag,
+        #                                                                  subset_attribute_value_tags=[attribute_value_left,attribute_value_right])
+        # else:
+        #     d
         
-        mapped_sample_names, _ = self._dataset.getSamplesAttributes()
-        print(mapped_sample_names)
-        #check if there is a within grouping, then subset the mapped sample names first
-        if within_attribute_value_tag is not None and within_attribute_value_tag is not None:
-            for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):
-                bool_within = mapped_sample_names.loc[:,within_attr_tag] == within_attr_value_tag
-                mapped_sample_names = mapped_sample_names.loc[bool_within]
-                
-        boolIdx = mapped_sample_names.loc[:,sample_attribute_tag].isin([attribute_value_left,attribute_value_right])
-        subset_mapped_sample_names = mapped_sample_names.loc[boolIdx]
-        #get the sample names (e.g. column names in the datatable)
-        samples_left = subset_mapped_sample_names.loc[subset_mapped_sample_names[sample_attribute_tag] == attribute_value_left].index.values
-        samples_right = subset_mapped_sample_names.loc[subset_mapped_sample_names[sample_attribute_tag] == attribute_value_right].index.values
-        # X1, X2 = X.loc[:,columNamesGroup1], X.loc[:,columNamesGroup2]
+        #mapped_sample_names, _ = self._dataset.getSamplesAttributes()
 
+        mapped_sample_index = self._sample_attribute_map
+        datatable = self._datatable
+        #check if there is a within grouping, then subset the mapped sample names first
+        if within_attribute_tag is not None and within_attribute_value_tag is not None:
+            for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):
+                bool_within = mapped_sample_index.loc[:,within_attr_tag] == within_attr_value_tag
+                mapped_sample_index = mapped_sample_index.loc[bool_within]
+                
+        boolIdx = mapped_sample_index.loc[:,sample_attribute_tag].isin([attribute_value_left,attribute_value_right])
+        subset_mapped_sample_index = mapped_sample_index.loc[boolIdx]
+        #get the sample index (e.g. column names in the datatable)
+        samples_left = subset_mapped_sample_index.loc[subset_mapped_sample_index[sample_attribute_tag] == attribute_value_left].index.values
+        samples_right = subset_mapped_sample_index.loc[subset_mapped_sample_index[sample_attribute_tag] == attribute_value_right].index.values
+            
         X = datatable.loc[:,samples_left]
         Y = datatable.loc[:,samples_right]
         T,p = ttest_ind(X, Y, nan_policy="omit", axis=1, equal_var=equal_variance)
@@ -76,7 +79,6 @@ class Ttest(DatasetStatistic):
         stats = pd.DataFrame({f"t-value {suffix}" : T, p_value_name : p}, 
                              columns=[f"t-value {suffix}",p_value_name], 
                              index=datatable.index)
-        
         
         stats = stats.dropna(subset=[p_value_name])
         stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])

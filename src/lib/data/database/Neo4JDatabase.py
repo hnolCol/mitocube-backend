@@ -1,9 +1,9 @@
 
 from neo4j import GraphDatabase, Driver, Result
 from neo4j.exceptions import ConstraintError
-from lib.data.database.ABCDatabase import DatabaseABC, MetaABC, MCDatabase, MCAttributes, FilterABC
+from lib.data.database.ABCDatabase import DatabaseABC, MetaABC, MCDatabase, MCAttributes, FilterABC, FeaturesABC
 from typing import List, Tuple, Any, Dict, Literal, Optional
-
+from collections import OrderedDict
 from lib.data.database.UserDB import Neo4JUser
 
 
@@ -201,7 +201,8 @@ attribute_value_models = [AttributeValueModel(**k, s = [str(k["text"]),k["descri
 
 
 mitocarta3 = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/filter/human_mitocarta/data.txt",sep="\t")
-print(mitocarta3)
+#mitocarta3 = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/filter/human_mitocarta/data.txt",sep="\t")
+#print(mitocarta3)
 
 
 def transform_model_to_cypher_string(baseModel : BaseModel) -> str:
@@ -217,6 +218,7 @@ class Neo4JConstructor:
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
         self.feature = Neo4JFeatures(driver=driver)
+        self.features = Neo4JFeatures(driver=driver)
         self.factory = Neo4JFactory(driver=driver)
         
         self._add_constraints()
@@ -394,7 +396,7 @@ class Neo4JConstructor:
         ## search for proteins 
         # find proteins that are mentioned together. 
         protein_list = ["Q9Y5T4","Q9Y4W6","Q9H3K2"]
-        self.feature.get_protein_by_tags(tags = protein_list) 
+        self.features.get_protein_by_tags(tags = protein_list) 
         
      #   "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=”OMA1”[Title/Abstract]%20AND%20depolarization[Title/Abstract]&sort=pub_date&retmode=JSON
     
@@ -492,12 +494,13 @@ class MCNeo4JDatabase(DatabaseABC):
         self.dataset_values = Neo4JDatasetHandler(driver=self.connection.driver, meta=self.meta)
         
         self.user = Neo4JUser(driver=self.connection.driver)
-        self.feature = Neo4JFeatures(driver=self.connection.driver)
+        self.features = Neo4JFeatures(driver=self.connection.driver)
         self.filters = Neo4JFilter(driver=self.connection.driver)
-        self.calcs = Neo4JCalculations(driver=self.connection.driver, feature=self.feature)
+        self.calcs = Neo4JCalculations(driver=self.connection.driver, feature=self.features)
         self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver)
-        self.genotype = Neo4JGenotype(driver=self.connection.driver)
+        self.genotypes = Neo4JGenotype(driver=self.connection.driver)
         self.proteomes = Neo4JProteomes(driver = self.connection.driver)
+        
         
         #checks if all is correctly defined 
         super(MCNeo4JDatabase, self).__init__()
@@ -549,7 +552,7 @@ class MCNeo4JDatabase(DatabaseABC):
         # `factory` object is not shown in the provided code snippet.
 
         #self.factory.create_text_index("protein_proteome_id_search",NodeLabelModel(label = "Protein"),"proteome_id")
-        #self.feature.get_protein_sequence(tags = ["Q12849","Q8TCS8"])
+        #self.features.get_protein_sequence(tags = ["Q12849","Q8TCS8"])
         #s = self.calcs.correlate_features()
         #print(B)
         
@@ -579,12 +582,16 @@ class MCNeo4JDatabase(DatabaseABC):
         
         
         self.get_protein_data(tag = 'Q86YN6',dataset_tags=[dataset_tag])
+        
+        print("====")
+        print(self.meta.get_users(dataset_tag=meta.label))
+        print("USERS")
         #print(B)
         #self.insert_meta()
         #self.insert_dataset(data_table=d, tag=dataset_tag)
        #ta(tag=dataset_tag)
         #print(B)
-       # self.feature.find_feature()
+       # self.features.find_feature()
        # self.get_datatable()
         # self.connection.close()
         
@@ -592,9 +599,9 @@ class MCNeo4JDatabase(DatabaseABC):
         
         #self.factory.insert_nodes_from_csv("https://raw.githubusercontent.com/hnolCol/mitocube/master/neotetst.csv")
 
-    def get_datatable(self, tag : str = meta.label) -> pd.DataFrame:
+    def get_dataset_table(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
         ""
-        values = self.dataset_values.get_datatable(tag)
+        values = self.dataset_values.get_datatable(tag,filter_tag)
         return values 
         
     def get_dataset_tags(self) -> List[str]:
@@ -642,6 +649,8 @@ class MCNeo4JDatabase(DatabaseABC):
     def get_protein_data(self, tag : str, dataset_tags : List[str] = None):
 
         query = ("MATCH (p:Protein {tag : $tag}) "
+                 "SET p.viewed = 1 + p.viewed "
+                 "WITH p "
                  "MATCH (p)-[quant:QUANTIFIED_IN]->(d:Dataset) ")
         if dataset_tags is not None:
             query += "WHERE d.tag in $dataset_tags "
@@ -656,7 +665,7 @@ class MCNeo4JDatabase(DatabaseABC):
         )
        
         
-        r = self._driver.execute_query(query,routing_="r",tag=tag, dataset_tags = dataset_tags, result_transformer_=Result.to_df)
+        r = self._driver.execute_query(query,routing_="w",tag=tag, dataset_tags = dataset_tags, result_transformer_=Result.to_df)
         
         
         a = [{"index" : idx} for idx in r.index]
@@ -683,10 +692,6 @@ class MCNeo4JDatabase(DatabaseABC):
         a = self.meta.get_sample_attributes(tag)
         self.meta.get_sample_genotypes(tag)
         self.meta.get_sample_attributes_and_genotypes(tag)
- 
-        
-    def get_datasets_by_attribute_value(self, attribute_value_tag : str):
-        """"""
         
         
     def insert_meta(self, meta_data : DatasetSubmissionModel):
@@ -747,6 +752,7 @@ class MCNeo4JDatabase(DatabaseABC):
         
         #metatext -> write in relationship: user, created_at, modified_at, mod
        # meta_texts = [meta_data.metatext]
+    
         self.meta.add_metatext(dataset_tag=dataset_tag, user_tag = meta_data.user_tag, meta_texts=meta_data.metatext)
         ##connect samples to dataset
         
@@ -782,7 +788,17 @@ class MCNeo4JDatabase(DatabaseABC):
             "WITH EXISTS {(d:Dataset {tag : $tag})} as dataset_exists "
             "RETURN dataset_exists "
         )    
-        r = self._driver.execute_query(query, tag = dataset_tag, result_transformer_=Result.value)
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+    
+    def dataset_has_data(self, tag: str) -> bool:
+        
+        query = (
+            "WITH EXISTS {(d:Dataset {tag : $tag})} as dataset_exists "
+            "WITH EXISTS {(d)<-[:QUANTIFIED_IN]-(:Protein)} as quant_values_exist, dataset_exists "
+            "RETURN dataset_exists AND quant_values_exist "
+        )
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return r[0]
     
     def update_state(self, dataset_tag : str, new_state : int, user_tag : str):
@@ -1051,6 +1067,26 @@ class Neo4JAttributes():
         attributes = self.factory.get_nodes_by_tag_list(NodeLabelModel(label="Attribute"),tags=tags)
         return [AttributeModel(**k) for k in attributes]
     
+    def get_values(self, tags : List[str] = None, dataset_tag : str = None) -> List[AttributeValueModel|FeatureNeoModel]:
+        ""
+        query = (
+            "MATCH (av:AttributeValue) "
+            "WHERE NOT 'Protein' in labels(av) AND av.tag in $tags "
+            "RETURN properties(av) as props "
+            "UNION "
+            "MATCH (av:AttributeValue:Protein) "
+            "WHERE av.tag in $tags "
+            "MATCH (d:Dataset)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
+            "WHERE d.tag = $dataset_tag "
+            "WITH {attribute_tag : r.attribute_tag} as attr_tag, av "
+            "WITH apoc.map.merge(properties(av), attr_tag) as props "
+            "RETURN props"
+        )
+        
+        attribute_values, _, _ = self._driver.execute_query(query, tags = tags, dataset_tag = dataset_tag, routing_="r")
+        attribute_values_props = [av.value() for av in attribute_values]
+            
+        return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av) for av in attribute_values_props]
     
     def get_attribute_values_by_dataset_tags(self, dataset_tags : List[str], attribute_tags : list[str] = None, attribute_value_tags : List[str] = None) -> List[AttributeValuesByDatasetModel]:
         """Finds all the attribute values that are assigned to a dataset and returns the number of dataset
@@ -1306,7 +1342,7 @@ class Neo4JMetaHandler(MetaABC):
         self._attributes = attributes
         self.create_title_search_index() ##put in creator!! TODO 
         
-    def get(self, tags : List[str]):
+    def get(self, tags : List[str]) -> List[MinimalMetadataModel]:
         """Returns the minimal meta information of a dataset node (e.g. properties)
         from Neo4J database. 
         
@@ -1319,20 +1355,23 @@ class Neo4JMetaHandler(MetaABC):
         query = (
             "MATCH (d:Dataset) "
             "WHERE d.tag in $tags "
-            "RETURN properties(d) "
+            "MATCH (d)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute {tag:'att_proteome'}) "
+            "WITH collect(av.tag) as proteome_ids, d, EXISTS {(d)<-[:QUANTIFIED_IN]-(:Protein)} as has_datatable "
+            "WITH {proteome_ids : proteome_ids, has_datatable : has_datatable} as add_meta, d "
+            "RETURN apoc.map.merge(properties(d), add_meta)"
         )
-    
+        ""
         metadata = self._driver.execute_query(query,result_transformer_=Result.value, tags = tags)
-        return metadata
+        return [MinimalMetadataModel(**x) for x  in metadata]
         
-    def get_metatext(self, tags : List[str]):
+    def get_metatext(self, tags : List[str]) -> pd.DataFrame:
         ""
         query = (
             "MATCH (d:Dataset) "
             "WHERE d.tag in $tags "
             "MATCH (d)<-[:DESCRIBES]-(m:Metatext)-[:HAS_CONTENT]->(c:Content) "
-            "WHERE c.tag = d.tag "
-            "RETURN d.tag as tag, m.tag as meta_tag, c.content as content "
+            "WHERE c.tag = d.tag and c.content IS NOT null and c.content <> '' "
+            "RETURN d.tag as dataset_tag, m.tag as tag, m.title as title, c.content as content ORDER BY m.priority DESC "
         )
         
         meta_text = self._driver.execute_query(query,tags=tags,result_transformer_=Result.to_df)
@@ -1340,12 +1379,15 @@ class Neo4JMetaHandler(MetaABC):
     
     def add_metatext(self, dataset_tag : str, user_tag : str, meta_texts : Dict[str,str]):
         "" 
-        meta_texts = [{"tag" : tag, "content" : content} for tag,content in meta_texts.items() if content != ""]
+        metatext_settings = MetaTexts()
+        meta_texts = [{"tag" : tag, "content" : content, "title" : metatext_settings.names[tag], "priority" : metatext_settings.priorities[tag]} for tag,content in meta_texts.items() if content != "" and tag in metatext_settings.names] 
         
         query = (
             "UNWIND $meta_texts as metatext "
             "MATCH (d:Dataset {tag : $dataset_tag}) "
             "MERGE (m:Metatext {tag : metatext.tag }) "
+            "SET m.title = metatext.title, m.priority = metatext.priority "
+            "WITH d, m, metatext "
             "MERGE (d)<-[r_d:DESCRIBES]-(m) "
             "SET r_d.created_at = timestamp(), r_d.user_tag = $user_tag "
             "WITH d, m, metatext "
@@ -1356,7 +1398,7 @@ class Neo4JMetaHandler(MetaABC):
         self._driver.execute_query(query, dataset_tag = dataset_tag, meta_texts = meta_texts, user_tag = user_tag, routing_="w")
         
     def add_samples_genotypes(self, meta_data : DatasetSubmissionModel = meta):
-        """_summary_
+        """Adds the sample genotypes
 
         Parameters
         ----------
@@ -1404,10 +1446,6 @@ class Neo4JMetaHandler(MetaABC):
                 if meta_data.samples_attributes_input is not None and attribute_tag in meta_data.samples_attributes_input:
                     user_inputs  = meta_data.samples_attributes_input[attribute_tag]
                     attributes_to_connect[n]["inputs"] = [u.model_dump() for u in user_inputs]
-                    
-    #                     attribute_value_tag : str 
-    # sample_index : Optional[int] = None 
-    # input : List[InputModel]
     
                 for idx in sample_idx:
                     sample_name = meta.sample_names[idx]
@@ -1451,9 +1489,7 @@ class Neo4JMetaHandler(MetaABC):
             "SET r_u_i += i "
             "RETURN r_u_i"
         )
-        
-        print(meta_data.tag, "DATASET TAG!! ")
-        
+                
         r,_,_ = self._driver.execute_query(query,dataset_tag=meta_data.tag, 
                                 attributes = attributes_to_connect,
                                 sample_attributes_data = sample_attributes_data,
@@ -1479,8 +1515,21 @@ class Neo4JMetaHandler(MetaABC):
         #print("sample attributes!!")
         
         
+    def _sample_attribute_to_dict(self, sample_attributes : pd.DataFrame)-> Dict[str,Dict[str,List[int]]]:
+        ""
+        if any(column_name not in sample_attributes.columns for column_name in ["attribute_index","attribute_tag","tag","sample_index"]): 
+            raise ValueError("sample attribute must have the required column names. ['attribute_index','attribute_tag','tag','sample_index']")
+        sample_attributes_dict = OrderedDict()
+        for _, groupData in sample_attributes.groupby("attribute_index", sort = True):
+            attribute_tag = groupData["attribute_tag"].values[0]
+            if attribute_tag not in sample_attributes_dict:
+                sample_attributes_dict[attribute_tag] = {}
+            for tag, tagData in groupData.groupby("tag"):
+                sample_attributes_dict[attribute_tag][tag] = tagData["sample_index"].to_list()
         
-    def get_sample_attributes_and_genotypes(self, tag:str, as_sample_map : bool = True):
+        return sample_attributes_dict
+        
+    def get_sample_attributes_and_genotypes(self, tag:str, as_sample_map : bool = True) -> Tuple[Dict,pd.DataFrame]|Dict:
         ""
         query = (
             "MATCH (d:Dataset {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)  "
@@ -1495,20 +1544,18 @@ class Neo4JMetaHandler(MetaABC):
             "RETURN s.index as sample_index, s.text as sample_text, av.tag as tag, r.index as attribute_index, a.tag as attribute_tag, av.text as text, 'Protein' in labels(av) as is_feature  " #g.tag as ag, g.tex as text, 
             "ORDER BY attribute_index, sample_index"
         )
-        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.to_df)
-        # print(r)
-        # if as_sample_map:
-        #     result = []
-        #     #pd.DataFrame().set_index()
-        #     r["tag"] = r["attribute_tag"] + ":" + r["tag"]
-        #     for attribute_index, data in r.set_index("sample_index").groupby("attribute_index"):
-        #         print(data)
-                
-        #         grouped = data.groupby(data.index)["tag"].agg(lambda x: ";".join(x))
-        #         print(grouped)
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.to_df) 
+        
+        if as_sample_map:
+            sample_map = r.pivot_table(index="sample_index",columns="attribute_tag",values="tag", aggfunc=lambda x: " ".join(x)) 
+            #add sample index
+            sample_name_to_index_mapper = dict([(sample_index,sample_text) for sample_text, sample_index in r[["sample_text","sample_index"]].drop_duplicates(subset=["sample_index"]).values])
+            sample_index = sample_map.index.map(sample_name_to_index_mapper)
+            sample_map.loc[:,"sample_text"] = sample_index.values
             
-            
-        return r 
+            return self._sample_attribute_to_dict(r), sample_map
+        
+        return self._sample_attribute_to_dict(r) 
         
     def get_sample_genotypes(self, tag : str):
         "" 
@@ -1583,9 +1630,51 @@ class Neo4JMetaHandler(MetaABC):
         
         r,_,_ = self._driver.execute_query(query, user_tags = user_tags, tag = tag, routing_ = "w", database_ = "neo4j")
 
+    def get_owner(self, dataset_tag : str) -> UserModel:
+        """Returns the owner (user) for a given dataset tag. 
 
-    def update_owner(self, dataset_tag: str, user_tag: str):
+        Parameters
+        ----------
+        dataset_tag : str
+            _description_
+
+        Returns
+        -------
+        UserModel
+            _description_
+            
+        Raises
+        ------
+        ValueError if the user does not exists. 
         
+        """
+        query = (
+            "MATCH (d:Dataset) "
+            "WHERE d.tag = $dataset_tag "
+            "MATCH (u:User)-[:OWNS]->(d) "
+            "RETURN properties(u)"
+        )
+        r = self._driver.execute_query(query, dataset_tag = dataset_tag, routing_="r", result_transformer_=Result.value)
+        if len(r) == 0: raise ValueError("User not found")
+        return UserModel(**r[0])
+
+    def get_users(self, dataset_tag : str) -> List[UserModel]:
+        ""
+        
+        query = (
+            "MATCH (d:Dataset) "
+            "WHERE d.tag = $dataset_tag "
+            "MATCH (u:User)-[:OWNS]->(d) "
+            "RETURN properties(u) "
+            "UNION "
+            "MATCH (u:User)-[:IS_PART]->(d) "
+            "RETURN properties(u) "
+        )
+        r = self._driver.execute_query(query, dataset_tag = dataset_tag, routing_="r", result_transformer_=Result.value)
+        return [UserModel(**u) for u in r]
+
+    def update_owner(self, dataset_tag: str, user_tag: str) -> bool:
+       
         query = (
             "MATCH (d:Dataset {tag : $dataset_tag}) "
             "MATCH (d)<-[r:OWNS]-(u:User) "
@@ -1618,10 +1707,17 @@ class Neo4JGenotype:
         self.constructor._add_genotypes([genotype], user_tag = user_tag)
         
         
-    def get(self, proteome_ids : List[str] = None, protein_tags : List[str] = None) -> List[MinimalGenotypeModel]:
+    def get(self, tags : List[str] = None, proteome_ids : List[str] = None, protein_tags : List[str] = None) -> List[MinimalGenotypeModel]:
         ""
         
-        if protein_tags is not None and proteome_ids is not None:
+        if tags is not None:
+            
+            query = (
+                 "MATCH (g:Genotype) "
+                 "WHERE g.tag in $tags "
+            )
+        
+        elif protein_tags is not None and proteome_ids is not None:
             query = (
                 "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
                 "WHERE p.tag in $protein_tags AND g.proteome_id in $proteome_ids "
@@ -1642,6 +1738,7 @@ class Neo4JGenotype:
         
         query += "RETURN g.tag as tag, g.text as text, g.proteome_id as proteome_id "
         r, _, _ = self._driver.execute_query(query, 
+                                             tags = tags,
                                              proteome_ids = proteome_ids, 
                                              protein_tags = protein_tags, 
                                              routing_="r", 
@@ -1678,6 +1775,7 @@ class Neo4JDatasetHandler:
         variances = pd.DataFrame(index = data_table.index)
         for group, group_data in sample_attributes.groupby(by=["attribute_tag","tag"]):
             sample_names = group_data["sample_text"].values
+            print(sample_names)
             group_var = data_table.loc[:,sample_names].var(axis=1)
             variances.loc[:,"__".join(group)] = group_var
         scaled_variances = variances.divide(total_variance, axis = 0)
@@ -1741,6 +1839,7 @@ class Neo4JDatasetHandler:
         t1 = time.time() 
         self.get_datatable(tag)
         print("took only", time.time()-t1)
+        
     def add_datatable(self, data_table : pd.DataFrame, tag : str):
         ""
         scaled_variance, max_var_group = self._get_variance_in_groups(tag, data_table)
@@ -1854,47 +1953,70 @@ class Neo4JDatasetHandler:
         
         
     
-    def get_datatable(self, tag : str) -> pd.DataFrame:
+    def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
         ""
-        index_dataset_node = MatchIndexedNode(cypher_label="d",label="Dataset",index_value=tag,index_prop="tag")
-        with self._driver.session() as session:
-            datatable =  session.execute_read(self._get_values,index_dataset_node)
-           # print(datatable.explode(["qs","idx"]))
-            r = datatable.pivot(index="tag",columns="idx",values="qs")
-            print(r)
-            return r
+        query = (
+            "MATCH (d:Dataset {tag : $tag}) "
+        )
+        if filter_tag is not None:
+            query += (
+                "MATCH (f:Filter) "
+                "WHERE f.tag = $filter_tag "
+                "MATCH (d)<-[r:QUANTIFIED_IN]-(p:Protein)-[:PART_OF]->(f)"
+                )
+        else:
+            query += (
+                "MATCH (d)<-[r:QUANTIFIED_IN]-(p:Protein) "
+                )
+        query += "RETURN r.qs AS qs, r.sample_index AS idx, p.tag AS tag"
+        
+        print(query)
+        datatable_long = self._driver.execute_query(query, routing_="r",tag = tag, filter_tag = filter_tag, result_transformer_=Result.to_df)
+        
+        return datatable_long.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
+        
+    #     index_dataset_node = MatchIndexedNode(cypher_label="d",label="Dataset",index_value=tag,index_prop="tag")
+    #     with self._driver.session() as session:
+    #         datatable =  session.execute_read(self._get_values,index_dataset_node)
+    #        # print(datatable.explode(["qs","idx"]))
+    #         r = 2
+    #         print(r)
+    #         return r
         
             
-    @staticmethod
-    def _get_values(tx, dataset_node : MatchIndexedNode):
+    # @staticmethod
+    # def _get_values(tx, dataset_node : MatchIndexedNode):
                 
-        query = (
-            f"{dataset_node.model_dump()} "
-            "MATCH (d)<-[r:QUANTIFIED_IN]-(n:Protein) "
-            "RETURN r.qs AS qs, r.sample_index AS idx, n.tag AS tag"
-        )
+    #     query = (
+    #         f"{dataset_node.model_dump()} "
+    #         "MATCH (d)<-[r:QUANTIFIED_IN]-(n:Protein) "
+    #         "RETURN r.qs AS qs, r.sample_index AS idx, n.tag AS tag"
+    #     )
        
         
-        t1 = time.time()
-        r = tx.run(query)
-       # rr = list(r)        
-        d1 = r.to_df().explode(["qs","idx"])
-        print(time.time()-t1,"FIRST")
+    #     t1 = time.time()
+    #     r = tx.run(query)
+    #    # rr = list(r)        
+    #     d1 = r.to_df().explode(["qs","idx"])
+    #     print(time.time()-t1,"FIRST")
         
-        # t1 = time.time()
-        # r = tx.run(query2)
-        # d2 = r.to_df()
-        # print(time.time()-t1,"SECODND")
+    #     # t1 = time.time()
+    #     # r = tx.run(query2)
+    #     # d2 = r.to_df()
+    #     # print(time.time()-t1,"SECODND")
         
-        # print("===")
+    #     # print("===")
         
-        # print(d1,d2)
-       # print(d2)
-        return d1
+    #     # print(d1,d2)
+    #    # print(d2)
+    #     return d1
     
     
     def is_quantified(self, tag : str, feature_node_label : NodeLabelModel, keys : List[str] = ['Q8ZddASD']):
         ""
+        
+        
+        
         index_dataset_node = MatchIndexedNode(cypher_label="d",label="Dataset",index_value=tag,index_prop="tag")
         with self._driver.session() as session:
             return session.execute_read(self._is_q,index_dataset_node, feature_node_label, keys)
@@ -2199,9 +2321,7 @@ class Neo4JFactory:
         )
         r = tx.run(query)
         return r.data()[0]["nodes"]
-    
-    
-    
+
     
     def full_text_search(self, index_name : str, query_string : str):
         
@@ -2215,14 +2335,14 @@ class Neo4JFactory:
 
 
 
-class Neo4JFeatures():
+class Neo4JFeatures(FeaturesABC):
     
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
         
         
         
-    def get_protein_sequence(self, tags : str):
+    def get_protein_sequence(self, tags : str) -> List[str]:
         """"""
         
         cypher_query = (
@@ -2261,19 +2381,20 @@ class Neo4JFeatures():
         return [FeatureNeoModel(**ri.data()["protein"]) for ri in r]
         
     def get_protein_tags(self, proteome_id : str|List[str] = "UP000005640", is_quantified : bool = True) -> List[str]:
-        """Returns the proteins in the database using the tags. 
-
+        """Returns the proteins in the database using the proteme_ids. 
+        TO DO: RATHER ADD TO THE PROTEOME DATABASE CLASS? 
         Parameters
         ----------
         proteome_id : str | List[str], optional
             _description_, by default "UP000005640"
         is_quantified : bool, optional
-            _description_, by default True
+            If True only proteins that were quantified in at least on experiment will be returned.
+            If False all protein tags will be returned, by default True
 
         Returns
         -------
         List[str]
-            _description_
+            The protein tags (Uniprot IDs)
         """
         if isinstance(proteome_id,str):
             proteome_id = [proteome_id]
@@ -2302,9 +2423,44 @@ class Neo4JFeatures():
             return []
         
         return r
+    
+    def get_quant_stats(self, tags : List[str]):
+        """Returns the general stats of a list of tags. 
+        
+        This includes the following stats:
+        
+        - quantified_in (int): The number of datasets in which 
+        the protein has been quantified 
+        - total_number (int): The number of dataset of the same proteome
+        - abundance_quantiles (List[float]): The quantiles of the log2 intensity of the requested tag (n=3, 0.25, 0.5, 0.75 quantile)
+        - total_abundance_quantiles (List[float]) - The quantiles of all the datasets that used the proteome 
+        (n=4, min, 0.25, 0.5, 0.75, max). 
+
+        Parameters
+        ----------
+        tags : List[str]
+            The tags of the proteins/feature for which the quantification stats should be returned. 
+            If the protein is not in the database, it will simply be ignored. 
+        """
+        
+        query = (
+            "MATCH (p:Protein) "
+            "WHERE p.tag in $tags "
+            "MATCH (p)-[:IN_PROTEOME]->(av:AttributeValue) "
+            "MATCH (p)-[r_quant:QUANTIFIED_IN]->(d) "
+            "WITH p.tag as tag, count(r_quant) as quantified_in, count(d) as total_number, apoc.agg.percentiles(r_quant.avg_log2_abundance, [0.25,0.5,0.75]) as abundance_quantiles, "
+            "apoc.coll.zip(collect(r_quant.variance),collect(r_quant.max_variance_attribute)) as variances "
+            "MATCH (d:Dataset)-[:HAS_ATTRIBUTE_VALUE]-(av) "
+            "MATCH (d)<-[r_all:QUANTIFIED_IN]-(pp:Protein) "
+            "RETURN tag, quantified_in, total_number, abundance_quantiles, apoc.agg.percentiles(r_all.avg_log2_abundance, [0,0.25,0.5,0.75,1.0]) as total_abundance_quantiles, variances"
+        )
+        
+        
+        r = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.to_df)
+        print(r)
         
     def find_feature(self, query : str = "FB", proteome_id : str|List[str] = "UP000005640", limit : int = 10) -> List[FeatureNeoModel]:
-        """_summary_
+        """Returns a list of features that are found by a query string. 
 
         Parameters
         ----------
@@ -2363,37 +2519,71 @@ class Neo4JFeatures():
             
         ) 
         
-        
         self._driver.execute_query(query, proteome_id = proteome_id, proteome_info = proteome_info)
         
     
-    def insert_uniprot_proteome(self, proteome_id : List[str] = ["UP000005640"], user_tag : str = None) -> int: #:#"):#"file:///UP000005640.txt"):#
+    def insert_uniprot_proteome(self, proteome_id : List[str] = ["UP000005640"], reviewed : bool = True, user_tag : str = None) -> int: #:#"):#"file:///UP000005640.txt"):#
         
         settings = UniprotAnnotationSettings()
         uniprotKB_URL = settings.uniprotKBAPI_URL
         
-        return download_proteome_annotations(uniprotKB_URL,proteome_id,chunc_callback=self.handle_uniprot_chunc, add_proteome_callback=self.add_proteome_details)
+        return download_proteome_annotations(uniprotKB_URL,proteome_id,
+                                             chunc_callback=self.handle_uniprot_chunc, 
+                                             add_proteome_callback=self.add_proteome_details, 
+                                             reviewed = reviewed,
+                                             user_tag = user_tag)
         
     def handle_uniprot_chunc(self,data : pd.DataFrame, proteome_id : str, user_tag : str = None):
+        """Data from the Uniprot API are returned in several pages covering
+        500 entries. This function handles the chuncks and inserts the entries into the database. 
         
-        self._insert_uniprot_db(data,proteome_id)
-        # with self._driver.session() as session:
-        #     session.execute_write(self._insert_uniprot_db,link)
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            _description_
+        proteome_id : str
+            _description_
+        user_tag : str, optional
+            The user that added the proteome identified by its tag, by default None
+        """
+        self._insert_uniprot_db(data,proteome_id,user_tag=user_tag)
+
     
     def _insert_uniprot_db(self, data : pd.DataFrame, proteome_id : str = "UP000005640", user_tag : str = None): 
-        ""
+        """Insert data from a Uniprot reference proteome to the database. 
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The protein data with the following headers
+            
+                - Length (int) : The number of amino acids
+                - Gene names (str) : All gene names associated with the protein
+                - Gene Names (primary) (str)
+                - Protein Names (str) - The associated protein name 
+                - Entry (str) : The Uniprot ID 
+                - Sequence (str) : The protein sequence.
+                
+        proteome_id : str, optional
+            The Uniprot reference proteome ID, by default "UP000005640"
+        user_tag : str, optional
+            The tag associated with a user, by default None
+        """
         
         query = (
             "UNWIND $uniprot_features as row "
             "MERGE (n:Protein:AttributeValue {tag : row.Entry}) "
             "ON CREATE "
-            " SET n += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_id : $proteome_id, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`)} "
+            " SET n += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_id : $proteome_id, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
             "ON MATCH "
             " SET n.gene_names = row.`Gene Names`, n.protein_name = row.`Protein names`, n.gene_name = row.`Gene Names (primary)`, n.aa_length = row.Length, n.proteome_id = $proteome_id "
             "WITH n, row "
             "MERGE (av:AttributeValue {tag : $proteome_attribute_tag}) "
             "ON CREATE "
             "SET av.created_at = timestamp(), av.user_tag = $user_tag "
+            "ON MATCH "
+            "SET av.modified_at = timestamp(), av.user_Tag = $user_tag "
             "WITH n,av, row "
             "MERGE (n)-[r:IN_PROTEOME]->(av) "
             "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
@@ -2404,7 +2594,9 @@ class Neo4JFeatures():
                                    uniprot_features = data.to_dict(orient="records"), 
                                    proteome_id = proteome_id,
                                    user_tag = user_tag,
-                                   routing_="w",database_="neo4j")
+                                   routing_="w",
+                                   database_="neo4j")
+        
         print("Page added to database ...")
         
 
@@ -2452,6 +2644,7 @@ class Neo4JFilter(FilterABC):
                    protein_tags : List[str], 
                    proteome_id : str, 
                    filter_tag : str, 
+                   filter_text : str,
                    description : str,
                    publication : Optional[str] = None):
         """_summary_
@@ -2464,18 +2657,20 @@ class Neo4JFilter(FilterABC):
             _description_
         filter_tag : str
             _description_
+        filter_text : str
+            The name that is visibile to the user on selection. 
         description : str
-            _description_
+            The description that is displayed along the filter. 
         publication : str 
-            _description_
+            A publication that (PUBMED ID) that can be used that describes the filter set. 
         """
         
         query = (
             "MERGE (f:Filter {tag : $tag}) "
             "ON CREATE "
-            "SET f.created_at = timestamp(), f.proteome_id = $proteome_id, f.description = $description "
+            "SET f.created_at = timestamp(), f.proteome_id = $proteome_id, f.description = $description, f.text = $filter_text "
             "ON MATCH "
-            "SET f.modified_at = timestamp(), f.proteome_id = $proteome_id, f.description = $description "
+            "SET f.modified_at = timestamp(), f.proteome_id = $proteome_id, f.description = $description, f.text = $filter_text "
             "WITH f "
             )
         
@@ -2501,6 +2696,7 @@ class Neo4JFilter(FilterABC):
         try:
             r = self._driver.execute_query(query, 
                                            protein_tags = protein_tags, 
+                                           filter_text = filter_text,
                                            proteome_id = proteome_id, 
                                            tag = filter_tag, 
                                            description = description,
@@ -2514,20 +2710,35 @@ class Neo4JFilter(FilterABC):
         return True, f"Filter added. In total {r} proteins were found and added to the filter."
     
     
-    def get(self, proteome_id : str|List[str]) -> List[Filter]:
+    def get(self, tag : str = None, proteome_id : List[str] = None, feature_tag : str = None) -> List[Filter]:
         ""
-        if isinstance(proteome_id,str):
-            proteome_id = [proteome_id]
+        if tag is not None:
+            query = (
+                "MATCH (f:Filter) "
+                "WHERE f.tag = $tag "
+                
+            )
+        elif proteome_id is not None:
+            query = (
+                "MATCH (f:Filter) "
+                "WHERE f.proteome_id in $proteome_id "
+            )
+        elif feature_tag is not None:
+            query = (
+                "MATCH (f:Filter)<-[:PART_OF]-(p:Protein) "
+                "WHERE p.tag = $feature_tag "
+            )
         
-        query = (
-            "MATCH (f:Filter) "
-            "WHERE f.proteome_id in $proteome_id "
-            "RETURN properties(f)"
+        query += (
+            "MATCH (f)-[:BASED_ON]-(pub:Publication) "
+            "WITH {publication : pub.tag} as pub_tag, f "
+            "RETURN apoc.map.merge(properties(f), pub_tag) "
         )
-        
         r = self._driver.execute_query(query, 
                                     database_="neo4j", 
                                     routing_="r",
+                                    feature_tag = feature_tag,
+                                    tag = tag,
                                     proteome_id = proteome_id,
                                     result_transformer_= Result.value)
         return r 

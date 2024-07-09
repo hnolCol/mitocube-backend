@@ -55,8 +55,9 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     if KEY_FIGURE_SETTINGS.number_submissions:
         key_figures["Submissions"] = len(db_helper.get_all_labels())
     if KEY_FIGURE_SETTINGS.number_published_datasets:
-        published_datasets = db_helper.get_label_count_by_state(k_subset=set([SubmissionStatesEnums.ACTIVE]))[SubmissionStatesEnums.ACTIVE]["submission_count"]
-        key_figures["Published Data"] = published_datasets
+        published_datasets = db_helper.get_label_count_by_state(k_subset=set([SubmissionStatesEnums.ACTIVE]))
+        if SubmissionStatesEnums.ACTIVE in published_datasets:
+            key_figures["Published Data"] = published_datasets[SubmissionStatesEnums.ACTIVE]["submission_count"] 
     if KEY_FIGURE_SETTINGS.number_proteins:
         key_figures["Proteins"] = db_helper.get_number_features()
     if KEY_FIGURE_SETTINGS.number_genotypes:

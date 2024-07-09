@@ -9,7 +9,7 @@ import pandas as pd
 
 class HierarchicalClustering(DatasetClustering):
     
-    def get_clusters(self, idcs : pd.Series, n_clusters : int = 8) -> Tuple[pd.DataFrame,pd.DataFrame]:
+    def get_clusters(self, idcs : pd.Series = None, n_clusters : int = 8) -> Tuple[pd.DataFrame,pd.DataFrame]:
         """
         
         Returns
@@ -19,10 +19,11 @@ class HierarchicalClustering(DatasetClustering):
         pd.DataFrame
             Dataframe with feature index and columns (sample names) containing the transformed values (likely Z-Score.)
         """
-        datatable = self._dataset.getDataTable()
+        datatable = self._datatable
         ##subset the data that should be clustered (likely significant)
-        datatable_subset =  datatable.loc[idcs,:]
-        values = zscore(datatable_subset.values,axis=1,nan_policy="omit") #fastcluster does not allow nans - TODO: change
+        if idcs is not None:
+            datatable =  datatable.loc[idcs,:]
+        values = zscore(datatable.values,axis=1,nan_policy="omit") #fastcluster does not allow nans - TODO: change
         row_linkage = fastcluster.linkage(values, method = "complete", metric = "euclidean")  
         max_distance = 0.75*max(row_linkage[:,2])
         Z_row = sch.dendrogram(row_linkage, orientation='left', color_threshold=max_distance, 
@@ -32,7 +33,7 @@ class HierarchicalClustering(DatasetClustering):
         ##get indices for clusters
         
         return pd.DataFrame(data = clusters, 
-                            index = datatable_subset.index,
+                            index = datatable.index,
                             columns = ["cluster"]), pd.DataFrame(values, 
-                                                            index=datatable_subset.index,
+                                                            index=datatable.index,
                                                             columns = datatable.columns).iloc[Z_row['leaves']]

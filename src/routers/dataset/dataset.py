@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 import pandas as pd 
-
+import numpy as np 
+from typing import List, Dict 
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
-
+from config.models.parameter import APIParamString
 from config.models.dataset.data import DatasetPCAResponse
-from config.models.submissions.submissions import DatasetSubmissionModel, DatasetSubmissionResponseModel
+from config.models.submissions.submissions import DatasetSubmissionModel, DatasetSubmissionResponseModel, MinimalMetadataResponseModel
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
 from config.models.annotations.feature import FeatureModel
 
@@ -16,7 +17,7 @@ from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.filter.NoMissingValues import NoNaNFilter
 
-from config.exceptions.HTTPExceptions import no_data_found
+from config.exceptions.HTTPExceptions import no_data_found_http_exception
 
 from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import map_tags_to_attribute_in_metadata, get_dataset_from_database
@@ -29,25 +30,24 @@ router = APIRouter(
     tags=["Dataset"]
     )
 
-@router.get("/datasets/{dataset_label}/data", response_model=[])
-def get_dataset_data(dataset_label : str):
-    """
-    Returns the data for a specific dataset
-    
-    NaN values are replace with null (e.g. undefined in JS)
-    The format that is used to export the data is records (List[Dict]):
-    ```
-    data : [{colName1 : value1, colName2: value2, ...}, {colName1 : value1, colName2: value2, ..}]
-    ```
+@router.get("/datasets/{dataset_tag}/data", response_model=[])
+def get_dataset_data(dataset_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[Dict[str,str|float]]:
+    """Returns the datatable of dataset by its tag. 
 
-    Validation Error 
+    Parameters
+    ----------
+    dataset_tag : str
+        The tag associated with the dataset 
 
-    data_id not found in database. 
+    Returns
+    -------
+    List[Dict[str,str|float]]
+        The data as dicts using {tag : <uniprot_id>, sample_index : float (log2 value)}
+        
     """
-    db = MCDatabase.getDatabase()
-    dataset = db.getDataset(dataset_label)
-    data_table = dataset.getDataTable()
-    return data_table.to_numpy().tolist()
+    if not DB.dataset_has_data(tag = dataset_tag): no_data_found_http_exception
+    data_table = DB.get_dataset_table(tag = dataset_tag)
+    return data_table.reset_index().to_dict(orient="records")
 
 # class QCResponse(BaseModel):
 
@@ -71,7 +71,7 @@ def get_dataset_data(dataset_label : str):
     proteome_ids =  [attrValueTag.split(":")[1] for attrValueTag in metadata.dataset_attributes["att_organism"]] 
     datatable = dataset.getDataTable()
     if datatable is None or datatable.empty:
-        raise no_data_found
+        raise no_data_found_http_exception
     data_summary = datatable.describe()
     data_summary.loc["total",:] = datatable.index.size
 
@@ -95,55 +95,98 @@ def get_dataset_data(dataset_label : str):
 
 
 #parameter endpoints 
-@router.get("/datasets/{dataset_label}/meta",
-            response_model=DatasetSubmissionResponseModel,
+@router.get("/datasets/{dataset_tag}/meta",
+            response_model=List[MinimalMetadataResponseModel]|MinimalMetadataResponseModel,
             tags=["Parameters","Meta data"])
-def get_dataset_params(dataset_label : str, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_params(dataset_tag : str, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the metadata associated to the dataset
     """
-    db = MCDatabase.getDatabase()
-    dataset = get_dataset_from_database(db,dataset_label)
-    metadata : DatasetSubmissionModel = dataset.getMetaJson()
     
-    return map_tags_to_attribute_in_metadata(metadata)
+    meta = DB.meta.get(tags = APIParamString(param=dataset_tag).param)
+    #if only a single meta data is requested, return it, otherwise return a list.
+    if len(meta) == 1: return meta[0]
+    return meta
+    
+    # db = MCDatabase.getDatabase()
+    # dataset = get_dataset_from_database(db,dataset_tag)
+    # metadata : DatasetSubmissionModel = dataset.getMetaJson()
+    
+    # return map_tags_to_attribute_in_metadata(metadata)
+
+
+@router.get("/datasets/{dataset_tag}/meta/samples")
+def get_dataset_sample_info(dataset_tag : str):
+    """Retrieve the meta data annotations for 
+    each sample. This includes the sample attributes and
+    the genotypes
+
+    Parameters
+    ----------
+    dataset_tag : str
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    if not DB.dataset_exists(tag = dataset_tag): no_data_found_http_exception
+    
+    sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)
+    has_genotype = "att_genotype" in sample_map.columns
+    attribute_tags = [attribute_tag for attribute_tag in sample_map.columns if attribute_tag not in ["sample_text"]]
+    attribute_value_tags = pd.Series(sample_map.values.flatten()).unique().tolist()
+    attributes = DB.attributes.get(tags = attribute_tags)
+    attribute_values = DB.attributes.get_values(tags = attribute_value_tags, dataset_tag = dataset_tag)
+    if has_genotype:
+        genotypes = DB.genotypes.get(tags = sample_map.loc[:,"att_genotype"].to_list())
+        attribute_values.extend(genotypes)
+    
+    
+    return {
+        "sample_text" : sample_map.loc[:,"sample_text"].to_list(),
+        "has_genotype" : has_genotype,
+        "attribute_values" : attribute_values,
+        "attributes" : attributes,
+        "sample_attributes" : sample_attributes
+    }
 
 
 #pca endpoints
-@router.get("/datasets/{dataset_label}/pca",
+@router.get("/datasets/{dataset_tag}/pca",
             response_model=DatasetPCAResponse,
             tags=["Dimensional reduction","PCA"])
 
-def get_dataset_pca(dataset_label : str, scale : bool = True, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_pca(dataset_tag : str, scale : bool = True): #user : UserModel = Depends(get_user_from_token))
     """
-    Returns the result of a Principal component anaylsis (PCA).
+    Returns the result of a Principal component analysis (PCA).
     """
-    db = MCDatabase.getDatabase()
-    dataset = db.getDataset(dataset_label)
-    if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
-    idcs = NoNaNFilter(dataset).get_indices()
-    
-    projected_data, drivers, variance_explained, samples_attributes = PCATransform(dataset=dataset,
+
+    if not DB.dataset_has_data(tag = dataset_tag): raise no_data_found_http_exception
+    data_table = DB.get_dataset_table(tag = dataset_tag)
+    print(data_table)
+    projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
                                         n_components=4,
-                                        scale = scale,
-                                        subset_index=idcs).transform()
-    
-    
-    projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")
-    
+                                        scale = scale).transform()
+   
+    sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)     
+    #match the sample attributes to the PCA projection.
+    projected_data = projected_data.join(sample_map)
+    projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")    
     
     # add feature information to drivers
     feature_keys = drivers.index 
-    features = DB.feature.get_protein_by_tags(tags = feature_keys.tolist(), as_data_frame=True)
+    features = DB.features.get_protein_by_tags(tags = feature_keys.tolist(), as_data_frame=True)
     #features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
    
     drivers_with_feature_info = pd.concat([drivers,features],axis=1)
     drivers_with_feature_info.reset_index(names="index", inplace=True)
     drivers_to_browser = drivers_with_feature_info.to_dict(orient="records")
     return DatasetPCAResponse(
-        projection=projected_data_to_browser,
-        drivers=drivers_to_browser,
-        variance_explained=variance_explained, 
-        samples_attributes=samples_attributes
+        projection = projected_data_to_browser,
+        drivers = drivers_to_browser,
+        variance_explained = variance_explained, 
+        samples_attributes = sample_attributes
         )
 

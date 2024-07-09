@@ -10,7 +10,7 @@ from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.statistic.ANOVA import OneWayANOVA
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 
-from config.exceptions.HTTPExceptions import no_data_found
+from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from config.models.user import UserModel
 from config.models.parameter import APIParamString
 from config.models.filter import Filter, FilterProps
@@ -50,8 +50,8 @@ def get_available_filters(proteome_id : str = None, user : UserModel = Depends(g
 @router.get("filters/{filter_tag}")
 def get_filter(filter_tag : str, user : UserModel = Depends(get_user_from_token)):
     "" 
-    features = DB.filters.get (tag = filter_tag)
-    
+    filter = DB.filters.get (tag = filter_tag)
+    return filter 
 
 @router.post("/filters")
 def add_filter(filterProps : FilterProps,
@@ -74,11 +74,14 @@ def add_filter(filterProps : FilterProps,
     if DB.filters.exists(tag = filterProps.tag):
         raise HTTPException(status_code=409, detail = "The tag exists already. Please delete the filter first if you want to replace it.")
 
-    DB.filters.add(protein_tags=filterProps.protein_tags,
+
+    ok, msg = DB.filters.add(protein_tags=filterProps.protein_tags,
                           proteome_id=filterProps.proteome_id, 
+                          filter_text = filterProps.text,
                           filter_tag = filterProps.tag, 
                           description=filterProps.description,
                           publication = filterProps.publication)
+    print(ok,msg)
     
     
 

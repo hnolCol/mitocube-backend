@@ -29,6 +29,7 @@ class GenotypeModel(BaseModel):
     
     
 class MinimalGenotypeModel(BaseModel):
+    attribute_tag : str = "att_genotype"
     tag : str 
     text : str 
     proteome_id : str 

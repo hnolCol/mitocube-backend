@@ -70,6 +70,10 @@ class DatabaseABC(ABC):
         if not isinstance(self.filters, FilterABC):
             raise TypeError("The attribute filters must be an instance of FilterABC")
         
+        if self.features is None:
+            raise NotImplementedError("A database class must have the features attribute defined. ")
+        
+        
     @abstractmethod
     def dataset_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 
@@ -86,10 +90,21 @@ class DatabaseABC(ABC):
             If the tag is associated with a dataset/submission.
         """
         
+        ----------
+        tag : str
+            The tag associated with a submission/dataset
+
+        Returns
+        -------
+        bool
     @abstractmethod
     def get_dataset_tags(self) -> List[str]:
         ""
         
+        filter_tag : str
+            The tag associated with an implemented filter set (list of proteins). 
+
+        Returns
     @abstractmethod
     def get_meta_data(self, tag : str) -> DatasetSubmissionModel:
         ""
@@ -164,24 +179,26 @@ class SubmissionFilterABC(ABC):
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
             limit : int = 10) -> List[str]:
-        """_summary_
+        """Returns submissions allowing to filter by 
+        various meta data. The given filter must all match (operator 'and').  
+        
 
         Parameters
         ----------
         state : List[int], optional
             _description_, by default None
         attribute_value_tag : List[str], optional
-            _description_, by default None
+            List of attribute_value_tags that are used to filter the submissions, by default None
         attribute_tag : List[str], optional
             _description_, by default None
         user_tag : List[str], optional
-            _description_, by default None
+            User filter, provide the tags of users that must be either owner or collaborator, by default None
         protein_tag : List[str], optional
-            _description_, by default None
+            The protein tags for which the dataset must a) have data table (e.g. state > 4) and b) have a quantitative value 
         genotype_tag : List[str], optional
-            _description_, by default None
         limit : int, optional
             _description_, by default 10
+            The number of max. submissions to be returned, by default 10
 
         Returns
         -------
@@ -218,6 +235,16 @@ class AttributesABC(ABC):
             _description_
         """
     
+    @abstractmethod
+    def get_values(self, tags : List[str] = None, dataset_tag : str = None) -> List[AttributeValueModel|FeatureNeoModel]:
+        """Returns the attribute values
+        ----------
+        tags : List[str]
+            _description_
+        dataset_tag : str, optional
+            Returns the attribute values matching the given tags. 
+            
+
         
     @abstractmethod
     def get_mandatory_attributes(self)->List[AttributeModel]:
@@ -256,6 +283,14 @@ class AttributesABC(ABC):
         """
         
     
+        """Returns the protein sequences for the given tags
+
+        Parameters
+        ----------
+        tags : str
+            Feature/protein tags
+
+        Returns
 class UserABC(ABC):
     
     @abstractmethod
@@ -352,6 +387,13 @@ class MetaABC(ABC):
         """
     
     def update_owner(self, dataset_tag : str, user_tag : str):
+        """Returns the metatext associated with the provided tags (dataset tags)
+
+        Parameters
+        ----------
+        tags : List[str]
+            The dataset/submission tags. 
+
         """Updates the ownership of data submission/dataset.
 
         Parameters
@@ -386,6 +428,7 @@ class FilterABC(ABC):
     def add(self, protein_tags : List[str], 
             proteome_id : str, 
             filter_tag : str, 
+            filter_text : str,
             description : str,
             publication : Optional[str] = None) -> Tuple[bool,str]:
         """Adds a filter to the database. 
@@ -398,11 +441,23 @@ class FilterABC(ABC):
             _description_
         filter_tag : str
             _description_
+        filter_text : str
+            _description_
         description : str
             _description_
         publication : Optional[str], optional
             _description_, by default None
         """
+        
+    @abstractmethod
+    def exists(self, tag : str) -> bool:
+        """Check if a filter exists with the given tag.
+
+        tag : str
+            _description_
+
+        Returns
+        -------
     
     @abstractmethod
     def get(self, tag : str = None) -> List[Filter]:
@@ -413,7 +468,8 @@ class FilterABC(ABC):
         ----------
         tag : str
             The filter tag
-
+            Ignored of tag is provided. 
+        
         Returns
         -------
         List[Filter]

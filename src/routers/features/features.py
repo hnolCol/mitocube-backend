@@ -30,8 +30,9 @@ def get_features_by_query(query : str, proteome_ids : str = None, limit : int = 
     ----------
     query : str
         _description_
-    proteome_ids : UserModel, optional
-        _description_
+    proteome_ids : str, optional
+        The list of proteomes to query the feature in. If None, alle available features will be searched for
+        If multiple proteomes should be provided, separate them by a semicolon. 
     limit : int, optional
         The maximum number of features to be returned.
     user : UserModel, optional
@@ -42,9 +43,25 @@ def get_features_by_query(query : str, proteome_ids : str = None, limit : int = 
     _type_
         _description_
     """
-    return DB.feature.find_feature(query, proteome_id = APIParamString(param=proteome_ids).param, limit = limit)
+    return DB.features.find_feature(query, proteome_id = APIParamString(param=proteome_ids).param, limit = limit)
+    
+
+
+@router.get("/{feature_tag}/i")
+def get_feature_info(feature_tag : str):
+    "" 
+    protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False)    
+    filters = DB.filters.get(feature_tag=feature_tag)
+    DB.features.get_quant_stats(tags = [feature_tag])
+
+    return {
+            "i" : protein,
+            "filters": filters
+            }
     
     
+
+
 
 @router.get("/{feature_key}/data",
             response_model=FeatureDataResponseModel)
@@ -145,6 +162,7 @@ def get_feature_variance(feature_key : str, labels : str = None):
     if labels is not None:
         labels = labels.split(";")
     df = db_helper.get_abundance_by_feature(feature_key)
+
     return df.to_dict(orient="records")
     
 
@@ -173,8 +191,7 @@ def get_feature_sequence(feature_key : str): #user : UserModel = Depends(get_use
     Please use the api endpoint /annotations to submit a list of feature_ids to 
     retrieve annotations efficiently. 
     """
-    print(DB.feature.get_protein_sequence(tags = APIParamString(param=feature_key).param))
-    return DB.feature.get_protein_sequence(tags = APIParamString(param=feature_key).param)
+    return DB.features.get_protein_sequence(tags = APIParamString(param=feature_key).param)
     
     
     db_annotations = AnnotationDatabase()

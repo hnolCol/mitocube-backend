@@ -48,6 +48,22 @@ class SampleAttribute(BaseModel):
     attribute : AttributeModel
     name : str 
 
+
+class MinimalMetadataModel(BaseModel):
+    ""
+    tag : str 
+    title : str 
+    state : SubmissionStatesEnums
+    created_at : float 
+    n_samples : int 
+    n_replicates : int 
+    proteome_ids : List[str]
+    has_datatable : bool 
+    
+class MinimalMetadataResponseModel(MinimalMetadataModel):
+    "" 
+    
+
 class NewSubmissionModel(BaseModel):
     """
     Model to handle submissions from the ui. 
@@ -224,7 +240,7 @@ class SubmissionCountResponse(BaseModel):
     count : int
 
 class SubmissionQueryResponse(BaseModel):
-    submissions : List[Dict]
+    submissions : List[MinimalMetadataModel]
     tags : List[str]
     query_count : int
     total_count : int 

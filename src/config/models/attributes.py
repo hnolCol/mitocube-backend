@@ -1,5 +1,5 @@
 from pydantic import BaseModel, field_validator, field_serializer
-# from pydantic import Field
+
 from typing import Any, Optional, List, Union, Literal
 import numpy as np 
 from config.models.feature import FeatureNeoModel
@@ -170,21 +170,6 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
         if v is None: return ""
         if isinstance(v,str): return v 
         return " ".join([str(s).lower() for s in v if s is not None])
-        
-        
-    @field_validator("tag")  # ToDo, issue with return type?
-    @classmethod
-    def check_tag(cls, v : str) -> str:
-        """Checks tags to contain att_ and a :"""
-        if ":" in v:  return v.split(":")[-1]
-        return v 
-        # if not v.startswith("att_"):
-        #     raise ValueError("AttributeValue Tags must start 'att_'. Example : 'att_organism")
-        # if ":" not in v and not v.endswith(":"):  # make sure tag is not empty after :
-        #     raise ValueError("AttributeValue tags must follow the the pattern <attribute_tag>:<attribute_value>")
-        # if len(v.split(":")) != 2:
-        #     raise ValueError("Tag must contain exactly one ':'")
-        # return v #changed from v.lower() this otherwise for uniprotIDs and proteome_ids  .upper() must be called, okay?
     
     @field_validator("text", mode="before")  # ToDo, issue with return type?
     @classmethod
@@ -236,3 +221,4 @@ class AttributeUnitModel(BaseModel):
 class AttributeUnitResponseModel(BaseModel):
     attribute : AttributeModel
     units : List[AttributeUnitModel]
+

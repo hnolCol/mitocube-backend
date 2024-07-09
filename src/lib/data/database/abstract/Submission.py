@@ -11,10 +11,105 @@ import pandas as pd
 from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeUnitResponseModel
 from config.models.submissions.submissions import DatasetSubmissionModel
-from config.models.user import UserModel 
-from config.models.feature import FeatureNeoModel
-from config.models.filter import Filter
+from config.enums.states import SubmissionStatesEnums
 
+
+class SubmissionABC(ABC):
+    """Handles Submissions in the backend. 
+    Notably, filtering submissions have an extra abstract class (see below)
+    
+    """
+    
+    def contains(self, tag : str) -> bool:
+        "Alias for exists()."
+        self.exists(tag)
+    
+    @abstractmethod
+    def exists(self, tag : str) -> bool:
+        """Checks if the given tag is associated with a 
+        submission in the database. 
+
+        Parameters
+        ----------
+        tag : str
+            _description_
+
+        Returns
+        -------
+        bool
+            If the submission tag was found. 
+        """
+    
+    @abstractmethod
+    def get(self, tag : str) -> DatasetSubmissionModel:
+        """Returns the submission
+
+        Parameters
+        ----------
+        tag : str
+            The associated tag. 
+
+        Returns
+        -------
+        DatasetSubmissionModel
+            _description_
+            
+        Exception
+        ---------
+        ValueError 
+            If the tag does not exists 
+        """
+    
+    @abstractmethod
+    def insert(self, submission : DatasetSubmissionModel) -> bool:
+        """Adds a new submission to the database. 
+
+        Parameters
+        ----------
+        submission : DatasetSubmissionModel
+            _description_
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+    
+    @abstractmethod
+    def delete(self, tag : str) -> bool:
+        """_summary_
+
+        Parameters
+        ----------
+        tag : str
+            _description_
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+
+
+    @abstractmethod
+    def update_state(self, tag : str, new_state : SubmissionStatesEnums) -> bool: #model for meta data.
+        """Updates the state of a submission.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag 
+        new_state : SubmissionStatesEnums
+            The new state the submission is in.
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+        
+        
+        
 
 class SubmissionFilterABC(ABC):
     

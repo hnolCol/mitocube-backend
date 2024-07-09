@@ -78,6 +78,13 @@ def post_meta_text(submission_label : str, metatext : Dict[str,str], user : User
     return True 
     
 
+@router.get("/submissions/{submission_tag}/metatext")
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    ""
+    meta_text = DB.meta.get_metatext(tags = APIParamString(param=submission_tag).param)
+    
+    print(meta_text)
+    return meta_text.to_dict(orient="records")
 
 @router.get("/submissions/metatext",
             summary="Returns the metatext information that can be used to describe a submission.",
@@ -91,6 +98,33 @@ def get_meta_text(user : UserModel = Depends(get_user_from_token)):
 def get_project_states(user : UserModel = Depends(get_user_from_token)):
     """"""
     return StateResponse()
+
+
+@router.get("/submissions/{submission_tag}/users")
+def get_users_associated_with_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[PublicUser]:
+    """_summary_
+
+    Parameters
+    ----------
+    submission_tag : str
+        _description_
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    List[PublicUser]
+        _description_
+
+    Raises
+    ------
+    user_not_found
+        If the user is not found that is interpreted from the token. 
+    tag_not_found
+        
+    """
+    if not DB.dataset_exists(tag = submission_tag): raise tag_not_found
+    return DB.meta.get_users(dataset_tag=submission_tag)
 
 
 @router.post("/submissions/{submission_label}/collaborators")
@@ -113,6 +147,8 @@ def add_collaborators(submission_label : str, collaborators : str, replace : boo
     _type_
         _description_
     """
+    
+    
     db = MCDatabase.getDatabase()
     dataset = get_dataset_from_database(db,submission_label)
     metadata = dataset.getMetaJson().model_dump()
@@ -122,13 +158,13 @@ def add_collaborators(submission_label : str, collaborators : str, replace : boo
     return True
 
 
-@router.get("/submissions/{submission_label}/owner", response_model=PublicUser)
-def get_submission_owner(submission_label : str, user : UserModel = Depends(get_user_from_token)):
+@router.get("/submissions/{submission_tag}/owner", response_model=PublicUser)
+def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters
     ----------
-    submission_label : str
+    submission_tag : str
         The label of the submission the owner should be returned. 
     user : UserModel, optional
         _description_, by default Depends(get_user_from_token)
@@ -141,19 +177,14 @@ def get_submission_owner(submission_label : str, user : UserModel = Depends(get_
     Raises
     ------
     tag_not_found
-       The submission_label was not found.
+       The submission_tag was not found.
     user_not_found
         If the user is not found in the database.
     """
-    db = MCDatabase.getDatabase()
-    dataset = get_dataset_from_database(db,submission_label)
-    metadata = dataset.getMetaJson()
-    user_label = metadata.user_label
-    db_user = UserDB
-    exists, user = db_user.get_user_by_label(user_label)
-    if not exists:
-        raise user_not_found
-    return user
+    
+    if not DB.dataset_exists(tag = submission_tag): raise tag_not_found 
+    user = DB.meta.get_owner(dataset_tag=submission_tag)
+    return user 
     
 
 @router.post("/submissions/{submission_tag}/owner")
@@ -181,7 +212,7 @@ def change_submission_owner(submission_tag : str,
     Returns
     -------
     bool
-        Returns true if not errors occurred.
+        Returns true if no errors occurred.
 
     Raises
     ------
@@ -195,9 +226,10 @@ def change_submission_owner(submission_tag : str,
     
     if not DB.user.exists(tag = user_tag): raise user_not_found 
     if not DB.dataset_exists(tag = submission_tag): raise tag_not_found
-    
     ok = DB.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
-    return 
+    if not ok:
+        raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
+    return True
 
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])

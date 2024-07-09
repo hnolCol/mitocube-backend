@@ -26,7 +26,7 @@ router = APIRouter(
 @router.get("/genotypes/q")
 def get_genotype_by_query(query : str) -> List[MinimalGenotypeModel]:
     """"""
-    return DB.genotype.find(query)
+    return DB.genotypes.find(query)
 
 
 @router.get("/genotypes/{genotype_label}")
@@ -53,7 +53,7 @@ def get_genotypes(proteome_ids : Optional[str] = None, feature_tag : Optional[st
     feature_key : Optional[str], optional
         The feature key can be used to access genotypes that affect a certain feature_key, by default Optional[str]=None
     """
-    r = DB.genotype.get(
+    r = DB.genotypes.get(
         proteome_ids=APIParamString(param = proteome_ids).param, 
         protein_tags=APIParamString(param = feature_tag).param
         )
@@ -77,7 +77,7 @@ def add_genotype(genotype : GenotypeModel, user : UserModel = Depends(get_user_f
     genotype : GenotypeModel
         The defined genotype.
     """
-    DB.genotype.add(genotype, user_tag = user.tag)
+    DB.genotypes.add(genotype, user_tag = user.tag)
     
     return True 
 

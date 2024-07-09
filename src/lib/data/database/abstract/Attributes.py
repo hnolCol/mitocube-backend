@@ -48,8 +48,9 @@ class AttributesABC(ABC):
         """
     
     @abstractmethod
-    def count_values(self) -> int:
-        """The number of attribute values
+    def count_values(self, attribute_tag : str = None) -> int:
+        """The total number of attribute values or 
+        the number of attribute values for a given attribute tag
 
         Returns
         -------
@@ -57,6 +58,24 @@ class AttributesABC(ABC):
             The number of attribute values
             in the database 
         """
+        
+    @abstractmethod
+    def delete(self, tag : str) -> bool:
+        """Deletes an attribute or attribute value by its tag. 
+        If an attribute is deleted, all associated values should also be deleted. 
+
+        Parameters
+        ----------
+        tag : str
+            The attribute or attribute_value tag. 
+
+        Returns
+        -------
+        bool
+            If the deletion was executed successfully 
+        """
+        
+        
     
     @abstractmethod
     def get(self, tags : List[str] = ["att_compound","att_protease"]) -> List[AttributeModel]:
@@ -79,11 +98,41 @@ class AttributesABC(ABC):
         Exception
             _description_
         """
-        
+    
+    @abstractmethod    
     def get_attributes_and_values_by_search_string(self, 
                                                    search_string : str, 
-                                                   min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
-        
+                                                   min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED, 
+                                                   param_name : Literal["allow_for_dataset",
+                                                                        "mandatory_for_submission",
+                                                                        "allow_as_filter",
+                                                                        "allow_for_genotype",
+                                                                        "allow_for_measurement",
+                                                                        "allow_as_qc",
+                                                                        "mandatory_for_submission",
+                                                                        "mandatory_for_active"] = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
+        """Finds attributes and attribute values by a search string the minimal required 
+        state as well as a boolean param can be set. 
+
+        Parameters
+        ----------
+        search_string : str
+            The search string to find an attribute. 
+        min_state : SubmissionStatesEnums, optional
+            The minimal state of a submission/dataset that is required. Certain attribute can only be 
+            selected if the submission is in specific state. For example, you can only set the 
+            mass spectrometer if the samples are being measured, by default SubmissionStatesEnums.SUBMITTED
+        param_name : str, optional
+            A boolean attribute param, if None it is ignored, by default None
+
+        Returns
+        -------
+        List[Tuple[AttributeModel,List[AttributeValueModel]]]
+            If an attribute value matches the search string, the attribute must always be returned. 
+        """
+
+    
+    
     @abstractmethod
     def get_attribute_values_by_dataset_tags(self, 
                                              dataset_tags : List[str], 
@@ -128,6 +177,69 @@ class AttributesABC(ABC):
             If the database query returns an error. 
         """
         
+    @abstractmethod
+    def insert(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
+        """Inserts an attribute and corresponding attribute_values to the database. 
+        
+
+        Parameters
+        ----------
+        attribute : AttributeModel
+            The attribute that should be inserted. 
+        attribute_values : List[AttributeValueModel]
+            The corresponding attribute_values. 
+
+        Returns
+        -------
+        bool
+            If the insertion was successful. 
+            
+        Exception
+        ---------
+        ValueError
+            If the attribute allows features (has_feature_values = True), but attribute_values
+            are provided which is not allowed.
+        ValueError
+            If the attribute_tag is already in the database. 
+        """
+    
+    @abstractmethod
+    def update(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
+        """Updates an attribute and its values. 
+
+        Parameters
+        ----------
+        attribute : AttributeModel
+            _description_
+        attribute_values : List[AttributeValueModel], optional
+            _description_, by default None
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+        
+    @abstractmethod
+    def update_values(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel], join : bool = True) -> bool:
+        """Updates the values of an attribute
+
+        Parameters
+        ----------
+        attribute : AttributeModel
+            The attribute for which the values should be updated. 
+        attribute_values : List[AttributeValueModel]
+            The updated attribute_values. 
+        join : bool 
+            Specify if the attribute values should be joined to the others (True) or replaced (False). 
+            The union of the attribute values is added. 
+            
+        Returns
+        -------
+        bool
+            _description_
+        """
+    
     @abstractmethod
     def unit(self, tag : str) -> List[AttributeUnitResponseModel]:
         """_summary_

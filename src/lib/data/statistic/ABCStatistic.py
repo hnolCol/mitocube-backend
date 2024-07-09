@@ -19,11 +19,11 @@ class DatasetStatistic(ABC):
         Returns the pd.Index of the dataset data that match the filtering.     
 
     """
-    def __init__(self, dataset : MCDataset) -> None:
+    def __init__(self, datatable : pd.DataFrame, sample_attribute_map : pd.DataFrame) -> None:
         """
         """
-        self._dataset = dataset
-        self._metadata = self._dataset.getMetaJson()
+        self._datatable = datatable
+        self._sample_attribute_map = sample_attribute_map
 
     @abstractmethod
     def get_stats(self) -> pd.Index:

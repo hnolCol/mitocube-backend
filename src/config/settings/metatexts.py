@@ -13,7 +13,7 @@ class MetaText(BaseModel):
 
 class MetaTexts(BaseSettings):
     """
-    Base settings to defined metatexts for a proeject
+    Base settings to defined metatexts for a project
     submission
     """
     titles : List[str] = ["Research Aim",
@@ -21,6 +21,13 @@ class MetaTexts(BaseSettings):
                           "Additional Information",
                           "Protein Digestion",
                           "Liquid Chromatography and Mass Spectrometry"]
+    priorities : Dict[str,int] = {
+        "metatext:research_aim" : 800,
+        "metatext:experimental_procedure" : 600,
+        "metatext:add_info" : 500,
+        "metatext:protein_digestion" : 400,
+        "metatext:lcms" : 300
+    }
     placeholders : Dict[str,str] = {
         "metatext:research_aim" : "Please enter some background information about your project. Think about it like a small abstract in a paper.",
         "metatext:experimental_procedure" : "Please provide detailed information about the experimental procedure/sample preparation.",

@@ -90,7 +90,7 @@ tag_not_found = HTTPException(
         detail="Label was not found.",
         headers={"WWW-Authenticate": "Bearer"})
 
-no_data_found = HTTPException(
+no_data_found_http_exception = HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="No datatable could be found for the label.",
         headers={"WWW-Authenticate": "Bearer"})
@@ -101,3 +101,7 @@ mandatory_dataset_attrs_not_found_exception = HTTPException(
         headers={"WWW-Authenticate": "Bearer"})
 
 
+filter_tag_does_not_exist_exception = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="The provided filter tag was not found in the DB.",
+        headers={"WWW-Authenticate": "Bearer"})
