@@ -12279,6 +12279,66 @@
             "description": "No FB serum has been added to the cell culture media.",
             "attribute_id": 133.0,
             "id": 932
+        },
+        {
+            "value": "UP000000589",
+            "attribute_tag": "att_organism",
+            "tag": "att_organism:UP000000589",
+            "keyword": "mouse",
+            "text": "Mus musculus",
+            "description": "Mouse (Mus Musculus) reference proteome (UP000000589)",
+            "attribute_id": 92.0,
+            "id": 933
+        },
+        {
+            "value": "UP000001940",
+            "attribute_tag": "att_organism",
+            "tag": "att_organism:UP000001940",
+            "keyword": "elegeans",
+            "text": "Caenorhabditis elegans",
+            "description": "C. Elegans reference proteome (UP000001940)",
+            "attribute_id": 92.0,
+            "id": 934
+        },
+        {
+            "value": "UP000002311",
+            "attribute_tag": "att_organism",
+            "tag": "att_organism:UP000002311",
+            "keyword": "yeast",
+            "text": "Saccharomyces cerevisiae",
+            "description": "Baker's yeast (Saccharomyces cerevisiae) reference proteome (UP000002311)",
+            "attribute_id": 92.0,
+            "id": 935
+        },
+        {
+            "value": "UP000002494",
+            "attribute_tag": "att_organism",
+            "tag": "att_organism:UP000002494",
+            "keyword": "rat",
+            "text": "Rattus norvegicus",
+            "description": "Rat (Rattus norvegus) reference proteome (UP000002494)",
+            "attribute_id": 92.0,
+            "id": 936
+        },
+        {
+            "value": "UP000005640",
+            "attribute_tag": "att_organism",
+            "tag": "att_organism:UP000005640",
+            "keyword": "human",
+            "text": "Homo sapiens",
+            "description": "Human (Homo sapiens) reference proteome (UP000005640)",
+            "attribute_id": 92.0,
+            "id": 937
+        },
+        {
+            "value": "controls",
+            "attribute_tag": "att_organism",
+            "tag": "att_organism:controls",
+            "keyword": "control",
+            "text": "Control Target Proteins",
+            "description": "Control targets proteins such as GFP, LacZ",
+            "attribute_id": 92.0,
+            "id": 938
         }
     ]
 }
