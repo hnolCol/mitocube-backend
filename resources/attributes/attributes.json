@@ -12225,8 +12225,8 @@
             "attribute_tag": "att_cellculture_media",
             "tag": "att_cellculture_media:fbs",
             "keyword": null,
-            "text": "10% FBS added to the cell culture media.",
-            "description": "Normal' growth",
+            "text": "FBS",
+            "description": "Fetal bovine serum\u00a0(FBS) is derived from the blood drawn from a bovine\u00a0fetus\u00a0via a closed system of collection at the\u00a0slaughterhouse. Fetal bovine serum is the most widely used serum-supplement for the in vitro cell culture of\u00a0eukaryotic cells. This is due to it having a very low level of\u00a0antibodies\u00a0and containing more\u00a0growth factors, allowing for versatility in many different cell culture applications.",
             "attribute_id": 133.0,
             "id": 927
         },
@@ -12235,8 +12235,8 @@
             "attribute_tag": "att_cellculture_media",
             "tag": "att_cellculture_media:nofbs",
             "keyword": null,
-            "text": "No FBS used in the cell culture",
-            "description": "Serum Starvation.",
+            "text": "No-FBS",
+            "description": "No FB serum has been added to the cell culture media.",
             "attribute_id": 133.0,
             "id": 928
         }
