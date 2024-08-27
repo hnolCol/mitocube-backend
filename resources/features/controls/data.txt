@@ -1,9 +1,0 @@
-Entry	Entry Name	Mass	Length	Gene Names	Organism	Organism (ID)	Protein names
-P42212	GFP_AEQVI	26886	238	GFP	Aequorea victoria	6100	Green fluorescent protein
-P00722	BGAL_ECOLI	116483	1024	"lacZ, b0344, JW0335"	Escherichia coli (strain K12)	83333	Beta-galactosidase
-SCRAMB	SCR_SCR	0	0	Scr	Unknown	-1	Scrambled control sequence
-UNTREAT	CTRL_UNTREATED	0	0	Untreated	Unknown	-1	Knock down control experiment (no transfection).
-P08659	LUCI_PHOPY	60745	550	FLUC	Photinus pyralis (Common eastern firefly) (Lampyris pyralis)	7054	Luciferin 4-monooxygenase (esiRNA/siRNA control)
-P27652	LUCI_RENRE	36022	311	RLUC	Renilla reniformis (Sea pansy)	6136	Coelenterazine h 2-monooxygenase
-IGGCTR	IGG_IGG	0	0	IgG	Unknown	-1	IgG Immunoprecipitation Control
-MOCKCT	MOCK_CTRL	0	0	Mock	Unknown	-1	Mock control for overexpression.

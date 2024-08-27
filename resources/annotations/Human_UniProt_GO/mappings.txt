@@ -1,7 +1,0 @@
-map	from
-entry	Entry
-key	Entry
-keywords	Keywords
-keywords_id	Keyword ID
-go	Gene Ontology (GO)
-go_ids	Gene Ontology IDs

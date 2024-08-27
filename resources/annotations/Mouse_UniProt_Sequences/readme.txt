@@ -1,1 +1,0 @@
-Downloaded from https://www.uniprot.org/uniprotkb on 2023-12-05.

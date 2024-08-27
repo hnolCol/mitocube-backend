@@ -1,4 +1,0 @@
-map	from
-entry	Entry
-key	Entry
-sequence	Sequence

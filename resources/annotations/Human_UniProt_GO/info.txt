@@ -1,4 +1,0 @@
-var	value
-class	GoKeywordAnnotation
-species_id	9606
-proteome_id	UP000005640
