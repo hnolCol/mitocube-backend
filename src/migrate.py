@@ -1,3 +1,0 @@
-from setup_utils.migrate_to_attributes import migrate_from_folder
-
-migrate_from_folder()
