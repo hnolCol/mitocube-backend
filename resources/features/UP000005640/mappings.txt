@@ -1,0 +1,9 @@
+map	from
+key	Entry
+entry	Entry Name
+proteins	Protein names
+genes	Gene Names
+organism	Organism
+organism_id	Organism (ID)
+aa_length	Length
+mass	Mass
