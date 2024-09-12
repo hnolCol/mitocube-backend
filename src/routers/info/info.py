@@ -10,6 +10,9 @@ from config.models.user import UserModel
 from config.models.info.info import InfoResponse
 from config.settings.general import get_general_settings
 from config.settings.keyfigures import get_key_figure_settings
+
+from lib.data.database.Database import Database 
+
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 from lib.user.UserHandling import UserDB
 
@@ -17,6 +20,9 @@ from config.enums.states import SubmissionStatesEnums
 
 GENERAL_SETTINGS  = get_general_settings()
 KEY_FIGURE_SETTINGS = get_key_figure_settings()
+
+
+DB = Database.DB()
 
 router = APIRouter(
     prefix="/api",
@@ -49,21 +55,23 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
         the user that is inferred from the token, by default Depends(get_user_from_token)
     """
     
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
+    
+    
+    
+    #db_helper = MCDatabaseHelper.getDatabaseHelper()
     key_figures = OrderedDict()
     
     if KEY_FIGURE_SETTINGS.number_submissions:
-        key_figures["Submissions"] = len(db_helper.get_all_labels())
+        key_figures["Submissions"] = len(DB.get_submission_tags())
     if KEY_FIGURE_SETTINGS.number_published_datasets:
-        published_datasets = db_helper.get_label_count_by_state(k_subset=set([SubmissionStatesEnums.ACTIVE]))
-        if SubmissionStatesEnums.ACTIVE in published_datasets:
-            key_figures["Published Data"] = published_datasets[SubmissionStatesEnums.ACTIVE]["submission_count"] 
+        published_datasets = DB.submission_filter.get(state = [SubmissionStatesEnums.ACTIVE])
+        key_figures["Published Data"] = len(published_datasets)
     if KEY_FIGURE_SETTINGS.number_proteins:
-        key_figures["Proteins"] = db_helper.get_number_features()
+        key_figures["Proteins"] = DB.features.count(quantified=True)
     if KEY_FIGURE_SETTINGS.number_genotypes:
-        key_figures["Genotypes"] = db_helper.get_number_genotypes()
+        key_figures["Genotypes"] = 2 #db_helper.get_number_genotypes()
     if KEY_FIGURE_SETTINGS.number_users:
-        key_figures["Users"] = UserDB.get_number_of_users()
+        key_figures["Users"] = DB.users.count()
     return [{"label" : k, "metric" : v} for k,v in key_figures.items()]
 
 

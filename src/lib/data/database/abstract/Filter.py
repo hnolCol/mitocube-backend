@@ -1,25 +1,14 @@
 from __future__ import annotations
-
 from abc import abstractmethod, ABC
-from collections import OrderedDict
-# from datetime import timedelta
-from typing import List, Dict, Optional, Tuple, Literal  # , Any
+
+from typing import List, Dict, Optional, Tuple
 from deprecated import deprecated
-from neo4j import Driver 
 
-import pandas as pd
-
-from lib.data.dataset.ABCDataset import MCDataset
-from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
-from lib.data.database.abstract.Attributes import AttributesABC
-
-from config.settings.db import get_db_settings
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel
-from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
-from config.models.filter import Filter
+from config.models.filter import FilterModel
 
+import pandas as pd 
 
 
 class FilterABC(ABC):
@@ -34,7 +23,7 @@ class FilterABC(ABC):
 
     @abstractmethod
     def add(self, protein_tags : List[str], 
-            proteome_id : str, 
+            proteome_tag : str, 
             filter_tag : str, 
             description : str,
             publication : Optional[str] = None) -> Tuple[bool,str]:
@@ -44,7 +33,7 @@ class FilterABC(ABC):
         ----------
         protein_tags : List[str]
             _description_
-        proteome_id : str
+        proteome_tag : str
             _description_
         filter_tag : str
             _description_
@@ -53,17 +42,40 @@ class FilterABC(ABC):
         publication : Optional[str], optional
             _description_, by default None
         """
+    @abstractmethod 
+    def count_feaures(self, tag : str)  -> int:
+        """Counts the number of features (e.g. the size
+        of the filter.) 
+
+        Parameters
+        ----------
+        tag : str
+            The filter tag 
+
+        Returns
+        -------
+        int
+            The size (e.g. number of features).
+            If the tag does not exists, 0 will be returned. 
+        """
+    
     
     @abstractmethod
-    def get(self, tag : str = None) -> List[Filter]:
-        """Returns the metadata of the available 
+    def get(self, tag : str = None, proteome_tags : List[str] = None, feature_tag : str = None) -> List[FilterModel]:
+        """Returns the details of the available 
         filters/protein sets from the database.
 
         Parameters
         ----------
         tag : str
-            The filter tag
-
+            The specific filter tag to be returned, default None
+            If a tag is provided, the other arguments are ignored. 
+        proteome_tags : List[str]
+            List of proteome tags. If just proteome tags are given, then all 
+            filters of a specific proteome are returned, ignored of tag is given. 
+        feature_tag : str 
+            A feature tag that must be in the filter, ignore if tag is or proteome_tags is provided.     
+        
         Returns
         -------
         List[Filter]
@@ -90,68 +102,29 @@ class FilterABC(ABC):
         ------
         Exception
             If the database query returns an error. 
-        """
-
-    
-    
-class DatasetABC(ABC):
-    def __init__(self, *args, **kwargs) -> None:
-        ""
-
-    @abstractmethod
-    def get(self, tags : List[str]) -> List[str]:
-        """Returns the minimal meta information of a dataset
-
-        Parameters
-        ----------
-        tags : List[str]
-            The list of tags that the minimal metadata should be returned. 
-
-        Returns
-        -------
-        List[str]
-            _description_
-        """
-    
-    @abstractmethod
-    def get_metatext(self, tags : List[str]) -> pd.DataFrame:
-        """Returns the metatext that is associated with 
-        the provided dataset_tags
-
-        Parameters
-        ----------
-        tags : List[str]
-            The tag associated with the dataset. 
-            
-        Returns
-        -------
-        pd.DataFrame
-            The metatext given in a pandas data frame with 
-            the following columns:
-            
-                - 'tag' (str) : The dataset tags. If multiple metatext are
-                present for the tag, each metatext is in a separate row (e.g. duplicates)
-                
-                - 'meta_tag' (str) : The tag that was given to the metatext 
-                
-                - 'content' (str) : The actual content of the metatext. 
+            . 
         """
         
+    
     @abstractmethod
-    def get_sample_attributes(self, tag : str) -> Dict[str,Dict[str,List[int]]]:
-        """Describes the attributes that were assigned to each sample.
+    def isin(self, tag : str, feature_tags : List[str]) -> pd.Series:
+        """Checks if the given feature tags are in the
+        filter (given by its tag. )
 
         Parameters
         ----------
-        tag : str
-            The dataset tag for which the sample attributes
-            should be returned. 
+        tag : str 
+            The filter tag. 
+            
+        feature_tag : List[str]
+            _description_
 
         Returns
         -------
-        Dict[str,Dict[str,List[int]]]
-            ```
-            {'attribute_tag' : {'attribute_value_tag' : List[sample indices (int) ]}}
-            ```
+        pd.Series
+            pandas Series with bools to indicate
+            if the given feature is present. 
+            If the tag does not exists, and empty Series will be returned
         """
+
     

@@ -14,12 +14,12 @@ DB = Database.DB()
 def are_public_users_allowed(users : List[PublicUser]) -> List[bool]:
     """Checks if a list of Users are allowed to login."""
     user_tags = [u.tag for u in users]
-    users_from_db = DB.user.get_users_by_tags(tags = user_tags)
+    users_from_db = DB.users.get_users_by_tags(tags = user_tags)
     return [u.allow_login for u in users_from_db if u is not None]
 
 def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends()) -> UserModel:
     """Returns the user from a login"""
-    user  = DB.user.get_user_by_email(form_data.username)
+    user  = DB.users.get_user_by_email(form_data.username)
     #user verification check
     user_in_db = check_user_allowed(user is not None,user)
 
@@ -66,7 +66,7 @@ def get_user_from_token(token = Depends(check_token_verified)) -> UserModel:
     """Extracts the user from a token"""
     #DB.get_user_by_id()
     if "label" not in token : token_not_valid_exception
-    user_in_db = DB.user.get_user_by_tag(tag = token["tag"])
+    user_in_db = DB.users.get_user_by_tag(tag = token["tag"])
     user  = check_user_allowed(user_in_db is not None,user_in_db)
     return user 
 

@@ -3,7 +3,7 @@ import time
 import datetime as dt
 from typing import List, Optional
 from services.random_generators import get_random_string
-
+from services.date import get_time_stamp
 class RunListRequestPropsModel(BaseModel):
     """
     Properties in an HTTP API Request
@@ -74,8 +74,8 @@ class RunListModel(BaseModel):
     The runlist model.
 
     """
-    created_at : float = Field(...,default_factory=time.time)
-    user_label : str #user that created the run list 
+    created_at : float = Field(...,default_factory=get_time_stamp)
+    user_tag : str #user that created the run list 
     dataset_label : str 
     n_runs : int 
     n_plates : int

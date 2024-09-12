@@ -4,6 +4,7 @@
     "label": "BuXOSlIl6G",
     "title": "Knockdown of JC15 JC19 TImm17a in HeLa and treatments",
     "user_tag": "VpVff4sS",
+    "user_label": "VpVff4sS",
     "collaborators": [
         "EGYpku60",
         "DsuV8w4t"
@@ -144,8 +145,8 @@
         "att_experiment": [
             "att_experiment:expression_proteome"
         ],
-        "att_organism": [
-            "att_organism:UP000005640"
+        "att_proteome": [
+            "att_proteome:UP000005640"
         ],
         "att_poi": [
             "att_poi:Q9Y5T4",

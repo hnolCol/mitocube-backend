@@ -1,97 +1,76 @@
 {
-    "created_on": 1715090794.017238,
+    "created_on": 1725887490.069941,
     "modified_on": null,
     "state": 0,
     "label": null,
-    "tag": "k4IgkTQ2MS",
-    "title": "Asdadsadad Asdadsadad Asdadsadad Asdadsadad ",
+    "tag": "TgCqC8tGgQ",
+    "title": "Heart Clpb solubilization assay ",
     "user_tag": "VpVff4sS",
     "collaborators": [],
     "replicates": [
         1,
-        1
+        2,
+        1,
+        2
     ],
     "sample_names": [
-        "20240507_k4IgkTQ2MS_01_5_fluorouracil",
-        "20240507_k4IgkTQ2MS_02_cccp"
+        "20240909_TgCqC8tGgQ_01_arginine",
+        "20240909_TgCqC8tGgQ_02_arginine",
+        "20240909_TgCqC8tGgQ_03_glutamine",
+        "20240909_TgCqC8tGgQ_04_glutamine"
     ],
-    "n_samples": 2,
+    "n_samples": 4,
     "metatext": {
-        "metatext:research_aim": "Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad ",
-        "metatext:experimental_procedure": "Asdadsadad Asdadsadad Asdadsadad Asdadsadad Asdadsadad "
+        "metatext:research_aim": "asdad asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad \n asdad  asdad  asdad  asdad  asdad  asdad  asdad ",
+        "metatext:experimental_procedure": " asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad  asdad "
     },
     "dataset_attributes": {
         "att_experiment": [
-            "interaction"
+            "solub"
         ],
         "att_omics_type": [
             "proteomics"
         ],
         "att_proteome": [
-            "UP000000589"
+            "UP000005640"
         ],
         "att_poi": [
             "att_poi:None"
+        ],
+        "att_organ": [
+            "heart"
         ]
     },
     "samples_attributes": {
-        "att_compound": {
-            "5_fluorouracil": [
-                0
-            ],
-            "cccp": [
+        "att_aa_starvation": {
+            "arginine": [
+                0,
                 1
+            ],
+            "glutamine": [
+                2,
+                3
             ]
         }
     },
     "samples_genotypes": {},
     "links": [],
     "timeline": {
-        "created_on": 1715090794.02723,
-        "modified_on": 1715090794.02723,
-        "label": "yhQ6J9pUJRxrNNyXkD83",
+        "created_on": 1725887490.074047,
+        "modified_on": 1725887490.074048,
+        "label": "3y7jUZ2S0Wu6DDCb944t",
         "entries": [
             {
                 "id": 0,
-                "label": "6EMw8ZrdveQhVE3cp30b",
-                "created_on": 1715090794.027213,
+                "label": "vRXNHnpCkIDuacQU2B3r",
+                "created_on": 1725887490.074034,
                 "user_tag": "VpVff4sS",
+                "user_label": null,
                 "state": 0,
                 "comment": "Project created"
             }
         ]
     },
     "runlist": null,
-    "samples_attributes_input": {
-        "att_compound": [
-            {
-                "attribute_value_tag": "5_fluorouracil",
-                "sample_index": 0,
-                "input": [
-                    {
-                        "value": 2.0,
-                        "unit_tag": "concentration"
-                    },
-                    {
-                        "value": 2.0,
-                        "unit_tag": "time"
-                    }
-                ]
-            },
-            {
-                "attribute_value_tag": "cccp",
-                "sample_index": 1,
-                "input": [
-                    {
-                        "value": 3.0,
-                        "unit_tag": "concentration"
-                    },
-                    {
-                        "value": 3.0,
-                        "unit_tag": "time"
-                    }
-                ]
-            }
-        ]
-    }
+    "samples_attributes_input": {}
 }

@@ -14,6 +14,9 @@ from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.FeatureData import FeatureData
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 from lib.data.database.Database import Database
+
+from config.exceptions.HTTPExceptions import protein_not_found
+
 DB = Database.DB()
 
 
@@ -23,7 +26,7 @@ router = APIRouter(
     )
 
 @router.get("")
-def get_features_by_query(query : str, proteome_ids : str = None, limit : int = 30):
+def get_features_by_query(query : str, proteome_tags : str = None, limit : int = 30):
     """_summary_
 
     Parameters
@@ -43,19 +46,20 @@ def get_features_by_query(query : str, proteome_ids : str = None, limit : int = 
     _type_
         _description_
     """
-    return DB.features.find_feature(query, proteome_id = APIParamString(param=proteome_ids).param, limit = limit)
+    return DB.features.find(query, proteome_tags = APIParamString(param=proteome_tags).param, limit = limit)
     
 
 
 @router.get("/{feature_tag}/i")
 def get_feature_info(feature_tag : str):
     "" 
-    protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False)    
+    protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False) 
+    if len(protein) == 0: raise protein_not_found
     filters = DB.filters.get(feature_tag=feature_tag)
-    DB.features.get_quant_stats(tags = [feature_tag])
+    #DB.features.get_quant_stats(tags = [feature_tag])
 
     return {
-            "i" : protein,
+            "i" : protein[0],
             "filters": filters
             }
     
@@ -63,9 +67,9 @@ def get_feature_info(feature_tag : str):
 
 
 
-@router.get("/{feature_key}/data",
+@router.get("/{feature_tag}/data",
             response_model=FeatureDataResponseModel)
-def get_dataset_data(feature_key : str, max_datasets : int = 200, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_data(feature_tag : str, max_datasets : int = 200, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the data for a specific feature in all datasets it was detected in. 
     
@@ -86,11 +90,25 @@ def get_dataset_data(feature_key : str, max_datasets : int = 200, user : UserMod
 
     
     """
-    db = MCDatabase.getDatabase()
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    #dataset labels that contain the feature
-    dataset_labels = db_helper.get_labels_by_feature(feature_key)
-    #dataset_labels = db.getDataLabels()
+    
+    #DB.features.get_data(tags)
+    
+
+    data = DB.features.get_data(tags=APIParamString(feature_tag))
+
+    print(data)
+    
+    # db = MCDatabase.getDatabase()
+    # db_helper = MCDatabaseHelper.getDatabaseHelper()
+    # #dataset labels that contain the feature
+    # dataset_labels = db_helper.get_labels_by_feature(feature_key)
+    # #dataset_labels = db.getDataLabels()
+    
+    
+    
+    
+    
+    
     
     feature_data_by_dataset_label : Dict[str,pd.DataFrame] = {}
     attributes_sample_by_dataset_label : Dict[str,Dict] = {}

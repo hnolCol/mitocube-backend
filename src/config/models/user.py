@@ -13,6 +13,7 @@ from config.models.attributes import AttributeValueModel
 from config.enums.users.roles import UserRolesEnum
 from services.random_generators import get_random_string
 from services.enums import get_inversed_enum_as_dict
+from services.date import get_time_stamp
 import time 
 
 GENERAL_SETTINGS = get_general_settings()
@@ -26,7 +27,7 @@ class BasicUser(BaseModel):
     lastname : str 
     institute : str 
     research_group : str 
-    created_on : float = Field(default_factory=time.time)
+    created_on : float = Field(default_factory=get_time_stamp)
 
 class BasicUserWithEmail(BasicUser):
     """
@@ -103,7 +104,7 @@ class UserModelForUpdate(BaseModel):
     institute : str 
     research_group : str 
     role : UserRolesEnum
-    updated_on : float = Field(default_factory=time.time)
+    updated_on : float = Field(default_factory=get_time_stamp)
 
 
 class AdminUserView(BasicUser):

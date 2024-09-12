@@ -18,10 +18,10 @@ from io import StringIO, BytesIO
 #https://rest.uniprot.org/uniprotkb/search?compressed=true&fields=accession%2Creviewed%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Clength%2Cgo_p%2Cgo_c%2Cgo_f&format=tsv&query=%28%28proteome%3AUP000005640%29%29&size=500
 
 def download_proteome_annotations(annotationUrl : str,
-                                  proteome_ids : List[str],
+                                  proteome_tags : List[str],
                                   apiParamModel : BaseModel = API_UniprotAnnotationsModel,
                                   add_proteome_callback = None,
-                                  reviewed : bool = True,
+                                  reviewed : bool = False,
                                   user_tag : str = None,
                                   chunc_callback = None) -> pd.DataFrame:
     """
@@ -33,21 +33,20 @@ def download_proteome_annotations(annotationUrl : str,
     N = 0
     ##get proteome information 
     #check proteome exists 
-    for proteome_id in proteome_ids:
-        proteome_info = requests.get(f"https://www.ebi.ac.uk/proteins/api/proteomes?offset=0&size=1&upid={proteome_id}")
+    for proteome_tag in proteome_tags:
+        proteome_info = requests.get(f"https://www.ebi.ac.uk/proteins/api/proteomes?offset=0&size=1&upid={proteome_tag}")
         uniprot_proteome_info = proteome_info.json()
         if len(uniprot_proteome_info) == 0:
             raise ValueError("The proteome was not found in the Uniprot database. ")
         elif add_proteome_callback is not None:
-            add_proteome_callback(proteome_id, uniprot_proteome_info[0])
-        uniprot_query = f"((proteome:{proteome_id}) AND (reviewed:{reviewed}))"
-        print(uniprot_query)
+            add_proteome_callback(proteome_tag, uniprot_proteome_info[0])
+        uniprot_query = f"((proteome:{proteome_tag}) AND (reviewed:true))" if reviewed else f"(proteome:{proteome_tag})"
         apiParams = apiParamModel(query=uniprot_query)
         rr = requests.get(annotationUrl,params=apiParams.model_dump())
         rr.raise_for_status()
         # Extract the zip file
         proteome_entries = tsv_string_to_dataframe(gzip.decompress(rr.content))
-        chunc_callback(proteome_entries,proteome_id,user_tag)
+        chunc_callback(proteome_entries,proteome_tag,user_tag)
         N += proteome_entries.index.size
     # result.append(tsv_string_to_dataframe(gzip.decompress(rr.content)))
         while "Link" in rr.headers: #if there is no link in the response, last page is reached.
@@ -65,7 +64,7 @@ def download_proteome_annotations(annotationUrl : str,
             
             if chunc_callback is not None:
                 proteome_entries = tsv_string_to_dataframe(gzip.decompress(rr.content))
-                chunc_callback(proteome_entries, proteome_id,user_tag)
+                chunc_callback(proteome_entries, proteome_tag,user_tag)
                 N += proteome_entries.index.size
             print(f"{N} proteins added.")
     return N

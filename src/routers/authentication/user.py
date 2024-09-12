@@ -37,7 +37,7 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Add
     except Exception as e:
         raise HTTPException(status_code=422,detail=str(e))
     try:
-        DB.user.add_user(user_to_add)
+        DB.users.add_user(user_to_add)
     except ValueError as e:
         raise HTTPException(status_code=500, detail = str(e))
         return 
@@ -74,8 +74,8 @@ def query_user_db(query : str = None, max_users : int = 40, user : UserModel = D
         _description_
     """
     
-    filtered_users = DB.user.find_user(query, limit=max_users)
-    total_count = DB.user.count()
+    filtered_users = DB.users.find_user(query, limit=max_users)
+    total_count = DB.users.count()
     query_count = len(filtered_users)
    
     return {"users" : filtered_users, 
@@ -127,7 +127,7 @@ def get_users(user : UserModel = Depends(is_user_admin)):
     Returns a list of users, requires admin rights.
     Full indicates that the full information of a user is provided.
     """
-    users = DB.user.get_users()
+    users = DB.users.get_users()
     return {"users" : users}
 
 
@@ -138,7 +138,7 @@ def get_collaborators(tags : str = None, user : UserModel = Depends(get_user_fro
     Returns collaborators, which is essential Users with a different response model (e.g. non sensitive information.)
     The response model defines the information that the API returns
     """
-    return DB.user.get_users_by_tags(tags=APIParamString(param=tags).param)
+    return DB.users.get_users_by_tags(tags=APIParamString(param=tags).param)
     
 
 
@@ -151,7 +151,7 @@ def get_user_roles(user : UserModel = Depends(get_user_from_token)):
 @router.get("/users/{user_tag}", summary="Returns the public user information of a user by its label.", response_model=PublicUser)
 def get_user(user_tag : str, user : UserModel = Depends(get_user_from_token)):
     """Deletes specific user. Returns an error if token does not belong to admin"""
-    user_from_db = DB.user.get_user_by_tag(user_tag)
+    user_from_db = DB.users.get_user_by_tag(user_tag)
     if user_from_db is None : raise user_not_found
     return user_from_db
 
@@ -166,7 +166,7 @@ def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
 @router.post("/users/{user_tag}/block", summary="Block a user. Requires admin rights.")
 def block_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Blocks the user. Limited to admin users."""
-    DB.user.block_user_by_tag(tag = user_tag)
+    DB.users.block_user_by_tag(tag = user_tag)
     #UserDB.block_user_by_label(user_props.label)
     
     

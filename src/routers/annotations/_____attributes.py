@@ -8,7 +8,13 @@ from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 from config.enums.users.roles import UserRolesEnum
 from services.users import get_user_from_token
 from services.enums import get_enum_as_dict
-import pandas as pd 
+import pandas as pd
+
+
+from lib.data.database.Database import Database 
+
+DB = Database.DB() 
+
 
 router = APIRouter(
     prefix="/api",
@@ -21,10 +27,14 @@ def get_attributes(user : UserModel = Depends(get_user_from_token)) -> Attribute
     """
     Returns the stored attribute and attribute values.
     """
-    db_attributes = MCAttributes.getAttributeDatabase()
+    
+    attributes = DB.attributes.get()
+    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+    print(attributes)
+    #db_attributes = MCAttributes.getAttributeDatabase()
 
-    return AttributeResponseModel(attributes=db_attributes.getAttributes().to_dict(orient="records"),
-                                  attribute_values=db_attributes.getAttributeValues().to_dict(orient="records"))
+    return AttributeResponseModel(attributes=attributes,
+                                  attribute_values=attribute_values)
 
 
 @router.get("/attributes/user", response_model=AttributeResponseModel)
@@ -32,13 +42,16 @@ def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> Attr
     """
     Returns the stored attribute and attribute value definitions that can be assigned to a user.
     """
-    db_attributes = MCAttributes.getAttributeDatabase()
+    
+    attributes = DB.attributes.get_attributes_for_user()
+    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+    #db_attributes = MCAttributes.getAttributeDatabase()
 
-    attributes = db_attributes.getAttributes()
-    attributes = attributes.loc[attributes["allow_for_user"], :]
+    # attributes = db_attributes.getAttributes()
+    # attributes = attributes.loc[attributes["allow_for_user"], :]
 
-    attribute_values = db_attributes.getAttributeValues()
-    attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
+    # attribute_values = db_attributes.getAttributeValues()
+    # attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
 
     # Todo: Do not understand what you mean with that.
     # if user.role == UserRolesEnum.ADMIN:
@@ -50,8 +63,8 @@ def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> Attr
     # else:
     #     attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
 
-    return AttributeResponseModel(attributes=attributes.to_dict(orient="records"),
-                                  attribute_values=attribute_values.to_dict(orient="records"))
+    return AttributeResponseModel(attributes=attributes,
+                                  attribute_values=attribute_values)
 
 
 # @router.post("/attributes")

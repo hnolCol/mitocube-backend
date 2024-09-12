@@ -15,10 +15,15 @@ class UserABC(ABC):
     @abstractmethod 
     def add_user(self, user_props):
         ""
-        
-        
-    
-    
+
+    def add_users(self, users : List[UserModel]):
+        """Adds users to the database from a list of users
+
+        Parameters
+        ----------
+        users : List[UserModel]
+            The users to be added using the common pydantic UserModel. 
+        """
     
     @abstractmethod
     def block_user_by_tag(self, tag : str) -> bool:
@@ -104,4 +109,30 @@ class UserABC(ABC):
         ------
         Exception
             If the database query resulted in an error. 
+        """
+
+
+    @abstractmethod
+    def update(self, tag : str, user_props : Dict) -> bool:
+        """Updates props of the users. 
+        All params in the user_props will be updated.
+        The tag is not updatable. 
+
+        Parameters
+        ----------
+        tag : str
+            The user tag 
+        user_props : Dict
+            The props to be updated. 
+
+        Returns
+        -------
+        bool
+            If the update was successful
+            
+            
+        Exception
+        ---------
+        ValueError
+            If the updated email exists already. 
         """

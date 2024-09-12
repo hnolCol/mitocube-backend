@@ -8,6 +8,7 @@ class APIParamString(BaseModel):
     def check_param(v : str|List[str] = None) -> List[str]:
         if v is None: return None
         if isinstance(v,str):
+            if len(v) == 0: return None
             return v.split(";")
         return v
 

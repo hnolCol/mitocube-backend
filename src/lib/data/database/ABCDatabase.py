@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 from collections import OrderedDict
 
-from typing import List, Dict, Optional, Tuple, Literal 
+from typing import List, Dict, Tuple, Literal 
 from deprecated import deprecated
 
 import pandas as pd
@@ -12,10 +12,17 @@ from lib.data.dataset.ABCDataset import MCDataset
 from lib.DesignPatterns import SingletonABCMeta 
 
 from config.settings.db import get_db_settings
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel
+from config.models.attributes import AttributeModel
 from config.models.submissions.submissions import DatasetSubmissionModel, MinimalMetadataResponseModel
 from config.models.user import UserModel 
-from config.models.filter import Filter
+from config.models.filter import FilterModel
+
+from lib.data.database.abstract.Attributes import AttributesABC
+from lib.data.database.abstract.Users import UserABC 
+from lib.data.database.abstract.Features import FeaturesABC
+from lib.data.database.abstract.Filter import FilterABC
+from lib.data.database.abstract.News import NewsABC
+from lib.data.database.abstract.Proteomes import ProteomesABC
 
 DB_SETTINGS = get_db_settings()
 
@@ -26,6 +33,8 @@ class DatabaseABC(ABC):
     attributes : AttributesABC = None
     filters : FilterABC = None
     features : FeaturesABC = None 
+    news : NewsABC = None 
+    proteomes : ProteomesABC = None 
     
     def __init__(self):
         """The abstract database class that defines
@@ -76,7 +85,19 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the features attribute defined. ")
         
         if not isinstance(self.features, FeaturesABC):
-            raise TypeError("The attribute filters must be an instance of FeaturesABC")
+            raise TypeError("The attribute features must be an instance of FeaturesABC")
+        
+        if self.news is None:
+            raise NotImplementedError("A database class must have the news attribute defined. ")
+        
+        if not isinstance(self.news, NewsABC):
+            raise TypeError("The attribute news must be an instance of NewsABC")
+        
+        if self.proteomes is None:
+            raise NotImplementedError("A database class must have the proteomes attribute defined. ")
+        
+        if not isinstance(self.proteomes, ProteomesABC):
+            raise TypeError("The attribute proteomes must be an instance of ProteomesABC")
         
     @abstractmethod
     def dataset_exists(self, tag : str) -> bool:
@@ -128,7 +149,7 @@ class DatabaseABC(ABC):
         -------
         pd.DataFrame
             The datatable characterized by:
-                - index (str) : the protein tag (Uniprot ID)
+                - index (str) : the protein id/tag (Uniprot ID)
                 - columns : The index of the column 
          """
         
@@ -205,7 +226,7 @@ class SubmissionFilterABC(ABC):
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
             limit : int = 10) -> List[str]:
-        """Returns submissions allowing to filter by 
+        """Returns submissions tags allowing to filter by 
         various meta data. The given filter must all match (operator 'and').  
         
 
@@ -237,220 +258,8 @@ class SubmissionFilterABC(ABC):
         ------
         Exception
             If the database query returns an error. 
-        """
+        """ 
 
-class AttributesABC(ABC):
-    
-    @abstractmethod
-    def get(self, tags : List[str] = ["att_compound","att_protease"]) -> List[AttributeModel]:
-        """Finds attributes by their tags. If the tag is not in the 
-        database it is simply ignored. 
-
-        Parameters
-        ----------
-        tags : List[str], optional
-            The attribute tags, by default ["att_compound","att_protease"]
-
-        Returns
-        -------
-        List[AttributeModel]
-            The list of attributes associated with the provided tags. Please note
-            that if the tag is not found, the attribute is simply ignored.
-
-        Raises
-        ------
-        Exception
-            _description_
-        """
-    
-    @abstractmethod
-    def get_values(self, tags : List[str] = None, dataset_tag : str = None) -> List[AttributeValueModel|FeatureNeoModel]:
-        """Returns the attribute values
-
-        Parameters
-        ----------
-        tags : List[str]
-            _description_
-        dataset_tag : str, optional
-            Returns the attribute values matching the given tags. 
-            
-
-        Returns
-        -------
-        List[AttributeValueModel|FeatureNeoModel]
-            The attribute values matching the tags that might be a standard attribute value
-            or a feature (e.g. protein)
-        """
-        
-    @abstractmethod
-    def get_mandatory_attributes(self)->List[AttributeModel]:
-        """Mandatory attributes that are required to fill in
-        at the submission state. 
-
-        Returns
-        -------
-        List[AttributeModel]
-            The required attributes for a submission.
-
-        Raises
-        ------
-        Exception
-            If the database query returns an error. 
-        """
-        
-    @abstractmethod
-    def unit(self, tag : str) -> List[AttributeUnitResponseModel]:
-        """_summary_
-
-        Parameters
-        ----------
-        tag : str
-            _description_
-
-        Returns
-        -------
-        Dict
-            _description_
-
-        Raises
-        ------
-        Exception
-            _description_
-        """
-        
-    
-
-class FeaturesABC(ABC):
-    
-    @abstractmethod
-    def get_protein_sequence(self, tags : str) -> List[str]:
-        """Returns the protein sequences for the given tags
-
-        Parameters
-        ----------
-        tags : str
-            Feature/protein tags
-
-        Returns
-        -------
-        List[str]
-            Protein sequences in a list.
-        """
-        
-    @abstractmethod
-    def  get_protein_by_tags(self, tags : List[str], as_data_frame : bool = True) -> List[FeatureNeoModel]|pd.DataFrame:
-        """Returns the protein information from the database
-
-        Parameters
-        ----------
-        tags : List[str]
-            The protein tags
-        as_data_frame : bool, optional
-            If the data should be returned as a pandas data frame, by default True
-
-        Returns
-        -------
-        List[FeatureNeoModel]|pd.DataFrame
-            if as_data_frame is True, then a pandas data frame is returned, otherwise a list of FeatureModel is returned
-        """
-    
-    @abstractmethod
-    def insert_uniprot_proteome(self, 
-                                proteome_id : List[str] = ["UP000005640"], 
-                                reviewed : bool = True, 
-                                user_tag : str = None) -> int:
-        """Insert the data from the Uniprot Database for a reference proteome. 
-
-        Parameters
-        ----------
-        proteome_id : List[str], optional
-            _description_, by default ["UP000005640"]
-        reviewed : bool, optional
-            _description_, by default True
-        user_tag : str, optional
-            _description_, by default None
-
-        Returns
-        -------
-        int
-            The number of proteins added to the database. 
-
-        Raises
-        ------
-        Exception
-            If the database insertion throws an Exception. 
-        """
-class UserABC(ABC):
-    
-    @abstractmethod
-    def block_user_by_tag(self, tag : str) -> bool:
-        ""
-    
-    def exists(self, tag : str) -> bool:
-        return self.is_user(tag)
-    
-    @abstractmethod
-    def get_user_by_email(self, email : str) -> None|UserModel:
-        """Returns the user in the database using the database. 
-
-        Parameters
-        ----------
-        email : str
-            The email that is associated with an user.
-
-        Returns
-        -------
-        None|UserModel
-            None if not found otherwise the user. 
-        """
-
-    @abstractmethod
-    def get_user_by_tag(self, tag : str) -> None|UserModel:
-        ""
-        
-    @abstractmethod
-    def get_users_by_tags(self, tags : List[str] = None) -> List[UserModel]:
-        """Get all users from the database that match the given tags.
-    
-        Parameters
-        ----------
-        tags : List[str]
-            The tags associated with users. If the tag is not present in the database
-            it is simply ignored. If None, it returns all users in the database, default None
-
-        Returns
-        -------
-        List[UserModel]
-            Users that are associated with the given tags.
-            
-
-        Raises
-        ------
-        Exception
-            If the database query resulted in an error. 
-        """
-    
-    @abstractmethod 
-    def is_user(self, tag : str) -> bool:
-        """Checks if a user is associated with the 
-        given tag. Use this method to check if a user
-        exists. The function ```exists``` is an alias. 
-
-        Parameters
-        ----------
-        tag : str
-            The user tag to test.
-
-        Returns
-        -------
-        bool
-            If the user with the given tag is present.
-
-        Raises
-        ------
-        Exception
-            If the database query resulted in an error. 
-        """
 class MetaABC(ABC):
     
     def __init__(self, *args, **kwargs) -> None:
@@ -610,103 +419,6 @@ class MetaABC(ABC):
             If the database query resulted in an error. 
         """
 
-class FilterABC(ABC):
-    """Filters handle the available 
-    filter (set of proteins) that can 
-    be used by the user to create a subset of the 
-    data. For example, the MitoCarta 3.0 
-    is simply a list of proteins that can be used
-    to subset a volcano plot or a heatmap. 
-    Filters are proteome_id sepcific. 
-    """
-
-    @abstractmethod
-    def add(self, protein_tags : List[str], 
-            proteome_id : str, 
-            filter_tag : str, 
-            filter_text : str,
-            description : str,
-            publication : Optional[str] = None) -> Tuple[bool,str]:
-        """Adds a filter to the database. 
-
-        Parameters
-        ----------
-        protein_tags : List[str]
-            _description_
-        proteome_id : str
-            _description_
-        filter_tag : str
-            _description_
-        filter_text : str
-            _description_
-        description : str
-            _description_
-        publication : Optional[str], optional
-            _description_, by default None
-        """
-        
-    @abstractmethod
-    def exists(self, tag : str) -> bool:
-        """Check if a filter exists with the given tag.
-
-        Parameters
-        ----------
-        tag : str
-            _description_
-
-        Returns
-        -------
-        bool
-            _description_
-        """
-    
-    @abstractmethod
-    def get(self, tag : str = None, proteome_ids : List[str] = None, feature_tag : str = None) -> List[Filter]:
-        """Returns the available filters/protein sets
-        from the database b using the tag for the filter.
-        A list of proteome_ids (Uniprot) or a specific feature_tag
-
-        Parameters
-        ----------
-        tag : str
-            The filter tag
-        proteome_ids : List[str]
-            The proteome ids for which all filters should be returned.
-            Ignored of tag is provided. 
-        feature_tag : str 
-            The feature tag for which the available filters should be returned. 
-            Ignored if tag or proteome_ids are provided. 
-        
-        Returns
-        -------
-        List[Filter]
-            The filters detected in the database. All if tag is None. 
-            Otherwise a subset. 
-        """
-        
-    @abstractmethod    
-    def get_features(self, tag : str) -> List[FeatureNeoModel]:
-        """Returns the list of proteins as a feature model that
-        are associated with the provided tag. 
-
-        Parameters
-        ----------
-        tag : str
-            The filter tag. 
-
-        Returns
-        -------
-        List[FeatureNeoModel]
-            _description_
-
-        Raises
-        ------
-        Exception
-            If the database query returns an error. 
-        """
-
-    
-    
 class DatasetABC(ABC):
     def __init__(self, *args, **kwargs) -> None:
         ""
@@ -725,30 +437,7 @@ class DatasetABC(ABC):
         List[str]
             _description_
         """
-    
-    @abstractmethod
-    def get_metatext(self, tags : List[str]) -> pd.DataFrame:
-        """Returns the metatext that is associated with 
-        the provided dataset_tags
 
-        Parameters
-        ----------
-        tags : List[str]
-            The tag associated with the dataset. 
-            
-        Returns
-        -------
-        pd.DataFrame
-            The metatext given in a pandas data frame with 
-            the following columns:
-            
-                - 'tag' (str) : The dataset tags. If multiple metatext are
-                present for the tag, each metatext is in a separate row (e.g. duplicates)
-                
-                - 'meta_tag' (str) : The tag that was given to the metatext 
-                
-                - 'content' (str) : The actual content of the metatext. 
-        """
         
     @abstractmethod
     def get_sample_attributes(self, tag : str) -> Dict[str,Dict[str,List[int]]]:

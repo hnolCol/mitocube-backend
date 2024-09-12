@@ -1,12 +1,12 @@
-import asyncio
-from typing import List, Tuple
-from pydantic import field_validator
-from neo4j import Driver, Result
+import asyncio 
+from typing import Dict, List, Tuple
+from neo4j import Driver, Result 
 
-from lib.data.database.ABCDatabase import UserABC
+from lib.data.database.abstract.Users import UserABC 
 
-from config.models.user import UserModel, UserModelForRegistration
 from config.enums.users.roles import UserRolesEnum 
+from config.models.user import UserModel, UserModelForRegistration
+
 from config.settings.general import get_general_settings 
 from config.settings.email import get_email_settings
 
@@ -21,26 +21,11 @@ def transform_query_result(result):
     "Transforms the result into a list of data."
     return result.data()[0]["query_result"]
 
-class UserNode(UserModel):
-    label : str = None
-    password : str 
-    tag : str
-    s : str = None
-    
-    @field_validator("s", mode="before")
-    def lower_s(cls, v : str|None):
-        if v is not None:
-            return v.lower()
-    
-    
-     
 class Neo4JUser(UserABC):
     
     def __init__(self, driver : Driver) -> None:
         
         self._driver = driver 
-        #self._check_user()
-        
         
     def _check_user(self):
         ""
@@ -139,9 +124,12 @@ class Neo4JUser(UserABC):
             "MATCH (u:User) "
             "RETURN count(u) "
         )
-        r,_,_ = self._driver.execute_query(query, routing_="r")
-        return r[0].value()
-        #return self.factory.count_nodes_by_label(NodeLabelModel(cypher_label="u",label="User"))
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        return r[0]
+
+    def delete_user(self, tag: str) -> bool:
+        return super().delete_user(tag)
+    
     
     def is_user_allowed(self, tag : str) -> Tuple[bool,UserModel|None]:
         ""
@@ -282,3 +270,6 @@ class Neo4JUser(UserABC):
             print("Query finding resulted in an error " + str(e))
             return []
         return [UserModel(**u, label = u["tag"]) for u in users]
+
+    def update(self, tag: str, user_props: Dict) -> bool:
+        return super().update(tag, user_props)

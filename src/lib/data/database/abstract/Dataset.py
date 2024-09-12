@@ -19,66 +19,69 @@ from config.models.attributes import AttributeModel, AttributeUnitResponseModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
-from config.models.filter import Filter
+from config.models.filter import FilterModel
    
     
 class DatasetABC(ABC):
     def __init__(self, *args, **kwargs) -> None:
         ""
-
-    @abstractmethod
-    def get(self, tags : List[str]) -> List[str]:
-        """Returns the minimal meta information of a dataset
-
-        Parameters
-        ----------
-        tags : List[str]
-            The list of tags that the minimal metadata should be returned. 
-
-        Returns
-        -------
-        List[str]
-            _description_
-        """
     
-    @abstractmethod
-    def get_metatext(self, tags : List[str]) -> pd.DataFrame:
-        """Returns the metatext that is associated with 
-        the provided dataset_tags
-
-        Parameters
-        ----------
-        tags : List[str]
-            The tag associated with the dataset. 
-            
-        Returns
-        -------
-        pd.DataFrame
-            The metatext given in a pandas data frame with 
-            the following columns:
-            
-                - 'tag' (str) : The dataset tags. If multiple metatext are
-                present for the tag, each metatext is in a separate row (e.g. duplicates)
-                
-                - 'meta_tag' (str) : The tag that was given to the metatext 
-                
-                - 'content' (str) : The actual content of the metatext. 
-        """
-        
-    @abstractmethod
-    def get_sample_attributes(self, tag : str) -> Dict[str,Dict[str,List[int]]]:
-        """Describes the attributes that were assigned to each sample.
+    @abstractmethod 
+    def exists(self, tag : str) -> bool: 
+        """If a submission tag is associated with a dataset. 
+        Datasets are always submissions, but such submission that 
+        have quantitative data available to inspect.
 
         Parameters
         ----------
         tag : str
-            The dataset tag for which the sample attributes
-            should be returned. 
+            _description_
 
         Returns
         -------
-        Dict[str,Dict[str,List[int]]]
-            ```
-            {'attribute_tag' : {'attribute_value_tag' : List[sample indices (int) ]}}
-            ```
+        bool
+            _description_
+        """
+    
+    @abstractmethod
+    def insert(self, data_table : pd.DataFrame, tag : str):
+        ""
+    
+    
+    @abstractmethod
+    def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
+        """Returns the database of a submission 
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag 
+        filter_tag : str, optional
+            The filter tag to apply to the datatable, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The quantitative matrix of data. 
+                - 'index' must be the uniprot id 
+                - the columns names must be the index of the sample. (0,1,2,3,4,...)
+        """
+    
+    
+    @abstractmethod
+    def is_quantified(self, tag : str, feature_tags : List[str]) -> pd.Series:
+        """Checks if the given feature is quantified in the given dataset. 
+
+        Parameters
+        ----------
+        tag : str
+            The dataset tag 
+        feature_tags : List[str]
+            The feature tags. If a feature does not exist, it is simply ignored. 
+
+        Returns
+        -------
+        pd.Series
+            indexes are feature tags, and values in the series are boolean and
+            indicate if the feature was quantified. 
         """

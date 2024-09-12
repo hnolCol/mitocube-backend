@@ -2,8 +2,8 @@ import time
 from datetime import datetime, timezone, date
 
 def get_time_stamp() -> float:
-    """Returns the current time in seconds from epoch"""
-    return time.time()
+    """Returns the current time in milliseconds from epoch to align the format to the databases."""
+    return time.time() * 1000
 
 def get_current_date_as_string() -> str:
     """Returns current date as string"""

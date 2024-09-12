@@ -26,7 +26,7 @@ class API_UniprotAnnotationsModel(BaseModel):
         "ft_transit",
         "ft_signal",
         "ft_domain",
-        "organism_id",
+        "organism_id"
         ]
     #reviewed : bool = True
     cursor : Optional[str] = None

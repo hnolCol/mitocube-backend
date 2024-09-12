@@ -6,7 +6,8 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from config.enums.states import SubmissionStatesEnums
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesByDatasetModel
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel
+from config.models.feature import FeatureNeoModel 
 
 class AttributesABC(ABC):
     """Attributes are used in the app to 
@@ -61,8 +62,13 @@ class AttributesABC(ABC):
         
     @abstractmethod
     def delete(self, tag : str) -> bool:
-        """Deletes an attribute or attribute value by its tag. 
+        """Deletes an attribute and its attribute values by its attribute tag. 
         If an attribute is deleted, all associated values should also be deleted. 
+        
+        Please note that deleting attributes might lead to submissions that are not
+        defined anymore. Assume a sample is described by an attribute and it is deleted. 
+        
+        Hence, this function should not be used regularly.
 
         Parameters
         ----------
@@ -76,29 +82,62 @@ class AttributesABC(ABC):
         """
         
         
+    @abstractmethod
+    def delete_value(self, tag : str) -> bool:
+        "Deletes a specific attribute value by its tag"    
+    
+        
+    @abstractmethod 
+    def exists(self, tag : str = None, value : str = None) -> bool:
+        """Checks if an attribute or attribute value exists by its tag. 
+
+        Parameters
+        ----------
+        tag : str, default None
+            The attribute tag.
+        value : str, default None
+            The attribute value tag. 
+        Returns
+        -------
+        bool
+            _description_
+            
+        Raises
+        ------
+        ValueError if tag and value are both None 
+        """
+           
     
     @abstractmethod
-    def get(self, tags : List[str] = ["att_compound","att_protease"]) -> List[AttributeModel]:
+    def get(self, tags : List[str] = None, 
+            param_name : Literal["allow_for_dataset","allow_as_filter",
+                                "allow_for_genotype","allow_for_measurement","allow_as_qc",
+                                "mandatory_for_submission","mandatory_for_active"] = None,
+            min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[AttributeModel]:
         """Finds attributes by their tags. If the tag is not in the 
         database it is simply ignored. 
 
         Parameters
         ----------
         tags : List[str], optional
-            The attribute tags, by default ["att_compound","att_protease"]
+            The attribute tags, by default None
 
         Returns
         -------
         List[AttributeModel]
             The list of attributes associated with the provided tags. Please note
             that if the tag is not found, the attribute is simply ignored.
+            If tags is None, all attributes are returned. 
 
         Raises
         ------
         Exception
             _description_
         """
-    
+    @abstractmethod
+    def get_values(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
+        ""
+        
     @abstractmethod    
     def get_attributes_and_values_by_search_string(self, 
                                                    search_string : str, 
@@ -109,7 +148,6 @@ class AttributesABC(ABC):
                                                                         "allow_for_genotype",
                                                                         "allow_for_measurement",
                                                                         "allow_as_qc",
-                                                                        "mandatory_for_submission",
                                                                         "mandatory_for_active"] = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
@@ -137,7 +175,7 @@ class AttributesABC(ABC):
     def get_attribute_values_by_dataset_tags(self, 
                                              dataset_tags : List[str], 
                                              attribute_tags : list[str] = None, 
-                                             attribute_value_tags : List[str] = None) -> List[AttributeValuesByDatasetModel]:
+                                             attribute_value_tags : List[str] = None) -> List[AttributeValuesBySubmissionModel]:
         """Finds all the attribute values that are assigned to a dataset and returns the number of dataset
         that match each attribute value. This is a convenient function to get the datasets tags that have 
         an attribute value and how many are used, as used in a filtering approach. 
@@ -153,8 +191,8 @@ class AttributesABC(ABC):
 
         Returns
         -------
-        List[AttributeValuesByDatasetModel]
-            The result of the query given by a list of AttributeValuesByDatasetModel with the following 
+        List[AttributeValuesBySubmissionModel]
+            The result of the query given by a list of AttributeValuesBySubmissionModel with the following 
             properties:
                 - attribute_value (AttributeValueModel|FeatureNeoModel) : The attribute Value
                 - tags (List[str]) : List of dataset tags that have the attribute value
@@ -202,7 +240,21 @@ class AttributesABC(ABC):
         ValueError
             If the attribute_tag is already in the database. 
         """
+        
+    @abstractmethod 
+    def insert_value(self, tag : str, attribute_value : AttributeValueModel) -> bool:
+        ""
     
+        query = (
+            "MATCH (a:Attribute {tag : $tag}) "
+            "MERGE (av:AttributeValue {tag : attribute_value_tag}) "
+            "SET av += $attribute_value_props "
+            "MERGE (a)-[:HAS_VALUE]->(av)"
+        )
+        
+        self._driver.exect
+    
+        
     @abstractmethod
     def update(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
         """Updates an attribute and its values. 

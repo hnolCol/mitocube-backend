@@ -23,6 +23,16 @@ class FeatureNeoModel(BaseModel):
     gene_name : str 
     gene_names : str = None
     protein_name : str
-    proteome_id : str
+    proteome_tag : str
     aa_length : int = None
     reviewed : Optional[bool] = True 
+
+
+
+
+class FeatureGeneModel(BaseModel):
+    
+    tag : str #the id of the gene (change)
+    gene_name : str 
+    gene_version : int 
+    gene_source : Optional[str] = None

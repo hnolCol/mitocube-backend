@@ -140,10 +140,6 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
     Parameters
     ----------
 
-    id : int 
-        ID of the attribute value
-    attribute_id : int 
-        ID of the attribute the value belongs to.
     text : str 
         String representative of the value
     value : str,float,int 
@@ -171,17 +167,32 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
         if isinstance(v,str): return v 
         return " ".join([str(s).lower() for s in v if s is not None])
     
-    @field_validator("text", mode="before")  # ToDo, issue with return type?
+    @field_validator("text", mode="before")  
     @classmethod
-    def check_name(cls, v : Any) -> str:
+    def check_text(cls, v : Any) -> str:
         """Checks text to be string"""
+        if not isinstance(v,str):
+            return str(v)
+        else:
+            return v
+        
+    @field_validator("tag", mode="before") 
+    @classmethod
+    def check_tag(cls, v : Any) -> str:
+        """Checks tag to be string"""
         if not isinstance(v,str):
             return str(v)
         else:
             return v
 
 
-class AttributeValuesByDatasetModel(BaseModel):
+class AttribteValueInsertModel(BaseModel):
+    attribute_tag : str
+    text : str 
+    description : str 
+
+
+class AttributeValuesBySubmissionModel(BaseModel):
     attribute_value : AttributeValueModel|FeatureNeoModel
     tags : List[str]
     count : int 

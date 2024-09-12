@@ -1,0 +1,323 @@
+from typing import Literal, List 
+from neo4j import Driver, Result 
+import pandas as pd 
+
+from config.models.searches import FulltextSearchResult
+
+from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC
+from lib.data.database.abstract.Meta import MetaABC
+from lib.data.database.Neo4JDatabase import Neo4JFactory
+from config.enums.states import SubmissionStatesEnums
+from config.models.submissions.submissions import DatasetSubmissionModel
+
+class Neo4JSubmissions(SubmissionABC):
+    def __init__(self, driver : Driver, meta : MetaABC) -> None:
+        self._meta = meta 
+        self._driver = driver
+        
+    def count(self) -> int:
+        "Counts the total number of submissions in the database"
+        
+        query = (
+            "MATCH (submission:Submission) "
+            "RETURN count(submission)"
+        )
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value)
+        if isinstance(r,list) and len(r) > 0:
+            return r[0]
+        return 0 
+        
+    def delete(self, tag: str) -> bool:
+        return super().delete(tag)
+    
+    def exists(self, tag: str) -> bool:
+        return super().exists(tag)
+    
+    def insert(self, submission: DatasetSubmissionModel) -> bool:
+        ""
+        submission_tag = submission.tag
+        sample_names = submission.sample_names
+        genotypes_added = 0 
+        sample_attributes_added = 0 
+        
+        dataset_props = {
+            "title" : submission.title, 
+            "n_samples" : submission.n_samples, 
+            "created_at" : submission.created_on,
+            "state" : submission.state, 
+            "n_replicates" : len(set(submission.replicates))
+            }
+        #get the state tag 
+        #state_tag =  SubmissionStatesEnums(submission.state).name
+        
+        samples = [{"tag" : sample_name, "props" : {"index" : idx, "replicate" : submission.replicates[idx], "text" : sample_name}} for idx,sample_name in enumerate(sample_names)]
+        dataset_attributes =  [tag for tag in submission.dataset_attributes.keys()]
+        dataset_attribute_values = [{"attribute_value_tag" : tag.split(":")[-1], "attribute_tag" : attribute_tag} 
+                                    for attribute_tag,tags in submission.dataset_attributes.items() for tag in tags]
+
+        query = (
+            "MERGE (submission:Submission {tag : $submission_tag}) "
+            "SET submission += $dataset_props "
+            "WITH submission "
+            "MATCH (state:State {tag : $state_tag}) "
+            "MERGE (submission)-[r_in_state:IN_STATE]->(state) "
+            "SET r_in_state.created_at = timestamp() "
+            "WITH submission "
+            "UNWIND $samples as sample_name "
+            "MERGE (s:Sample {tag : sample_name.tag}) "
+            "SET s += sample_name.props "
+            "SET s.created_at = timestamp() "
+            "WITH s, submission "
+            "MERGE (s)<-[:HAS_SAMPLE]-(submission) "   
+            "WITH submission "
+            "UNWIND $dataset_attributes as attribute_tag "
+            "MATCH (a:Attribute {tag : attribute_tag}) "
+            "MERGE (submission)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a) "
+            "WITH submission "
+            "UNWIND $dataset_attribute_values as attribute_value "
+            "MATCH (av:AttributeValue {tag : attribute_value.attribute_value_tag}) "
+            "MATCH (a:Attribute {tag : attribute_value.attribute_tag}) "
+            "MERGE (submission)-[:HAS_ATTRIBUTE_VALUE]->(av) "
+            "MERGE (av)-[:HAS_VALUE]-(a) "  
+        )
+    
+        self._driver.execute_query(query, routing_="w", 
+                                   samples = samples, 
+                                   submission_tag = submission_tag, 
+                                   dataset_attributes  = dataset_attributes, 
+                                   state_tag = submission.state, 
+                                   dataset_props = dataset_props, 
+                                   dataset_attribute_values = dataset_attribute_values)
+        try:
+            self._meta.add_samples_attributes(meta_data=submission)
+            sample_attributes_added = 1 
+        except:
+            print("No sample attributes added ")
+        try:
+            self._meta.add_samples_genotypes(meta_data=submission)
+            genotypes_added = 1 
+        except:
+            print("No genotypes found")
+            
+        if genotypes_added == 0 and sample_attributes_added == 0: raise ValueError("Neither genotypes nor sample attributes could be defined for this project. ")
+        
+        self._meta.add_owner(tag=submission_tag, user_tag=submission.user_tag)
+        self._meta.add_collaborators(tag=submission_tag, user_tags=submission.collaborators)
+        self._meta.add_metatext(tag=submission_tag, user_tag= submission.user_tag, meta_texts=submission.metatext)
+        
+        
+    def get(self, tag: str) -> DatasetSubmissionModel:
+        return super().get(tag)
+
+    
+    def update_state(self, tag: str, new_state: SubmissionStatesEnums) -> bool:
+        return super().update_state(tag, new_state)
+
+
+class Neo4JSubmissionFilter(SubmissionFilterABC):
+    def __init__(self, driver : Driver) -> None:
+        
+        self._driver = driver
+        self._factory = Neo4JFactory(driver=driver)
+        
+        
+    def _add_limit(self, query : str, limit : int = None):
+        ""
+        if limit is not None : query += "LIMIT $limit"
+        return query 
+        
+    
+    def get_all_tags(self, limit : int = None)->List[str]:
+        "" 
+        query = (
+                "MATCH (submission:Submission) "
+                "RETURN DISTINCT submission.tag "
+            )
+        query = self._add_limit(query,limit)
+        r = self._driver.execute_query(query, routing_="r",limit=limit,result_transformer_=Result.value)
+        return r
+    
+    def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value"] = "state") -> pd.DataFrame:
+        """Counts the submissions and groups them from the Neo4j database. 
+
+        Parameters
+        ----------
+        tags : List[str], optional
+            The submission tags to use, if None all tags in the database are used, by default None
+        by : Literal[&quot;user&quot;,&quot;state&quot;,&quot;attribute&quot;,&quot;attribute_value&quot;], optional
+            count the submissions by the given property, by default "state"
+
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        if by == "user":
+            query = ("MATCH (n:User) "
+                     "MATCH (n)-[:OWNS|IS_PART]->(submission:Submission) ")
+        elif by == "state":
+            query = ("MATCH (n:State) "
+                     "MATCH (n)<-[:IN_STATE]-(submission:Submission) ")
+        elif by == "attribute":
+            query = ("MATCH (n:Attribute) "
+                     "MATCH (n)<-[:HAS_VALUES_FOR_ATTRIBUTE]-(submission:Submission) ")
+        elif by == "attribute_value":
+            query = ("MATCH (n:AttributeValue) "
+                     "MATCH (n)<-[:HAS_ATTRIBUTE_VALUE]-(submission:Submission) ")
+        if tags is not None:
+            query += "WHERE submission.tag in $tags "
+            
+        query += "RETURN n.tag as tag, count(submission) as count, collect(submission.tag) as tags "
+        
+        submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
+        return submission_counts.set_index("tag")
+    
+    def filter_by_attribute_value_tags(self, attribute_value_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:
+        ""
+        query = (
+            "MATCH (submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            "WITH submission, COLLECT(DISTINCT av.tag) AS value_tags "
+            "WHERE ALL(value_tag in $attribute_value_tags WHERE value_tag in value_tags) "
+            "RETURN DISTINCT submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        r,_,_ = self._driver.execute_query(query, attribute_value_tags=attribute_value_tag, submission_tags = submission_tags, limit = limit)
+        return [ri.value() for ri in r] 
+    
+            
+    def filter_by_attribute_tags(self, attribute_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:
+        ""
+        query = (
+            "MATCH (submission:Submission)-[:HAS_VALUES_FOR_ATTRIBUTE]->(av:Attribute) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            "WITH submission, COLLECT(DISTINCT av.tag) AS value_tags "
+            "WHERE ALL(value_tag in $attribute_tags WHERE value_tag in value_tags) "
+            "RETURN DISTINCT submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        r,_,_ = self._driver.execute_query(query, attribute_tags=attribute_tag, submission_tags = submission_tags, limit = limit)
+        
+        return [ri.value() for ri in r] 
+    
+    def filter_by_genotype_tags(self, genotype_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+        ""
+        query = (
+            "MATCH (g:Genotype) "
+            "WHERE g.tag in $genotype_tags "
+            "MATCH (g)<-[:HAS_GENOTYPE]-(submission:Submission) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            "RETURN DISTINCT submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        r,_,_ = self._driver.execute_query(query, genotype_tags = genotype_tag, submission_tags = submission_tags, limit = limit)
+        return [ri.value() for ri in r] 
+    
+    def filter_by_user(self, user_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+        ""
+        query = (
+            "MATCH (submission:Submission) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            "MATCH (u:User) "
+            "WHERE u.tag in $user_tags AND ((u)-[:OWNS]-(submission) OR (u)-[:IS_PART]->(submission)) "
+            "RETURN DISTINCT submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        r,_,_ = self._driver.execute_query(query, user_tags=user_tag, submission_tags = submission_tags, limit = limit)
+        return [ri.value() for ri in r] 
+    
+    def filter_by_quantified_protein(self, protein_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+        ""
+        query = (
+            "MATCH (p:Protein ) "
+            "WHERE p.tag in $protein_tags "
+            "MATCH (p)-[:QUANTIFIED_IN]->(submission:Submission) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            "RETURN DISTINCT submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        r,_,_ = self._driver.execute_query(query, protein_tags = protein_tag, submission_tags = submission_tags, limit = limit)
+        return [ri.value() for ri in r] 
+        
+        
+    def filter_by_state(self, state : List[int], submission_tags : List[str] = None, limit : int = None):
+        ""
+        query = (
+            "MATCH (state:State ) "
+            "WHERE state.tag in $state "
+            "MATCH (state)<-[:IN_STATE]-(submission:Submission) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            "RETURN DISTINCT submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        r,_,_ = self._driver.execute_query(query, state = state, submission_tags = submission_tags, limit = limit)
+        return [ri.value() for ri in r] 
+    
+    def get(self, 
+            state : List[int] = None, 
+            attribute_value_tag : List[str] = None, 
+            attribute_tag : List[str]= None, 
+            user_tag : List[str] = None, 
+            protein_tag : List[str] = None, 
+            genotype_tag : List[str] = None,
+            limit : int = 10) -> List[str]:
+        ""
+        
+        tags = None 
+        
+        if state is not None:
+            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag, genotype_tag]) else None
+            tags = self.filter_by_state(state=state, submission_tags=tags, limit=limit_)
+        
+        if genotype_tag is not None:
+            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag]) else None
+            tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_)
+        
+        if attribute_value_tag is not None:
+            limit_ = limit if all(attr is None for attr in [attribute_tag,user_tag,protein_tag]) else None
+            tags = self.filter_by_attribute_value_tags(attribute_value_tag,submission_tags=tags,limit=limit_)
+
+        if attribute_tag is not None:
+            limit_ = limit if all(attr is None for attr in [user_tag,protein_tag]) else None
+            tags = self.filter_by_attribute_tags(attribute_tag,submission_tags=tags,limit=limit_)
+        
+        if user_tag is not None:
+            limit_ = limit if protein_tag is None else None
+            tags = self.filter_by_user(user_tag,submission_tags=tags,limit=limit_)
+        
+        if protein_tag is not None:
+            tags = self.filter_by_quantified_protein(protein_tag,submission_tags=tags,limit=limit)
+            
+        if tags is None: #none defined, then just return all. 
+            
+            return self.get_all_tags(limit=limit)
+        
+        return tags 
+        
+        
+    def title_full_text_search(self, query_string : str):
+        ""
+        
+        
+        r, _ , _ = self._factory.full_text_search("titleSearch",query_string)
+        
+        print(r)
+        
+        
+    def meta_text_search(self, query_string : str):
+        ""
+        r, _ , _ = self._factory.full_text_search("metatextSearch",query_string)
+        
+        print(r)
+        
+    def full_dataset_text_search(self, search_string : str) -> List[FulltextSearchResult]:
+        ""  
+        
+        r, _ , _ = self._factory.full_text_search("datasetSearch",search_string)
+        return [ri.data() for ri in r]
+        
+        
+        
+        
+         

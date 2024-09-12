@@ -4,16 +4,13 @@ from collections import OrderedDict
 from typing import List 
 
 from lib.data.database.Database import Database
-from lib.data.database.ABCDatabase import MCDatabase
-from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
-from lib.data.statistic.ANOVA import OneWayANOVA
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from config.models.user import UserModel
 from config.models.parameter import APIParamString
-from config.models.filter import Filter, FilterProps
+from config.models.filter import FilterModel, FilterProps
 from services.users import get_user_from_token, is_user_admin
 from services.submission import map_tags_to_attribute_in_metadata
 
@@ -27,13 +24,13 @@ router = APIRouter(
 #heatmap endpoints 
 @router.get("/filters",
             tags=["Filter"])
-def get_available_filters(proteome_id : str = None, user : UserModel = Depends(get_user_from_token)) -> List[Filter]:
+def get_available_filters(proteome_tags : str = None, user : UserModel = Depends(get_user_from_token)) -> List[FilterModel]:
     """Returns the filter set that are available in the database.
 
     Parameters
     ----------
-    proteome_id : str, optional
-        The Uniprot proteome id, by default None
+    proteome_tags : str, optional
+        The Uniprot proteome tag. For multiple proteoms - separate by ';', by default None
     user : UserModel, optional
         User inferred from the token, by default Depends(get_user_from_token)
 
@@ -43,19 +40,19 @@ def get_available_filters(proteome_id : str = None, user : UserModel = Depends(g
         Filters available in the database.
     """
     
-    filters = DB.filters.get(proteome_id=APIParamString(param=proteome_id).param)
+    filters = DB.filters.get(proteome_tags=APIParamString(param=proteome_tags).param)
     return filters
 
 
 @router.get("filters/{filter_tag}")
-def get_filter(filter_tag : str, user : UserModel = Depends(get_user_from_token)):
-    "" 
+def get_filter(filter_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[FilterModel]:
+    ""
     filter = DB.filters.get (tag = filter_tag)
     return filter 
 
-@router.post("/filters")
+@router.post("/filters") 
 def add_filter(filterProps : FilterProps,
-               user : UserModel = Depends(is_user_admin)):
+               user : UserModel = Depends(is_user_admin)) -> bool :
     """Adds a filter from a list of protein tags. Tags are not created if not existance, therefore you may 
     have to add a proteome prior to setting up the filter. 
     This function can only be executed by an admin. 
@@ -64,7 +61,7 @@ def add_filter(filterProps : FilterProps,
     ----------
     tag : str
         The tag that the filter should have. 
-    proteome_id : str
+    proteome_tag : str
         The uniprot reference proteome. 
     description : str
         Description of the filter. 
@@ -75,13 +72,13 @@ def add_filter(filterProps : FilterProps,
         raise HTTPException(status_code=409, detail = "The tag exists already. Please delete the filter first if you want to replace it.")
 
 
-    ok, msg = DB.filters.add(protein_tags=filterProps.protein_tags,
-                          proteome_id=filterProps.proteome_id, 
+    ok, msg = DB.filters.add(protein_tags = filterProps.protein_tags,
+                          proteome_tag = filterProps.proteome_tag, 
                           filter_text = filterProps.text,
                           filter_tag = filterProps.tag, 
                           description=filterProps.description,
                           publication = filterProps.publication)
-    print(ok,msg)
+    return ok 
     
     
 

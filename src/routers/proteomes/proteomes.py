@@ -25,6 +25,7 @@ router = APIRouter(
 
 DB = Database.DB()
 
+
 @router.get("")
 def get_proteomes(user : UserModel = Depends(is_user_admin)):
     ""
@@ -33,31 +34,31 @@ def get_proteomes(user : UserModel = Depends(is_user_admin)):
 
 
 @router.post("")
-def add_protein_by_proteome_id(background_task : BackgroundTasks, proteome_id : str, reviewed : bool = True, user : UserModel = Depends(is_user_admin)):
+def add_protein_by_proteome_tag(background_task : BackgroundTasks, proteome_tag: str, reviewed : bool = True, user : UserModel = Depends(is_user_admin)):
     """Adds proteins from Uniprot
     including the annotations and sequence information.
 
     Parameters
     ----------
     proteome_id : str
-        _description_
+        The Uniprot proteome tag.
     user : UserModel, optional
-        _description_, by default Depends(is_user_admin)
+        The user that added the proteome to the database, by default Depends(is_user_admin)
     """
     try:
-        N = DB.features.insert_uniprot_proteome(proteome_id=APIParamString(param=proteome_id).param, reviewed  = reviewed, user_tag = user.tag)
+        N = DB.proteomes.insert_uniprot_proteome(proteome_tags=APIParamString(param=proteome_tag).param, reviewed  = reviewed, user_tag = user.tag)
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500,detail="There was an error when retrieving data from Uniprot.")
     
     send_email_in_background(background_tasks=background_task,
-                             subject=f"Proteome {proteome_id} added.",
+                             subject=f"Proteome {proteome_tag} added.",
                              email_to=[user.email],
                              include_setting_cc=True,
                              body={
                                  "app_name" : GENERAL_SETTINGS.app_name,
                                  "first_name" : user.firstname,
-                                 "proteome_id" : proteome_id,
+                                 "proteome_tag" : proteome_tag,
                                  "n_proteins" : N
                                  
                              },

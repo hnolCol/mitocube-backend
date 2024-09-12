@@ -21,6 +21,7 @@ from config.settings.metatexts import MetaTexts
 from config.enums.states import SubmissionStatesEnums
 from services.random_generators import get_random_string
 
+from services.date import get_time_stamp
 
 
 
@@ -57,7 +58,8 @@ class MinimalMetadataModel(BaseModel):
     created_at : float 
     n_samples : int 
     n_replicates : int 
-    proteome_ids : List[str]
+    user_tag : Optional[str] = None 
+    proteome_tags : List[str]
     has_datatable : bool 
     
 class MinimalMetadataResponseModel(MinimalMetadataModel):
@@ -73,7 +75,7 @@ class NewSubmissionModel(BaseModel):
 
 
     """
-    created_on : float = Field(..., default_factory= time.time)
+    created_on : float = Field(..., default_factory= get_time_stamp)
     sampleNames : List[str]
     replicates : List[int]
     collaborators : List[PublicUser]
@@ -176,7 +178,7 @@ class NewSubmissionModelBACKUP(BaseModel):
     
 class UpdateDatasetAttributesInSubmission(BaseModel):
     """Update submission model"""
-    modified_on : float = Field(..., default_factory= time.time)
+    modified_on : float = Field(..., default_factory= get_time_stamp)
     datasetAttributeValues : Dict[str,List[Union[AttributeValueModel,FeatureModel]]]
     datasetAttributes : List[AttributeModel]
 
@@ -257,3 +259,36 @@ class SubmissionIDResponse(BaseModel):
 
 
 
+class DatasetAttributesResponse(BaseModel):
+    """BaseModel for the response of dataset attributes
+    for a submission. 
+
+    Parameters
+    ----------
+    tag - submission tag 
+    
+    """
+    tag : str
+    tags : Dict[str,List[str]]
+    attributes : Dict[str,AttributeModel]
+    attribute_values : Dict[str,AttributeValueModel|FeatureNeoModel]
+    
+
+    @field_validator('attributes', mode='before')
+    def transform_attributes(cls, attributes : List[AttributeModel]|Dict[str,AttributeModel|FeatureNeoModel]) -> Dict[str,AttributeModel]:
+        "Transform list of attributes to a dict -> attributes by tag" 
+        if isinstance(attributes,list):
+            return dict([(a.tag,a) for a in attributes])
+        elif isinstance(attributes,dict):
+            return attributes 
+        raise TypeError("Attributes must either be a list or dict. ")
+
+    @field_validator('attribute_values', mode='before')
+    def transform_attribute_values(cls, attribute_values : List[AttributeValueModel|FeatureNeoModel]|Dict[str,AttributeModel|FeatureNeoModel]) -> Dict[str,AttributeValueModel|FeatureNeoModel]:
+        "Transform list of attributes to a dict -> attributes by tag" 
+        if isinstance(attribute_values,list):
+            return dict([(av.tag,av) for av in attribute_values])
+        elif isinstance(attribute_values,dict):
+            return attribute_values 
+        raise TypeError("Attributes must either be a list or dict. ") 
+        

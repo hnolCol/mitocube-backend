@@ -9,31 +9,55 @@ from neo4j import Driver
 
 import pandas as pd
 
-from lib.data.dataset.ABCDataset import MCDataset
-from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
 from lib.data.database.abstract.Attributes import AttributesABC
 from lib.data.database.abstract.Filter import FilterABC
 from lib.data.database.abstract.Users import UserABC 
 from lib.data.database.abstract.Meta import MetaABC 
-
-
+from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC
+from lib.data.database.abstract.Features import FeaturesABC
+from lib.data.database.abstract.Dataset import DatasetABC
+from lib.data.database.abstract.Genotypes import GenotypeABC
 
 from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeUnitResponseModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
-from config.models.filter import Filter
+from config.models.filter import FilterModel
+
 
 DB_SETTINGS = get_db_settings()
 
 ## load database 
 
 class DatabaseABC(ABC):
+    """
+    Main Database Class. 
+    
+    More specific interfaces are available
+    
+    - attributes 
+        Handles the attributes (controlled vocabulary)
+    - user
+        User database, handles authorization, sign in etc 
+    - submission_filter 
+        Filtering submissions using various meta data input such 
+        as attributes, attribute values, users, features etc 
+    - filters 
+        Sets of features that can be used to quickly filter a 
+        set of proteins (example: MitoCarta 3.0)
+    """
+    
+    
     meta : MetaABC = None 
-    user : UserABC = None 
+    users : UserABC = None 
+    features : FeaturesABC = None
     attributes : AttributesABC = None
     filters : FilterABC = None
+    submissions : SubmissionABC = None
+    submission_filter : SubmissionFilterABC = None
+    datasets : DatasetABC = None 
+    genotypes : GenotypeABC = None
     
 
     def __init__(self):
@@ -51,12 +75,14 @@ class DatabaseABC(ABC):
                 - 'user' (UserABC) : User class which handles user verification, addition and blocking. 
                 - 'attributes' (AttributesABC) : Attribute database class to manage attributes.
                 - 'filters' (FilterABC) : Set of proteins that can be used for filtering. 
+                - 'submission_filter' (SubmissionFilterABC) : Filtering class for submission to quickly find 
+                    submission that match specific criteria (attribute_values, proteomes, users)
         Raises
         ------
         NotImplementedError
-            If an attribute is missing. 
+            If an class attribute is missing. 
         TypeError
-            If an attribute is not of the correct type. 
+            If an  class attribute is not of the correct type. 
         """
         if self.meta is None:
             raise NotImplementedError("A database class must have the meta attribute defined.")
@@ -64,17 +90,17 @@ class DatabaseABC(ABC):
         if not isinstance(self.meta, MetaABC):
             raise TypeError("The attribute meta must be an instance of MetaABC")
         
-        if self.user is None:
-            raise NotImplementedError("A database class must have the user attribute defined.")
+        if self.users is None:
+            raise NotImplementedError("A database class must have the users attribute defined.")
         
-        if not isinstance(self.user, UserABC):
+        if not isinstance(self.users, UserABC):
             raise TypeError("The attribute user must be an instance of UserABC")
     
         if self.attributes is None:
             raise NotImplementedError("A database class must have the attributes class attribute defined.")
         
-        if not isinstance(self.user, UserABC):
-            raise TypeError("The attribute user must be an instance of UserABC")
+        if not isinstance(self.attributes, AttributesABC):
+            raise TypeError("The attribute user must be an instance of AttributesABC")
         
         if self.filters is None:
             raise NotImplementedError("A database class must have the filter attribute defined.")
@@ -82,8 +108,30 @@ class DatabaseABC(ABC):
         if not isinstance(self.filters, FilterABC):
             raise TypeError("The attribute filters must be an instance of FilterABC")
         
-    @abstractmethod
-    def dataset_exists(self, tag : str) -> bool:
+        if self.submission_filter is None:
+            raise NotImplementedError("A database class must have the submission_filter attribute defined.")
+        
+        if not isinstance(self.submission_filter,SubmissionFilterABC):
+            raise TypeError("The submission_filter class must be an instance of SubmissionFilterABC")
+        
+        if self.submissions is None:
+            raise NotImplementedError("A database class must have the submissions attribute defined.")
+        
+        if not isinstance(self.submissions, SubmissionABC):
+            raise TypeError("The submissions class must be an instance of SubmissionABC")
+        
+        if self.datasets is None:
+            raise NotImplementedError("A database class must have the submissions attribute defined.")
+        
+        if not isinstance(self.datasets, DatasetABC):
+            raise TypeError("The datasets class must be an instance of DatasetABC")
+        
+        if self.genotypes is None:
+            raise not NotImplementedError("A database class must have the genotypes attribute defined")
+        if not isinstance(self.genotypes,GenotypeABC):
+            raise TypeError("The genotypes class must be an instance of GenotypeABC")
+        
+    def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 
         Use this function to check if a tag exists. 
 
@@ -98,15 +146,73 @@ class DatabaseABC(ABC):
             If the tag is associated with a dataset/submission.
         """
         
-    @abstractmethod
-    def get_dataset_tags(self) -> List[str]:
-        ""
+        return self.submissions.exists(tag = tag)
+    
+    def submission_has_dataset(self, tag : str) -> bool:
+        """Checks if a submission exists and if quantitative 
+        data are associated with it. Note, that tags that are not 
+        found, are simply ignored and False is returned.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag 
+
+        Returns
+        -------
+        bool
+            If quantitative data are available for the submission.
+        """
+        return self.datasets.exists(tag)
         
-    @abstractmethod
-    def get_meta_data(self, tag : str) -> DatasetSubmissionModel:
+    def get_submission_tags(self, limit : int = None) -> List[str]:
         ""
+        return self.submission_filter.get_all_tags(limit = limit)
     
     @abstractmethod
+    def get_feature_data(self, tag : str) -> List[Dict]:
+        """Returns the feature (protein) data
+        by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The feature tag 
+
+        Returns
+        -------
+        List[Dict]
+            The data 
+            TODO: Define model on how the data should be returned ! 
+        """
+        
+    def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
+        """Returns the quantitative matrix containing the 
+        features as tags (index) an the quant values in wide format
+        columns indicate sample indices and rows features. Values in
+        the matrix are log2 intensitiees/abundance 
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+        filter_tag : str
+            If a tag is given and exists, then the datatable will 
+            be filtered by the filter (list of feature tags). 
+        
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        return self.datasets.get_datatable(tag = tag, filter_tag = filter_tag)
+        
+   
+    def get_meta_data(self, tag : str) -> DatasetSubmissionModel:
+        ""
+        return self.submissions.get(tag = tag)
+    
+    
     def insert_dataset(self, data_table : pd.DataFrame, tag : str):
         """Adds a dataset to the database. 
 
@@ -115,10 +221,11 @@ class DatabaseABC(ABC):
         data_table : pd.DataFrame
             _description_
         tag : str
-            _description_
+            The submission tag. 
         """
+        return self.datasets.insert(data_table,tag)
     
-    @abstractmethod
+    
     def insert_meta(self, meta_data : DatasetSubmissionModel):
         """Insert meta data
 
@@ -136,314 +243,6 @@ class DatabaseABC(ABC):
         ------
         Exception
             _description_
-        Exception
-            _description_
-        Exception
-            _description_
-        Exception
-            _description_
         """
+        return self.submissions.insert(submission=meta_data)
         
-
-class InvalidDatasetLabelError(Exception):
-    pass
-
-class MCAttributes(metaclass=SingletonABCMeta):
-    """"""
-    # Todo: Write documentation
-
-    @staticmethod
-    def getAttributeDatabase() -> MCAttributes:
-        """
-        Returns a (singleton) database object depending on the settings. Either A PandaFileDatabase or PostgreSQLDatabase.
-        """
-        if DB_SETTINGS.db_handler == "postgresql":
-            from lib.data.database.ProstgreSQLDatabase import PostgreSQLAttributes
-            return PostgreSQLAttributes()
-        elif DB_SETTINGS.db_handler == "pandafiles":
-            from lib.data.database.FileDatabase import PandaFileAttributes
-            return PandaFileAttributes()
-        else:
-            raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
-
-    @abstractmethod
-    def getAttributes(self, sort : bool = True, sort_by : str = "priority", tags : List[str] = None) -> pd.DataFrame:
-        """
-        Returns the full attribute table as Panda DataFrame.
-        
-        Parameters
-        ----------
-        sort : bool, default True
-            If true, the attributes will be sorted by the column priority. 
-            
-        Returns
-        -------
-        pd.DataFrame 
-            The attributes in the database
-        """
-        pass
-
-    @abstractmethod
-    def getAttributeValues(self, tags : List[str] = None) -> pd.DataFrame:
-        """
-        Returns the full attribute value table as Panda DataFrame.
-        """
-        pass
-
-    @abstractmethod
-    def getAttributeTable(self) -> pd.DataFrame:
-        """
-        Returns a table combining attributes and attributes values as Panda DataFrame.
-        """
-        pass
-
-    @abstractmethod
-    def getMandatoryAttributesForStage(self, stage : int) -> List[str]:
-        """
-        Returns a list of tags of mandatory attributes required from defined stage
-        """
-        pass
-
-    @abstractmethod
-    def getMandatoryActivationAttributes(self) -> List[str]:
-        """
-        Returns a list of tags of mandatory attributes.
-        """
-        pass
-
-    @abstractmethod
-    def getMandatorySubmissionAttributes(self) -> List[str]:
-        """
-        Returns a list of tags of mandatory attributes.
-        """
-        pass
-
-    @abstractmethod
-    def update(self):
-        """
-        Triggers a reload of the database.
-        """
-        pass
-
-    #@abstractmethod
-    # def add(self):
-   ##     """
-    #     Triggers a reload of the database.
-    #     """
-    #     pass
-
-    # @abstractmethod
-    # def remove(self):
-    #     """
-    #     Triggers a reload of the database.
-    ##    """
-    #     pass
-
-
-class MCDatabase(metaclass=SingletonABCMeta):
-    """"""
-    # Todo: Write documentation
-
-    def __init__(self):  # ToDo: Check DataType Date
-        """Singleton Constructor"""
-        # Todo: Write documentation
-
-        self._cached_datasets = OrderedDict()
-
-        # otherTestiTestValue = 69
-        # def doTestiTest():
-        #     print(" >>> doTestiTest() !!!")
-        #     return otherTestiTestValue
-        # self.testitest = ExpiringValue[int](expireTime=timedelta(seconds = 5),
-        #                                     value=42,
-        #                                     updateProcess = doTestiTest)
-
-    def clearCachedDatasets(self):
-        """
-        Clears the cached of (memory) stored datasets.
-        """
-        # Todo: Write documentation
-        self._cached_datasets.clear()
-
-    @abstractmethod
-    def doesLabelExists(self, dataset_label : str) -> bool:
-        """
-        Returns true if the dataset label exists.
-        """
-        pass
-
-    @abstractmethod
-    @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
-    def getSampleAttributeJSON(self, grouping_json: Dict = {}) -> Dict:
-        """"""
-        # Todo: Write documentation
-        pass
-
-    def getDataset(self, label: str) -> MCDataset:
-        """
-        Returns a dataset object with the defined label. If it is cached, take it from memory, otherwise read it from the long-term database. Raises an InvalidDatasetLabelError exception if the dataset (label) is not found.
-        """
-        dataset = None
-
-        if label in self._cached_datasets.keys():
-            dataset = self._cached_datasets[label]
-            self._cached_datasets.move_to_end(label, last=True)
-        else:
-            # if DB_SETTINGS.db_handler == "postgresql":
-            #     from lib.data.dataset.PostgreSQLDataset import PostgreSQLDataset
-            #     dataset = PostgreSQLDataset(label=label, loadFromDatabase=True)
-            # elif DB_SETTINGS.db_handler == "pandafiles":
-            if DB_SETTINGS.db_handler == "pandafiles":
-                from lib.data.dataset.PandaDataset import PandaFileDataset
-                dataset = PandaFileDataset(label=label, loadFromDatabase=True)
-            else:
-                raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
-
-            if len(self._cached_datasets) > int(100):
-                self._cached_datasets.popitem(last=False)
-
-            self._cached_datasets[label] = dataset
-
-        return dataset
-
-    @abstractmethod
-    def getJSONDatasets(self, labels: List[str] = []) -> Dict[str, DatasetSubmissionModel]:
-        """"""
-        # Todo: Write documentation
-        pass
-
-    def getDatasets(self, labels: List[str] = []) -> Dict[str, MCDataset]:
-        """
-        Returns a dictionary of the datasets defined in labels. 
-        Uses the database labels as keys. Labels with no matching label in the database will be silently ignored.
-
-        Parameters
-        ----------
-        labels : List[str], default []
-            The dataset labels to be returned. If a label is missing, it will be ignored. 
-
-        Returns
-        -------
-        Dict[str, MCDataset]
-            The datasets as a dictionary with labels as keys. Any missing label will not exists in the output.
-        """
-        # Todo: Write documentation
-        datasets = {}
-
-        if len(labels) < 1:
-            labels = self.getDataLabels()
-
-        for label in labels:
-            if label in self._cached_datasets.keys():
-                datasets[label] = self._cached_datasets[label]
-            elif self.doesLabelExists(label): # otherwise it will return None which we would then have again to check for.
-                datasets[label] = self.getDataset(label)
-
-        return datasets
-
-    @abstractmethod
-    @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
-    def getDatasetAttributeJSON(self, tag: str = "") -> Dict:
-        """"""
-        # Todo: Write documentation
-        pass
-
-    @abstractmethod
-    def getDataLabels(self, sort_createdOn_desc: bool = False) -> List[str]:
-        """
-        Equivalent to getAllDataIDs() but returns a list of database string labels instead of numerical ids.
-        """
-        # Todo: Write documentation
-        pass
-
-    @abstractmethod
-    def getDatasetsWithLabels(self,
-                              n_limit: int = 42,
-                              n_offset: int = 0,
-                              sort_createdOn_desc: bool = False) -> List[str]:
-        """"""
-        # Todo: Write documentation
-        pass
-
-    @staticmethod
-    def getDatabase() -> MCDatabase:
-        """
-        Returns a (singleton) database object depending on the settings. Either A PandaFileDatabase or PostgreSQLDatabase.
-        """
-        if DB_SETTINGS.db_handler == "postgresql":
-            from lib.data.database.ProstgreSQLDatabase import PostgreSQLDatabase
-            return PostgreSQLDatabase()
-        elif DB_SETTINGS.db_handler == "pandafiles":
-            from lib.data.database.FileDatabase import PandaFileDatabase
-            return PandaFileDatabase()
-        else:
-            raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
-
-    @staticmethod
-    def getDatasetObject() -> MCDataset:
-        if DB_SETTINGS.db_handler == "postgresql":
-            from lib.data.dataset.PostgreSQLDataset import PostgreSQLDataset
-            return PostgreSQLDataset
-        elif DB_SETTINGS.db_handler == "pandafiles":
-            from lib.data.dataset.PandaDataset import PandaFileDataset
-            return PandaFileDataset
-        else:
-            raise Exception("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
-
-
-
-    @abstractmethod
-    @deprecated(reason="Will be remove. Please use classes related to MCAttribute in the future.")
-    def getMandatorySubmissionAttributes(self) -> List[AttributeModel]:
-        """
-        Returns a list of mandatory attributes.
-        """
-        pass
-
-    @abstractmethod
-    def getNumberOfDatasets(self) -> int:
-        """
-        Returns numbers of datasets saved in the database.
-        """
-        # Todo: Write documentation
-        pass
-
-    @abstractmethod
-    def getDatasetsWithFeature(self, feature_key : str) -> List:
-        """
-        Returns all datasets that contain a specific feature as List.
-
-        Parameters
-        ----------
-
-        feature_key : str 
-            The feature key (e.g. Uniprot ID)
-        """
-        pass
-
-    @abstractmethod
-    def getSize(self) -> int:
-        """
-        Returns used size for data in bytes.
-        """
-        # Todo: Write documentation
-        pass
-
-    def insert_meta(self, obj: MCDataset,  meta : DatasetSubmissionModel, update : bool = False):
-        """Inserts metadata in the database. 
-        It is mandatory to call this before you can insert a 
-        dataset when using the panda file database.
-
-        Parameters
-        ----------
-        meta : DatasetSubmissionModel
-            _description_
-        """
-        obj.write_json(meta=meta, update=update)
-
-    def insert(self, obj: MCDataset):
-        """
-        Adds/Writes new MCDataset to the database.
-        """
-        # Todo: Write documentation
-        obj.write()

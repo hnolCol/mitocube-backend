@@ -52,45 +52,58 @@ def get_dataset_data(dataset_tag : str, user : UserModel = Depends(get_user_from
 # class QCResponse(BaseModel):
 
 
-@router.get("/datasets/{dataset_label}/qc", 
+@router.get("/datasets/{dataset_tag}/qc", 
             response_model=[], 
             summary="Quality control of data set. Includes a statistic summary.")
-def get_dataset_data(dataset_label : str):
+def get_dataset_data(dataset_tag : str):
     """
-    Returns the summary statistcs data for a specific dataset
+    Returns the summary statistic data for a specific dataset
     TO DO : Add response model.
     """
     poi_data = []
-    db = MCDatabase.getDatabase()
+    
+    datatable = DB.get_datatable(tag = dataset_tag)
+    #db = MCDatabase.getDatabase()
+    print(dataset_tag)
+    #dataset = db.getDataset(dataset_label)
+    dataset_attributes = DB.meta.get_dataset_attributes(tag = dataset_tag)
+    print(dataset_attributes)
+    
 
-    dataset = db.getDataset(dataset_label)
-    metadata : DatasetSubmissionModel = dataset.getMetaJson()
+    
     #TODO Check if proteome/organism is there, otherwise cause error 
-    if "att_organism" not in metadata.dataset_attributes:
+    if "att_proteome" not in dataset_attributes:
         raise HTTPException(status_code=400,detail="No organism defined for this dataset.")
-    proteome_ids =  [attrValueTag.split(":")[1] for attrValueTag in metadata.dataset_attributes["att_organism"]] 
-    datatable = dataset.getDataTable()
+    
+    proteome_tags =  dataset_attributes["att_proteome"]
+    applicable_filters = DB.filters.get(proteome_tags=proteome_tags)
+    features_in_filters = [(f.tag, DB.filters.isin(tag = f.tag, feature_tags=datatable.index.to_list())) for f in applicable_filters]
+    print(features_in_filters)
+    print(applicable_filters)
+    
     if datatable is None or datatable.empty:
         raise no_data_found_http_exception
     data_summary = datatable.describe()
     data_summary.loc["total",:] = datatable.index.size
 
-    if "att_poi" in metadata.dataset_attributes: 
-        pois = metadata.dataset_attributes["att_poi"]
+    if "att_poi" in dataset_attributes: 
+        pois = dataset_attributes["att_poi"]
         ids = [poi.split(":")[-1].upper() for poi in pois]
-        feature_db = PandaFeatureDatabase()
-        features = feature_db.get(keys=ids,proteome_ids=proteome_ids).reset_index(names="key")
-        feature_annotations = features.to_dict(orient="records")
-        poi_data = [FeatureData(dataset).transform(id, add_annotations=True) for id in ids if id in datatable.index]
+        
+        # feature_db = PandaFeatureDatabase()
+        # features = feature_db.get(keys=ids,proteome_ids=proteome_ids).reset_index(names="key")
+        # feature_annotations = features.to_dict(orient="records")
+        # poi_data = [FeatureData(dataset).transform(id, add_annotations=True) for id in ids if id in datatable.index]
 
     return {"stats" : data_summary.to_dict(), 
-            "poi_data" : [{
-            "feature_key" : ids[n],
-            "feature_annotations" : FeatureModel(**feature_annotations[n], tag=f"att_poi:{feature_annotations[n]['key']}"),
-            "annotations" : {},
-            "data" : data.to_dict(orient="records"),
-            "samples_attributes" : samples_attributes} for n,(data, samples_attributes, annotations) in enumerate(poi_data)]
-            }
+            "poi_data" : [] } 
+    #[{
+           # "feature_key" : ids[n],
+           # "feature_annotations" : FeatureModel(**feature_annotations[n], tag=f"att_poi:{feature_annotations[n]['key']}"),
+           # "annotations" : {},
+           # "data" : data.to_dict(orient="records"),
+           # "samples_attributes" : samples_attributes} for n,(data, samples_attributes, annotations) in enumerate(poi_data)]
+            #}
 
 
 
@@ -131,14 +144,15 @@ def get_dataset_sample_info(dataset_tag : str):
     _type_
         _description_
     """
-    if not DB.dataset_exists(tag = dataset_tag): no_data_found_http_exception
+    
+    if not DB.datasets.exists(tag = dataset_tag): no_data_found_http_exception
     
     sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)
     has_genotype = "att_genotype" in sample_map.columns
     attribute_tags = [attribute_tag for attribute_tag in sample_map.columns if attribute_tag not in ["sample_text"]]
     attribute_value_tags = pd.Series(sample_map.values.flatten()).unique().tolist()
     attributes = DB.attributes.get(tags = attribute_tags)
-    attribute_values = DB.attributes.get_values(tags = attribute_value_tags, dataset_tag = dataset_tag)
+    attribute_values = DB.attributes.get_values(submission_tag = dataset_tag, tags = attribute_value_tags)
     if has_genotype:
         genotypes = DB.genotypes.get(tags = sample_map.loc[:,"att_genotype"].to_list())
         attribute_values.extend(genotypes)
@@ -158,14 +172,15 @@ def get_dataset_sample_info(dataset_tag : str):
             response_model=DatasetPCAResponse,
             tags=["Dimensional reduction","PCA"])
 
-def get_dataset_pca(dataset_tag : str, scale : bool = True): #user : UserModel = Depends(get_user_from_token))
+def get_dataset_pca(dataset_tag : str, filter_tag : str = None, scale : bool = True): #user : UserModel = Depends(get_user_from_token))
     """
     Returns the result of a Principal component analysis (PCA).
     """
+    if not DB.datasets.exists(tag = dataset_tag): raise no_data_found_http_exception
 
-    if not DB.dataset_has_data(tag = dataset_tag): raise no_data_found_http_exception
-    data_table = DB.get_dataset_table(tag = dataset_tag)
-    print(data_table)
+
+    #if not DB.dataset_has_data(tag = dataset_tag): raise no_data_found_http_exception
+    data_table = DB.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
     projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
                                         n_components=4,
                                         scale = scale).transform()

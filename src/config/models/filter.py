@@ -4,7 +4,7 @@ from typing import Optional, List
 class FilterProps(BaseModel):
     tag : str
     text : str 
-    proteome_id : str 
+    proteome_tag : str 
     description : str 
     publication : Optional[str] = None
     protein_tags : List[str]
@@ -18,13 +18,15 @@ class FilterProps(BaseModel):
             return cls.text.replace(" ","_").lower() 
         return v 
         
-class Filter(BaseModel):
+class FilterModel(BaseModel):
     tag : str 
-    proteome_id : str 
+    text : str 
+    proteome_tag : str 
     description : str 
     created_at : float
     modified_at : float = None 
     publication : Optional[str] = None 
+    N : int 
     
     
 

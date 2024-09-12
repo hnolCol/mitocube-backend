@@ -3,23 +3,15 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from collections import OrderedDict
-# from datetime import timedelta
+
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
-from neo4j import Driver 
 
 import pandas as pd
 
-from lib.data.dataset.ABCDataset import MCDataset
-from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
-from lib.data.database.abstract.Attributes import AttributesABC
-
-from config.settings.db import get_db_settings
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel
-from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
-from config.models.filter import Filter
+from config.models.filter import FilterModel
    
    
    
@@ -32,16 +24,62 @@ class FeaturesABC(ABC):
     'custom' proteins such as controls. 
     """
     
+    # @abstractmethod
+    # def correlate_features(self):
+    #     ""
+    
+    
     @abstractmethod
-    def find(self, search_string : str, proteome_ids : List[str]) -> List[FeatureNeoModel]:
+    def count(self, quantified : bool = True) -> int:
+        """Counts the number of features
+
+        Parameters
+        ----------
+        quantified : bool, optional
+            wether the protein must have been quantified at least once, by default True
+
+        Returns
+        -------
+        int
+            The number of features
+        """
+        
+    @abstractmethod
+    def count_quantifications(self, tags : List[str]) -> pd.DataFrame: 
+        """Counts the total number of quantifications
+        as well as the number of samples in which the protein 
+        could also have been detected (e.g. same genotype).
+
+        Parameters
+        ----------
+        tag : str
+            The feature tag 
+
+        Returns
+        -------
+        pd.DataFrame
+            Counts of the quantification of a particular protein as a
+            pandas data frame given the following columns:
+                - tag (str) : the feature tag
+                - n (int) : The number of samples that quantified the feature 
+                - total (int) : The number of total samples that could potentially quantify the sample
+                (e.g. samples that are analysed the same proteome.)
+                - submissions (List[str]) : Submission tags in which the protein has been quantified. 
+        """
+    
+    @abstractmethod
+    def find(self, search_string : str, proteome_tags : List[str] = None, filter_tags : List[str] = None) -> List[FeatureNeoModel]:
         """Search the feature database by a search string.
 
         Parameters
         ----------
         search_string : str
             _description_
-        proteome_ids : List[str]
-            The proteome ids to search in. 
+            
+        proteome_tags : List[str], optional
+            The proteome ids to search in. If None the search will 
+            be performed throughout all available proteomes. If a proteome is 
+            given but not in the database, an error will be thrown.
 
         Returns
         -------
@@ -52,10 +90,34 @@ class FeaturesABC(ABC):
         ---------
         
         ValueError 
-            If any of the given proteome_ids does not exist.     
+            If any of the given proteome_tags does not exist.     
         
         """
     
+    @abstractmethod
+    def get_data(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:
+        """Returns the data in the database for given features (tags).
+        The result can be filtered by providing a list of submission tags. 
+
+        Parameters
+        ----------
+        tags : List[str]
+            The feature tags 
+        submission_tags : List[str], optional
+            The submission tags which should only be considered, if None all submissions in which
+            the protein has been quantified will be considered, default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The data as a pandas data frame with the following columns:
+                - tag (str) : Feature tag 
+                - value (float) : The quantification value 
+                - submission_tag(str) : The submission tag in which the feature has been quantified. 
+                - sample_index(int): The sample index 
+                - attribute_value_tag (str): The tag that the particular sample is associated with. 
+                - attribute_tag (str): The tag associating the sample index with an attribute 
+        """
     
     @abstractmethod
     def get_protein_sequence(self, tags : str) -> List[str]:
@@ -74,7 +136,7 @@ class FeaturesABC(ABC):
         
     @abstractmethod
     def get_protein_by_tags(self, tags : List[str], as_data_frame : bool = True) -> List[FeatureNeoModel]|pd.DataFrame:
-        """Returns the protein information from the database
+        """Returns the protein information from the database by a list of tags.
 
         Parameters
         ----------
@@ -86,32 +148,22 @@ class FeaturesABC(ABC):
         Returns
         -------
         List[FeatureNeoModel]|pd.DataFrame
-            if as_data_frame is True, then a pandas data frame is returned, otherwise a list of FeatureModel is returned
+            if as_data_frame is True, then a pandas data frame is returned, otherwise a list of FeatureModel is returned.
+            The dataframe then has the same column names as the FeatureNeModel params.
         """
-    
+
+
     @abstractmethod
-    def insert_uniprot_proteome(self, 
-                                proteome_id : List[str] = ["UP000005640"], 
-                                reviewed : bool = True, 
-                                user_tag : str = None) -> int:
-        """Insert the data from the Uniprot Database for a reference proteome. 
+    def get_proteins_by_view(self, limit : int = 10, filter_tags : List[str] = None) -> List[FeatureNeoModel]:
+        """Returns the most viewed proteins in the database 
 
         Parameters
         ----------
-        proteome_id : List[str], optional
-            _description_, by default ["UP000005640"]
-        reviewed : bool, optional
-            _description_, by default True
-        user_tag : str, optional
-            _description_, by default None
+        limit : int, optional
+            _description_, by default 10
 
         Returns
         -------
-        int
-            The number of proteins added to the database. 
-
-        Raises
-        ------
-        Exception
-            If the database insertion throws an Exception. 
+        List[FeatureNeoModel]
+            _description_
         """

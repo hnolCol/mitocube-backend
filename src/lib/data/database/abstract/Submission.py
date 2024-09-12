@@ -20,6 +20,11 @@ class SubmissionABC(ABC):
     
     """
     
+    @abstractmethod
+    def count(self) -> int:
+        "Counts the total number of submissions in the database"
+        
+    
     def contains(self, tag : str) -> bool:
         "Alias for exists()."
         self.exists(tag)
@@ -113,9 +118,13 @@ class SubmissionABC(ABC):
 
 class SubmissionFilterABC(ABC):
     
+    
+    
     @abstractmethod
     def get_all_tags(self, limit : int = None) -> List[str]:
-        """Returns all tags in the database. 
+        """Returns all submission tags in the database. 
+        A submission that has data is also called a 'dataset' but every 
+        'dataset' is a submission. 
 
         Parameters
         ----------

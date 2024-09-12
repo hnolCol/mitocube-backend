@@ -1,6 +1,6 @@
 from datetime import datetime
 from collections import OrderedDict
-from lib.data.database.ABCDatabase import MCAttributes, MCDatabase, InvalidDatasetLabelError
+from lib.data.database.ABCDatabase import MCAttributes, MCDatabase
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.genotype.PandaGenotype import PandaFileGenotype
 
@@ -51,7 +51,7 @@ def get_dataset_from_database(db : MCDatabase, label : str, force_reload : bool 
         dataset = db.getDataset(label)
         if dataset is None:
             raise tag_not_found
-    except InvalidDatasetLabelError:
+    except:
         raise tag_not_found
     
     return dataset

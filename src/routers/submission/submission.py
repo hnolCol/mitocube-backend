@@ -5,7 +5,7 @@ from collections import OrderedDict
 from neo4j.exceptions import ConstraintError
 import pandas as pd 
 
-from lib.data.database.ABCDatabase import MCDatabase, MCAttributes, InvalidDatasetLabelError
+from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
 from lib.data.runs.runs import RunListCreator
 from lib.user.UserHandling import UserDB
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
@@ -19,10 +19,12 @@ from config.enums.users.roles import UserRolesEnum
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
 from config.models.searches import FulltextSearchResult
+from config.models.news.news import NewsModel
+
 from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
 from config.models.attributes import AttributeModel
-from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission, SubmissionQueryResponse
+from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission, SubmissionQueryResponse, DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
 from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel, SubmissionCountResponse
@@ -51,12 +53,13 @@ router = APIRouter(
     )
 
 
-@router.get("/submission/id",
-    summary = "Returns a unique id for a new submission.",
+@router.get("/submission/tag",
+    summary = "Returns a unique tag for a new submission.",
     response_model = SubmissionIDResponse)
-def get_submission_id():
+def get_submission_id(user : UserModel = Depends(get_user_from_token)):
     """
     A unique id that cannot be changed for a project/data/submission.
+    TODO Check if its really unique ;) dummy func. 
     """
     return SubmissionIDResponse()
 
@@ -123,17 +126,17 @@ def get_users_associated_with_submission(submission_tag : str, user : UserModel 
     tag_not_found
         
     """
-    if not DB.dataset_exists(tag = submission_tag): raise tag_not_found
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
     return DB.meta.get_users(dataset_tag=submission_tag)
 
 
-@router.post("/submissions/{submission_label}/collaborators")
-def add_collaborators(submission_label : str, collaborators : str, replace : bool = True, user : UserModel = Depends(get_user_from_token)):
+@router.post("/submissions/{submission_tag}/collaborators")
+def add_collaborators(submission_tag : str, collaborators : str, replace : bool = True, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters
     ----------
-    submission_label : str
+    submission_tag : str
         The submission label.
     collaborators : str
         user labels of collaborators, for multiple users separate them by a ';'
@@ -150,7 +153,7 @@ def add_collaborators(submission_label : str, collaborators : str, replace : boo
     
     
     db = MCDatabase.getDatabase()
-    dataset = get_dataset_from_database(db,submission_label)
+    dataset = get_dataset_from_database(db,submission_tag)
     metadata = dataset.getMetaJson().model_dump()
     query_collaborators = [ UserDB.get_user_by_label(user_label=coll_label) for coll_label in collaborators.split(";")]
     filtered_collaborators = [user for exists,user in query_collaborators if exists and user.allow_login]
@@ -182,7 +185,7 @@ def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_us
         If the user is not found in the database.
     """
     
-    if not DB.dataset_exists(tag = submission_tag): raise tag_not_found 
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
     user = DB.meta.get_owner(dataset_tag=submission_tag)
     return user 
     
@@ -224,8 +227,8 @@ def change_submission_owner(submission_tag : str,
         If the user that is supposed to be the new owner is blocked (not allowed for login)
     """
     
-    if not DB.user.exists(tag = user_tag): raise user_not_found 
-    if not DB.dataset_exists(tag = submission_tag): raise tag_not_found
+    if not DB.users.exists(tag = user_tag): raise user_not_found 
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
     ok = DB.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
     if not ok:
         raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
@@ -246,7 +249,8 @@ def get_submissions_by_user_label(tags : str = None, group : Literal["state","us
     ------
     """
     
-    counts = DB.submission_filter.get_counts(by = group, tags = APIParamString(param=tags).param)
+    counts = DB.submission_filter.get_counts(by = group, 
+                                             tags = APIParamString(param=tags).param)
     return counts.to_dict(orient="index")
    
 
@@ -320,7 +324,7 @@ def get_submission_by_query(state : str|int = None,
             - 'total_count' (int) : The number of all submissions in the dataset. 
     """
 
-    N = DB.get_submission_count()    
+    N = DB.submissions.count()
     tags = DB.submission_filter.get(
             state = APIParamInt(param = state).param, 
             attribute_tag=APIParamString(param=attribute_tag).param,
@@ -335,6 +339,7 @@ def get_submission_by_query(state : str|int = None,
         return SubmissionQueryResponse(submissions=[],query_count=0,total_count=N,tags=[])
     
     meta_data = DB.meta.get(tags = tags)
+    
     d = {
         "submissions" : meta_data,
         "tags" : tags,
@@ -345,18 +350,17 @@ def get_submission_by_query(state : str|int = None,
     
     
     
-@router.post("/submissions",summary="Add submission to the database")
+@router.post("/submissions", summary="Add submission to the database")
 def add_submission(background_task : BackgroundTasks ,submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
     """
     Adds a submission to the database
     """
     
-    if DB.dataset_values.tag_exists(tag = submission.tag):
+    if DB.submission_exists(tag = submission.tag):
         raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update the submission tag.")
 
     mandatory_attributes = DB.attributes.get_mandatory_attributes()
     missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
-    print(missing_mand_attributes)
     if len(missing_mand_attributes) > 0:
         exception = mandatory_dataset_attrs_not_found_exception
         raise exception
@@ -371,11 +375,21 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
         DB.insert_meta(meta_data=metadata)
     except ConstraintError:
         #should not happen, since it is controlled before, delete?
-        raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update a submission.")
+        raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update a submission.")
     except Exception as e:
-        print(e)
         raise HTTPException(status_code=500, detail="An unknown error occured.")
     check_collaborators = are_public_users_allowed(submission.collaborators)
+    if not submission.includes_data:
+        DB.news.insert(NewsModel(user_tag=user.tag,
+                             title="New Submission!",
+                             content = f"New sample submission: {metadata.title} by {user.firstname}.", 
+                             submission_tags=[metadata.tag])) 
+    else:
+         DB.news.insert(NewsModel(user_tag=user.tag,
+                             title="New dataset!",
+                             content = f"New dataset online: {metadata.title} by {user.firstname}.", 
+                             submission_tags=[metadata.tag])) 
+    
     send_email_in_background(background_tasks=background_task,
                         subject=f"Submission Complete : {submission.title} ({submission.tag})",
                         email_to=[user.email],
@@ -422,19 +436,65 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
     check_collaborators = are_public_users_allowed(submission.collaborators)
         
     
+    
+@router.get("/submissions/{submission_tag}/datasetattributes",summary="Returns the dataset attributes of a submission.")
+def get_submission_attributes(submission_tag : str,
+                              user : UserModel = Depends(get_user_from_token)) -> DatasetAttributesResponse:
+    
+    dataset_attribute_tags = DB.meta.get_dataset_attributes(tag = submission_tag)
+    dataset_attribute_value_tags = [av_tag for av_tags in dataset_attribute_tags.values() for av_tag in av_tags]
+    attributes = DB.attributes.get(tags = list(dataset_attribute_tags))
+    values = DB.attributes.get_values(submission_tag=submission_tag, tags = dataset_attribute_value_tags)
 
-@router.patch("/submissions/{submission_label}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
+    DatasetAttributesResponse(tag = submission_tag, attribute_values= values, attributes= attributes, tags = dataset_attribute_tags)
+    return {'tags' : dataset_attribute_tags, 
+            'attributes' : attributes, 
+            'attribute_values' : values, 
+            'tag' : submission_tag}
+
+@router.patch("/submissions/{submission_tag}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 
-                      submission_label : str,
+                      submission_tag : str,
                       state_change : StateChangeModel,  
                       datasetAttributes : UpdateDatasetAttributesInSubmission, 
-                      user : UserModel = Depends(is_user_at_least_curator)) -> DatasetSubmissionModel:
+                      user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Update datasetattribute along with the state if user is at least curator.
     Returns the updated version of the complete submission.
 
     TO DO: Add exception handling 
     """
+    
+    dataset_attributes = dict([(attribute_tag, [attribute_value.tag for attribute_value in attribute_values]) 
+                          for attribute_tag, attribute_values in datasetAttributes.datasetAttributeValues.items() ])
+    
+    print(submission_tag)
+    submission = {}
+    
+    ok = DB.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes)
+    
+    print(ok)
+    
+    return ok 
+
+    #notify the user if the state updated. For regular updates, no email is sent. 
+    if state_change.prev_state != state_change.state:
+        send_email_in_background(background_tasks=background_task,
+                             subject=f"Project {submission.title} ({submission.tag}) state updated.",
+                             email_to=[submission_user.email, user.email],
+                             include_setting_cc=True,
+                             body={
+                                 "app_name" : GENERAL_SETTINGS.app_name,
+                                 "first_name" : submission_user.firstname,
+                                 "state" : SubmissionStatesEnums(updated_submission.state).name,
+                                 "title" : submission.title,
+                                 "submission_label" : submission_label,
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.tag}" #pydanitc HttpUrl (url) returns www.__.com/  
+                             },
+                             template_mame=EMAIL_SETTINGS.mail_project_state_template)
+    print(datasetAttributes)
+   # DB.meta.update_dataset_attributes(submisison_tag, )
+    return 
     
     db = MCDatabase.getDatabase()
     if not db.doesLabelExists(submission_label): return tag_not_found
@@ -468,20 +528,7 @@ def update_submission(background_task : BackgroundTasks,
     
     dataset.write_json(updated_submission, update = True)
     
-    if state_change.prev_state != state_change.state:
-        send_email_in_background(background_tasks=background_task,
-                             subject=f"Project {updated_submission.title} ({updated_submission.label}) state updated.",
-                             email_to=[submission_user.email, user.email],
-                             include_setting_cc=True,
-                             body={
-                                 "app_name" : GENERAL_SETTINGS.app_name,
-                                 "first_name" : submission_user.firstname,
-                                 "state" : SubmissionStatesEnums(updated_submission.state).name,
-                                 "title" : updated_submission.title,
-                                 "submission_label" : submission_label,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{updated_submission.label}" #pydanitc HttpUrl (url) returns www.__.com/  
-                             },
-                             template_mame=EMAIL_SETTINGS.mail_project_state_template)
+    
 
     return updated_submission    
 

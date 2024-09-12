@@ -87,7 +87,7 @@ dataid_not_found_exception = HTTPException(
 
 tag_not_found = HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail="Label was not found.",
+        detail="Tag was not found.",
         headers={"WWW-Authenticate": "Bearer"})
 
 no_data_found_http_exception = HTTPException(
@@ -104,4 +104,10 @@ mandatory_dataset_attrs_not_found_exception = HTTPException(
 filter_tag_does_not_exist_exception = HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail="The provided filter tag was not found in the DB.",
+        headers={"WWW-Authenticate": "Bearer"})
+
+
+protein_not_found = HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="The feature/protein tag was not found.",
         headers={"WWW-Authenticate": "Bearer"})

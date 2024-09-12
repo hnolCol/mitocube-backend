@@ -120,7 +120,7 @@ def verify_token_by_code(verification : TokenVerificationCode,
     #get user by id 
     user_tag = decoded_token["tag"]
     
-    allowed, user  = DB.user.is_user_allowed(tag = user_tag)
+    allowed, user  = DB.users.is_user_allowed(tag = user_tag)
     if not allowed: raise user_blocked
 
     jwt_token = create_access_token(user.model_dump(),

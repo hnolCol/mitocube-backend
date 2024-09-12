@@ -1,26 +1,30 @@
 
 from neo4j import GraphDatabase, Driver, Result
 from neo4j.exceptions import ConstraintError
-from lib.data.database.ABCDatabase import DatabaseABC, MetaABC, MCDatabase, MCAttributes, FilterABC, FeaturesABC
+from lib.data.database.ABCDatabase import DatabaseABC, MetaABC, MCDatabase, MCAttributes
 from typing import List, Tuple, Any, Dict, Literal, Optional
 from collections import OrderedDict
-from lib.data.database.UserDB import Neo4JUser
-
+from lib.data.database.neo4j.Users import Neo4JUser
+from lib.data.database.neo4j.Meta import Neo4JMetaHandler
+from lib.data.database.abstract.Features import FeaturesABC 
 
 from config.enums.states import SubmissionStatesEnums
 from config.enums.users.roles import UserRolesEnum
 from config.settings.db import get_db_settings
 from config.settings.proteomes.annotations import UniprotAnnotationSettings
-from config.settings.metatexts import MetaTexts
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeUnitResponseModel #, AttributeValuesByDatasetModel
+
+from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.feature import FeatureNeoModel
 from config.models.submissions.submissions import DatasetSubmissionModel
-from config.models.user import UserModel, UserModelForRegistration
-from config.models.parameter import APIParamString
+
+
 from config.models.feature import FeatureNeoModel
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel
 from config.models.searches import FulltextSearchResult
-from config.models.filter import Filter
+from config.models.filter import FilterModel
+
+
+from lib.data.database.neo4j.Features import Neo4JFeatures
 
 from services.json import read_json 
 from services.annotations.uniprot import download_proteome_annotations
@@ -40,13 +44,13 @@ users_from_db = UserDB.get_users()
 #print(users_from_db[0])
 
 
-genotypes = [GenotypeModel(**x) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
+genotypes = []#[GenotypeModel(**x) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
 #print(genotypes)
 
 
 
 
-class AttributeValuesByDatasetModel(BaseModel):
+class AttributeValuesBySubmissionModel(BaseModel):
     attribute_value : AttributeValueModel|FeatureNeoModel
     tags : List[str]
     count : int 
@@ -148,6 +152,7 @@ constraints = [
     ConstraintModel(constrain_label  = "protein_tag", node_label = NodeLabelModel(label = "Protein"),property_name = ["tag","proteome_id"]),
     ConstraintModel(constrain_label  = "sample_tag", node_label = NodeLabelModel(label = "Sample"),property_name = "tag"),
     ConstraintModel(constrain_label  = "dataset_label",node_label = NodeLabelModel(label = "Dataset"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "submission_label",node_label = NodeLabelModel(label = "Submission"),property_name ="tag"),
     ConstraintModel(constrain_label  = "attribute_tag",node_label = NodeLabelModel(label = "Attribute"),property_name ="tag"),
     ConstraintModel(constrain_label  = "attribute_value_tag",node_label = NodeLabelModel(label = "AttributeValue"),property_name ="tag"),
     #ConstraintModel(constrain_label  = "attribute_proteome_value_tag",node_label = NodeLabelModel(label = ["AttributeValue","Proteome"]),property_name ="tag"),
@@ -255,7 +260,6 @@ class Neo4JConstructor:
         
         attribute_df = pd.DataFrame().from_dict(attributes["attributes"])
         attribute_value_df = pd.DataFrame().from_dict([av.model_dump() for av in attribute_value_models])
-        print(attribute_value_df)
         rels = []
         min_state_attributes = []
         for attribute_tag in attribute_df.loc[:,"tag"].unique():
@@ -270,14 +274,15 @@ class Neo4JConstructor:
                                         NodeLabelModel(cypher_label="tn",label="AttributeValue"), relationship_label="HAS_VALUE", 
                                         properties=rels)
         
+        
         ## connect states         
         query = (
             "UNWIND $props as prop "
             "MATCH (a:Attribute {tag : prop.tag}) "
-            "MATCH (s:State {id : prop.min_state}) " 
+            "MATCH (s:State {tag : prop.min_state}) " 
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
         )
-        
+        print(min_state_attributes)
         self._driver.execute_query(query,props = min_state_attributes)
         
         
@@ -309,70 +314,70 @@ class Neo4JConstructor:
         
         self._driver.execute_query(query)
         
-    def _add_genotypes(self, genotypes : List[GenotypeModel], user_tag : str = None):
+    # def _add_genotypes(self, genotypes : List[GenotypeModel], user_tag : str = None):
         
-        def extract_genotype_attributes(genotype_attributes):
-            ""
-            gen_attrs = []
-            n = 0
-            for attribute in genotype_attributes:
-                #there might be multiple protein mutations
-                for idx in range(len(attribute["att_protein_mutation"])):
-                    gen_attrs.append({})
-                    mutation_tag = attribute["att_protein_mutation"][idx].tag
-                    position_of_mutation = attribute["att_protein_position"][mutation_tag]
-                    gen_attrs[n]["protein_tag"] = attribute["att_protein_coding_sequence"][0].key
-                    gen_attrs[n]["engineering_tag"] = attribute["att_gene_engineering"][0].tag
-                    gen_attrs[n]["method_tag"] = attribute["att_gene_editing_method"][0].tag
-                    gen_attrs[n]["mutation_tag"] = mutation_tag
-                    gen_attrs[n]["position_tag"] = position_of_mutation.attribute_value.tag
-                    gen_attrs[n]["aa_position"] = position_of_mutation.aa_position
-                    gen_attrs[n]["aa"] = position_of_mutation.aa
-                    gen_attrs[n]["substitution"] = position_of_mutation.substitution
-                    n += 1
-            return gen_attrs
+    #     def extract_genotype_attributes(genotype_attributes):
+    #         ""
+    #         gen_attrs = []
+    #         n = 0
+    #         for attribute in genotype_attributes:
+    #             #there might be multiple protein mutations
+    #             for idx in range(len(attribute["att_protein_mutation"])):
+    #                 gen_attrs.append({})
+    #                 mutation_tag = attribute["att_protein_mutation"][idx].tag
+    #                 position_of_mutation = attribute["att_protein_position"][mutation_tag]
+    #                 gen_attrs[n]["protein_tag"] = attribute["att_protein_coding_sequence"][0].key
+    #                 gen_attrs[n]["engineering_tag"] = attribute["att_gene_engineering"][0].tag
+    #                 gen_attrs[n]["method_tag"] = attribute["att_gene_editing_method"][0].tag
+    #                 gen_attrs[n]["mutation_tag"] = mutation_tag
+    #                 gen_attrs[n]["position_tag"] = position_of_mutation.attribute_value.tag
+    #                 gen_attrs[n]["aa_position"] = position_of_mutation.aa_position
+    #                 gen_attrs[n]["aa"] = position_of_mutation.aa
+    #                 gen_attrs[n]["substitution"] = position_of_mutation.substitution
+    #                 n += 1
+    #         return gen_attrs
                 
             
-        genotype_props = [{"tag" : genotype.label, 
-                           "proteome_id" : genotype.proteome_id, 
-                           "text" : genotype.text, 
-                           "attributes" : extract_genotype_attributes(genotype.attributes)} for genotype in genotypes if "att_protein_mutation" in genotype.attributes[0] and "att_protein_position" in genotype.attributes[0]]
+    #     genotype_props = [{"tag" : genotype.label, 
+    #                        "proteome_id" : genotype.proteome_id, 
+    #                        "text" : genotype.text, 
+    #                        "attributes" : extract_genotype_attributes(genotype.attributes)} for genotype in genotypes if "att_protein_mutation" in genotype.attributes[0] and "att_protein_position" in genotype.attributes[0]]
 
-        query = (
-            "UNWIND $genotypes as genotype "
-            "MERGE (g:Genotype {tag : genotype.tag}) "
-            "ON CREATE "
-            "SET g.created_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
-            "ON MATCH "
-            "SET g.modified_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
-            "WITH g, genotype "
-            "UNWIND genotype.attributes as attribute "
-            "MATCH (p:Protein {tag : attribute.protein_tag}) "
-            "SET g.s = toLower(genotype.text)+' '+p.s "
-            "WITH g,p,genotype, attribute "
-            "MERGE (g)-[effect_r:EFFECTS {tag : genotype.tag}]->(p) "
-            "SET effect_r.created_at = timestamp() "
-            "WITH attribute,p,genotype,g "
-            "MATCH (engineer_attribute:AttributeValue {tag : attribute.engineering_tag}) "
-            "MATCH (method_attribute:AttributeValue {tag : attribute.method_tag}) "
-            "MATCH (prot_mutation_attribute:AttributeValue {tag : attribute.mutation_tag}) "
-            "MATCH (position_attribute:AttributeValue {tag : attribute.position_tag}) "
-            "MERGE (method_attribute)<-[:MEDIATED_BY {tag : genotype.tag}]-(engineer_attribute) "
-            "MERGE (method_attribute)-[:MODIFYING {tag : genotype.tag}]-(p) "
-            "MERGE (p)-[:INTRODUCING {tag : genotype.tag}]-(prot_mutation_attribute) "
-            "MERGE (prot_mutation_attribute)-[at_r:AT {tag : genotype.tag}]->(position_attribute) "
-            "SET at_r.position = attribute.aa_position, at_r.amino_acids = attribute.aa, at_r.substitution = attribute.substitution "
-            )
+    #     query = (
+    #         "UNWIND $genotypes as genotype "
+    #         "MERGE (g:Genotype {tag : genotype.tag}) "
+    #         "ON CREATE "
+    #         "SET g.created_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
+    #         "ON MATCH "
+    #         "SET g.modified_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
+    #         "WITH g, genotype "
+    #         "UNWIND genotype.attributes as attribute "
+    #         "MATCH (p:Protein {tag : attribute.protein_tag}) "
+    #         "SET g.s = toLower(genotype.text)+' '+p.s "
+    #         "WITH g,p,genotype, attribute "
+    #         "MERGE (g)-[effect_r:EFFECTS {tag : genotype.tag}]->(p) "
+    #         "SET effect_r.created_at = timestamp() "
+    #         "WITH attribute,p,genotype,g "
+    #         "MATCH (engineer_attribute:AttributeValue {tag : attribute.engineering_tag}) "
+    #         "MATCH (method_attribute:AttributeValue {tag : attribute.method_tag}) "
+    #         "MATCH (prot_mutation_attribute:AttributeValue {tag : attribute.mutation_tag}) "
+    #         "MATCH (position_attribute:AttributeValue {tag : attribute.position_tag}) "
+    #         "MERGE (method_attribute)<-[:MEDIATED_BY {tag : genotype.tag}]-(engineer_attribute) "
+    #         "MERGE (method_attribute)-[:MODIFYING {tag : genotype.tag}]-(p) "
+    #         "MERGE (p)-[:INTRODUCING {tag : genotype.tag}]-(prot_mutation_attribute) "
+    #         "MERGE (prot_mutation_attribute)-[at_r:AT {tag : genotype.tag}]->(position_attribute) "
+    #         "SET at_r.position = attribute.aa_position, at_r.amino_acids = attribute.aa, at_r.substitution = attribute.substitution "
+    #         )
         
-        if user_tag is not None:
-            query += ("WITH g "
-                      "MATCH (u:User {tag : $user_tag}) "
-                      "MERGE (u)-[r_defined:DEFINED {tag : g.tag}]->(g) "
-                      "ON CREATE "
-                      "SET r_defined.created_at = timestamp() "
-            )
+    #     if user_tag is not None:
+    #         query += ("WITH g "
+    #                   "MATCH (u:User {tag : $user_tag}) "
+    #                   "MERGE (u)-[r_defined:DEFINED {tag : g.tag}]->(g) "
+    #                   "ON CREATE "
+    #                   "SET r_defined.created_at = timestamp() "
+    #         )
         
-        self._driver.execute_query(query, genotypes = genotype_props, user_tag = user_tag, routing_="w",  database_="neo4j")
+    #     self._driver.execute_query(query, genotypes = genotype_props, user_tag = user_tag, routing_="w",  database_="neo4j")
         
     def _add_states(self):
         ""
@@ -590,7 +595,6 @@ class MCNeo4JDatabase(DatabaseABC):
         #self.insert_dataset(data_table=d, tag=dataset_tag)
        #ta(tag=dataset_tag)
         #print(B)
-       # self.features.find_feature()
        # self.get_datatable()
         # self.connection.close()
         
@@ -821,213 +825,6 @@ class MCNeo4JDatabase(DatabaseABC):
         r,_,_ = self._driver.execute_query(query,dataset_tag=dataset_tag, state_tag = new_state, user_tag = user_tag)
 
 
-class Neo4JSubmissionFilter():
-    def __init__(self, driver : Driver) -> None:
-        
-        self._driver = driver
-        self._factory = Neo4JFactory(driver=driver)
-        
-        
-    def _add_limit(self, query : str, limit : int = None):
-        ""
-        if limit is not None : query += "LIMIT $limit"
-        return query 
-        
-    def get_all_tags(self, limit : int = None)->List[str]:
-        "" 
-        
-        query = (
-            "MATCH (d:Dataset) "
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, routing_="r",limit=limit)
-        return [ri.value() for ri in r] 
-    
-    def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value"] = "state") -> pd.DataFrame:
-        """Counts the submissions and groups them from the Neo4j database. 
-
-        Parameters
-        ----------
-        tags : List[str], optional
-            The submission tags to use, if None all tags in the database are used, by default None
-        by : Literal[&quot;user&quot;,&quot;state&quot;,&quot;attribute&quot;,&quot;attribute_value&quot;], optional
-            count the submissions by the given property, by default "state"
-
-        Returns
-        -------
-        pd.DataFrame
-            _description_
-        """
-        if by == "user":
-            query = ("MATCH (n:User) "
-                     "MATCH (n)-[:OWNS|IS_PART]->(d:Dataset) ")
-        elif by == "state":
-            query = ("MATCH (n:State) "
-                     "MATCH (n)<-[:IN_STATE]-(d:Dataset) ")
-        elif by == "attribute":
-            query = ("MATCH (n:Attribute) "
-                     "MATCH (n)<-[:HAS_VALUES_FOR_ATTRIBUTE]-(d:Dataset) ")
-        elif by == "attribute_value":
-            query = ("MATCH (n:AttributeValue) "
-                     "MATCH (n)<-[:HAS_ATTRIBUTE_VALUE]-(d:Dataset) ")
-        if tags is not None:
-            query += "WHERE d.tag in $tags "
-            
-        query += "RETURN n.tag as tag, count(d) as count, collect(d.tag) as tags "
-        
-        submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
-        return submission_counts.set_index("tag")
-    
-    def filter_by_attribute_value_tags(self, attribute_value_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:
-        ""
-        query = (
-            "MATCH (d:Dataset)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
-            f"{'WHERE d.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "WITH d, COLLECT(DISTINCT av.tag) AS value_tags "
-            "WHERE ALL(value_tag in $attribute_value_tags WHERE value_tag in value_tags) "
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, attribute_value_tags=attribute_value_tag, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
-    
-            
-    def filter_by_attribute_tags(self, attribute_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:
-        ""
-        query = (
-            "MATCH (d:Dataset)-[:HAS_VALUES_FOR_ATTRIBUTE]->(av:Attribute) "
-            f"{'WHERE d.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "WITH d, COLLECT(DISTINCT av.tag) AS value_tags "
-            "WHERE ALL(value_tag in $attribute_tags WHERE value_tag in value_tags) "
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, attribute_tags=attribute_tag, submission_tags = submission_tags, limit = limit)
-        
-        return [ri.value() for ri in r] 
-    
-    def filter_by_genotype_tags(self, genotype_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
-        ""
-        query = (
-            "MATCH (g:Genotype) "
-            "WHERE g.tag in $genotype_tags "
-            "MATCH (g)<-[:HAS_GENOTYPE]-(d:Dataset) "
-            f"{'WHERE d.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, genotype_tags = genotype_tag, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
-    
-    def filter_by_user(self, user_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
-        ""
-        query = (
-            "MATCH (d:Dataset) "
-            f"{'WHERE d.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "MATCH (u:User) "
-            "WHERE u.tag in $user_tags AND ((u)-[:OWNS]-(d) OR (u)-[:IS_PART]->(d)) "
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, user_tags=user_tag, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
-    
-    def filter_by_quantified_protein(self, protein_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
-        ""
-        query = (
-            "MATCH (p:Protein ) "
-            "WHERE p.tag in $protein_tags "
-            "MATCH (p)-[:QUANTIFIED_IN]->(d:Dataset) "
-            f"{'WHERE d.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, protein_tags = protein_tag, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
-        
-        
-    def filter_by_state(self, state : List[int], submission_tags : List[str] = None, limit : int = None):
-        ""
-        query = (
-            "MATCH (state:State ) "
-            "WHERE state.tag in $state "
-            "MATCH (state)<-[:IN_STATE]-(d:Dataset) "
-            f"{'WHERE d.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "RETURN DISTINCT d.tag "
-        )
-        query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, state = state, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
-    
-    def get(self, 
-            state : List[int] = None, 
-            attribute_value_tag : List[str] = None, 
-            attribute_tag : List[str]= None, 
-            user_tag : List[str] = None, 
-            protein_tag : List[str] = None, 
-            genotype_tag : List[str] = None,
-            limit : int = 10) -> List[str]:
-        ""
-        
-        tags = None 
-        
-        if state is not None:
-            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag, genotype_tag]) else None
-            tags = self.filter_by_state(state=state, submission_tags=tags, limit=limit_)
-        
-        if genotype_tag is not None:
-            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag]) else None
-            tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_)
-        
-        if attribute_value_tag is not None:
-            limit_ = limit if all(attr is None for attr in [attribute_tag,user_tag,protein_tag]) else None
-            tags = self.filter_by_attribute_value_tags(attribute_value_tag,submission_tags=tags,limit=limit_)
-
-        if attribute_tag is not None:
-            limit_ = limit if all(attr is None for attr in [user_tag,protein_tag]) else None
-            tags = self.filter_by_attribute_tags(attribute_tag,submission_tags=tags,limit=limit_)
-        
-        if user_tag is not None:
-            limit_ = limit if protein_tag is None else None
-            tags = self.filter_by_user(user_tag,submission_tags=tags,limit=limit_)
-        
-        if protein_tag is not None:
-            tags = self.filter_by_quantified_protein(protein_tag,submission_tags=tags,limit=limit)
-            
-        if tags is None: #none defined, then just return all. 
-            
-            return self.get_all_tags(limit=limit)
-        
-        return tags 
-        
-        
-    def title_full_text_search(self, query_string : str):
-        ""
-        
-        
-        r, _ , _ = self._factory.full_text_search("titleSearch",query_string)
-        
-        print(r)
-        
-        
-    def meta_text_search(self, query_string : str):
-        ""
-        r, _ , _ = self._factory.full_text_search("metatextSearch",query_string)
-        
-        print(r)
-        
-    def full_dataset_text_search(self, search_string : str) -> List[FulltextSearchResult]:
-        ""  
-        
-        r, _ , _ = self._factory.full_text_search("datasetSearch",search_string)
-        return [ri.data() for ri in r]
-        
-        
-        
-        
-         
-
         
         
         
@@ -1045,718 +842,6 @@ class Neo4JSubmissionFilter():
 #                             genotype_label : str = None, 
 #                             user_label : str = None,
 #                             max_submissions : int = 50, 
-
-class Neo4JAttributes():
-
-    def __init__(self, driver : Driver) -> None:
-        
-        self._driver = driver
-        self.factory = Neo4JFactory(driver = driver)    
-    
-    def __read_attributes_values_from_tuple_results(self,ri):
-            attribute = AttributeModel(**ri[0])
-            if attribute.has_features_value:
-                values = [FeatureNeoModel(**av) for av in ri[1]]
-            else:
-                values = [AttributeValueModel(**av) for av in ri[1]]
-            return (attribute,values)
-        
-    def get(self, tags : List[str] = ["att_compound","att_protease"]) -> List[AttributeModel]:
-        ""
-        attributes = self.factory.get_nodes_by_tag_list(NodeLabelModel(label="Attribute"),tags=tags)
-        return [AttributeModel(**k) for k in attributes]
-    
-    def get_values(self, tags : List[str] = None, dataset_tag : str = None) -> List[AttributeValueModel|FeatureNeoModel]:
-        ""
-        query = (
-            "MATCH (av:AttributeValue) "
-            "WHERE NOT 'Protein' in labels(av) AND av.tag in $tags "
-            "RETURN properties(av) as props "
-            "UNION "
-            "MATCH (av:AttributeValue:Protein) "
-            "WHERE av.tag in $tags "
-            "MATCH (d:Dataset)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
-            "WHERE d.tag = $dataset_tag "
-            "WITH {attribute_tag : r.attribute_tag} as attr_tag, av "
-            "WITH apoc.map.merge(properties(av), attr_tag) as props "
-            "RETURN props"
-        )
-        
-        attribute_values, _, _ = self._driver.execute_query(query, tags = tags, dataset_tag = dataset_tag, routing_="r")
-        attribute_values_props = [av.value() for av in attribute_values]
-            
-        return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av) for av in attribute_values_props]
-    
-    def get_attribute_values_by_dataset_tags(self, dataset_tags : List[str], attribute_tags : list[str] = None, attribute_value_tags : List[str] = None) -> List[AttributeValuesByDatasetModel]:
-        """Finds all the attribute values that are assigned to a dataset and returns the number of dataset
-        that match each attribute value. This is a convenient function to get the datasets tags that have 
-        an attribute value and how many are used, as used in a filtering approach. 
-
-        Parameters
-        ----------
-        dataset_tags : List[str]
-            The list of dataset tags to consider. 
-        attribute_tags : list[str], optional
-            Subset of attribute tags to consider, if None all the attribute available are considered, by default None
-        attribute_value_tags : List[str], optional
-            Subset of attribute value tags, by default None
-
-        Returns
-        -------
-        List[AttributeValuesByDatasetModel]
-            The result of the query given by a list of AttributeValuesByDatasetModel with the following 
-            properties:
-                - attribute_value (AttributeValueModel|FeatureNeoModel) : The attribute Value
-                - tags (List[str]) : List of dataset tags that have the attribute value
-                - counts (int) : The number of datasets tags, equals len(tags)
-        """
-        
-        if attribute_tags is None and attribute_value_tags is None:
-            #returns all attribute values for the given dataset tags 
-            query = (
-                "MATCH (d:Dataset) "
-                "WHERE d.tag in $tags "
-                "MATCH (d)-[:HAS_ATTRIBUTE_VALUE]-(av:AttributeValue) "
-                "RETURN properties(av) as attribute_value, collect(d.tag) as tags, count(d) as count "
-            )
-            r, _ , _ = self._driver.execute_query(query, tags=dataset_tags)
-            
-        elif attribute_tags is None and attribute_value_tags is not None:
-            #filtered for set of attribute value tags 
-            query = (
-                "MATCH (d:Dataset) "
-                "WHERE d.tag in $tags "
-                "MATCH (d)-[:HAS_ATTRIBUTE_VALUE]-(av:AttributeValue) "
-                "WHERE av.tag in $attribute_value_tags"
-                "RETURN properties(av) as attribute_value, collect(d.tag) as tags, count(d) as count "
-            )
-            r, _ , _ = self._driver.execute_query(query, tags=dataset_tags, attribute_value_tags = attribute_value_tags)
-        
-        elif attribute_tags is not None and attribute_value_tags is not None:
-            #filtered for attribute_tags and attribute_value_tags 
-            query = (
-                "MATCH (d:Dataset) "
-                "WHERE d.tag in $tags AND EXISTS {(d)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a:Attribute) WHERE a.tag in $attribute_tags} "
-                "MATCH (d)-[:HAS_ATTRIBUTE_VALUE]-(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute) "
-                "WHERE av.tag in $attribute_value_tags AND a.tag in $attribute_tags "
-                "RETURN properties(av) as attribute_value, collect(d.tag) as tags, count(d) as count "
-            )
-            r, _ , _ = self._driver.execute_query(query, tags=dataset_tags, attribute_value_tags = attribute_value_tags, attribute_tags = attribute_tags)
-        
-        elif attribute_tags is not None and attribute_value_tags is None:
-            #filtered for attribute_tags and attribute_value_tags 
-            query = (
-                "MATCH (d:Dataset) "
-                "WHERE d.tag in $tags AND EXISTS {(d)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a:Attribute) WHERE a.tag in $attribute_tags} "
-                "MATCH (d)-[:HAS_ATTRIBUTE_VALUE]-(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute) "
-                "WHERE a.tag in $attribute_tags "
-                "RETURN properties(av) as attribute_value, collect(d.tag) as tags, count(d) as count "
-            )
-            r, _ , _ = self._driver.execute_query(query, 
-                                                  tags=dataset_tags, 
-                                                  attribute_tags = attribute_tags,
-                                                  database_="neo4j", 
-                                            routing_="r")
-        
-        return [AttributeValuesByDatasetModel(**ri.data()) for ri in r]
-        
-        
-    def get_mandatory_attributes(self) -> List[AttributeModel]:
-        
-        return self._get_attributes_by_boolean_param()
-    
-    def get_dataset_attributes(self, min_state : SubmissionStatesEnums = None):
-        """_summary_
-
-        Parameters
-        ----------
-        min_state : SubmissionStatesEnums, optional
-            _description_, by default None
-
-        Returns
-        -------
-        _type_
-            _description_
-        """
-        if min_state is None:
-            return self._get_attributes_by_boolean_param(param_name="allow_for_dataset")
-        else:
-            return self._get_attributes_by_boolean_param_and_state(param_name="allow_for_dataset", min_state=min_state)
-    
-    def _get_attributes_by_boolean_param(self, 
-                                         param_name : str = "mandatory_for_submission", 
-                                         order_param : str = "priority", 
-                                         order_direction : Literal["ASC","DESC"] = "DESC",
-                                         ) -> List[AttributeModel]:
-        ""
-        
-        query = (
-            "MATCH (a:Attribute) "
-            "WHERE a[$param_name] "
-            "RETURN properties(a) ORDER BY a[$order_param]" + f" {order_direction} "
-        )
-
-        r, _, _ = self._driver.execute_query(query,param_name = param_name, order_param = order_param)    
-        return [AttributeModel(**ri.value()) for ri in r]
-    
-    def _get_attributes_by_boolean_param_and_state(self, 
-                                         param_name : str = "mandatory_for_submission", 
-                                         order_param : str = "priority", 
-                                         order_direction : Literal["ASC","DESC"] = "DESC",
-                                         min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
-                                         ) -> List[AttributeModel]:
-        ""
-        
-        query = (
-            "MATCH (s:State)<-[:REQUIRES_STATE]-(a:Attribute) "
-            "WHERE s.id = $min_state AND a[$param_name] "
-            "RETURN properties(a) ORDER BY a[$order_param]" + f" {order_direction} "
-        )
-
-        r, _, _ = self._driver.execute_query(query,param_name = param_name, order_param = order_param, min_state = min_state)
-
-        return [AttributeModel(**ri.value()) for ri in r]
-        
-    
-    def get_attribute_values_by_attribute_tag(self, tags :  List[str] = ["att_compound"]) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
-        """Returns the attribute values for the given attribute_tags 
-        
-
-        Parameters
-        ----------
-        tags : List[str], optional
-            _description_, by default ["att_compound"]
-
-        Returns
-        -------
-        List[Tuple[AttributeModel,List[AttributeValueModel]]]
-            _description_
-        """
-        
-
-        
-        query = (
-            "MATCH (a:Attribute) "
-            "WHERE a.tag in $tags "
-            "MATCH (a)-[:HAS_VALUE]->(av:AttributeValue) "
-            "RETURN properties(a) as attribute, collect(properties(av)) as values "
-        )
-        
-        r, _ , _ = self._driver.execute_query(query, 
-                                            tags = tags,
-                                            database_="neo4j", 
-                                            routing_="r")
-        return [self.__read_attributes_values_from_tuple_results(ri.values()) for ri in r]
-    
-    def get_attributes_by_state(self, state : int) -> List[AttributeModel]:
-        
-        query = (
-            "MATCH (s:State)<-[:REQUIRES_STATE]-(a:Attribute) "
-            "WHERE s.id = $state_id "
-            "RETURN properties(a) as attribute"
-        )
-        
-        r, _ , _ = self._driver.execute_query(query, state_id = state)
-        
-        return [AttributeModel(**ri[0]) for ri in r]
-    
-    def get_attributes(self):
-        ""
-        
-        query = (
-            "MATCH (a:Attribute) "
-            "MATCH (a)-[:HAS_VALUE]->(av:AttributeValue) "
-            "RETURN properties(a), collect(properties(av)) as values "
-        )
-        
-        self._driver.execute_query(query)
-        
-        
-    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
-        """_summary_
-
-        Parameters
-        ----------
-        search_string : str
-            _description_
-        min_state : SubmissionStatesEnums, optional
-            _description_, by default SubmissionStatesEnums.SUBMITTED
-
-        Returns
-        -------
-        List[Tuple[AttributeModel,List[AttributeValueModel]]]
-            _description_
-        """
-        
-        query = (
-            f"{'MATCH (a:Attribute) ' if min_state is None else 'MATCH (s:State {id : $min_state})<-[:REQUIRES_STATE]-(a:Attribute) '}"
-            f"{'WHERE a[$param_name] 'if param_name is not None else ''}"
-            "MATCH (a)-[:HAS_VALUE]->(av:AttributeValue) "
-            "WHERE a.s CONTAINS $search_string OR av.s CONTAINS $search_string "
-            "WITH a, av ORDER BY av.text "
-            "RETURN properties(a), collect(DISTINCT properties(av)) as values"
-        )
-        r, _ , _ = self._driver.execute_query(
-            query,
-            search_string=search_string.lower(),
-            min_state = min_state, 
-            param_name = param_name, 
-            routing_="r", 
-            database_="neo4j")
-        
-        return [self.__read_attributes_values_from_tuple_results(ri.values()) for ri in r]
-
-
-    def unit(self, tags : List[str]) -> List[AttributeUnitResponseModel]:
-        """Returns the unit by attribute tag
-
-        Parameters
-        ----------
-        tag : str
-            Attribute tag for which the unit should be returned. 
-
-        Returns
-        -------
-        _type_
-            _description_
-        """
-        
-        query = (
-            "MATCH (a:Attribute) "
-            "WHERE a.tag in $tags AND a.has_unit "
-            "MATCH (u:Unit) "
-            "WHERE u.tag in a.unit "
-            "RETURN a as attribute, collect(properties(u)) as units "
-        )
-        
-        r = self._driver.execute_query(query, tags = tags, result_transformer_=Result.data)
-        return [AttributeUnitResponseModel(**ri) for ri in r ]
-
-class Neo4JMetaHandler(MetaABC):
-
-    def __init__(self, driver : Driver, attributes : Neo4JAttributes) -> None:
-        
-        self._driver = driver
-        self.factory = Neo4JFactory(driver = driver)
-        self._attributes = attributes
-        self.create_title_search_index() ##put in creator!! TODO 
-        
-    def get(self, tags : List[str]) -> List[MinimalMetadataModel]:
-        """Returns the minimal meta information of a dataset node (e.g. properties)
-        from Neo4J database. 
-        
-        Parameters
-        ----------
-        tags : List[str]
-            The list of tags that the minimal metadata should be returned. 
-        """
-        
-        query = (
-            "MATCH (d:Dataset) "
-            "WHERE d.tag in $tags "
-            "MATCH (d)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute {tag:'att_proteome'}) "
-            "WITH collect(av.tag) as proteome_ids, d, EXISTS {(d)<-[:QUANTIFIED_IN]-(:Protein)} as has_datatable "
-            "WITH {proteome_ids : proteome_ids, has_datatable : has_datatable} as add_meta, d "
-            "RETURN apoc.map.merge(properties(d), add_meta)"
-        )
-        ""
-        metadata = self._driver.execute_query(query,result_transformer_=Result.value, tags = tags)
-        return [MinimalMetadataModel(**x) for x  in metadata]
-        
-    def get_metatext(self, tags : List[str]) -> pd.DataFrame:
-        ""
-        query = (
-            "MATCH (d:Dataset) "
-            "WHERE d.tag in $tags "
-            "MATCH (d)<-[:DESCRIBES]-(m:Metatext)-[:HAS_CONTENT]->(c:Content) "
-            "WHERE c.tag = d.tag and c.content IS NOT null and c.content <> '' "
-            "RETURN d.tag as dataset_tag, m.tag as tag, m.title as title, c.content as content ORDER BY m.priority DESC "
-        )
-        
-        meta_text = self._driver.execute_query(query,tags=tags,result_transformer_=Result.to_df)
-        return meta_text
-    
-    def add_metatext(self, dataset_tag : str, user_tag : str, meta_texts : Dict[str,str]):
-        "" 
-        metatext_settings = MetaTexts()
-        meta_texts = [{"tag" : tag, "content" : content, "title" : metatext_settings.names[tag], "priority" : metatext_settings.priorities[tag]} for tag,content in meta_texts.items() if content != "" and tag in metatext_settings.names] 
-        
-        query = (
-            "UNWIND $meta_texts as metatext "
-            "MATCH (d:Dataset {tag : $dataset_tag}) "
-            "MERGE (m:Metatext {tag : metatext.tag }) "
-            "SET m.title = metatext.title, m.priority = metatext.priority "
-            "WITH d, m, metatext "
-            "MERGE (d)<-[r_d:DESCRIBES]-(m) "
-            "SET r_d.created_at = timestamp(), r_d.user_tag = $user_tag "
-            "WITH d, m, metatext "
-            "MERGE (m)-[:HAS_CONTENT]-(c:Content {tag : d.tag}) "
-            "SET c.content = metatext.content"
-        )
-        
-        self._driver.execute_query(query, dataset_tag = dataset_tag, meta_texts = meta_texts, user_tag = user_tag, routing_="w")
-        
-    def add_samples_genotypes(self, meta_data : DatasetSubmissionModel = meta):
-        """Adds the sample genotypes
-
-        Parameters
-        ----------
-        meta_data : DatasetSubmissionModel, optional
-            _description_, by default meta
-        """
-        
-        samples_genotypes = meta_data.samples_genotypes
-        if len(samples_genotypes) == 0: return 
-        sample_names = meta_data.sample_names
-        
-        sample_genotypes_props = [
-            {"tag" : genotype_tag, 
-             "sample_name" : sample_names[sample_index]} for genotype_tag, sample_indices in samples_genotypes.items() for sample_index in sample_indices]
-        
-        query = ( 
-                "MATCH (d:Dataset {tag : $dataset_tag}) "
-                "UNWIND $props as prop "
-                "MATCH (g:Genotype {tag : prop.tag}) "
-                "MATCH (s:Sample {tag : prop.sample_name}) "
-                "MERGE (d)-[:HAS_GENOTYPE]-(g) "
-                "MERGE (g)<-[r:HAS_GENOTYPE]-(s) "
-                "SET r.created_at = timestamp(), r.attribute_tag = 'att_genotype'"
-                )
-
-        self._driver.execute_query(query, props = sample_genotypes_props, dataset_tag = meta_data.label)
-    
-    def add_samples_attributes(self, meta_data : DatasetSubmissionModel):
-        """_summary_
-
-        Parameters
-        ----------
-        meta_data : DatasetSubmissionModel, optional
-            _description_, by default meta
-        """
-        sample_attributes_data = []
-        attributes_to_connect = []
-        
-        for n, (attribute_tag, attribute_value) in enumerate(meta_data.samples_attributes.items()):
-            attributes_to_connect.append({"attribute_tag" : attribute_tag, "values" : [], "inputs" : []})
-            for attribute_value_tag, sample_idx in attribute_value.items():
-                attr_value_tag = attribute_value_tag.split(":")[-1]
-                attributes_to_connect[n]["values"].append(attr_value_tag)
-                
-                if meta_data.samples_attributes_input is not None and attribute_tag in meta_data.samples_attributes_input:
-                    user_inputs  = meta_data.samples_attributes_input[attribute_tag]
-                    attributes_to_connect[n]["inputs"] = [u.model_dump() for u in user_inputs]
-    
-                for idx in sample_idx:
-                    sample_name = meta.sample_names[idx]
-                    sample_attributes_data.append(
-                        {
-                            "attribute_tag" : attribute_tag,
-                            "index" : n,
-                            "sample_name" : sample_name, 
-                            "attribute_value_tag" :  attr_value_tag##matching proteins by tag.
-                        }
-                    )
-
-        print(sample_attributes_data)
-        query = (
-            "UNWIND $sample_attributes_data as sample_attr "
-            "MATCH (s:Sample {tag : sample_attr.sample_name}) "
-            "MATCH (av:AttributeValue {tag : sample_attr.attribute_value_tag}) "
-            "MERGE (s)-[r_s:HAS_SAMPLE_ATTRIBUTE_VALUE]-(av) "
-            "SET r_s += {index : sample_attr.index, attribute_tag : sample_attr.attribute_tag, created_at : timestamp()} "
-            "WITH $dataset_tag as dataset_tag, $attributes as attributes "
-            "MATCH (d:Dataset) "
-            "WHERE d.tag = dataset_tag "
-            "UNWIND attributes as attr "
-            "MATCH (a:Attribute) "
-            "WHERE a.tag = attr.attribute_tag "
-            "MERGE (d)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a) "
-            "WITH d, a, attr "
-            "MATCH (av: AttributeValue) "
-            "WHERE av.tag in attr.values "
-            "MERGE (d)-[r:HAS_ATTRIBUTE_VALUE]-(av) "
-            "SET r.attribute_tag = a.tag "
-            "WITH a, av, attr, d "
-            "MERGE (a)-[:HAS_VALUE]->(av) "
-            "WITH attr, d "
-            "UNWIND attr.inputs as user_input "
-            "MATCH (av_u:AttributeValue) "
-            "WHERE av_u.tag = user_input.attribute_value_tag "
-            "MATCH (d)-[:HAS_SAMPLE]->(s:Sample {index : user_input.sample_index}) " #match the sample of the dataset 
-            "MATCH (s)-[r_u_i:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av_u) " #create a relationship
-            "UNWIND user_input.input as i " #add the user input to the relationship
-            "SET r_u_i += i "
-            "RETURN r_u_i"
-        )
-                
-        r,_,_ = self._driver.execute_query(query,dataset_tag=meta_data.tag, 
-                                attributes = attributes_to_connect,
-                                sample_attributes_data = sample_attributes_data,
-                                database_="neo4j", 
-                                routing_="w", 
-                                   )
-        print(r)
-        #print(B)
-        
-    
-    @staticmethod
-    def _add_sample_attrs(tx, sample_attributes_data, relation_label : str = "HAS_SAMPLE_ATTRIBUTE_VALUE"):
-        query = (
-            f"UNWIND $props as prop "
-            "MATCH (s:Sample {tag : prop.sample_name}) "
-            "MATCH (a:AttributeValue {tag : prop.attribute_value_tag}) "
-            "WITH s,a, prop "
-            f"MERGE (s)-[r:{relation_label} {{index : prop.index, attribute_tag : prop.attribute_tag}}]->(a) "
-            "RETURN count(r) as count"
-        )
-        
-        r = tx.run(query,props = sample_attributes_data, relation_label = relation_label)
-        #print("sample attributes!!")
-        
-        
-    def _sample_attribute_to_dict(self, sample_attributes : pd.DataFrame)-> Dict[str,Dict[str,List[int]]]:
-        ""
-        if any(column_name not in sample_attributes.columns for column_name in ["attribute_index","attribute_tag","tag","sample_index"]): 
-            raise ValueError("sample attribute must have the required column names. ['attribute_index','attribute_tag','tag','sample_index']")
-        sample_attributes_dict = OrderedDict()
-        for _, groupData in sample_attributes.groupby("attribute_index", sort = True):
-            attribute_tag = groupData["attribute_tag"].values[0]
-            if attribute_tag not in sample_attributes_dict:
-                sample_attributes_dict[attribute_tag] = {}
-            for tag, tagData in groupData.groupby("tag"):
-                sample_attributes_dict[attribute_tag][tag] = tagData["sample_index"].to_list()
-        
-        return sample_attributes_dict
-        
-    def get_sample_attributes_and_genotypes(self, tag:str, as_sample_map : bool = True) -> Tuple[Dict,pd.DataFrame]|Dict:
-        ""
-        query = (
-            "MATCH (d:Dataset {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)  "
-            "MATCH (g:Genotype)<-[:HAS_GENOTYPE]->(s) "
-            "RETURN s.index as sample_index, s.text as sample_text, g.tag as tag, -1 as attribute_index, 'att_genotype' as attribute_tag, g.text as text, false as is_feature  "
-            "ORDER BY attribute_index, sample_index "
-            "UNION ALL "
-            "MATCH (d:Dataset {tag : $tag}) "
-            "MATCH (d)-[:HAS_SAMPLE]->(s:Sample) "
-            "MATCH (s)-[r:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue|Protein)<-[:HAS_VALUE]-(a:Attribute) "
-           # "MATCH (g:Genotype)<-[:HAS_GENOTYPE]->(s) "# <-[:HAS_VALUE]-(a:Attribute)
-            "RETURN s.index as sample_index, s.text as sample_text, av.tag as tag, r.index as attribute_index, a.tag as attribute_tag, av.text as text, 'Protein' in labels(av) as is_feature  " #g.tag as ag, g.tex as text, 
-            "ORDER BY attribute_index, sample_index"
-        )
-        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.to_df) 
-        
-        if as_sample_map:
-            sample_map = r.pivot_table(index="sample_index",columns="attribute_tag",values="tag", aggfunc=lambda x: " ".join(x)) 
-            #add sample index
-            sample_name_to_index_mapper = dict([(sample_index,sample_text) for sample_text, sample_index in r[["sample_text","sample_index"]].drop_duplicates(subset=["sample_index"]).values])
-            sample_index = sample_map.index.map(sample_name_to_index_mapper)
-            sample_map.loc[:,"sample_text"] = sample_index.values
-            
-            return self._sample_attribute_to_dict(r), sample_map
-        
-        return self._sample_attribute_to_dict(r) 
-        
-    def get_sample_genotypes(self, tag : str):
-        "" 
-        #(g)<-[r:HAS_GENOTYPE]-(s)
-        query = (
-            "MATCH (d:Dataset {tag : $tag}) "
-            "MATCH (d)-[:HAS_SAMPLE]->(s:Sample)-[r:HAS_GENOTYPE]->(g:Genotype) "# <-[:HAS_VALUE]-(a:Attribute)
-            "RETURN s.index as sample_index, s.text as sample_text, g.tag as tag, g.text as text, 'att_genotype' as attribute_tag "
-            "ORDER BY sample_index "
-        )
-        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.to_df)
-        return r
-
-        
-    def get_sample_attributes(self, tag : str):
-        
-        query = (
-            "MATCH (d:Dataset {tag : $tag}) "
-            "MATCH (d)-[:HAS_SAMPLE]->(s:Sample)-[r:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue|Protein)<-[:HAS_VALUE]-(a:Attribute) "
-            "RETURN s.index as sample_index, s.text as sample_text, av.tag as attribute_value_tag, r.index as index, a.tag as attribute_tag, 'Protein' in labels(av) as is_feature "
-            "ORDER BY r.index, s.index"
-        )
-        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.to_df)
-        return r 
-
-
-    def create_title_search_index(self):
-        query = (
-            f"CREATE FULLTEXT INDEX  titleSearch IF NOT EXISTS FOR (d:Dataset) ON EACH [d.title] "
-            "OPTIONS {"
-            "indexConfig: {"
-            "    `fulltext.analyzer`: 'english', "
-            "    `fulltext.eventually_consistent`: true "
-            "}"
-            "}"    
-        )
-        
-        with self._driver.session() as session:
-            r = session.run(query) 
-            
-            
-    def add_owner(self, tag : str, user_tag : str):
-        ""
-        query = (
-            "MATCH (u:User) "
-            "WHERE u.tag = $user_tag "
-            "MATCH (d:Dataset) "
-            "WHERE d.tag = $tag "
-            "MERGE (u)-[r:OWNS]-(d) "
-            "SET r.created_at = timestamp() "
-        )
-        
-        self._driver.execute_query(query, user_tag = user_tag, tag = tag, routing_ = "w", database_ = "neo4j")
-
-
-            
-    def add_collaborators(self, tag : str, user_tags : List[str]):
-        ""
-        query = (
-            "MATCH (u:User) "
-            "WHERE u.tag in $user_tags "
-            "MATCH (d:Dataset) "
-            "WHERE d.tag = $tag "
-            "MERGE (u)-[r:IS_PART]-(d) "
-            "SET r.created_at = timestamp() "
-            "WITH u,d "
-            "MATCH (owner:User)-[:OWNS]->(d) "
-            "MERGE (owner)-[:COLLABORATES_WITH]-(u) "
-            "RETURN d.tag"
-            
-        )
-        
-        r,_,_ = self._driver.execute_query(query, user_tags = user_tags, tag = tag, routing_ = "w", database_ = "neo4j")
-
-    def get_owner(self, dataset_tag : str) -> UserModel:
-        """Returns the owner (user) for a given dataset tag. 
-
-        Parameters
-        ----------
-        dataset_tag : str
-            _description_
-
-        Returns
-        -------
-        UserModel
-            _description_
-            
-        Raises
-        ------
-        ValueError if the user does not exists. 
-        
-        """
-        query = (
-            "MATCH (d:Dataset) "
-            "WHERE d.tag = $dataset_tag "
-            "MATCH (u:User)-[:OWNS]->(d) "
-            "RETURN properties(u)"
-        )
-        r = self._driver.execute_query(query, dataset_tag = dataset_tag, routing_="r", result_transformer_=Result.value)
-        if len(r) == 0: raise ValueError("User not found")
-        return UserModel(**r[0])
-
-    def get_users(self, dataset_tag : str) -> List[UserModel]:
-        ""
-        
-        query = (
-            "MATCH (d:Dataset) "
-            "WHERE d.tag = $dataset_tag "
-            "MATCH (u:User)-[:OWNS]->(d) "
-            "RETURN properties(u) "
-            "UNION "
-            "MATCH (u:User)-[:IS_PART]->(d) "
-            "RETURN properties(u) "
-        )
-        r = self._driver.execute_query(query, dataset_tag = dataset_tag, routing_="r", result_transformer_=Result.value)
-        return [UserModel(**u) for u in r]
-
-    def update_owner(self, dataset_tag: str, user_tag: str) -> bool:
-       
-        query = (
-            "MATCH (d:Dataset {tag : $dataset_tag}) "
-            "MATCH (d)<-[r:OWNS]-(u:User) "
-            "DELETE r "
-            "WITH d "
-            "MATCH (new_owner:User {tag : $user_tag}) "
-            "MERGE (new_owner)-[r_new:OWNS]->(d) "
-            "SET r_new.created_at = timestamp() "
-            "WITH new_owner, d, r_new "
-            "MATCH (d)<-[:IS_PART]-(coll:User) "
-            "MERGE (new_owner)-[:COLLABORATES_WITH]-(coll) "
-            "RETURN count(r_new) as count"
-        )
-        
-        r = self._driver.execute_query(query, dataset_tag = dataset_tag, user_tag = user_tag, routing_="w", database_="neo4j", result_transformer_=Result.value)
-        if r[0] == 1: return True
-        return False 
-
-class Neo4JGenotype:
-    
-    
-    def __init__(self, driver : Driver) -> None:
-    
-        self._driver = driver 
-        self.constructor = Neo4JConstructor(driver = driver)
-        
-        
-    def add(self, genotype : GenotypeModel, user_tag : str):
-        ""
-        self.constructor._add_genotypes([genotype], user_tag = user_tag)
-        
-        
-    def get(self, tags : List[str] = None, proteome_ids : List[str] = None, protein_tags : List[str] = None) -> List[MinimalGenotypeModel]:
-        ""
-        
-        if tags is not None:
-            
-            query = (
-                 "MATCH (g:Genotype) "
-                 "WHERE g.tag in $tags "
-            )
-        
-        elif protein_tags is not None and proteome_ids is not None:
-            query = (
-                "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
-                "WHERE p.tag in $protein_tags AND g.proteome_id in $proteome_ids "
-            )
-        elif protein_tags is None and proteome_ids is not None:
-            query = (
-                "MATCH (g:Genotype) "
-                "WHERE g.proteome_id in $proteome_ids "
-            )
-        elif protein_tags is not None and proteome_ids is None:
-            #since protein_tags are proteome_id specific this is actually not very logical
-            query = (
-                "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
-                "WHERE p.tag in $protein_tags "
-            )
-        else:
-            query = ("MATCH (g:Genotype) ")
-        
-        query += "RETURN g.tag as tag, g.text as text, g.proteome_id as proteome_id "
-        r, _, _ = self._driver.execute_query(query, 
-                                             tags = tags,
-                                             proteome_ids = proteome_ids, 
-                                             protein_tags = protein_tags, 
-                                             routing_="r", 
-                                             database_="neo4j")
-        
-        return [MinimalGenotypeModel(**ri.data()) for ri in r]
-    
-        
-    def find(self, query : str):
-        query_string = query.lower() 
-        query = (
-            "MATCH (g:Genotype) "
-            "WHERE g.s CONTAINS $query_string "
-            "RETURN g.tag as tag, g.text as text, g.proteome_id as proteome_id "
-        )
-        
-        r, _ , _= self._driver.execute_query(query, query_string = query_string, routing_="r", database_="neo4j")
-        return [MinimalGenotypeModel(**ri.data()) for ri in r]
-        
 
 
 class Neo4JDatasetHandler:
@@ -1969,7 +1054,6 @@ class Neo4JDatasetHandler:
                 )
         query += "RETURN r.qs AS qs, r.sample_index AS idx, p.tag AS tag"
         
-        print(query)
         datatable_long = self._driver.execute_query(query, routing_="r",tag = tag, filter_tag = filter_tag, result_transformer_=Result.to_df)
         
         return datatable_long.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
@@ -2334,447 +1418,277 @@ class Neo4JFactory:
 
 
 
-class Neo4JFeatures(FeaturesABC):
+# class Neo4JFeatures(FeaturesABC):
     
-    def __init__(self, driver : Driver) -> None:
-        self._driver = driver 
+#     def __init__(self, driver : Driver) -> None:
+#         self._driver = driver 
         
         
         
-    def get_protein_sequence(self, tags : str) -> List[str]:
-        """"""
+#     def get_protein_sequence(self, tags : str) -> List[str]:
+#         """"""
         
-        cypher_query = (
-            "MATCH (p:Protein) "
-            "WHERE p.tag in $tags "
-            "MATCH (p)-[:HAS_SEQUENCE]-(s:Sequence) "
-            "RETURN p.tag as feature_tag, s.content as sequence"
-        ) 
+#         cypher_query = (
+#             "MATCH (p:Protein) "
+#             "WHERE p.tag in $tags "
+#             "MATCH (p)-[:HAS_SEQUENCE]-(s:Sequence) "
+#             "RETURN p.tag as feature_tag, s.content as sequence"
+#         ) 
         
-        try:
-            r, _, _ = self._driver.execute_query(cypher_query,
-                                database_="neo4j", 
-                                routing_="r",
-                                tags = tags)
-                               # result_transformer_= transform_query_result)
+#         try:
+#             r, _, _ = self._driver.execute_query(cypher_query,
+#                                 database_="neo4j", 
+#                                 routing_="r",
+#                                 tags = tags)
+#                                # result_transformer_= transform_query_result)
             
-        except Exception as e:
-            print("Finding sequence resulted in an error " + str(e))
-            return []
-        return [sequence.data() for sequence in r]
+#         except Exception as e:
+#             print("Finding sequence resulted in an error " + str(e))
+#             return []
+#         return [sequence.data() for sequence in r]
         
         
-    def get_protein_by_tags(self, tags : List[str], as_data_frame : bool = True) -> List[FeatureNeoModel]|pd.DataFrame:
-        ""
-        query = (
-            "MATCH (p:Protein) "
-            "WHERE p.tag in $tags "
-            "RETURN properties(p) as protein" 
-        )
-        r,_,_ = self._driver.execute_query(query, tags = tags, database_="neo4j", routing_="r")
+#     def get_protein_by_tags(self, tags : List[str], as_data_frame : bool = True) -> List[FeatureNeoModel]|pd.DataFrame:
+#         ""
+#         query = (
+#             "MATCH (p:Protein) "
+#             "WHERE p.tag in $tags "
+#             "RETURN properties(p) as protein" 
+#         )
+#         r,_,_ = self._driver.execute_query(query, tags = tags, database_="neo4j", routing_="r")
         
-        if as_data_frame:
-            if len(r) == 0: return pd.DataFrame()
-            return pd.DataFrame([ri.values()[0] for ri in r]).set_index("tag")
+#         if as_data_frame:
+#             if len(r) == 0: return pd.DataFrame()
+#             return pd.DataFrame([ri.values()[0] for ri in r]).set_index("tag")
         
-        return [FeatureNeoModel(**ri.data()["protein"]) for ri in r]
+#         return [FeatureNeoModel(**ri.data()["protein"]) for ri in r]
         
-    def get_protein_tags(self, proteome_id : str|List[str] = "UP000005640", is_quantified : bool = True) -> List[str]:
-        """Returns the proteins in the database using the proteme_ids. 
-        TO DO: RATHER ADD TO THE PROTEOME DATABASE CLASS? 
-        Parameters
-        ----------
-        proteome_id : str | List[str], optional
-            _description_, by default "UP000005640"
-        is_quantified : bool, optional
-            If True only proteins that were quantified in at least on experiment will be returned.
-            If False all protein tags will be returned, by default True
+#     def get_protein_tags(self, proteome_id : str|List[str] = "UP000005640", is_quantified : bool = True) -> List[str]:
+#         """Returns the proteins in the database using the proteme_ids. 
+#         TO DO: RATHER ADD TO THE PROTEOME DATABASE CLASS? 
+#         Parameters
+#         ----------
+#         proteome_id : str | List[str], optional
+#             _description_, by default "UP000005640"
+#         is_quantified : bool, optional
+#             If True only proteins that were quantified in at least on experiment will be returned.
+#             If False all protein tags will be returned, by default True
 
-        Returns
-        -------
-        List[str]
-            The protein tags (Uniprot IDs)
-        """
-        if isinstance(proteome_id,str):
-            proteome_id = [proteome_id]
+#         Returns
+#         -------
+#         List[str]
+#             The protein tags (Uniprot IDs)
+#         """
+#         if isinstance(proteome_id,str):
+#             proteome_id = [proteome_id]
         
-        if is_quantified:
-            cypher_query = (
-                "MATCH (p:Protein) "
-                "WHERE p.proteome_id in $proteome_id AND EXISTS {(p)-[:QUANTIFIED_IN]->(:Dataset)}"
-                "RETURN collect(p.tag) as query_result " 
-            )
-        else:
-            cypher_query = (
-                "MATCH (p:Protein) "
-                "WHERE p.proteome_id in $proteome_id "
-                "RETURN collect(p.tag) as query_result " 
-            )
-        try:
-            r = self._driver.execute_query(cypher_query , 
-                                        database_="neo4j", 
-                                        routing_="r", 
-                                        proteome_id = proteome_id,
-                                        result_transformer_= transform_query_result
-                                        )
-        except Exception as e:
-            print("Query finding resulted in an error " + str(e))
-            return []
+#         if is_quantified:
+#             cypher_query = (
+#                 "MATCH (p:Protein) "
+#                 "WHERE p.proteome_id in $proteome_id AND EXISTS {(p)-[:QUANTIFIED_IN]->(:Dataset)}"
+#                 "RETURN collect(p.tag) as query_result " 
+#             )
+#         else:
+#             cypher_query = (
+#                 "MATCH (p:Protein) "
+#                 "WHERE p.proteome_id in $proteome_id "
+#                 "RETURN collect(p.tag) as query_result " 
+#             )
+#         try:
+#             r = self._driver.execute_query(cypher_query , 
+#                                         database_="neo4j", 
+#                                         routing_="r", 
+#                                         proteome_id = proteome_id,
+#                                         result_transformer_= transform_query_result
+#                                         )
+#         except Exception as e:
+#             print("Query finding resulted in an error " + str(e))
+#             return []
         
-        return r
+#         return r
     
-    def get_quant_stats(self, tags : List[str]):
-        """Returns the general stats of a list of tags. 
+#     def get_quant_stats(self, tags : List[str]):
+#         """Returns the general stats of a list of tags. 
         
-        This includes the following stats:
+#         This includes the following stats:
         
-        - quantified_in (int): The number of datasets in which 
-        the protein has been quantified 
-        - total_number (int): The number of dataset of the same proteome
-        - abundance_quantiles (List[float]): The quantiles of the log2 intensity of the requested tag (n=3, 0.25, 0.5, 0.75 quantile)
-        - total_abundance_quantiles (List[float]) - The quantiles of all the datasets that used the proteome 
-        (n=4, min, 0.25, 0.5, 0.75, max). 
+#         - quantified_in (int): The number of datasets in which 
+#         the protein has been quantified 
+#         - total_number (int): The number of dataset of the same proteome
+#         - abundance_quantiles (List[float]): The quantiles of the log2 intensity of the requested tag (n=3, 0.25, 0.5, 0.75 quantile)
+#         - total_abundance_quantiles (List[float]) - The quantiles of all the datasets that used the proteome 
+#         (n=4, min, 0.25, 0.5, 0.75, max). 
 
-        Parameters
-        ----------
-        tags : List[str]
-            The tags of the proteins/feature for which the quantification stats should be returned. 
-            If the protein is not in the database, it will simply be ignored. 
-        """
+#         Parameters
+#         ----------
+#         tags : List[str]
+#             The tags of the proteins/feature for which the quantification stats should be returned. 
+#             If the protein is not in the database, it will simply be ignored. 
+#         """
         
-        query = (
-            "MATCH (p:Protein) "
-            "WHERE p.tag in $tags "
-            "MATCH (p)-[:IN_PROTEOME]->(av:AttributeValue) "
-            "MATCH (p)-[r_quant:QUANTIFIED_IN]->(d) "
-            "WITH p.tag as tag, count(r_quant) as quantified_in, count(d) as total_number, apoc.agg.percentiles(r_quant.avg_log2_abundance, [0.25,0.5,0.75]) as abundance_quantiles, "
-            "apoc.coll.zip(collect(r_quant.variance),collect(r_quant.max_variance_attribute)) as variances "
-            "MATCH (d:Dataset)-[:HAS_ATTRIBUTE_VALUE]-(av) "
-            "MATCH (d)<-[r_all:QUANTIFIED_IN]-(pp:Protein) "
-            "RETURN tag, quantified_in, total_number, abundance_quantiles, apoc.agg.percentiles(r_all.avg_log2_abundance, [0,0.25,0.5,0.75,1.0]) as total_abundance_quantiles, variances"
-        )
+#         query = (
+#             "MATCH (p:Protein) "
+#             "WHERE p.tag in $tags "
+#             "MATCH (p)-[:IN_PROTEOME]->(av:AttributeValue) "
+#             "MATCH (p)-[r_quant:QUANTIFIED_IN]->(d) "
+#             "WITH p.tag as tag, count(r_quant) as quantified_in, count(d) as total_number, apoc.agg.percentiles(r_quant.avg_log2_abundance, [0.25,0.5,0.75]) as abundance_quantiles, "
+#             "apoc.coll.zip(collect(r_quant.variance),collect(r_quant.max_variance_attribute)) as variances "
+#             "MATCH (d:Dataset)-[:HAS_ATTRIBUTE_VALUE]-(av) "
+#             "MATCH (d)<-[r_all:QUANTIFIED_IN]-(pp:Protein) "
+#             "RETURN tag, quantified_in, total_number, abundance_quantiles, apoc.agg.percentiles(r_all.avg_log2_abundance, [0,0.25,0.5,0.75,1.0]) as total_abundance_quantiles, variances"
+#         )
         
         
-        r = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.to_df)
-        print(r)
+#         r = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.to_df)
+#         print(r)
         
-    def find_feature(self, query : str = "FB", proteome_id : str|List[str] = "UP000005640", limit : int = 10) -> List[FeatureNeoModel]:
-        """Returns a list of features that are found by a query string. 
+#     def find(self, query : str = "FB", proteome_id : str|List[str] = "UP000005640", limit : int = 10) -> List[FeatureNeoModel]:
+#         """Returns a list of features that are found by a query string. 
 
-        Parameters
-        ----------
-        query : str, optional
-            _description_, by default "FB"
-        proteome_id : str|List[str], optional
-            The proteome_ids (Uniprot), by default "UP000005640" (Human)
+#         Parameters
+#         ----------
+#         query : str, optional
+#             _description_, by default "FB"
+#         proteome_id : str|List[str], optional
+#             The proteome_ids (Uniprot), by default "UP000005640" (Human)
 
-        Returns
-        -------
-        List[FeatureNeoModel]
-            The list of features in the database that match the query.
-            The list has a maximum length of limit. 
-        """
+#         Returns
+#         -------
+#         List[FeatureNeoModel]
+#             The list of features in the database that match the query.
+#             The list has a maximum length of limit. 
+#         """
         
-        if isinstance(proteome_id,str):
-            proteome_id = [proteome_id]
+#         if isinstance(proteome_id,str):
+#             proteome_id = [proteome_id]
         
 
-        cypher_query = (
-            "MATCH (p:Protein) "
-            "WHERE p.s CONTAINS $query_string AND p.proteome_id in $proteome_id "
-            "RETURN collect(p)[0..$limit] as query_result " 
-        )
-        try:
-            r = self._driver.execute_query(cypher_query , 
-                                        database_="neo4j", 
-                                        routing_="r", 
-                                        result_transformer_= transform_query_result,
-                                        query_string = query.lower(),
-                                        proteome_id = proteome_id,
-                                        limit = limit)
-        except Exception as e:
-            print("Query finding resulted in an error " + str(e))
-            return []
-        return [FeatureNeoModel(**f) for f in r]
+#         cypher_query = (
+#             "MATCH (p:Protein) "
+#             "WHERE p.s CONTAINS $query_string AND p.proteome_id in $proteome_id "
+#             "RETURN collect(p)[0..$limit] as query_result " 
+#         )
+#         try:
+#             r = self._driver.execute_query(cypher_query , 
+#                                         database_="neo4j", 
+#                                         routing_="r", 
+#                                         result_transformer_= transform_query_result,
+#                                         query_string = query.lower(),
+#                                         proteome_id = proteome_id,
+#                                         limit = limit)
+#         except Exception as e:
+#             print("Query finding resulted in an error " + str(e))
+#             return []
+#         return [FeatureNeoModel(**f) for f in r]
                
         
         
-    def add_proteome_details(self, proteome_id : str, proteome_info : Dict):
-        ""
-        #trim proteome_info 
-        for attr in ["reference","genomeAssembly","dbReference","component",'annotationScore','scores']:
-            if attr in proteome_info:
-                del proteome_info[attr]
-        proteome_info["text"] = proteome_info["name"]
-        proteome_info["attribute_tag"] = "att_proteome"
-        proteome_info["s"] = f"{proteome_id} {proteome_info['description']} {proteome_info['name']}"
-        query = (
-            "MERGE (av:AttributeValue {tag : $proteome_id}) "
-            "SET av += $proteome_info "
-            "WITH av "
-            "MATCH (a:Attribute {tag : 'att_proteome'}) "
-            "MERGE (a)-[:HAS_VALUE]->(av) "
-            "RETURN av"
+#     def add_proteome_details(self, proteome_id : str, proteome_info : Dict):
+#         ""
+#         #trim proteome_info 
+#         for attr in ["reference","genomeAssembly","dbReference","component",'annotationScore','scores']:
+#             if attr in proteome_info:
+#                 del proteome_info[attr]
+#         proteome_info["text"] = proteome_info["name"]
+#         proteome_info["attribute_tag"] = "att_proteome"
+#         proteome_info["s"] = f"{proteome_id} {proteome_info['description']} {proteome_info['name']}"
+#         query = (
+#             "MERGE (av:AttributeValue {tag : $proteome_id}) "
+#             "SET av += $proteome_info "
+#             "WITH av "
+#             "MATCH (a:Attribute {tag : 'att_proteome'}) "
+#             "MERGE (a)-[:HAS_VALUE]->(av) "
+#             "RETURN av"
             
-        ) 
+#         ) 
         
-        self._driver.execute_query(query, proteome_id = proteome_id, proteome_info = proteome_info)
+#         self._driver.execute_query(query, proteome_id = proteome_id, proteome_info = proteome_info)
         
     
-    def insert_uniprot_proteome(self, proteome_id : List[str] = ["UP000005640"], reviewed : bool = True, user_tag : str = None) -> int: #:#"):#"file:///UP000005640.txt"):#
+#     def insert_uniprot_proteome(self, proteome_id : List[str] = ["UP000005640"], reviewed : bool = True, user_tag : str = None) -> int: #:#"):#"file:///UP000005640.txt"):#
         
-        settings = UniprotAnnotationSettings()
-        uniprotKB_URL = settings.uniprotKBAPI_URL
+#         settings = UniprotAnnotationSettings()
+#         uniprotKB_URL = settings.uniprotKBAPI_URL
         
-        return download_proteome_annotations(uniprotKB_URL,proteome_id,
-                                             chunc_callback=self.handle_uniprot_chunc, 
-                                             add_proteome_callback=self.add_proteome_details, 
-                                             reviewed = reviewed,
-                                             user_tag = user_tag)
+#         return download_proteome_annotations(uniprotKB_URL,proteome_id,
+#                                              chunc_callback=self.handle_uniprot_chunc, 
+#                                              add_proteome_callback=self.add_proteome_details, 
+#                                              reviewed = reviewed,
+#                                              user_tag = user_tag)
         
-    def handle_uniprot_chunc(self,data : pd.DataFrame, proteome_id : str, user_tag : str = None):
-        """Data from the Uniprot API are returned in several pages covering
-        500 entries. This function handles the chuncks and inserts the entries into the database. 
+#     def handle_uniprot_chunc(self,data : pd.DataFrame, proteome_id : str, user_tag : str = None):
+#         """Data from the Uniprot API are returned in several pages covering
+#         500 entries. This function handles the chuncks and inserts the entries into the database. 
         
 
-        Parameters
-        ----------
-        data : pd.DataFrame
-            _description_
-        proteome_id : str
-            _description_
-        user_tag : str, optional
-            The user that added the proteome identified by its tag, by default None
-        """
-        self._insert_uniprot_db(data,proteome_id,user_tag=user_tag)
+#         Parameters
+#         ----------
+#         data : pd.DataFrame
+#             _description_
+#         proteome_id : str
+#             _description_
+#         user_tag : str, optional
+#             The user that added the proteome identified by its tag, by default None
+#         """
+#         self._insert_uniprot_db(data,proteome_id,user_tag=user_tag)
 
     
-    def _insert_uniprot_db(self, data : pd.DataFrame, proteome_id : str = "UP000005640", user_tag : str = None): 
-        """Insert data from a Uniprot reference proteome to the database. 
+#     def _insert_uniprot_db(self, data : pd.DataFrame, proteome_id : str = "UP000005640", user_tag : str = None): 
+#         """Insert data from a Uniprot reference proteome to the database. 
 
-        Parameters
-        ----------
-        data : pd.DataFrame
-            The protein data with the following headers
+#         Parameters
+#         ----------
+#         data : pd.DataFrame
+#             The protein data with the following headers
             
-                - Length (int) : The number of amino acids
-                - Gene names (str) : All gene names associated with the protein
-                - Gene Names (primary) (str)
-                - Protein Names (str) - The associated protein name 
-                - Entry (str) : The Uniprot ID 
-                - Sequence (str) : The protein sequence.
+#                 - Length (int) : The number of amino acids
+#                 - Gene names (str) : All gene names associated with the protein
+#                 - Gene Names (primary) (str)
+#                 - Protein Names (str) - The associated protein name 
+#                 - Entry (str) : The Uniprot ID 
+#                 - Sequence (str) : The protein sequence.
                 
-        proteome_id : str, optional
-            The Uniprot reference proteome ID, by default "UP000005640"
-        user_tag : str, optional
-            The tag associated with a user, by default None
-        """
+#         proteome_id : str, optional
+#             The Uniprot reference proteome ID, by default "UP000005640"
+#         user_tag : str, optional
+#             The tag associated with a user, by default None
+#         """
         
-        query = (
-            "UNWIND $uniprot_features as row "
-            "MERGE (n:Protein:AttributeValue {tag : row.Entry}) "
-            "ON CREATE "
-            " SET n += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_id : $proteome_id, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
-            "ON MATCH "
-            " SET n.gene_names = row.`Gene Names`, n.protein_name = row.`Protein names`, n.gene_name = row.`Gene Names (primary)`, n.aa_length = row.Length, n.proteome_id = $proteome_id "
-            "WITH n, row "
-            "MERGE (av:AttributeValue {tag : $proteome_attribute_tag}) "
-            "ON CREATE "
-            "SET av.created_at = timestamp(), av.user_tag = $user_tag "
-            "ON MATCH "
-            "SET av.modified_at = timestamp(), av.user_Tag = $user_tag "
-            "WITH n,av, row "
-            "MERGE (n)-[r:IN_PROTEOME]->(av) "
-            "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
-            "MERGE (n)-[:HAS_SEQUENCE]-(sequence) "
-        )
-        self._driver.execute_query(query, 
-                                   proteome_attribute_tag = proteome_id, 
-                                   uniprot_features = data.to_dict(orient="records"), 
-                                   proteome_id = proteome_id,
-                                   user_tag = user_tag,
-                                   routing_="w",
-                                   database_="neo4j")
+#         query = (
+#             "UNWIND $uniprot_features as row "
+#             "MERGE (n:Protein:AttributeValue {tag : row.Entry}) "
+#             "ON CREATE "
+#             " SET n += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_id : $proteome_id, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
+#             "ON MATCH "
+#             " SET n.gene_names = row.`Gene Names`, n.protein_name = row.`Protein names`, n.gene_name = row.`Gene Names (primary)`, n.aa_length = row.Length, n.proteome_id = $proteome_id "
+#             "WITH n, row "
+#             "MERGE (av:AttributeValue {tag : $proteome_attribute_tag}) "
+#             "ON CREATE "
+#             "SET av.created_at = timestamp(), av.user_tag = $user_tag "
+#             "ON MATCH "
+#             "SET av.modified_at = timestamp(), av.user_Tag = $user_tag "
+#             "WITH n,av, row "
+#             "MERGE (n)-[r:IN_PROTEOME]->(av) "
+#             "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
+#             "MERGE (n)-[:HAS_SEQUENCE]-(sequence) "
+#         )
+#         self._driver.execute_query(query, 
+#                                    proteome_attribute_tag = proteome_id, 
+#                                    uniprot_features = data.to_dict(orient="records"), 
+#                                    proteome_id = proteome_id,
+#                                    user_tag = user_tag,
+#                                    routing_="w",
+#                                    database_="neo4j")
         
-        print("Page added to database ...")
+#         print("Page added to database ...")
         
 
-#         CALL {
-#   LOAD CSV WITH HEADERS FROM 'https://data.neo4j.com/importing-cypher/persons.csv' AS row
-#   MERGE (p:Person {tmdbId: row.person_tmdbId})
-#   SET p.name = row.name, p.born = row.born
-# } IN TRANSACTIONS OF 200 ROWS
+# #         CALL {
+# #   LOAD CSV WITH HEADERS FROM 'https://data.neo4j.com/importing-cypher/persons.csv' AS row
+# #   MERGE (p:Person {tmdbId: row.person_tmdbId})
+# #   SET p.name = row.name, p.born = row.born
+# # } IN TRANSACTIONS OF 200 ROWS
 
-
-class Neo4JProteomes():
-     
-    def __init__(self, driver : Driver) -> None:
-        ""
-        self._driver = driver    
-        
-    def get(self) -> List[Dict]:
-        ""
-        
-        query = (
-            "MATCH (a:Attribute {tag : 'att_proteome'})-[:HAS_VALUE]->(av:AttributeValue) "
-            "RETURN properties(av) "
-        )
-        
-        r, _, _ = self._driver.execute_query(query,routing_="r",database_="neo4j")
-        return [ri.data() for ri in r]
-
-class Neo4JFilter(FilterABC):
-    
-    def __init__(self, driver : Driver) -> None:
-        ""
-        self._driver = driver 
-    
-    def exists(self, tag : str) -> bool:
-        ""
-        ""
-        query = (
-            "WITH EXISTS {(f:Filter {tag : $tag})} as filter_exists "
-            "RETURN filter_exists "
-        )    
-        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
-        return r[0]
-    
-    def add(self, 
-                   protein_tags : List[str], 
-                   proteome_id : str, 
-                   filter_tag : str, 
-                   filter_text : str,
-                   description : str,
-                   publication : Optional[str] = None):
-        """_summary_
-
-        Parameters
-        ----------
-        protein_tags : List[str]
-            _description_
-        proteome_id : str
-            _description_
-        filter_tag : str
-            _description_
-        filter_text : str
-            The name that is visibile to the user on selection. 
-        description : str
-            The description that is displayed along the filter. 
-        publication : str 
-            A publication that (PUBMED ID) that can be used that describes the filter set. 
-        """
-        
-        query = (
-            "MERGE (f:Filter {tag : $tag}) "
-            "ON CREATE "
-            "SET f.created_at = timestamp(), f.proteome_id = $proteome_id, f.description = $description, f.text = $filter_text "
-            "ON MATCH "
-            "SET f.modified_at = timestamp(), f.proteome_id = $proteome_id, f.description = $description, f.text = $filter_text "
-            "WITH f "
-            )
-        
-        if publication is not None:
-            
-            query += (
-                "MERGE (pub:Publication {tag : $publication}) "
-                "ON CREATE "
-                "SET pub.created_at = timestamp() "
-                "WITH pub, f "
-                "MERGE (f)-[:BASED_ON]->(pub) "
-                "WITH f ")    
-        
-        query += (
-            "MATCH (p:Protein) "
-            "WHERE p.tag in $protein_tags "
-            "MERGE (f)<-[r:PART_OF]-(p) "
-            "WITH count(r) as count, f "
-            "SET f.N = count "
-            "RETURN count"
-            
-        )
-        try:
-            r = self._driver.execute_query(query, 
-                                           protein_tags = protein_tags, 
-                                           filter_text = filter_text,
-                                           proteome_id = proteome_id, 
-                                           tag = filter_tag, 
-                                           description = description,
-                                           publication = publication, 
-                                           routing_="w", 
-                                           database_="neo4j",
-                                           result_transformer_=Result.value)
-        except Exception as e : 
-            return False, "An error was returned" + str(e)
-        
-        return True, f"Filter added. In total {r} proteins were found and added to the filter."
-    
-    
-    def get(self, tag : str = None, proteome_id : List[str] = None, feature_tag : str = None) -> List[Filter]:
-        ""
-        if tag is not None:
-            query = (
-                "MATCH (f:Filter) "
-                "WHERE f.tag = $tag "
-                
-            )
-        elif proteome_id is not None:
-            query = (
-                "MATCH (f:Filter) "
-                "WHERE f.proteome_id in $proteome_id "
-            )
-        elif feature_tag is not None:
-            query = (
-                "MATCH (f:Filter)<-[:PART_OF]-(p:Protein) "
-                "WHERE p.tag = $feature_tag "
-            )
-        
-        query += (
-            "MATCH (f)-[:BASED_ON]-(pub:Publication) "
-            "WITH {publication : pub.tag} as pub_tag, f "
-            "RETURN apoc.map.merge(properties(f), pub_tag) "
-        )
-        r = self._driver.execute_query(query, 
-                                    database_="neo4j", 
-                                    routing_="r",
-                                    feature_tag = feature_tag,
-                                    tag = tag,
-                                    proteome_id = proteome_id,
-                                    result_transformer_= Result.value)
-        return r 
-        
-        
-    def get_features(self, tag : str) -> List[FeatureNeoModel]:
-        """Returns the proteins associated with the filter. 
-        Since filters are proteome_id specific, the returned list of
-        features is also of a specific proteome_id. 
-
-        Parameters
-        ----------
-        tag : str
-            Filter tag. 
-
-        Returns
-        -------
-        List[FeatureNeoModel]
-            The proteins that are part of the filter
-        """
-        query = ("MATCH (f:Filter {tag : $tag}) "
-                 "MATCH (f)<-[:PART_OF]-(p:Protein) "
-                 "RETURN properties(p) "
-                 )
-        
-        try:
-            r = self._driver.execute_query(query , 
-                                        database_="neo4j", 
-                                        routing_="r", 
-                                        result_transformer_= Result.value,
-                                        tag = tag)
-        except Exception as e:
-            print(e)
-            print("There has been an error. ")
-            
-        return [FeatureNeoModel(**f) for f in r]
-        
 
 
 class Neo4JCalculations():
@@ -2862,4 +1776,4 @@ class Neo4JCalculations():
 #  21.0756 21.5356 21.0951 20.9742 20.5915] 14
                 
                 
-DB = MCNeo4JDatabase()
+#DB = MCNeo4JDatabase()
