@@ -213,11 +213,13 @@ CREATE TABLE traits (
     id serial NOT NULL,
     attribute_id integer NOT NULL,
     tag character varying NOT NULL,
+    full_tag character varying NOT NULL,
     text character varying,
     keyword character varying,
     description text,
     PRIMARY KEY(id),
-    UNIQUE(tag),
+    UNIQUE(tag, attribute_id),
+    UNIQUE(full_tag),
     UNIQUE(keyword),  -- NULLS NOT DISTINCT
     FOREIGN KEY(attribute_id) REFERENCES attributes(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -293,7 +295,7 @@ CREATE INDEX index_instruments_pk ON instruments USING btree(id);
 CREATE TABLE datasets (
     id serial NOT NULL,
     instrument_id smallint,
-    project_id integer NOT NULL,
+    project_id integer,
     label character varying NOT NULL,
     created_on timestamp without time zone NOT NULL,
     uploaded_on timestamp without time zone DEFAULT now() NOT NULL,

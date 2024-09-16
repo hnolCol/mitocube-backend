@@ -36,7 +36,8 @@ class ABCDataset(ABC, dlib.FlexDataClass):
                  parent_project: dlib.ABCProject | None = None, instrument: dlib.ABCInstrument | None = None,
                  created_on: datetime | None = None,  uploaded_on: datetime | None = None,
                  owner_group: dlib.ABCResearchGroup | None = None, metatexts: Dict[str, dlib.ABCMetatext] = None,
-                 urls: List[dlib.ABCUrl] = None):  # ToDo: Counter check typing below and return values of get methods (and argument typing set methods)
+                 urls: List[dlib.ABCUrl] = None,
+                 attributes: Dict[str, dlib.ABCTrait] | None = None):  # ToDo: Counter check typing below and return values of get methods (and argument typing set methods)
         self._internal_id: int | None = internal_id
         self._external_id: str | None = external_id
 
@@ -56,6 +57,8 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._state: DatasetState = state
         self._title: str = title
         self._uploaded_on: datetime | None = uploaded_on
+
+        self._attributes: Dict[str, dlib.ABCTrait] = attributes
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
@@ -80,6 +83,9 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     @abstractmethod
     def does_exist_with_labels(labels: List[str]) -> Dict[str, bool]:
         pass
+
+    def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:
+        return self._attributes
 
     def get_internal_id(self) -> int | None:
         return self._internal_id
@@ -136,6 +142,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def objectify_with_label(cls, label: str) -> dlib.ABCDataset:
         pass
 
+    @classmethod
+    @abstractmethod
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> dlib.ABCDataset:
+        pass
+
     @abstractmethod
     def read(self, fetch_datatable: bool = False):
         pass
@@ -150,6 +161,9 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._owner_group = owner_group
         self._owner_user = owner_user
         self._title = title
+
+    def set_attributes(self, attributes: Dict[str, dlib.ABCTrait] | None):
+        self._attributes = attributes
 
     def set_email(self, email: str):
         self._contact_email = email
@@ -186,5 +200,5 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         pass
 
     @abstractmethod
-    def write(self):
+    def write(self, write_datatable: bool = False):
         pass

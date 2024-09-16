@@ -10,8 +10,8 @@ class ABCUrlError(dlib.ABCDatasetError):
 
 class ABCUrl(ABC, dlib.FlexDataClass):
 
-    def __init__(self, dataset_id: int, url: str):
-        self._dataset_id: int = dataset_id
+    def __init__(self, url: str, dataset_id: int | None = None):
+        self._dataset_id: int | None = dataset_id
         self._url: str = url
 
     @classmethod
@@ -19,14 +19,14 @@ class ABCUrl(ABC, dlib.FlexDataClass):
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLUrl}
 
-    def get_dataset_id(self) -> int:
+    def get_dataset_id(self) -> int | None:
         return self._dataset_id
 
     def get_url(self) -> str:
         return self._url
 
     @abstractmethod
-    def append_to_dataset(self):
+    def append_to_dataset(self, dataset_id: int):
         pass
 
     @classmethod

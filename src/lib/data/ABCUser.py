@@ -13,9 +13,9 @@ class ABCUserError(dlib.ABCDataError):
     pass
 
 class ABCUser(ABC, dlib.FlexDataClass):
-    def __init__(self, db_id: int | None, username: str, firstname: str, lastname: str, email: str,
-                 research_group: dlib.ABCResearchGroup | None = None,
-                 base64_image: str | None = None, profile_text: str | None = None, orcid: str | None = None,
+    def __init__(self, username: str, firstname: str, lastname: str, email: str,
+                 research_group: dlib.ABCResearchGroup | None = None, base64_image: str | None = None,
+                 profile_text: str | None = None, orcid: str | None = None,  db_id: int | None = None,
                  url: str | None = None, allow_login: bool = False, expires_after: datetime = datetime.now()):
 
         self._id: int | None = db_id
@@ -76,9 +76,8 @@ class ABCUser(ABC, dlib.FlexDataClass):
 
     def is_expired(self) -> bool:
         return self._expires_after <= datetime.now()
-    # ToDo: Implement abstract is_login_allowed method (see fixme below)
 
-    def is_login_allowed(self) -> bool:  # FixMe: Name can be confusing. allow (to allow)... change to is_login_allowed
+    def is_login_allowed(self) -> bool:
         return self._db_allow_login and self._expires_after > datetime.now()
 
     @staticmethod
@@ -180,13 +179,18 @@ class ABCUser(ABC, dlib.FlexDataClass):
     def objectify_with_username(cls, username: str) -> dlib.ABCUser:
         pass
 
+    @classmethod
+    @abstractmethod
+    def objectify_with_object(cls, user: dlib.ABCUser) -> dlib.ABCUser:
+        pass
+
     @abstractmethod
     def read(self):
         pass
 
-    def set(self, db_id: int | None, username: str, research_group: dlib.ABCResearchGroup | None, firstname: str, lastname: str,
-            email: str, base64_image: str | None, profile_text: str | None, orcid: str | None, url: str | None,
-            allow_login: bool, expires_after: datetime):
+    def set(self, db_id: int | None, username: str, research_group: dlib.ABCResearchGroup | None, firstname: str,
+            lastname: str, email: str, base64_image: str | None, profile_text: str | None, orcid: str | None,
+            url: str | None, allow_login: bool, expires_after: datetime):
         self._refresh_update_date(forceWrite = False)
 
         self._id = db_id
@@ -202,9 +206,9 @@ class ABCUser(ABC, dlib.FlexDataClass):
         self._db_allow_login = allow_login
         self._expires_after = expires_after
 
-    def set_full(self, db_id: int | None, username: str, research_group: dlib.ABCResearchGroup | None, firstname: str, lastname: str,
-            email: str, base64_image: str | None, profile_text: str | None, orcid: str | None, url: str | None,
-            allow_login: bool, expires_after: datetime):
+    def set_full(self, db_id: int | None, username: str, research_group: dlib.ABCResearchGroup | None, firstname: str,
+                 lastname: str, email: str, base64_image: str | None, profile_text: str | None, orcid: str | None,
+                 url: str | None, allow_login: bool, expires_after: datetime):
         self._refresh_update_date(forceWrite = False)
 
         self._id = db_id

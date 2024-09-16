@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Self
+from typing import Dict, List, Self
 
 import lib.data as dlib
 
@@ -18,7 +18,7 @@ class ABCDatatableError(dlib.ABCDatasetError):
     pass
 
 
-class ABCDataTableState(ABC):
+class ABCDataTableState(ABC):  # Question: Just a place holder for abstract state that could control actions in some methods
 
     def __init__(self, datatable: ABCDataTable):
         self._datatable = datatable
@@ -37,13 +37,15 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     _row_index_name: str = "Key"
     _column_name_long_values: str = "intensity"
 
-    def __init__(self, db_id: int | None = None, parent_dataset: dlib.ABCDataset | None = None):  # ToDo: id into this object?
+    def __init__(self, db_id: int | None = None, parent_dataset: dlib.ABCDataset | None = None,
+                 attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None = None):  # ToDo: id into this object?
         self._id: int | None = db_id
         self._is_stored: bool = False
         self._data_columns: list[str] | None = None
         self._data_long: pd.DataFrame | None = None
         self._data_wide: pd.DataFrame | None = None
         self._parent_dataset: dlib.ABCDataset | None = parent_dataset
+        self._attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None = attributes_samples  # sample names as keys
 
     # FixMe: make it thread-safe!
     def _change_to_long(self, col_columns: str = "sample", col_feature: str = None, col_values: str | None = None):
@@ -87,6 +89,13 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
         self._data_columns = None
         self._data_long = None
         self._data_wide = None
+
+    @staticmethod
+    def _test_attributes_samples_keys(data_table: ABCDataTable, attributes_samples: dict[str, List[dlib.ABCTraitValue]]):
+        if len(attributes_samples) > 0:
+            if not all(sample in data_table._data_columns for sample in attributes_samples.keys()):
+                raise dlib.ABCDatatableError("Some sample names in provided attributes list do not exist in the DataTable.")
+
 
     def is_stored(self) -> bool:
         return self._is_stored
@@ -138,6 +147,10 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
 
     def set_parent_dataset(self, parent: dlib.ABCDataset):  # Question: Should it be possible for the dataset to reject change of parent? Exception here?
         self._parent_dataset = parent
+
+    def set_samples_attributes(self, attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None):
+        ABCDataTable._test_attributes_samples_keys(data_table = self, attributes_samples = attributes_samples)
+        self._attributes_samples = attributes_samples
 
     # fixme: make it thread-safe!
     def splitup_protein_groups(self, sep=","):

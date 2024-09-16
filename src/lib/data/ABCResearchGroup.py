@@ -10,8 +10,8 @@ class ABCResearchGroupError(dlib.ABCDataError):
 
 class ABCResearchGroup(ABC, dlib.FlexDataClass):
 
-    def __init__(self, db_id: int | None, name: str, name_short: str , institute: str, base64_image: str | None,
-                 profile_text: str | None, contact_address: str | None, contact_email: str | None, url: str | None):
+    def __init__(self, name: str, name_short: str , institute: str, base64_image: str | None, profile_text: str | None,
+                 contact_address: str | None, contact_email: str | None, url: str | None, db_id: int | None = None):
         self._id: int = db_id
         self._name: str = name
         self._name_short: str = name_short
@@ -62,6 +62,16 @@ class ABCResearchGroup(ABC, dlib.FlexDataClass):
 
     def get_url(self) -> str | None:
         return self._url
+
+    @classmethod
+    @abstractmethod
+    def objectify_from_id(cls, db_id: int) -> dlib.ABCResearchGroup:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_from_object(cls, rgroup: dlib.ABCResearchGroup) -> dlib.ABCResearchGroup:
+        pass
 
     @abstractmethod
     def read(self):

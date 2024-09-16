@@ -7,10 +7,12 @@
 
 from .FlexDataClass import FlexDataClass
 
-from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait
-from .ABCDatabase import ABCDatabase, ABCDataError, ABCDatabaseError
-from .ABCDataset import ABCDataset, ABCDatasetError, DatasetState
-from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait
+from .ABCDatabase import ABCDataError  # ToDo: Needs to be first due to issues with circular imports ...
+from .ABCDataset import ABCDataset, ABCDatasetError, DatasetState  # ToDo: Needs to be second due to issues with circular imports ...
+from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait  # ToDo: Needs to be third due to issues with circular imports ...
+
+from .ABCDatabase import ABCDatabase, ABCDatabaseError
+from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait, ABCTraitValue
 from .ABCDataTable import ABCDataTable, ABCDatatableError
 from .ABCFeatureDatabase import ABCFeatureDatabaseError, ABCFeatureDatabase
 from .ABCInstrument import ABCInstrument, ABCInstrumentError

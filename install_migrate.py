@@ -6,7 +6,9 @@ import sys
 from config import get_system_settings
 
 import lib.data as dlib
+import lib.data.sql.postgresql as psql
 from lib.data.io import CSVDataTable, JSONDataset
+from lib.data.io.JSONAttributes import JSONAttributes
 
 print("\n")
 
@@ -60,6 +62,20 @@ print("=========================================")
 print("\n\n\n")
 
 print("=========================================")
+print("Import & Install Attributes with Traits")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
+print(".........................................")
+json_attributes = JSONAttributes(path_json_file = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources/installation/attributes_examples.json")
+json_attributes.read(ignore_missing_parent_attributes = True)
+print("? here")
+json_attributes.write()
+print("? here")
+print("=========================================")
+
+print("\n\n\n")
+
+print("=========================================")
 print("Import existing Datasets")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
@@ -85,14 +101,25 @@ for dataset_id, dataset_path in list_dataset_ids.items():
         print("  (i) does not exist in database, prepare import")
 
         if os.path.isfile(os.path.join(str_parent_folder, dataset_id, "data.txt")):
-            json = JSONDataset.objectify_with_json(path=os.path.join(str_parent_folder, dataset_id, "params.json"),
-                                                   owner_user=superuser)
-
             csv = CSVDataTable(path=os.path.join(str_parent_folder, dataset_id, "data.txt"),
                                regex_rule_data_col="^[0-9]{8}[_\\.-]",
                                name_index_col="Key")
 
+            print(csv)
+
             print("  (i) imported 'data.txt' with n = {n} features".format(n=len(csv.get_features())))
+
+            json_dataset = JSONDataset.objectify_with_json(path = os.path.join(str_parent_folder, dataset_id, "params.json"),
+                                                           owner_user = superuser,
+                                                           data_table = csv)
+
+            print(json_dataset)
+
+            pgsql_dataset = psql.PostgreSQLDataset.objectify_with_dataset(json_dataset)
+            pgsql_dataset.write(write_datatable = True)
+
+            print("  (i) imported 'params.json' with n = {n} features".format(n=0))
+
 
 print("=========================================")
 

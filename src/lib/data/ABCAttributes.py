@@ -143,6 +143,10 @@ class ABCAttribute(ABC, dlib.FlexDataClass):
         self._required_for_dataset_state = required_for_dataset_state
 
     @abstractmethod
+    def read(self):
+        pass
+
+    @abstractmethod
     def write(self):
         pass
 
@@ -152,7 +156,7 @@ class ABCTrait(ABC, dlib.FlexDataClass):
         self._id: int = db_id
         self._attribute: ABCAttribute = parent_attribute
         self._tag: str = tag
-        self._text: str = text,  # Fixme: issue with type. is text reserved?
+        self._text: str = text  # Fixme: issue with type. is text reserved?
         self._keyword: str | None = keyword
         self._description: str | None = description
 
@@ -163,7 +167,7 @@ class ABCTrait(ABC, dlib.FlexDataClass):
 
     @staticmethod
     @abstractmethod
-    def does_tag_exist(tag: str) -> bool:
+    def does_tag_exist(attribute: dlib.ABCAttribute, tag: str) -> bool:
         pass
 
     @staticmethod
@@ -194,6 +198,16 @@ class ABCTrait(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
+    def objectify_with_attribute_id(cls, db_id: int) -> Dict[str, ABCTrait]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_attribute_tag(cls, tag: str) -> Dict[str, ABCTrait]:
+        pass
+
+    @classmethod
+    @abstractmethod
     def objectify_with_id(cls, db_id: int) -> ABCTrait:
         pass
 
@@ -205,26 +219,6 @@ class ABCTrait(ABC, dlib.FlexDataClass):
     @classmethod
     @abstractmethod
     def objectify_with_keyword(cls, keyword: str) -> ABCTrait:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def objectify_with_attribute_id(cls, db_id: int) -> Dict[str, ABCTrait]:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def objectify_with_attribute_label(cls, label: str) -> Dict[str, ABCTrait]:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def objectify_with_dataset_id(cls, db_id: int) -> Dict[str, ABCTrait]:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def objectify_with_dataset_label(cls, label: str) -> Dict[str, ABCTrait]:
         pass
 
     def set(self, parent_attribute: ABCAttribute, tag: str, text: str, keyword: str | None, description: str | None):
@@ -250,5 +244,72 @@ class ABCTrait(ABC, dlib.FlexDataClass):
         self._description = description
 
     @abstractmethod
+    def read(self):
+        pass
+
+    @abstractmethod
     def write(self):
+        pass
+
+
+class ABCTraitValue(ABC, dlib.FlexDataClass):
+
+    def __init__(self, trait: dlib.ABCTrait, value: str | None = None, unit: str | None = None):
+        self._trait: dlib.ABCTrait = trait
+        self._value: str | None = value
+        self._unit: str | None = unit
+
+    @classmethod
+    def _get_class_rulings(cls) -> Dict[str, Self]:
+        import lib.data.sql.postgresql as sqllib
+        return {"postgresql": sqllib.PostgreSQLTraitValue}
+
+    def get_trait(self) -> dlib.ABCTrait:
+        return self._trait
+
+    def get_value(self) -> str | None:
+        return self._value
+
+    def get_unit(self) -> str | None:
+        return self._unit
+
+    def set(self, trait: dlib.ABCTrait, value: str | None = None, unit: str | None = None):
+        self._trait: dlib.ABCTrait = trait
+        self._value: str | None = value
+        self._unit: str | None = unit
+
+    @abstractmethod
+    def add_to_dataset_id(self, dataset_id: int) -> List[ABCTraitValue]:
+        pass
+
+    @abstractmethod
+    def add_to_sample_id(self, sample_id: int) -> List[ABCTraitValue]:
+        pass
+
+    @abstractmethod
+    def remove_from_dataset_id(self, dataset_id: int):
+        pass
+
+    @abstractmethod
+    def remove_from_sample_id(self, sample_id: int):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_dataset_id(cls, db_id: int) -> List[ABCTraitValue]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_dataset_label(cls, label: str) -> List[ABCTraitValue]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_sample_id(cls, sample_id: int) -> List[ABCTraitValue]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_sample_label(cls, dataset_id: int, label: str) -> List[ABCTraitValue]:
         pass

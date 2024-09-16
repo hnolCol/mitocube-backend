@@ -5,29 +5,44 @@ import json
 from typing import Dict, List
 
 import lib.data as dlib
-from lib.data import DatasetState
+import lib.data.sql.postgresql as psql
 
 
 class JSONDataset(dlib.ABCDataset):
 
-
-
-    def __init__(self, path_json_file: str, external_id: str | None, state: DatasetState, title: str,
+    def __init__(self, path_json_file: str, external_id: str | None, state: dlib.DatasetState, title: str,
                  owner_user: dlib.ABCUser, contact_email: str, internal_id: int | None = None,
                  data: dlib.ABCDataTable | None = None, parent_project: dlib.ABCProject | None = None,
                  instrument: dlib.ABCInstrument | None = None, created_on: datetime | None = None,
                  uploaded_on: datetime | None = None, owner_group: dlib.ABCResearchGroup | None = None,
-                 metatexts: Dict[str, dlib.ABCMetatext] = None, urls: List[dlib.ABCUrl] = None):
+                 metatexts: Dict[str, dlib.ABCMetatext] = None, urls: List[dlib.ABCUrl] = None,
+                 attributes: Dict[str, dlib.ABCTrait] | None = None,
+                 class_target: dlib.ABCDataset | None = psql.PostgreSQLDataset):  # ToDo: Fix Typing?
 
         super().__init__(external_id, state, title, owner_user, contact_email, internal_id, data, parent_project,
-                         instrument, created_on, uploaded_on, owner_group, metatexts, urls)
+                         instrument, created_on, uploaded_on, owner_group, metatexts, urls, attributes)
 
         self._path_json_file: str = path_json_file
+        self._class_target: dlib.ABCDataset | None = class_target
+
+        if class_target is None:
+            self._object_target: dlib.ABCDataset | None = None
+        else:
+            self._object_target: dlib.ABCDataset | None = class_target(external_id, state, title, owner_user,
+                                                                       contact_email, internal_id, data, parent_project,
+                                                                       instrument, created_on, uploaded_on, owner_group,
+                                                                       metatexts, urls, attributes)
 
     @staticmethod
     def __read_json(path: str) -> Dict[str, any]:
         with open(path, "r+") as io_in:
             return json.load(io_in)
+
+    def get_target_class(self) -> dlib.ABCDataset | None:  # ToDo: Fix Typing?
+        return self._class_target
+
+    def get_target_object(self) -> dlib.ABCDataset | None: 
+        return self._object_target
 
     def does_exist(self):
         pass
@@ -53,31 +68,79 @@ class JSONDataset(dlib.ABCDataset):
         raise dlib.ABCDatasetError("Objectify methods using labels are not implemented (possible) for the class JSON Dataset.")
 
     @classmethod
-    def objectify_with_json(cls, path: str, owner_user: dlib.ABCUser, owner_group: dlib.ABCResearchGroup | None = None):
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> dlib.ABCDataset:
+        raise dlib.ABCDatasetError("Objectify methods using other datasets are not implemented (possible) for the class JSON Dataset.")
+
+    @classmethod
+    def objectify_with_json(cls, path: str, owner_user: dlib.ABCUser, owner_group: dlib.ABCResearchGroup | None = None,
+                            data_table: dlib.ABCDataTable | None = None,
+                            class_target: dlib.ABCDataset | None = psql.PostgreSQLDataset,
+                            class_attribute_traits = psql.PostgreSQLTrait):
         data = JSONDataset.__read_json(path)
 
+        traits_dataset = {}
+
+        if "dataset_attributes" in data:
+            for key, values in data["dataset_attributes"].items():
+                for item in values:
+                    try:
+                        traits_dataset[item] = class_attribute_traits.objectify_with_tag(full_tag = item)
+                        # traits_dataset.append(class_attribute_traits.objectify_with_tag(full_tag = item))
+                    except Exception as err:
+                        print("Unable to catch for dataset: {} = {} \t {}".format(key, item, err))  # Question: How to print warnings? Or stop here?
+
+        if "samples_attributes" in data:
+            if data_table is not None:
+                # index attributes: att_key = [0, 1, 2, 3]
+
+                # sample attributes: samplename = { attributesvalues }
+                cleaned_trait_values: Dict[str, List[psql.PostgreSQLTraitValue]] = {}  # ToDo: Fix Class selection
+                collected_traits: Dict[str, psql.PostgreSQLTrait] = {}  # ToDo: Fix Class selection
+
+                for att, items in data["samples_attributes"].items():
+                    for trait_key, ixs in items.items():
+                        try:
+                            if trait_key in collected_traits:
+                                trait = collected_traits[trait_key]
+                            else:
+                                trait = psql.PostgreSQLTrait.objectify_with_tag(trait_key)  # ToDo: Fix Class selection
+                                collected_traits[trait_key] = trait
+
+                            for ix in ixs:
+                                trait_value = psql.PostgreSQLTraitValue(trait=trait, value=None, unit=None)
+
+                                if data["sample_names"][ix] not in cleaned_trait_values:
+                                    cleaned_trait_values[data["sample_names"][ix]] = []
+
+                                cleaned_trait_values[data["sample_names"][ix]].append(trait_value)
+
+                        except dlib.ABCAttributeError as err:
+                            print("Error: Issue with {}, skipping! - {}".format(trait_key, err))
+
+                data_table.set_samples_attributes(cleaned_trait_values)
+
         dataset = cls(path_json_file = path, internal_id = None, external_id = data["label"],
-                      data = None, parent_project = None, instrument = None,
+                      data = data_table, parent_project = None, instrument = None,
                       created_on = datetime.fromtimestamp(data["created_on"]),  # ToDo: To int to date
                       uploaded_on = None,  # ToDo: Figure out
                       state = data["state"],  # ToDo:  dlib.DatasetState  # ToDo: "state" 5 ?
                       title = data["title"],
-                      owner_user = owner_user,
-                      owner_group = owner_group,
+                      owner_user = owner_user,  # ToDo: Fix Class selection
+                      owner_group = owner_group,  # ToDo: Fix Class selection
                       contact_email = data["title"],
-                      metatexts = {k.replace("metatext:", ""): dlib.ABCMetatext.get_class()(tag = k.replace("metatext:", ""), text = v) for k, v in data["metatext"].items()},
-                      urls = None if data["links"] is None or len(data["links"]) < 1 else data["links"]  # urls: List[dlib.ABCUrl]
-                      )
+                      metatexts = {k.replace("metatext:", ""): dlib.ABCMetatext.get_class()(tag = k.replace("metatext:", ""), text = v) for k, v in data["metatext"].items()},  # ToDo: Fix Class selection
+                      urls = None if data["links"] is None or len(data["links"]) < 1 else data["links"],  # ToDo: Fix Class selection
+                      attributes = traits_dataset,
+                      class_target = class_target)
 
         return dataset
 
 
-    def read(self, fetch_datatable: bool = False):
+    def read(self, fetch_datatable: bool = False):  # ToDo: Implement Exception?
         pass
 
-    def update_state(self, state: DatasetState | None, allow_downgrade: bool = False):
+    def update_state(self, state: dlib.DatasetState | None, allow_downgrade: bool = False):  # ToDo: Implement Exception?
         pass
 
-    def write(self):
+    def write(self, write_datatable: bool = False):
         raise dlib.ABCDatasetError("JSONDataset is read only!")
-

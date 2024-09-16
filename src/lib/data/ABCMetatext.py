@@ -30,9 +30,14 @@ class ABCMetatext(ABC, dlib.FlexDataClass):
     def get_text(self) -> str:
         return self._text
 
+    @staticmethod
+    @abstractmethod
+    def is_tag_used(dataset_id: int, tag: str) -> bool:
+        pass
+
     @classmethod
     @abstractmethod
-    def objectify_from_dataset_id(cls, database_id: int) -> List[ABCMetatext]:
+    def objectify_with_dataset_id(cls, database_id: int) -> List[ABCMetatext]:
         pass
 
     @abstractmethod

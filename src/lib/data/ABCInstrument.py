@@ -49,6 +49,11 @@ class ABCInstrument(ABC, dlib.FlexDataClass):
     def get_base64_image(self) -> str | None:
         return self._base64_image
 
+    @classmethod
+    @abstractmethod
+    def objectify_with_id(cls, db_id: int) -> dlib.ABCInstrument:
+        pass
+
     @abstractmethod
     def read(self):
         pass

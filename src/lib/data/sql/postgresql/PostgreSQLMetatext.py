@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import List, Self
+from typing import Any, List, Tuple
+
+import psycopg2
 
 import lib.data as dlib
 import lib.data.sql.postgresql as psql
@@ -8,117 +10,155 @@ import lib.data.sql.postgresql as psql
 
 class PostgreSQLMetatext(dlib.ABCMetatext):
 
-    # def __init__(self, is_in_database: bool = False, **kwargs):  # Fixme: Would love multiple constructors... what is the clean python alternative?
-    #     super().__init__(**kwargs)  # Question: Why is this not working? dataset_id is missing as positional argument Exception
+    @staticmethod
+    def __get_db_select_row(dataset_id: int, tag: str, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
+        db_conn = None
+        db_cur = db_cur_session
 
-    def __init__(self, tag: str, text: str, dataset_id: int | None = None, is_in_database: bool = False):
-        super().__init__(tag = tag, text = text, dataset_id = dataset_id)
-
-        self._is_in_database: bool = is_in_database
-
-    def __db_insert(self):
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
-
-            db_cur.execute("""INSERT urls(dataset_id, tag, text) VALUES(%(dataset_id)s, %(tag)s, %(text)s);""",
-                           {"dataset_id": self._dataset_id, "tag": self._tag, "text": self._text})
-
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-
-            self._is_in_database = True
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
-
-    def __db_select(self):
-        try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT text FROM metatexts WHERE tag = %(tag)s AND dataset_id = %(db_id)s;",
-                           {"dataset_id": self._dataset_id, "tag": self._dataset_id})
+                           {"dataset_id": dataset_id, "tag": tag})
 
             db_row = db_cur.fetchone()
-            self._text = db_row[0]
-            self._is_in_database = True
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
 
-    def __db_delete(self):
+        return db_row
+
+    def __db_insert(self, db_cur_session: psycopg2.cursor | None = None):
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            print("INSERT INTO metatexts(dataset_id, tag, text) VALUES({dataset_id}, {tag}, {text});".format(dataset_id = self._dataset_id,
+                                                                                                             tag = self._tag,
+                                                                                                             text = self._text))
+            db_cur.execute("""INSERT INTO metatexts(dataset_id, tag, text) VALUES(%(dataset_id)s, %(tag)s, %(text)s);""",
+                           {"dataset_id": self._dataset_id, "tag": self._tag, "text": self._text})
+
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
+            raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+    def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
+        db_row = PostgreSQLMetatext.__get_db_select_row(dataset_id=self._dataset_id, tag=self._tag, db_cur_session = db_cur_session)
+        self._text = db_row[0]
+
+    def __db_delete(self, db_cur_session: psycopg2.cursor | None = None):
         if self._tag is None or self._dataset_id is None:
             raise dlib.ABCMetatextError("No tag nor dataset_id set for PostgreSQLMetatext. Unable to perform a DELETE.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("""DELETE FROM metatexts WHERE dataset_id = %(dataset_id)s AND tag = %(tag)s;""",
                            {"dataset_id": self._dataset_id, "tag": self._tag, "text": self._text})
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def __db_update(self, use_id: bool = False):
+    def __db_update(self, db_cur_session: psycopg2.cursor | None = None):
         if self._tag is None or self._dataset_id is None:
-            raise dlib.ABCMetatextError("No tag nor dataset_id set for PostgreSQLMetatext. Unable to perform UPDATE.")
+            raise dlib.ABCMetatextError("No tag or no dataset_id set for PostgreSQLMetatext. Unable to perform UPDATE.")
+
+        db_conn = None
+        db_cur = db_cur_session
 
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("""UPDATE metatexts SET text =  %(text)s WHERE dataset_id = %(dataset_id)s AND tag = %(tag)s;""",
                            {"dataset_id": self._dataset_id, "tag": self._tag, "text": self._text})
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    @classmethod
-    def objectify_from_dataset_id(cls, database_id: int) -> List[dlib.ABCMetatext]:
-        metatexts: List[PostgreSQLMetatext] = []
+    @staticmethod
+    def is_tag_used(dataset_id: int, tag: str, db_cur_session: psycopg2.cursor | None = None) -> bool:
+        db_conn = None
+        db_cur = db_cur_session
 
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("SELECT EXISTS(SELECT 1 FROM metatexts WHERE dataset_id=%(dataset_id)s AND tag=%(tag)s);", {"dataset_id": dataset_id, "tag": tag})
+            does_exist = db_cur.fetchone()[0]
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return does_exist
+
+    @classmethod
+    def objectify_with_dataset_id(cls, database_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLMetatext]:
+        metatexts: List[PostgreSQLMetatext] = []
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT tag, text FROM metatexts WHERE dataset_id = %(dataset_id)s;", {"dataset_id": database_id})
 
             for db_row in db_cur:  # db_cur.rowcount  # db_cur.rowcount
-                metatexts.append(cls(dataset_id=database_id, tag=db_row[0], text=db_row[1], is_in_database=True))
+                metatexts.append(cls(dataset_id=database_id, tag=db_row[0], text=db_row[1]))
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
 
         return metatexts
 
-    def read(self):
-        self.__db_select()
+    def read(self, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_select(db_cur_session=db_cur_session)
 
-    def write(self):
+    def write(self, db_cur_session: psycopg2.cursor | None = None):
         if self._text is None or len(self._text) < 1:
-            self.__db_delete()  #
+            self.__db_delete(db_cur_session=db_cur_session)
+        elif PostgreSQLMetatext.is_tag_used(dataset_id = self._dataset_id, tag = self._tag):
+            self.__db_update(db_cur_session=db_cur_session)
         else:
-            self.__db_update() if self._is_in_database else self.__db_insert()
+            self.__db_insert(db_cur_session = db_cur_session)

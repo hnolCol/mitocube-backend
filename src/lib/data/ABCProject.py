@@ -43,6 +43,11 @@ class ABCProject(ABC, dlib.FlexDataClass):
     def get_description(self) -> str | None:
         return self._description
 
+    @classmethod
+    @abstractmethod
+    def objectify_with_id(cls, db_id: int, fetch_datasets: bool = False) -> dlib.ABCProject:
+        pass
+
     @abstractmethod
     def read(self, fetch_datasets: bool = False):
         pass

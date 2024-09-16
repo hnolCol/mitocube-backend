@@ -2,18 +2,24 @@ from __future__ import annotations
 
 from typing import Any, Dict, Tuple, List
 
+import psycopg2
+
 import lib.data as dlib
 import lib.data.sql.postgresql as psql
 
 
 class PostgreSQLDataset(dlib.ABCDataset):
-    def __db_insert(self, use_id: bool = False, write_datatable: bool = False):  # ToDo: Implement write_datatable
+    def __db_insert(self, use_id: bool = False, write_datatable: bool = False, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Implement write_datatable
         if self.does_exist():  # ToDo: Implement does_exist and matching static function
             raise dlib.ABCDatasetError("Unable to perform database INSERT with PostgreSQLDataset that does already exist in database.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             if self._owner_user is None:
                 raise dlib.ABCDatasetError("No owner of the dataset was set!")
@@ -22,24 +28,19 @@ class PostgreSQLDataset(dlib.ABCDataset):
                 if self._internal_id is None:
                     raise dlib.ABCDatasetError("No id (db_id) set for PostgreSQLDataset. Unable to perform INSERT with assigned id.")
 
-                db_cur.execute("""INSERT INTO public.datasets(id, instrument_id, project_id, label, created_on, title, contact_email, user_id, research_group_id, state) 
-                                    VALUES (%(db_id)s, %(instrument_id)s, %(project_id)s, %(label)s, %(created_on)s, %(title)s, %(email)s, %(user_id)s, %(research_group_id)s, %(state)s) RETURNING id;""",
+                db_cur.execute("""INSERT INTO datasets(id, instrument_id, project_id, label, created_on, title, contact_email, user_id, research_group_id, state) 
+                                    VALUES (%(db_id)s, %(instrument_id)s, %(project_id)s, %(label)s, %(created_on)s, %(title)s, %(contact_email)s, %(user_id)s, %(research_group_id)s, %(state)s) RETURNING id;""",
                                {"db_id": self._internal_id,
                                 "instrument_id": self._instrument.get_id() if self._instrument else None,
                                 "project_id": self._parent_project.get_id() if self._parent_project else None,
                                 "label": self._external_id,
                                 "created_on": self._created_on,
                                 "title": self._title,
-                                "email": self._contact_email,
+                                "contact_email": self._contact_email,
                                 "user_id": self._owner_user.get_id() if self._owner_user else None,
-                                "research_group_id": self._owner_group.get_id(),
+                                "research_group_id": self._owner_group.get_id() if self._owner_group else None,
                                 "state": self._state})
             else:
-                if self._parent_project:
-                    value_project_id = self._parent_project.get_id()
-                else:
-                    value_project_id = None
-
                 db_cur.execute("""INSERT INTO datasets(instrument_id, project_id, label, created_on, title, user_id, research_group_id, contact_email, state) 
                                     VALUES (%(instrument_id)s, %(project_id)s, %(label)s, %(created_on)s, %(title)s, %(user_id)s, %(research_group_id)s, %(contact_email)s, %(state)s) RETURNING id;""",
                                {"instrument_id": self._instrument.get_id() if self._instrument else None,
@@ -47,25 +48,38 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                 "label": self._external_id,
                                 "created_on": self._created_on,
                                 "title": self._title,
-                                "email": self._contact_email,
                                 "user_id": self._owner_user.get_id() if self._owner_user else None,
-                                "research_group_id": self._owner_group.get_id(),
+                                "research_group_id": self._owner_group.get_id() if self._owner_group else None,
                                 "contact_email": self._contact_email,
                                 "state": self._state})
 
             self._id = db_cur.fetchone()[0]
 
+            # FixMe: Issue with not shared connection, with new pool, dataset does not exist yet
             # TODO: Add metatexts
+            if self._metatexts:
+                for metatext_tag, metatext in self._metatexts.items():
+                    print("metatext.write(db_cur_session = db_cur)")
+                    metatext.write(db_cur_session=db_cur)
             # self._metatexts = psql.PostgreSQLMetatext.instantiate_from_dataset_id(self._internal_id)
+
+            # FixMe: Issue with not shared connection, with new pool, dataset does not exist yet
             # TODO: Add Urls
             # self._urls = psql.PostgreSQLUrl.instantiate_from_dataset_id(self._internal_id)
+            if self._urls:
+                for url in self._urls:
+                    print("url.append_to_dataset()")
+                    url.append_to_dataset(db_cur_session=db_cur)
 
+
+            # FixMe: Issue with not shared connection, with new pool, dataset does not exist yet
             psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
                                                                    user=self._owner_user if self._owner_user else None,
                                                                    state=dlib.TimelineEventState.INFO,
-                                                                   text=None,  # ToDo: What text should be saved?
-                                                                   event_type=dlib.DatasetTimelineEventType.INITIALISED,
-                                                                   dataset_id=self._id)
+                                                                   text="Import via install & migration script.",  # ToDo: What text should be saved?
+                                                                   event_type=dlib.DatasetTimelineEventType.INITIATED,
+                                                                   dataset_id=self._id,
+                                                                   db_cur_session=db_cur)  # ToDo: Another event downstream?
 
             if write_datatable:
                 if self._data is None:
@@ -73,34 +87,44 @@ class PostgreSQLDataset(dlib.ABCDataset):
                 elif len(self._data) < 1:
                     raise dlib.ABCDatasetError("Empty list of datasets attached to PostgreSQLDataset. Unable to add datatable!")
 
+                # self._data.w db_cur_session=db_cur
+
                 psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
                                                                        user=self._owner_user if self._owner_user else None,
                                                                        state=dlib.TimelineEventState.INFO,
                                                                        text=None,  # ToDo: What text should be saved?
                                                                        event_type=dlib.DatasetTimelineEventType.UPLOADED,
-                                                                       dataset_id=self._id)  # Question: Second timeline event here for upload at the same time? Or just one?
+                                                                       dataset_id=self._id,
+                                                                       db_cur_session=db_cur)  # Question: Second timeline event here for upload at the same time? Or just one?
 
                 raise dlib.ABCDatasetError("Writing attached datable is not implemented yet!")  # ToDo: implement adding dataset
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.rollback()  # ToDo: swap me at the end
+                # db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
         # INSERT INTO datasets(...) VALUES (...) RETURNING id;"
         pass
 
     @staticmethod
-    def __db_select_db_row(db_id: int | None = None, label: str | None = None) -> Tuple[Any]:
+    def __db_select_db_row(db_id: int | None = None, label: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
         if db_id is None and label is None:
             raise dlib.ABCDatasetError("No id nor label is set for PostgreSQLDataset. Unable to perform SELECT.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             if db_id:
                 db_cur.execute("""SELECT id, label, instrument_id, project_id, created_on, title, 
@@ -113,16 +137,14 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
             db_row = db_cur.fetchone()
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-
-            return db_row
-        except Exception as err:
-            if "db_cur" in locals():
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
 
-    def __db_select(self):
-        db_row = PostgreSQLDataset.__db_select_db_row(db_id = self._internal_id, label = self._external_id)
+        return db_row
+
+    def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
+        db_row = PostgreSQLDataset.__db_select_db_row(db_id = self._internal_id, label = self._external_id, db_cur_session = db_cur_session)
 
         self._internal_id = db_row[0]
         self._external_id = db_row[1]
@@ -138,25 +160,28 @@ class PostgreSQLDataset(dlib.ABCDataset):
         self._contact_email = db_row[8]
         self._state = db_row[9]
 
-        self._metatexts = psql.PostgreSQLMetatext.instantiate_from_dataset_id(self._internal_id)  # ToDo: Update to final method or function
+        self._metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(self._internal_id)  # ToDo: Update to final method or function
         self._urls = psql.PostgreSQLUrl.objectify_with_dataset_id(self._internal_id)
 
-        self._traits = psql.PostgreSQLTrait.objectify_with_dataset_id(db_id=self._internal_id)  # ToDo: Implement / Update to final method or function
+        self._traits = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id=self._internal_id)  # ToDo: Implement / Update to final method or function
 
         # ToDo: implement reading datasets
         # self._data = psql.PostgreSQLDataTable.create_from_dataset(dataset=self)  # ToDo: Implement / Update with final method / function
         # self._data = psql.PostgreSQLDataTable.create_from_id(dataset_id=self._internal_id)  # ToDo: Update with final method / function
 
-        obj = cls(db_id=db_id)  # Fixme: This will cause an exception since not all argument are served
-        obj.read()
+        raise dlib.ABCDatasetError("Not Finished yet!")
 
-    def __db_update(self, update_metatexts: bool = True, update_urls: bool = True):  # ToDo: Implement write_datatable
+    def __db_update(self, update_metatexts: bool = True, update_urls: bool = True, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Implement write_datatable
         if not self.does_exist():
             raise dlib.ABCDatasetError("Unable to perform database UPDATE on PostgreSQLDataset that does not exist in database.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("""UPDATE datasets SET instrument_id = %(instrument_id)s, project_id = %(project_id)s, 
                                      title =  %(title)s, contact_email = %(email)s, user_id = %(user_id)s, 
@@ -191,17 +216,18 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                                                    event_type=dlib.DatasetTimelineEventType.UPDATE_META,
                                                                    dataset_id=self._id)
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @classmethod
-    def objectify_with_id(cls, db_id: int) -> dlib.ABCDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
+    def objectify_with_id(cls, db_id: int) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
         db_row = PostgreSQLDataset.__db_select_db_row(db_id = db_id)
 
         dataset = cls(internal_id = db_row[0], external_id=db_row[1],
@@ -226,7 +252,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
         return dataset
 
     @classmethod
-    def objectify_with_label(cls, label: str) -> dlib.ABCDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
+    def objectify_with_label(cls, label: str) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
         db_row = PostgreSQLDataset.__db_select_db_row(label = label)
 
         dataset = cls(internal_id = db_row[0], external_id = db_row[1],
@@ -250,36 +276,69 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
         return dataset
 
-    def does_exist(self):  # ToDo: Inherit from parent class?
+    @classmethod
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> PostgreSQLDataset:
+
+        # def migrate_obj(obj, id, target_class) -> target_class:
+        #     if object is target_class:
+        #         return obj
+        #     else:
+        #       return obj._objectify_with_id(id)
+
+        new_dataset = cls(internal_id = None, external_id = dataset._external_id,
+                          data = dataset._data,  # ToDo: objectify with sql type if needed? dataset._data.set_parent_dataset(self)
+                          parent_project = dataset._parent_project,  # ToDo: objectify with sql type if needed?
+                          instrument = dataset._instrument,  # ToDo: objectify with sql type if needed?
+                          created_on = dataset._created_on,
+                          uploaded_on = dataset._uploaded_on,
+                          state = dataset._state,
+                          title = dataset._title,
+                          owner_user = dataset._owner_user,  # ToDo: objectify with sql type if needed?
+                          owner_group = dataset._owner_group,  # ToDo: objectify with sql type if needed?
+                          contact_email = dataset._contact_email)
+
+        new_dataset._metatexts = dataset._metatexts  # ToDo: objectify with sql type if needed?
+        new_dataset._urls = dataset._urls  # ToDo: objectify with sql type if needed?
+        new_dataset._attributes = dataset._attributes  # ToDo: objectify with sql type if needed?
+
+        return new_dataset
+
+    def does_exist(self, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Inherit from parent class?
         if self._internal_id is None:
             return False
         else:
-            return PostgreSQLDataset.does_exist_with_id(self._id)
+            return PostgreSQLDataset.does_exist_with_id(self._id, db_cur_session=db_cur_session)
 
     @staticmethod
-    def does_exist_with_id(db_id: int) -> bool:
+    def does_exist_with_id(db_id: int, db_cur_session: psycopg2.cursor | None = None) -> bool:
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT EXISTS(SELECT 1 FROM datasets WHERE id=%(id)s", {"id": db_id})
             does_exist = db_cur.fetchone()[0]
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)  # fixme: cleaner way of doing this?
-            raise err
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return does_exist
 
     @staticmethod
-    def does_exist_with_ids(db_ids: List[int]) -> Dict[int, bool]:
+    def does_exist_with_ids(db_ids: List[int], db_cur_session: psycopg2.cursor | None = None) -> Dict[int, bool]:
         return_dict = {}
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT id FROM datasets WHERE id IN %(labels)s;", {"ids": tuple(db_ids)})
             db_rows = db_cur.fetchall()
@@ -289,38 +348,42 @@ class PostgreSQLDataset(dlib.ABCDataset):
             for db_id in db_ids:
                 return_dict[db_id] = db_id in found_ids
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)  # fixme: cleaner way of doing this?
-            raise err
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return return_dict
 
     @staticmethod
-    def does_exist_with_label(label: str) -> bool:
+    def does_exist_with_label(label: str, db_cur_session: psycopg2.cursor | None = None) -> bool:
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT EXISTS(SELECT 1 FROM datasets WHERE label=%(label)s);", {"label": label})
             does_exist = db_cur.fetchone()[0]
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)  # fixme: cleaner way of doing this?
-            raise err
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return does_exist
 
     @staticmethod
-    def does_exist_with_labels(labels: List[str]) -> Dict[str, bool]:
+    def does_exist_with_labels(labels: List[str], db_cur_session: psycopg2.cursor | None = None) -> Dict[str, bool]:
         return_dict = {}
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT label FROM datasets WHERE label IN %(labels)s;", {"labels": tuple(labels)})
             db_rows = db_cur.fetchall()
@@ -330,16 +393,14 @@ class PostgreSQLDataset(dlib.ABCDataset):
             for str_label in labels:
                 return_dict[str_label] = str_label in found_labels
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)  # fixme: cleaner way of doing this?
-            raise err
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return return_dict
 
-    def read(self, fetch_datatable: bool = False):
-        self.__db_select()
+    def read(self, fetch_datatable: bool = False, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_select(db_cur_session=db_cur_session)
 
         if fetch_datatable:
             raise dlib.ABCDatasetError("Fetching the database for a PostgreSQLDataset is not implemented yet.")  # ToDo: implement fetch_datatable for dataset
@@ -364,16 +425,20 @@ class PostgreSQLDataset(dlib.ABCDataset):
                     if key not in self._metatexts:
                         self._metatexts[key] = metatexts[key]
 
-    def update_state(self, state: dlib.DatasetState | None, allow_downgrade: bool = False):  # ToDo: Add to parent class
+    def update_state(self, state: dlib.DatasetState | None, allow_downgrade: bool = False, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Add to parent class
         if not self.does_exist():
             raise dlib.ABCDatasetError("Unable to perform database UPDATE on PostgreSQLDataset that does not exist in database.")
 
         if state is None:
             state = self._state
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             if allow_downgrade:
                 db_cur.execute("""UPDATE datasets SET state = %(state)s WHERE id = %(db_id)s;""",
@@ -391,16 +456,18 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                                                    event_type=dlib.DatasetTimelineEventType.UPDATE_STATE,
                                                                    dataset_id=self._id)
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def write(self, write_datatable: bool = False):
-        self.__db_insert(use_id=False) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True)
+    def write(self, write_datatable: bool = False, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_insert(use_id=False, db_cur_session=db_cur_session) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True, db_cur_session=db_cur_session)
 
         if write_datatable:
             raise dlib.ABCDatasetError("Writing/Creating datasets for a PostgreSQLDataset is not implemented yet.")  # ToDo: implement write_datatable for dataset

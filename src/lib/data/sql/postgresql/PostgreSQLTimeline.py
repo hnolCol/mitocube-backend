@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Dict, List
 
+import psycopg2
+
 import lib.data as dlib
 import lib.data.sql.postgresql as psql
 
@@ -11,70 +13,83 @@ class PostgreSQLTimeline(dlib.ABCTimeline):
     @classmethod
     def add_new_dataset_timeline_event(cls, user: dlib.ABCUser | None, state: dlib.TimelineEventState, text: str | None,
                                        event_type: dlib.DatasetTimelineEventType, dataset_id: int | None,
-                                       timestamp: datetime = datetime.now(tz=None)) -> PostgreSQLDatasetTimelineEvent:
+                                       timestamp: datetime = datetime.now(tz=None),
+                                       test: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDatasetTimelineEvent:
         event = PostgreSQLDatasetTimelineEvent(db_id=None, timestamp=timestamp, user=user, state=state, text=text, event_type=event_type, dataset_id=dataset_id)
-        event.write()
+        event.write(db_cur_session=db_cur_session)
         return event
 
     @classmethod
-    def receive_for_dataset(cls, dataset_id: int) -> List[PostgreSQLDatasetTimelineEvent]:
+    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLDatasetTimelineEvent]:
         events: List[PostgreSQLDatasetTimelineEvent] = []
         users: Dict[int, psql.PostgreSQLUser] = {}
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT id, event_on, created_by, type, state, comment FROM dataset_timeline_events WHERE dataset_id = %(dataset_id)s ORDER BY event_on DESC;",
                            {"dataset_id": dataset_id})
 
             for db_row in db_cur:  # db_cur.rowcount  # db_cur.rowcount
                 if db_row[2] not in users:
-                    users[db_row[2]] = psql.PostgreSQLUser.create_from_id(db_row[2])  # ToDo: Improve Create / Receive user object by id
+                    users[db_row[2]] = psql.PostgreSQLUser.objectify_with_id(db_row[2])  # ToDo: Improve Create / Receive user object by id
 
                 events.append(PostgreSQLDatasetTimelineEvent(db_id=db_row[0], timestamp=db_row[1], user=users[db_row[2]],
                                                              state=db_row[4], text=db_row[5], event_type=db_row[3], dataset_id=dataset_id))
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
+
         return events
 
 
 class PostgreSQLDatasetTimelineEvent(dlib.ABCDatasetTimelineEvent):
-    def __db_insert(self):
+    def __db_insert(self, db_cur_session: psycopg2.cursor | None = None):
         if self._id:
             raise dlib.ABCTimelineError("Unable to perform database INSERT with PostgreSQLDatasetTimelineEvent that does already exist in database.")
 
-        try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+        db_conn = None
+        db_cur = db_cur_session
 
-            db_cur.execute("""INSERT dataset_timeline_events(event_on, created_by, type, state, comment, dataset_id) VALUES(%(event_on)s, %(created_by)s, %(type)s, %(state)s, %(comment)s, %(dataset_id)s) RETURNING id;""",
-                           {"event_on": self._timestamp, "created_by": self._user,
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("""INSERT INTO dataset_timeline_events(event_on, created_by, type, state, comment, dataset_id) VALUES(%(event_on)s, %(created_by)s, %(type)s, %(state)s, %(comment)s, %(dataset_id)s) RETURNING id;""",
+                           {"event_on": self._timestamp, "created_by": self._user.get_id(),
                             "type": self._event_type, "state": self._state,
                             "comment": self._text, "dataset_id": self._dataset_id})
 
             self._id = db_cur.fetchone()[0]
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def __db_select(self):
+    def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
         if self._id is None:
             raise dlib.ABCInstrumentError("No id (db_id) set for PostgreSQLDatasetTimelineEvent. Unable to perform SELECT.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT event_on, created_by, type, state, comment, dataset_id FROM dataset_timeline_events WHERE id = %(db_id)s;", {"db_id": self._id})
 
@@ -86,17 +101,15 @@ class PostgreSQLDatasetTimelineEvent(dlib.ABCDatasetTimelineEvent):
             self._text = db_row[4]
             self._dataset_id = db_row[5]
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
+        finally:
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
 
-    def read(self):
-        self.__db_select()
+    def read(self, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_select(db_cur_session = db_cur_session)
 
-    def write(self):
+    def write(self, db_cur_session: psycopg2.cursor | None = None):
         if self._id is None:  # Question: Can we assume that? It should be 'always' True if only PostgreSQLInstruments classes are used.
-            self.__db_insert()
+            self.__db_insert(db_cur_session = db_cur_session)
         else:
             raise dlib.ABCTimelineError("No update implemented for PostgreSQLDatasetTimelineEvent yet!")

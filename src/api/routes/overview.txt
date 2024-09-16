@@ -1,0 +1,90 @@
+/api/annotations  # annotations/annotations.py
+/api/annotations/features
+
+/api  # annotations/attributes.py
+/api/attributes
+/api/attributes/user
+
+/api/attributes  # attributes/attributes.py
+/api/attributes/attribute_values/q
+/api/attributes/q
+/api/attributes/user ? conflict ???
+
+/api/auth/token  # authentication/token.py
+/api/attributes/valid
+/api/attributes/verify
+/api/attributes/share
+
+/api  # authentication/user.py
+/api/users
+/api/users/q
+/api/users/user
+/api/users/full
+/api/users/public
+/api/users/{user_label}
+/api/users/{user_label}
+/api/users/user/block
+/api/users/{user_label}/useterms
+
+/api  # dataset/dataset.py
+/api/datasets/{dataset_label}/data
+/api/datasets/{dataset_label}/qc
+/api/datasets/{dataset_label}/meta
+/api/datasets/{dataset_label}/pca
+
+/api  # dataset/heatmap.py
+/api/datasets/{dataset_label}/heatmap
+
+/api  # dataset/volcano.py
+/api/datasets/{dataset_label}/volcano
+
+/api/features  # features/features.py
+/api/features/{feature_key}/data
+/api/features/{feature_key}/variance
+/api/features/{feature_key}/abundance
+
+/api/  # genotypes/genotypes.py
+/api/genotypes/q
+/api/genotypes/{genotype_label}
+/api/genotypes
+/api/genotypes
+/api/genotypes/{genotype_label}
+
+/api  # info/info.py
+/api/info/app
+/api/info/keyfigures
+/api/info/terms
+
+/api/instruments  # instruments/instruments.py
+/api/instruments{instrument_tag}/stats
+
+
+/api/networks  # network/network.py
+/api/networks/mitocarta/{dataset_label
+
+
+/api/rc/  # rc/update_dbs.py
+/api/rc/clear/db-cache
+/api/rc/update/annotations
+/api/rc/update/attributes
+/api/rc/update/features
+/api/rc/clear/db-cache
+
+/api  # submission/submission.py
+/api/submission/id
+/api/submissions/{submission_label}/metatext
+/api/submissions/metatext
+/api/submissions/states
+/api/submissions/{submission_label}/collaborators
+/api/submissions/{submission_label}/owner
+/api/submissions/{submission_label}/owner
+/api/submissions/count
+/api/submissions/users
+/api/submissions/q
+/api/submissions
+/api/submissions/{submission_label}/datasetattributes
+/api/submissions/{label}/sampleattributes
+/api/submissions
+/api/submissions/{submission_label}/runlist
+/api/submissions/{submission_label}/runlist
+

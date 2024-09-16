@@ -60,7 +60,7 @@ class ABCTimeline(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def receive_for_dataset(cls, dataset_id: int) -> List[ABCDatasetTimelineEvent]:
+    def objectify_with_dataset_id(cls, dataset_id: int) -> List[dlib.ABCDatasetTimelineEvent]:
         pass
 
 

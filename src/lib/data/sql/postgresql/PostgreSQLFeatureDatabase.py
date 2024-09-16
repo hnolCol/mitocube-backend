@@ -7,6 +7,8 @@ import os
 import pandas as pd
 import numpy as np
 
+import psycopg2
+
 from config import get_system_settings
 from lib.designpatterns import SingletonABCMeta
 import lib.data as dlib
@@ -17,40 +19,49 @@ class PostgreSQLFeatureDatabase(PandaFeatureDatabase):
     def __init__(self):
         super().__init__()
 
-    def _sync_db_with_cached(self):
+    def _sync_db_with_cached(self, db_cur_session: psycopg2.cursor | None = None):
         if "sql_id" in self._cached_features.columns:
             tbl_no_sql_id = self._cached_features[self._cached_features["sql_id"].isna()]
 
+            db_conn = None
+            db_cur = db_cur_session
+
             try:
-                db_conn = psql.PostgreSQLConnection().getConnection()
-                db_cur = db_conn.cursor()
+                if db_cur is None:
+                    db_conn = psql.PostgreSQLConnection().getConnection()
+                    db_cur = db_conn.cursor()
 
                 for index, row in tbl_no_sql_id.iterrows():
                     db_cur.execute("""INSERT INTO feature_pgs(label, proteome_id, is_grouped) 
                                             VALUES (%(label)s, %(proteome_id)s, %(is_grouped)s);""",
                                    {"label": row["key"], "proteome_id": row["proteom_id"], "is_grouped": ";" in row["key"]})
 
-                db_conn.commit()
-                psql.PostgreSQLConnection().returnConnection(db_conn)
-            except Exception as err:
-                if "db_conn" in locals():
-                    db_conn.rollback()  # fixme: cleaner way of doing this?
-                if "db_cur" in locals():
-                    psql.PostgreSQLConnection().returnConnection(db_conn)
+                if db_conn:
+                    db_conn.commit()
+            except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+                if db_conn:
+                    db_conn.rollback()
                 raise err
+            finally:
+                if db_conn:
+                    psql.PostgreSQLConnection().returnConnection(db_conn)
 
     def _split_and_add_protein_groups(self):
         # TODO: Implement _split_and_add_protein_groups(self)
-        print(" > PostgreSQLFeatureDatabase.py - _split_and_add_protein_groups(...) - TODO: Implement _split_and_add_protein_groups(self)" )
+        print(" > PostgreSQLFeatureDatabase.py - _split_and_add_protein_groups(...) - TODO: Implement _split_and_add_protein_groups(self)")
 
-    def read(self):
+    def read(self, db_cur_session: psycopg2.cursor | None = None):
         super().read()
 
         print(" > PostgreSQL read(...)")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT id, label, proteome_id, is_grouped FROM feature_pgs WHERE NOT is_grouped;")
 
@@ -84,11 +95,9 @@ class PostgreSQLFeatureDatabase(PandaFeatureDatabase):
                 if tbl_no_sql_id.shape[0] > 0:
                     raise dlib.ABCFeatureDatabaseError(f"Not all features can be linked to a postgresql entry!")
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
 
     def reset(self):
         super().reset()

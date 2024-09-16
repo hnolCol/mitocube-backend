@@ -30,10 +30,28 @@ class ABCDatabaseError(ABCDataError):
 class ABCDatabase(dlib.FlexDataClass, metaclass=SingletonABCMeta):
 
     def __init__(self):
+        self._cached_attributes: OrderedDict[str, dlib.ABCAttribute] = OrderedDict()
         self._cached_datasets: OrderedDict[str, dlib.ABCDataset] = OrderedDict()
+        self._cached_instruments: OrderedDict[str, dlib.ABCInstrument] = OrderedDict()
+        self._cached_traits: OrderedDict[str, dlib.ABCTrait] = OrderedDict()
+
+    def clear_cache(self):
+        self.clear_cached_attributes()
+        self.clear_cached_datasets()
+        self.clear_cached_instruments()
+        self.clear_cached_traits()
+
+    def clear_cached_attributes(self):
+        self._cached_attributes.clear()
 
     def clear_cached_datasets(self):
         self._cached_datasets.clear()
+
+    def clear_cached_instruments(self):
+        self._cached_instruments.clear()
+
+    def clear_cached_traits(self):
+        self._cached_traits.clear()
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:

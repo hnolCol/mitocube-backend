@@ -1,25 +1,50 @@
 from __future__ import annotations
 
+from typing import Any, Tuple
+
+import psycopg2
+
 import lib.data as dlib
 import lib.data.sql.postgresql as psql
 
 
 class PostgreSQLProject(dlib.ABCProject):
-    
-    # def __init__(self, db_id: int, title: str, description: str | None, datasets: List[dlib.ABCDataset] | None = None):
-    def __init__(self, **kwargs):  # FixMe: Would love multiple constructors... what is the clean python alternative?
-        super().__init__(**kwargs)
-        # super().__init__(db_id=-1, title="str", description:="str", datasets=None) 
 
-    # @staticmethod
+    @staticmethod
+    def __get_db_select_row(db_id: int | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
 
-    def __db_insert(self, use_id: bool = False, write_datasets: bool = False):  # ToDo: Implement write_datasets
+        if db_id is None:
+            raise dlib.ABCProjectError("No id (db_id) set for PostgreSQLProject. Unable to perform SELECT.")
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("SELECT id, title, description FROM projects WHERE id = %(db_id)s;", {"db_id": db_id})
+
+            db_row = db_cur.fetchone()
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return db_row
+
+    def __db_insert(self, use_id: bool = False, write_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Implement write_datasets
         if self.does_exist():
             raise dlib.ABCProjectError("Unable to perform database INSERT with Project that does already exist in database.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             if use_id :
                 if self._id is None:
@@ -41,100 +66,94 @@ class PostgreSQLProject(dlib.ABCProject):
 
                 raise dlib.ABCProjectError("Writing attached datasets is not implemented yet!")
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # fixme: cleaner way of doing this?
-            if "db_cur" in locals():
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
+            raise err
+        finally:
+            if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-            raise err
 
-    def __db_select(self):
-        try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+    def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
+        db_row = PostgreSQLProject.__get_db_select_row(self._id, db_cur_session = db_cur_session)
 
-            if self._id is None:
-                raise dlib.ABCProjectError("No id (db_id) set for PostgreSQLProject. Unable to perform SELECT.")
+        self._id = db_row[0]
+        self._title = db_row[1]
+        self._description = db_row[2]
 
-            db_cur.execute("SELECT id, title, description FROM projects WHERE id = %(db_id)s;", {"db_id": self._id})
-
-            db_row = db_cur.fetchone()
-            self._id = db_row[0]
-            self._title = db_row[1]
-            self._description = db_row[2]
-
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)  # fixme: cleaner way of doing this?
-            raise err
-
-    def __db_update(self):
+    def __db_update(self, db_cur_session: psycopg2.cursor | None = None):
         if not self.does_exist():
             raise dlib.ABCProjectError("Unable to perform database UPDATE on Project that does not exist in database.")
 
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("UPDATE projects SET title = %(title)s, description = %(description)s WHERE id = %(id)s;",
                            {"id": self._id, "title": self._title, "description": self._description})
 
-            db_conn.commit()
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_conn" in locals():
-                db_conn.rollback()  # Fixme: cleaner way of doing this?
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
             raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @classmethod
-    def create_from_id(cls, db_id: int, fetch_datasets: bool = False) -> PostgreSQLProject:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
-        obj = cls(db_id = db_id)  # Fixme: This will cause an exception since not all argument are served
-        obj.read()
+    def objectify_with_id(cls, db_id: int, fetch_datasets: bool = False) -> PostgreSQLProject:
+        db_row = PostgreSQLProject.__get_db_select_row(db_id)
+
+        obj = cls(db_id=db_id, title=db_row[1], description=db_row[2], datasets=None)  # : List[dlib.ABCDataset] | None = None
 
         if fetch_datasets:
-            raise dlib.ABCProjectError("Fetching linked datasets is not implemented yet!")  # ToDo: add argument to fetch datasets and do it here!
+            raise dlib.ABCProjectError("Fetching linked datasets is not implemented yet!")  # ToDo: add argument / implement fetch datasets and do it here!
 
         return obj
 
-    def does_exist(self):
+    def does_exist(self, db_cur_session: psycopg2.cursor | None = None):
         if self._id is None:
             return False
         else:
-            return PostgreSQLProject.does_exist_with_id(self._id)
+            return PostgreSQLProject.does_exist_with_id(self._id, db_cur_session = db_cur_session)
 
     @staticmethod
-    def does_exist_with_id(db_id: int) -> bool:
+    def does_exist_with_id(db_id: int, db_cur_session: psycopg2.cursor | None = None) -> bool:
+        db_conn = None
+        db_cur = db_cur_session
+
         try:
-            db_conn = psql.PostgreSQLConnection().getConnection()
-            db_cur = db_conn.cursor()
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
 
             db_cur.execute("SELECT EXISTS(SELECT 1 FROM projects WHERE id=%(id)s", {"id": db_id})
             does_exist = db_cur.fetchone()[0]
 
-            psql.PostgreSQLConnection().returnConnection(db_conn)
-        except Exception as err:
-            if "db_cur" in locals():
-                psql.PostgreSQLConnection().returnConnection(db_conn)  # fixme: cleaner way of doing this?
-            raise err
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return does_exist
 
-    def read(self, fetch_datasets: bool = False):
-        self.__db_select()
+    def read(self, fetch_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_select(db_cur_session = db_cur_session)
 
         if fetch_datasets:
-            raise dlib.ABCProjectError(
-                "Fetching datasets for a project is not implemented yet.")  # ToDo: implement fetch_datasets for projects
+            raise dlib.ABCProjectError("Fetching datasets for a project is not implemented yet.")  # ToDo: implement fetch_datasets for projects
         else:
             self._datasets = None
 
-    def write(self, write_datasets: bool = False):
-        self.__db_insert(use_id=False) if self._id is None else self.__db_update()
+    def write(self, write_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_insert(use_id=False, db_cur_session=db_cur_session) if self._id is None else self.__db_update(db_cur_session=db_cur_session)
 
         if write_datasets:
             raise dlib.ABCProjectError("Writing/Creating datasets for a project is not implemented yet.")  # ToDo: implement write_datasets for projects
