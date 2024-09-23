@@ -165,6 +165,15 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def set_attributes(self, attributes: Dict[str, dlib.ABCTrait] | None):
         self._attributes = attributes
 
+    def set_data(self, data: dlib.ABCDataTable | None):
+        if self._data:
+            self._data.set_parent_dataset(parent=None)
+
+        self._data = data
+
+        if self._data:
+            self._data.set_parent_dataset(parent=self)
+
     def set_email(self, email: str):
         self._contact_email = email
 

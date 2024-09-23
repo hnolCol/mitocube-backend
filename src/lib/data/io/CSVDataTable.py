@@ -1,12 +1,11 @@
-# from abc import ABC, ABCMeta, abstractmethod
-# from enum import Enum
+from __future__ import annotations
 
 import errno
 import os.path
 import pandas as pd
 import re
 
-from lib.data import ABCDataTable, ABCDatatableError
+from lib.data import ABCDataTable, ABCDataTableError
 
 class CSVDataTable(ABCDataTable):
 
@@ -34,10 +33,10 @@ class CSVDataTable(ABCDataTable):
             shape_data = data.shape
 
             if shape_data[0] < 1:
-                raise ABCDatatableError("There are no rows in the imported data table '{}'!".format(self._path))
+                raise ABCDataTableError("There are no rows in the imported data table '{}'!".format(self._path))
 
             if shape_data[1] < 1:
-                raise ABCDatatableError("There are no data columns in the imported data table '{}'!".format(self._path))
+                raise ABCDataTableError("There are no data columns in the imported data table '{}'!".format(self._path))
 
             self._data_wide = data
             self._data_long = None
@@ -55,7 +54,7 @@ class CSVDataTable(ABCDataTable):
             cols = pd.read_csv(self._path, sep=sep, nrows=1, header=None).loc[0].tolist()
 
             if self._name_index_col not in cols:
-                raise ABCDatatableError("Unable to find the index column '{icol}' in '{fname}'.".format(icol=self._name_index_col, fname=self._path))
+                raise ABCDataTableError("Unable to find the index column '{icol}' in '{fname}'.".format(icol=self._name_index_col, fname=self._path))
 
             # re_data_col = re.compile(self._regex_rule_data_col)  # fixme: why does this does not work compared to re.search(...)?
             # res_cols_data = [col for col in cols if re_data_col.match(col)]
@@ -64,22 +63,45 @@ class CSVDataTable(ABCDataTable):
             if any(res_cols_data):
                 self._data_columns = res_cols_data
             else:
-                raise ABCDatatableError("Unable to find any data columns using the regular expression '{}'".format(self._regex_rule_data_col))
+                raise ABCDataTableError("Unable to find any data columns using the regular expression '{}'".format(self._regex_rule_data_col))
 
     def _write_csv_file(self, sep="\t"):
         if not self._data_wide:
             self._change_to_wide()
 
         if not self._data_wide:
-            ABCDatatableError("There is no data to write.")
+            raise ABCDataTableError("There is no data to write.")
 
-        self._data_wide.to_csv(path_or_buf=self._path)
+        self._data_wide.to_csv(path_or_buf=self._path, sep=sep)
+
+    def is_stored(self) -> bool:
+        return False
+
+    @staticmethod
+    def get_n_values_with_dataset_id(dataset_id: int) -> int:
+        return 0
+
+    @staticmethod
+    def get_n_samples_with_dataset_id(dataset_id: int) -> int:
+        return 0
 
     def get_path(self) -> str:
         return self._path
 
     def create(self):
         self._write_csv_file()
+
+    @classmethod
+    def objectify_with_dataset_id(cls, dataset_id: int) -> CSVDataTable:
+        raise ABCDataTableError("CSVDataTable objects can only be created using path to csv files.")
+
+    @classmethod
+    def objectify_with_dataset_label(cls, dataset_label: str) -> CSVDataTable:
+        raise ABCDataTableError("CSVDataTable objects can only be created using path to csv files.")
+
+    @classmethod
+    def objectify_with_datatable(cls, datatable: ABCDataTable) -> CSVDataTable:
+        raise ABCDataTableError("CSVDataTable objects can only be created using path to csv files.")
 
     def read(self):
         self._read_file()

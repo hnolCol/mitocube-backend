@@ -37,19 +37,19 @@ class ABCMetatext(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset_id(cls, database_id: int) -> List[ABCMetatext]:
+    def objectify_with_dataset_id(cls, dataset_id: int) -> List[ABCMetatext]:
         pass
 
     @abstractmethod
     def read(self):
         pass
 
-    def set(self, dataset_id: int, tag: str, text: str):
+    def set(self, dataset_id: int | None, tag: str, text: str):
         self._dataset_id = dataset_id
         self._tag = tag
         self._text = text
 
-    def set_dataset_id(self, dataset_id: int):
+    def set_dataset_id(self, dataset_id: int | None):
         self._dataset_id = dataset_id
 
     def set_tag(self, tag: str):

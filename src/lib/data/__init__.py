@@ -13,7 +13,7 @@ from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait  # ToDo: Ne
 
 from .ABCDatabase import ABCDatabase, ABCDatabaseError
 from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait, ABCTraitValue
-from .ABCDataTable import ABCDataTable, ABCDatatableError
+from .ABCDataTable import ABCDataTable, ABCDataTableError
 from .ABCFeatureDatabase import ABCFeatureDatabaseError, ABCFeatureDatabase
 from .ABCInstrument import ABCInstrument, ABCInstrumentError
 from .ABCMetatext import ABCMetatext, ABCMetatextError

@@ -53,54 +53,42 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                 "contact_email": self._contact_email,
                                 "state": self._state})
 
-            self._id = db_cur.fetchone()[0]
+            self._internal_id = db_cur.fetchone()[0]
 
-            # FixMe: Issue with not shared connection, with new pool, dataset does not exist yet
-            # TODO: Add metatexts
             if self._metatexts:
                 for metatext_tag, metatext in self._metatexts.items():
-                    print("metatext.write(db_cur_session = db_cur)")
+                    metatext.set_dataset_id(dataset_id = self._internal_id)
                     metatext.write(db_cur_session=db_cur)
-            # self._metatexts = psql.PostgreSQLMetatext.instantiate_from_dataset_id(self._internal_id)
 
-            # FixMe: Issue with not shared connection, with new pool, dataset does not exist yet
-            # TODO: Add Urls
-            # self._urls = psql.PostgreSQLUrl.instantiate_from_dataset_id(self._internal_id)
             if self._urls:
                 for url in self._urls:
-                    print("url.append_to_dataset()")
+                    url.set_dataset_id(dataset_id = self._internal_id)
                     url.append_to_dataset(db_cur_session=db_cur)
 
 
-            # FixMe: Issue with not shared connection, with new pool, dataset does not exist yet
             psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
                                                                    user=self._owner_user if self._owner_user else None,
                                                                    state=dlib.TimelineEventState.INFO,
                                                                    text="Import via install & migration script.",  # ToDo: What text should be saved?
                                                                    event_type=dlib.DatasetTimelineEventType.INITIATED,
-                                                                   dataset_id=self._id,
+                                                                   dataset_id=self._internal_id,
                                                                    db_cur_session=db_cur)  # ToDo: Another event downstream?
 
-            if write_datatable:
-                if self._data is None:
-                    raise dlib.ABCDatasetError("No datable attached to PostgreSQLDataset. Unable to add datasets!")
-                elif len(self._data) < 1:
-                    raise dlib.ABCDatasetError("Empty list of datasets attached to PostgreSQLDataset. Unable to add datatable!")
-
-                # self._data.w db_cur_session=db_cur
+            if write_datatable and self._data:
+                self._data.write(db_cur_session=db_cur)
 
                 psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
                                                                        user=self._owner_user if self._owner_user else None,
                                                                        state=dlib.TimelineEventState.INFO,
-                                                                       text=None,  # ToDo: What text should be saved?
+                                                                       text="Data table import via install & migration script.",  # ToDo: What text should be saved?
                                                                        event_type=dlib.DatasetTimelineEventType.UPLOADED,
-                                                                       dataset_id=self._id,
+                                                                       dataset_id=self._internal_id,
                                                                        db_cur_session=db_cur)  # Question: Second timeline event here for upload at the same time? Or just one?
-
-                raise dlib.ABCDatasetError("Writing attached datable is not implemented yet!")  # ToDo: implement adding dataset
+            else:
+                raise dlib.ABCDatasetError("No datable attached to PostgreSQLDataset. Unable to add datasets!")
 
             if db_conn:
-                db_conn.rollback()  # ToDo: swap me at the end
+                db_conn.rollback()  # ToDo: swap me at the end!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 # db_conn.commit()
         except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:
@@ -109,9 +97,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
         finally:
             if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
-
-        # INSERT INTO datasets(...) VALUES (...) RETURNING id;"
-        pass
 
     @staticmethod
     def __db_select_db_row(db_id: int | None = None, label: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
@@ -144,7 +129,9 @@ class PostgreSQLDataset(dlib.ABCDataset):
         return db_row
 
     def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
-        db_row = PostgreSQLDataset.__db_select_db_row(db_id = self._internal_id, label = self._external_id, db_cur_session = db_cur_session)
+        db_row = PostgreSQLDataset.__db_select_db_row(db_id = self._internal_id,
+                                                      label = self._external_id,
+                                                      db_cur_session = db_cur_session)
 
         self._internal_id = db_row[0]
         self._external_id = db_row[1]
@@ -444,7 +431,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                 db_cur.execute("""UPDATE datasets SET state = %(state)s WHERE id = %(db_id)s;""",
                                {"db_id": self._internal_id, "state": state})
             else:
-                db_cur.execute("""UPDATE datasets SET state = %(state)s WHERE id = %(db_id)s AND state < %(state)s RETURNING id;""",
+                db_cur.execute("""UPDATE datasets SET state = %(state)s WHERE id = %(db_id)s AND state < %(state)s;""",
                                {"db_id": self._internal_id, "state": state})
 
                 if db_cur.rowcount < 0:
@@ -466,8 +453,5 @@ class PostgreSQLDataset(dlib.ABCDataset):
             if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def write(self, write_datatable: bool = False, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_insert(use_id=False, db_cur_session=db_cur_session) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True, db_cur_session=db_cur_session)
-
-        if write_datatable:
-            raise dlib.ABCDatasetError("Writing/Creating datasets for a PostgreSQLDataset is not implemented yet.")  # ToDo: implement write_datatable for dataset
+    def write(self, write_datatable: bool = True, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_insert(use_id=False, write_datatable=write_datatable, db_cur_session=db_cur_session) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True, db_cur_session=db_cur_session)

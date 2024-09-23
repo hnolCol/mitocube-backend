@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 import json
-from typing import Dict, List
+from typing import Dict, Type, List
 
 import lib.data as dlib
 import lib.data.sql.postgresql as psql
@@ -17,7 +17,7 @@ class JSONDataset(dlib.ABCDataset):
                  uploaded_on: datetime | None = None, owner_group: dlib.ABCResearchGroup | None = None,
                  metatexts: Dict[str, dlib.ABCMetatext] = None, urls: List[dlib.ABCUrl] = None,
                  attributes: Dict[str, dlib.ABCTrait] | None = None,
-                 class_target: dlib.ABCDataset | None = psql.PostgreSQLDataset):  # ToDo: Fix Typing?
+                 class_target: Type[dlib.ABCDataset] = psql.PostgreSQLDataset):
 
         super().__init__(external_id, state, title, owner_user, contact_email, internal_id, data, parent_project,
                          instrument, created_on, uploaded_on, owner_group, metatexts, urls, attributes)
@@ -25,13 +25,10 @@ class JSONDataset(dlib.ABCDataset):
         self._path_json_file: str = path_json_file
         self._class_target: dlib.ABCDataset | None = class_target
 
-        if class_target is None:
-            self._object_target: dlib.ABCDataset | None = None
-        else:
-            self._object_target: dlib.ABCDataset | None = class_target(external_id, state, title, owner_user,
-                                                                       contact_email, internal_id, data, parent_project,
-                                                                       instrument, created_on, uploaded_on, owner_group,
-                                                                       metatexts, urls, attributes)
+        self._object_target: dlib.ABCDataset = class_target(external_id, state, title, owner_user,
+                                                            contact_email, internal_id, data, parent_project,
+                                                            instrument, created_on, uploaded_on, owner_group,
+                                                            metatexts, urls, attributes)
 
     @staticmethod
     def __read_json(path: str) -> Dict[str, any]:
@@ -41,7 +38,7 @@ class JSONDataset(dlib.ABCDataset):
     def get_target_class(self) -> dlib.ABCDataset | None:  # ToDo: Fix Typing?
         return self._class_target
 
-    def get_target_object(self) -> dlib.ABCDataset | None: 
+    def get_target_object(self) -> dlib.ABCDataset:
         return self._object_target
 
     def does_exist(self):
@@ -74,8 +71,8 @@ class JSONDataset(dlib.ABCDataset):
     @classmethod
     def objectify_with_json(cls, path: str, owner_user: dlib.ABCUser, owner_group: dlib.ABCResearchGroup | None = None,
                             data_table: dlib.ABCDataTable | None = None,
-                            class_target: dlib.ABCDataset | None = psql.PostgreSQLDataset,
-                            class_attribute_traits = psql.PostgreSQLTrait):
+                            class_target: Type[dlib.ABCDataset] = psql.PostgreSQLDataset,  # Fixme: fix typing issue here
+                            class_attribute_traits: Type[dlib.ABCTrait] = psql.PostgreSQLTrait):  # Fixme: fix typing issue here
         data = JSONDataset.__read_json(path)
 
         traits_dataset = {}
@@ -103,8 +100,9 @@ class JSONDataset(dlib.ABCDataset):
                             if trait_key in collected_traits:
                                 trait = collected_traits[trait_key]
                             else:
-                                trait = psql.PostgreSQLTrait.objectify_with_tag(trait_key)  # ToDo: Fix Class selection
-                                collected_traits[trait_key] = trait
+                                # ToDo: Fix Class selection
+                                trait = psql.PostgreSQLTrait.objectify_with_tag(full_tag=trait_key)
+                                collected_traits[trait_key] = psql.PostgreSQLTrait.objectify_with_tag(full_tag=trait_key)
 
                             for ix in ixs:
                                 trait_value = psql.PostgreSQLTraitValue(trait=trait, value=None, unit=None)
@@ -118,6 +116,24 @@ class JSONDataset(dlib.ABCDataset):
                             print("Error: Issue with {}, skipping! - {}".format(trait_key, err))
 
                 data_table.set_samples_attributes(cleaned_trait_values)
+
+        if "replicates" in data:
+            if data_table is not None:
+                # Assign replicates
+                # Just a list? same order as samples? with repeating numbers replicates?
+                replicates_samples: Dict[str, int] = {}
+                for ix, item in enumerate(data["sample_names"]):
+                    replicates_samples[item] = data["replicates"][ix]
+                    # ToDo: Assign to DataTable Object
+
+        if "batches" in data:
+            if data_table is not None:
+                # Assign replicates
+                # Just a list? same order as samples? with repeating numbers replicates?
+                batches_samples: Dict[str, int] = {}
+                for ix, item in enumerate(data["sample_names"]):
+                    batches_samples[item] = data["batches"][ix]
+                    # ToDo: Assign to DataTable Object
 
         dataset = cls(path_json_file = path, internal_id = None, external_id = data["label"],
                       data = data_table, parent_project = None, instrument = None,

@@ -26,7 +26,7 @@ class ABCUrl(ABC, dlib.FlexDataClass):
         return self._url
 
     @abstractmethod
-    def append_to_dataset(self, dataset_id: int):
+    def append_to_dataset(self, dataset_id: int | None = None):
         pass
 
     @classmethod
@@ -34,11 +34,11 @@ class ABCUrl(ABC, dlib.FlexDataClass):
     def objectify_with_dataset_id(cls, dataset_id: int) -> List[ABCUrl]:
         pass
 
-    def set(self, dataset_id: int, url: str):
+    def set(self, dataset_id: int | None, url: str):
         self._dataset_id = dataset_id
         self._url = url
 
-    def set_dataset_id(self, dataset_id: int):
+    def set_dataset_id(self, dataset_id: int | None):
         self._dataset_id = dataset_id
 
     def set_url(self, url: str):

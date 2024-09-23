@@ -338,7 +338,7 @@ class PostgreSQLTrait(dlib.ABCTrait):
                    tag = db_row[2], text = db_row[3], keyword = db_row[4], description = db_row[5], db_id = db_row[0])
 
     @classmethod
-    def objectify_with_tag(cls, tag: str | None, full_tag: str | None) -> dlib.ABCTrait:
+    def objectify_with_tag(cls, full_tag: str | None) -> dlib.ABCTrait:
         db_row = PostgreSQLTrait.__get_db_select_row(full_tag = full_tag)  # ToDo: Check with tag versus full_tag
 
         return cls(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1], catch_parent = True),

@@ -24,6 +24,17 @@ print("=========================================")
 print("\n\n\n")
 
 print("=========================================")
+print("Prepare the FeatureDatabase")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
+print(".........................................")
+db_features = psql.PostgreSQLFeatureDatabase()  # todo: create 'init'/first loading method
+db_features.read()
+print(".........................................")
+print(db_features._cached_features.head().to_string())
+print("=========================================")
+
+print("=========================================")
 print("Check for installed users")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
@@ -101,22 +112,27 @@ for dataset_id, dataset_path in list_dataset_ids.items():
         print("  (i) does not exist in database, prepare import")
 
         if os.path.isfile(os.path.join(str_parent_folder, dataset_id, "data.txt")):
-            csv = CSVDataTable(path=os.path.join(str_parent_folder, dataset_id, "data.txt"),
-                               regex_rule_data_col="^[0-9]{8}[_\\.-]",
-                               name_index_col="Key")
+            csv_dataset = CSVDataTable(path=os.path.join(str_parent_folder, dataset_id, "data.txt"),
+                                       regex_rule_data_col="^[0-9]{8}[_\\.-]",
+                                       name_index_col="Key")
 
-            print(csv)
-
-            print("  (i) imported 'data.txt' with n = {n} features".format(n=len(csv.get_features())))
+            print("  (i) imported 'data.txt' with n = {n} features".format(n=len(csv_dataset.get_features())))
 
             json_dataset = JSONDataset.objectify_with_json(path = os.path.join(str_parent_folder, dataset_id, "params.json"),
                                                            owner_user = superuser,
-                                                           data_table = csv)
+                                                           data_table = csv_dataset,
+                                                           class_target = psql.PostgreSQLDataset,  # Fixme: fix typing issue here, what is the type of a (class) class-object?
+                                                           class_attribute_traits = psql.PostgreSQLTrait)  # Fixme: fix typing issue here
 
-            print(json_dataset)
+            psql_data = psql.PostgreSQLDataTable.objectify_with_datatable(csv_dataset)  # "Casts" the CSV data table to a postgresql data table
+            # psql_data.set_batches(xxx)
+            # psql_data.set_replicates(xxx)
 
-            pgsql_dataset = psql.PostgreSQLDataset.objectify_with_dataset(json_dataset)
-            pgsql_dataset.write(write_datatable = True)
+            print(psql_data)
+
+            pgsql_dataset = psql.PostgreSQLDataset.objectify_with_dataset(json_dataset)  # "Casts" the json data set to a postgresql dataset
+            pgsql_dataset.set_data(data = psql_data)  # assigns the data table to the dataset
+            pgsql_dataset.write(write_datatable = True)  # writes everything to the db. Attributes etc. require to be postgresql at this point but JSONDataset takes partly care of it already
 
             print("  (i) imported 'params.json' with n = {n} features".format(n=0))
 

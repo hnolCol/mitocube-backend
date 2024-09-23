@@ -213,7 +213,7 @@ class ABCTrait(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_tag(cls, tag: str | None, full_tag: str | None) -> ABCTrait:
+    def objectify_with_tag(cls, full_tag: str | None) -> ABCTrait:
         pass
 
     @classmethod

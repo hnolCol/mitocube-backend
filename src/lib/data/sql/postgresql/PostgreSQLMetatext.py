@@ -40,9 +40,6 @@ class PostgreSQLMetatext(dlib.ABCMetatext):
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
 
-            print("INSERT INTO metatexts(dataset_id, tag, text) VALUES({dataset_id}, {tag}, {text});".format(dataset_id = self._dataset_id,
-                                                                                                             tag = self._tag,
-                                                                                                             text = self._text))
             db_cur.execute("""INSERT INTO metatexts(dataset_id, tag, text) VALUES(%(dataset_id)s, %(tag)s, %(text)s);""",
                            {"dataset_id": self._dataset_id, "tag": self._tag, "text": self._text})
 
@@ -130,7 +127,7 @@ class PostgreSQLMetatext(dlib.ABCMetatext):
         return does_exist
 
     @classmethod
-    def objectify_with_dataset_id(cls, database_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLMetatext]:
+    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLMetatext]:
         metatexts: List[PostgreSQLMetatext] = []
 
         db_conn = None
@@ -141,10 +138,10 @@ class PostgreSQLMetatext(dlib.ABCMetatext):
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
 
-            db_cur.execute("SELECT tag, text FROM metatexts WHERE dataset_id = %(dataset_id)s;", {"dataset_id": database_id})
+            db_cur.execute("SELECT tag, text FROM metatexts WHERE dataset_id = %(dataset_id)s;", {"dataset_id": dataset_id})
 
             for db_row in db_cur:  # db_cur.rowcount  # db_cur.rowcount
-                metatexts.append(cls(dataset_id=database_id, tag=db_row[0], text=db_row[1]))
+                metatexts.append(cls(dataset_id=dataset_id, tag=db_row[0], text=db_row[1]))
 
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:

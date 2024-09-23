@@ -16,9 +16,8 @@ class PandaFeatureDatabase(dlib.ABCFeatureDatabase):
     def __init__(self):
         self._lock = Lock()
 
-        self._feature_paths : List[str] = []
-        self._cached_features : pd.DataFrame | None = None
-        self._cached_info : pd.DataFrame | None = None  # todo: implement the read function and row merge
+        self._feature_paths : List[str] = []  # ToDo: Move stuff to  ABCFeatureDatabase
+        self._cached_features : pd.DataFrame | None = None  # ToDo: Move stuff to  ABCFeatureDatabase
 
     def read(self):
         print(" > Panda read(...)")
@@ -30,12 +29,9 @@ class PandaFeatureDatabase(dlib.ABCFeatureDatabase):
         if not os.path.exists(dir_root):
             raise FileNotFoundError(f"Invalid feature database path {dir_root}.")
 
-        # question: cCheck if the following is true
-        # According to https://peps.python.org/pep-0343/ lock is guaranteed to be released when the block is left
         with self._lock:
             self._feature_paths = []
             self._cached_features = None
-            self._cached_info = None
 
             for path in os.scandir(dir_root):
                 if path.is_dir():
@@ -82,7 +78,7 @@ class PandaFeatureDatabase(dlib.ABCFeatureDatabase):
                     features["ix_entry"] = features["entry"]
                     features.set_index(["ix_proteom_id", "ix_organism_id", "ix_key", "ix_entry"], drop=True, inplace=True)
 
-                    if self._cached_features:
+                    if self._cached_features is not None:
                         self._cached_features = pd.concat([self._cached_features, features])
                     else:
                         self._cached_features = features
@@ -91,4 +87,3 @@ class PandaFeatureDatabase(dlib.ABCFeatureDatabase):
         with self._lock:
             self._feature_paths = []
             self._cached_features = {}
-            self._cached_info = None
