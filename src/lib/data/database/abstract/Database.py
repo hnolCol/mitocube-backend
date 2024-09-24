@@ -17,6 +17,7 @@ from lib.data.database.abstract.Submission import SubmissionFilterABC, Submissio
 from lib.data.database.abstract.Features import FeaturesABC
 from lib.data.database.abstract.Dataset import DatasetABC
 from lib.data.database.abstract.Genotypes import GenotypeABC
+from lib.data.database.abstract.QC import QCABC
 
 from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeUnitResponseModel
@@ -58,6 +59,8 @@ class DatabaseABC(ABC):
     submission_filter : SubmissionFilterABC = None
     datasets : DatasetABC = None 
     genotypes : GenotypeABC = None
+    qc : QCABC = None 
+   # performance : Per
     
 
     def __init__(self):
@@ -130,6 +133,13 @@ class DatabaseABC(ABC):
             raise not NotImplementedError("A database class must have the genotypes attribute defined")
         if not isinstance(self.genotypes,GenotypeABC):
             raise TypeError("The genotypes class must be an instance of GenotypeABC")
+
+        if self.qc is None:
+            raise not NotImplementedError("A database class must have the qc attribute defined")
+        if not isinstance(self.qc,QCABC):
+            raise TypeError("The qc class must be an instance of QCABC")    
+        
+        
         
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 

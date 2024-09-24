@@ -34,7 +34,7 @@ class AttributeModel(BaseModel):
         The minimal state defined in ``SubmissionStatesEnums`` the submission must be in to allow the attribute
         to be defined. For example, upon changing the submission to ``MEASURING`` the mass spectrometer should be defined. 
         But this information is not yet available at submission. 
-    allow_as_qc : bool, default False
+    allow_for_qc : bool, default False
         Allow the attribute for quality control 
     allow_as_filter : bool, default True
         If True, the attribute can be used to filter datasets/submissions. 
@@ -46,7 +46,7 @@ class AttributeModel(BaseModel):
     has_unit : bool, default False
         If true, the user can define a unit for the attribute.
     
-    unit : Literal["weight","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"], default None
+    unit : Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"], default None
         The unit type
     """
     id : int
@@ -62,14 +62,14 @@ class AttributeModel(BaseModel):
     has_features_value : bool = False  # if true, features (e.g. proteins) can be selected for this attribute
     has_numeric_input : bool = False  # if true, attribute can be defined by the user (numeric input)
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
-    allow_as_qc : bool = False  # attributes that are required for qc runs
+    allow_for_qc : bool = False  # attributes that are required for qc runs
     allow_as_filter : bool = True  # attributes allow to filter datasets
     allow_for_measurement : bool = True  # attribute that are required when state of project changes to measuring, ToDO: I think this is covered by min_state? 
     allow_for_genotype : bool = False  # attributes that are allowed for specifying a genotype.
     allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
     allow_for_user : bool = False
     has_unit : bool = False 
-    unit : Optional[List[Literal["weight","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"]]] = None # ToDo: define units like this? 
+    unit : Optional[List[Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"]]] = None # ToDo: define units like this? 
 
 
     @field_validator('s', mode="before")
@@ -213,6 +213,9 @@ class AttributeResponseModel(BaseModel):
     attribute_values : List[AttributeValueModel]
 
 
+
+
+
 class SampleAttributes(BaseModel):
     """Model that describes the sample attributes 
 
@@ -228,6 +231,7 @@ class AttributeUnitModel(BaseModel):
     tag : str 
     text : str     
     unit : str  
+    
 
 class AttributeUnitResponseModel(BaseModel):
     attribute : AttributeModel

@@ -230,7 +230,7 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
 
     json = {}
     json["created_on"] = submission.created_on
-    json["created_on_dt"] = datetime.fromtimestamp(submission.created_on).strftime("%m/%d/%Y, %H:%M:%S")
+    #json["created_on_dt"] = datetime.fromtimestamp(submission.created_on).strftime("%m/%d/%Y, %H:%M:%S")
     json["state"] = SubmissionStatesEnums.SUBMITTED
     json["tag"] = submission.tag
     json["title"] = submission.title 

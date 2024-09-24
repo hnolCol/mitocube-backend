@@ -84,7 +84,7 @@ class AttributesABC(ABC):
         
     @abstractmethod
     def delete_value(self, tag : str) -> bool:
-        "Deletes a specific attribute value by its tag"    
+        """Deletes a specific attribute value by its tag (attribute value tag)"""    
     
         
     @abstractmethod 

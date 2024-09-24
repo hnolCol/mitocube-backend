@@ -58,8 +58,19 @@ d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data
 
 from lib.user.UserHandling import UserDB
 from config.models.genotype import GenotypeModel
-
+from config.models.performance import QCRunModel
 users_from_db = UserDB.get_users()
+
+
+DB.qc.insert(QCRunModel(tag = "asd23a23", 
+                        instrument_name_tag="expl480", 
+                        user_tag = "DsuV8w4t", 
+                        quant_proteins=5000, 
+                        quant_peptides=12000,
+                        group_attr={'att_ms':['exploris480'],'att_lc_system':['e1200']},
+                        rt_peptides={'ASTNDFR':12.2,"TNPOTRSK" : 28.2})
+             )
+
 
 DB.users.add_users(users_from_db)
 genotypes_from_file = [GenotypeModel(**x, proteome_tag=x["proteome_id"]) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]

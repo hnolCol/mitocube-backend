@@ -1,10 +1,10 @@
 from abc import abstractmethod, ABC 
 from typing import List 
 
-from config.models.performance import PerformanceRunModel
+from config.models.performance import QCRunModel
 
 
-class PerformanceABC(ABC):
+class QCABC(ABC):
     def __init__(self) -> None:
         ""
         
@@ -27,7 +27,6 @@ class PerformanceABC(ABC):
     def count(self, by_instrument : bool = False) -> int:
         """Counts the number of performance runs. 
         
-
         Parameters
         ----------
         by_instrument : bool, optional
@@ -41,7 +40,7 @@ class PerformanceABC(ABC):
         """
     
     @abstractmethod
-    def get(self, tags : List[str] = None, instrument : str = None, limit : int = 50) -> PerformanceRunModel:
+    def get(self, tags : List[str] = None, instrument : str = None, limit : int = 50) -> QCRunModel:
         """Returns the perfromance run. 
 
         Parameters
@@ -55,17 +54,17 @@ class PerformanceABC(ABC):
 
         Returns
         -------
-        PerformanceRunModel
+        QCRunModel
             _description_
         """
     
     @abstractmethod
-    def insert(self, performance_run : PerformanceRunModel) -> bool: 
+    def insert(self, performance_run : QCRunModel) -> bool: 
         """Add a new performance run to the database 
 
         Parameters
         ----------
-        performance_run : PerformanceRunModel
+        performance_run : QCRunModel
             _description_
 
         Returns
@@ -81,6 +80,23 @@ class PerformanceABC(ABC):
         Parameters
         ----------
         tag : str
+            _description_
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+        
+    @abstractmethod
+    def update(self, tag : str, peformance_run : QCRunModel) -> bool:
+        """Updates a specific performance run. 
+
+        Parameters
+        ----------
+        tag : str
+            _description_
+        peformance_run : QCRunModel
             _description_
 
         Returns

@@ -2,15 +2,15 @@ from pydantic import BaseModel, field_validator
 from typing import Dict, Optional, List 
 
 
-class PerformanceRunModel(BaseModel):
+class QCRunModel(BaseModel):
     ""
     tag : str 
-    instrument_tag : str 
+    instrument_name_tag : str 
     user_tag : str 
     rt_peptides : Dict[str,float]
     quant_proteins : int 
     quant_peptides : int 
-    group_attr : Dict[str:List[str]] #the attributes and attribute values that creates a group /e.g. the 
+    group_attr : Dict[str, List[str]] #the attributes and attribute values that creates a group /e.g. the 
     #performance runs are analysed and visualized together. A group attribute should be anything that 
     #has an significant effect on the performance. 
     

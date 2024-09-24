@@ -103,7 +103,7 @@ class Neo4JAttributes(AttributesABC):
         
     def get(self, tags : List[str] = None,
             param_name : Literal["allow_for_dataset","allow_as_filter",
-                                "allow_for_genotype","allow_for_measurement","allow_as_qc",
+                                "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
             min_state : SubmissionStatesEnums = None) -> List[AttributeModel]:
         ""
@@ -129,7 +129,7 @@ class Neo4JAttributes(AttributesABC):
             else:
                 query += "AND a.min_state <= $min_state "
             
-        query += "RETURN properties(a) "
+        query += "RETURN properties(a) ORDER BY a.priority"
 
         attributes = self._driver.execute_query(query_=query, 
                                                 routing_="r",
@@ -219,7 +219,6 @@ class Neo4JAttributes(AttributesABC):
                 - counts (int) : The number of submission tags, equals len(tags)
         """
         
-        print(dataset_tags,attribute_tags,attribute_value_tags)
         
         if attribute_tags is None and attribute_value_tags is None:
             #returns all attribute values for the given dataset tags 
@@ -416,7 +415,7 @@ class Neo4JAttributes(AttributesABC):
         query += (
             "MATCH (a)-[:HAS_VALUE]->(av:AttributeValue) "
             "WHERE a.s CONTAINS $search_string OR av.s CONTAINS $search_string "
-            "WITH a, av ORDER BY av.text "
+            "WITH a, av ORDER BY a.priority DESC "
             "RETURN properties(a), collect(DISTINCT properties(av))"
         )
         
@@ -468,8 +467,11 @@ class Neo4JAttributes(AttributesABC):
 
         Returns
         -------
-        _type_
-            _description_
+         List[AttributeUnitResponseModel]
+            The list of attribute units. Please note that if the attribute 
+            tag is not associated with an Attribute it will be simply
+            ignored. Therefore the length of the response list 
+            might be different from the provided tag's list. 
         """
         
         query = (
@@ -481,11 +483,67 @@ class Neo4JAttributes(AttributesABC):
         )
         
         r = self._driver.execute_query(query, tags = tags, result_transformer_=Result.data)
+        
         return [AttributeUnitResponseModel(**ri) for ri in r ]
 
 
     def update(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel] = None) -> bool:
         return super().update(attribute, attribute_values)
 
-    def update_values(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel], join: bool = True) -> bool:
-        return super().update_values(attribute, attribute_values, join)
+    def update_values(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel], join: bool = True) -> Tuple[AttributeModel,List[AttributeValueModel]]:
+        #return super().update_values(attribute, attribute_values, join)
+    
+        query = (
+                "MATCH (a:Attribute {tag : attribute.tag}) " )
+    
+        if not join:
+            query += (
+                "MATCH (a)-[:HAS_VALUES]->(av:AttributeValue) "
+                "DELETE av "
+                "WITH a ")
+                
+        query += (
+                "UNWIND $attribute_values as attribute_value "
+                "MERGE (av:AttributeValue {tag : attribute_value.tag}) "
+                "SET av += attribute_value "
+                "SET av.s = toLower(av.text)+' '+toLower(av.description)), av.created_at = timestamp() "
+                "RETURN a as attribute, collect(av) as attribute_values"
+                )
+            
+
+        r = self._driver.execute_query(query,
+                                   routing_="w",
+                                   attribute = attribute.model_dump(exclude_none=True),
+                                   attribute_values = [av.model_dump(exclude_none=True) for av in attribute_values],
+                                   result_transformer_=Result.value)
+        print(r)
+        return r 
+        
+    
+    def update_value(self, tag, attribute_value_props : dict) -> bool:
+        """Updates a single attribute value. 
+
+        Parameters
+        ----------
+        tag : attribute value (!) tag. 
+            The attribute value tag (not the attribute tag!)
+        attribute_value_props : dict
+            The props you want to update for the given attribute value. 
+
+        Returns
+        -------
+        bool
+            _description_
+        """
+
+        query = (
+            "MATCH (av:AttributeValue) "
+            "WHERE av.tag = $tag "
+            "SET av += $attribute_value_props "
+            "SET av.s = toLower(av.text)+' '+toLower(av.description)), av.modified_at = timestamp() " #update the search string 
+            "RETURN av "
+        )
+
+        r = self._driver.execute_query(query, attribute_value_props = attribute_value_props, tag = tag, result_transformer_= Result.value, routing_="w")
+        
+        return True 

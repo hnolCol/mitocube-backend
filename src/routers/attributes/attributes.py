@@ -32,7 +32,7 @@ router = APIRouter(
 @router.get("") #AttributeResponseModel
 def get_attributes(search_string : Optional[str] = None, 
                    min_state : SubmissionStatesEnums = None, 
-                   param_name : Literal["allow_for_dataset","mandatory_for_submission","allow_as_filter","allow_for_genotype","allow_for_measurement","allow_as_qc","mandatory_for_active"] = None, 
+                   param_name : Literal["allow_for_dataset","mandatory_for_submission","allow_as_filter","allow_for_genotype","allow_for_measurement","allow_for_qc","mandatory_for_active"] = None, 
                    user : UserModel = Depends(get_user_from_token)) :
     """
     Returns the stored attribute and attribute values.
@@ -185,3 +185,13 @@ def add_attribute_value(attribute_tag : str, attribute_value : AttribteValueInse
 def delete_attribute_value(attribute_tag : str, attribute_value_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
     
     ok = DB.attributes.delete_value(tag = attribute_value_tag)
+    
+
+@router.patch("/{attribute_tag}/values/{attribute_value_tag}")
+def update_attribute_value(attribute_tag : str, 
+                           attribute_value_tag : str, 
+                           attribute_value_props : dict, 
+                           user : UserModel = Depends(is_user_at_least_curator)):
+    ""
+    print(attribute_value_props)
+    ok = DB.attributes.update_value(tag = attribute_value_tag, attribute_value_props = attribute_value_props )

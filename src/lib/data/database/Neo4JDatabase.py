@@ -58,13 +58,13 @@ class AttributeValuesBySubmissionModel(BaseModel):
     
     
 class UnitModel(BaseModel):
-    tag : Literal["weight","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"]
+    tag : Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"]
     unit : Literal["g","M","s","°C","L","m/z","V","L/min",""]
     text : str 
     
     
     
-units = [UnitModel(tag = "weight", unit="g", text="Weight"),
+units = [UnitModel(tag = "mass", unit="g", text="Mass"),
          UnitModel(tag = "concentration", unit="M", text="Concentration"), 
          UnitModel(tag = "time", unit="s", text="Time"),
          UnitModel(tag = "temperature", unit="°C", text="Temperature"),
@@ -163,7 +163,10 @@ constraints = [
     ConstraintModel(constrain_label  = "user_role_tag",node_label = NodeLabelModel(label = "Role"),property_name ="tag"),
     ConstraintModel(constrain_label  = "query_tag",node_label = NodeLabelModel(label = "Query"),property_name ="tag"),
     ConstraintModel(constrain_label  = "metatext_tag",node_label = NodeLabelModel(label = "Metatext"),property_name ="tag"), #meta text? 
-    ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag")
+    ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "qc_tag",node_label = NodeLabelModel(label = "QCRun"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "peptide_tag",node_label = NodeLabelModel(label = "Peptide"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "news_tag",node_label = NodeLabelModel(label = "News"),property_name ="tag")
 ]
 
 
