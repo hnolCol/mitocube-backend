@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
-from lib.data.database.ABCDatabase import MCAttributes
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
@@ -11,11 +10,11 @@ from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString
-from lib.user.UserHandling import UserDB
 
-import numpy as np 
 from config.settings.general import get_general_settings
 from config.settings.email import get_email_settings
+
+
 GENERAL_SETTINGS = get_general_settings()
 EMAIL_SETTINGS = get_email_settings()
 router = APIRouter(

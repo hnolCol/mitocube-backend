@@ -17,6 +17,7 @@ from lib.data.database.abstract.Submission import SubmissionFilterABC, Submissio
 from lib.data.database.abstract.Features import FeaturesABC
 from lib.data.database.abstract.Dataset import DatasetABC
 from lib.data.database.abstract.Genotypes import GenotypeABC
+from lib.data.database.abstract.Peptides import PeptidesABC
 from lib.data.database.abstract.QC import QCABC
 
 from config.settings.db import get_db_settings
@@ -60,6 +61,7 @@ class DatabaseABC(ABC):
     datasets : DatasetABC = None 
     genotypes : GenotypeABC = None
     qc : QCABC = None 
+    peptides : PeptidesABC = None 
    # performance : Per
     
 
@@ -138,6 +140,12 @@ class DatabaseABC(ABC):
             raise not NotImplementedError("A database class must have the qc attribute defined")
         if not isinstance(self.qc,QCABC):
             raise TypeError("The qc class must be an instance of QCABC")    
+        
+        if self.peptides is None:
+            raise not NotImplementedError("A database class must have the peptides attribute defined")
+        
+        if not isinstance(self.peptides,PeptidesABC):
+            raise TypeError("The peptides class must be an instance of PeptidesABC")    
         
         
         

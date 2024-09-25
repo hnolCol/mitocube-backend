@@ -13,6 +13,7 @@ from lib.data.database.neo4j.Users import Neo4JUser
 from lib.data.database.neo4j.Features import Neo4JFeatures
 from lib.data.database.neo4j.Genotypes import Neo4JGenotype
 from lib.data.database.neo4j.News import Neo4JNews
+from lib.data.database.neo4j.Peptides import Neo4JPeptides
 from lib.data.database.Neo4JDatabase import Neo4JFactory, Neo4JConnection, Neo4JConstructor
 from lib.data.database.neo4j.QC import Neo4JQC
 
@@ -42,6 +43,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.qc = Neo4JQC(driver = self.connection.driver)
+        self.peptides = Neo4JPeptides(driver = self.connection.driver)
         #checks if all is correctly defined 
         super(MCNeo4JDatabase, self).__init__()
         

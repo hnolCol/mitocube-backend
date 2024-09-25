@@ -2,6 +2,23 @@ from pydantic import BaseModel, field_validator
 from typing import Dict, Optional, List 
 
 
+
+class QCPeptideModel(BaseModel):
+    sequence : str 
+    description : Optional[str] = None 
+    protein_tag : str 
+    
+    
+
+class QCPeptidesModel(BaseModel):
+    user_tag : str 
+    peptides : List[QCPeptideModel]
+
+    
+    
+
+    
+
 class QCRunModel(BaseModel):
     ""
     tag : str 

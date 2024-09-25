@@ -34,11 +34,12 @@ from routers.filter import filter
 from routers.rc import rc
 from routers.proteomes import proteomes
 from routers.news import news
+from routers.performance import performance
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
 
-router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments, network, filter, rc, proteomes, news]
+router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments, network, filter, rc, proteomes, news, performance]
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
@@ -58,10 +59,13 @@ d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data
 
 from lib.user.UserHandling import UserDB
 from config.models.genotype import GenotypeModel
-from config.models.performance import QCRunModel
+from config.models.performance import QCRunModel, QCPeptidesModel, QCPeptideModel
 users_from_db = UserDB.get_users()
 
 
+
+DB.peptides.set_qc_peptides(peptides = QCPeptidesModel(user_tag="DsuV8w4t",peptides = [QCPeptideModel(sequence="DIPGLTDTTVPR",protein_tag="P62753"),QCPeptideModel(sequence="FDDAVVQSDFK", protein_tag="P11142")]), join = False)
+print(DB.peptides.get_qc_peptides())
 DB.qc.insert(QCRunModel(tag = "asd23a23", 
                         instrument_name_tag="expl480", 
                         user_tag = "DsuV8w4t", 

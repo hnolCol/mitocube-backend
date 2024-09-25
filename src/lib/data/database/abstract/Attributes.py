@@ -111,7 +111,7 @@ class AttributesABC(ABC):
     @abstractmethod
     def get(self, tags : List[str] = None, 
             param_name : Literal["allow_for_dataset","allow_as_filter",
-                                "allow_for_genotype","allow_for_measurement","allow_as_qc",
+                                "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
             min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[AttributeModel]:
         """Finds attributes by their tags. If the tag is not in the 
@@ -147,7 +147,7 @@ class AttributesABC(ABC):
                                                                         "allow_as_filter",
                                                                         "allow_for_genotype",
                                                                         "allow_for_measurement",
-                                                                        "allow_as_qc",
+                                                                        "allow_for_qc",
                                                                         "mandatory_for_active"] = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
