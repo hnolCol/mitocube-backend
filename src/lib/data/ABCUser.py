@@ -176,7 +176,7 @@ class ABCUser(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_username(cls, username: str) -> dlib.ABCUser:
+    def objectify_with_username(cls, username: str) -> dlib.ABCUser | None:
         pass
 
     @classmethod

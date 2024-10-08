@@ -11,9 +11,9 @@
 /api/attributes/user ? conflict ???
 
 /api/auth/token  # authentication/token.py
-/api/attributes/valid
-/api/attributes/verify
-/api/attributes/share
+/api/auth/valid
+/api/auth/verify
+/api/auth/share
 
 /api  # authentication/user.py
 /api/users

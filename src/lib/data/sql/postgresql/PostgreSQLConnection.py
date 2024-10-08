@@ -22,8 +22,6 @@ class PostgreSQLConnection(SQLConnection):  # (metaclass=SingletonMeta):
         """
         CONF = get_system_settings()
 
-        print(CONF)
-
         self.__db_ip: str = CONF.db_ip
         self.__db_port: str = CONF.db_port
         self.__db_name: str = CONF.db_name.get_secret_value()

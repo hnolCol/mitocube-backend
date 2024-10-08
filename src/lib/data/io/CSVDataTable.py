@@ -92,7 +92,7 @@ class CSVDataTable(ABCDataTable):
         self._write_csv_file()
 
     @classmethod
-    def objectify_with_dataset_id(cls, dataset_id: int) -> CSVDataTable:
+    def objectify_with_dataset_id(cls, dataset_id: int) -> CSVDataTable | None:
         raise ABCDataTableError("CSVDataTable objects can only be created using path to csv files.")
 
     @classmethod

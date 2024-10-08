@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
 import pandas as pd
 
 import psycopg2
@@ -11,7 +11,7 @@ import lib.data.sql.postgresql as psql
 class PostgreSQLDataTable(dlib.ABCDataTable):
 
     @staticmethod
-    def __db_select_db_row(dataset_id: int | None = None, dataset_label: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
+    def _db_select_db_row(dataset_id: int | None = None, dataset_label: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
         if dataset_id is None and dataset_label is None:
             raise dlib.ABCDatasetError("No dataset id nor label is set for PostgreSQLDataTable. Unable to perform SELECT.")
 
@@ -29,12 +29,12 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                     f.label AS accession, f.is_grouped, f.proteome_id, 
                     b.batch_label, r.replicate_label, 
                     v.feature_value AS intensity 
-                FROM samples AS s 
+                FROM samples AS s  ---- (SELECT * FROM samples WHERE dataset_id = %(dataset_id)s) AS s  ---- ToDo: Rearrange order
                     LEFT JOIN sample_replicates AS r ON s.id = r.sample_id 
                     LEFT JOIN sample_batches AS b ON s.id = b.sample_id 
-                    LEFT JOIN feature_pg_values AS v ON s.id = v.sample_id 
+                    LEFT JOIN feature_pg_values AS v ON s.id = v.sample_id  ---- (SELECT * FROM feature_pg_values WHERE dataset_id = %(dataset_id)s) AS v
                     LEFT JOIN feature_pgs AS f ON v.feature_id = f.id 
-                WHERE s.dataset_id = %(dataset_id)s;""",  # ToDo: or v.dataset_id = <xyz> ToDo: Check if this is faster
+                WHERE v.dataset_id = %(dataset_id)s;""",  # ToDo: or s.dataset_id = <xyz> ? v.dataset_id should be faster, maybe with sub-select first
                                {"dataset_id": dataset_id})
             else:
                 db_cur.execute("""SELECT s.dataset_id, s.id AS sample_id, s.label AS sample, 
@@ -48,7 +48,7 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                     LEFT JOIN feature_pg_values AS v ON s.id = v.sample_id 
                     LEFT JOIN feature_pgs AS f ON v.feature_id = f.id 
                     LEFT JOIN datasets AS d ON s.id = d.id 
-                WHERE d.label = %(dataset_label)s;""",  # ToDo: or v.dataset_id = <xyz> ToDo: Check if this is faster
+                WHERE d.label = %(dataset_label)s;""",
                                {"dataset_label": dataset_label})
 
             db_rows = db_cur.fetchall()
@@ -130,7 +130,19 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                 if self._attributes_samples:
                     for sample, traits in self._attributes_samples.items():
                         for trait in traits:
-                            trait.add_to_sample_id(sample_id=dbids_samples[sample], db_cur_session=db_cur)
+                            trait.add_to_sample_id(sample_id=dbids_samples[sample], db_cur_session=db_cur)  # #FixMe: should trait me more specfic here? Typing issue
+
+                # Write Replicates to DB
+                if self._replicates:
+                    for sample, replicate in self._replicates.items():
+                        db_cur.execute("""INSERT INTO sample_replicates (sample_id, replicate_label) VALUES (%(sample_id)s, %(replicate_label)s);""",
+                                       {"sample_id": dbids_samples[sample], "replicate_label": replicate})
+
+                # Write Batches to DB
+                if self._batches:
+                    for sample, batch in self._batches.items():
+                        db_cur.execute("""INSERT INTO sample_batches (sample_id, batch_label) VALUES (%(sample_id)s, %(batch_label)s);""",
+                                       {"sample_id": dbids_samples[sample], "batch_label": batch})
 
                 if db_conn:
                     db_conn.commit()
@@ -152,11 +164,7 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
         else:
             raise dlib.ABCDataTableError("Unable to perform select without set parent dataset to receive dataset id.")
 
-        # self._data_columns: list[str] | None = None
-        # self._data_long: pd.DataFrame | None = None
-        # self._data_wide: pd.DataFrame | None = None
-        # self._attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None = attributes_samples  # sample names as keys
-
+        # ToDo: Implement
         print(db_rows)
 
         tbl = pd.DataFrame(db_rows, columns=["dataset_id",  # db_row[0]  # db_row = db_cur.fetchone()
@@ -228,25 +236,84 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
         return n
 
     @classmethod
-    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDataTable:
-        pass
+    def _objectify_with_db_row(cls, db_rows: List[Tuple[Any]]) -> PostgreSQLDataTable | None:
+        # db_rows[0]
+        # 0              1                  2                         3             4                     5             6              7              8                  9
+        # s.dataset_id,  s.id AS sample_id, s.label AS sample,        v.feature_id, f.label AS accession, f.is_grouped, f.proteome_id, b.batch_label, r.replicate_label, v.feature_value AS intensity
+        # (152,          1481,              '20231122_BuXOSlIl6G_01', 7649,         'Q6IQ22',             False,        'UP000005640', None,          '1',               22.8541)
+
+        if len(db_rows) < 1:
+            return None
+        else:
+            # Create pandas long format data.frame:
+            # - Key: A0JP43
+            # - sample: 20221129_DuMi_0214_VSTFFlpDMyDG_001_WT_9389
+            # - intensity: 22.416995
+            # * f.label s.label v.feature_value --> (db_row[4], db_row[2], db_row[9])
+            data_long = pd.DataFrame([(db_row[4], db_row[2], db_row[9]) for db_row in db_rows],
+                                     columns = [cls._row_index_name, "sample", "intensity"])
+            data_long.dropna(inplace = True)  # ToDo: Countercheck missing values, maybe introduced by the left joins
+
+            # big_data = pd.DataFrame([(db_row[4], db_row[2], db_row[9], db_row[8], db_row[7]) for db_row in db_rows],
+            #                         columns = [cls._row_index_name, "sample", "intensity", "replicate", "batch"])
+
+            # FixMe: why are there NaN in the list?  Q9Y6Q3  20231122_BuXOSlIl6G_60        NaN
+
+            # Break down Replicates / Batches
+            # {db_row[2]: db_row[8] for db_row in db_rows if db_row[2] not in batches.keys()}
+            replicates: Dict[str, str] = {}
+            for db_row in db_rows:
+                if db_row[2] not in replicates.keys():
+                    replicates[db_row[2]] = db_row[8]
+
+            # {db_row[2]: db_row[7] for db_row in db_rows if db_row[2] not in batches.keys()}
+            batches: Dict[str, str] = {}
+            for db_row in db_rows:
+                if db_row[2] not in batches.keys():
+                    batches[db_row[2]] = db_row[7]
+
+            obj = cls(parent_dataset=None, data_long=data_long,
+                      replicates_samples=replicates, batches_samples=batches,
+                      attributes_samples=None)
+
+            # Receive and Set attributes for samples
+            attributes: Dict[str, List[dlib.ABCTraitValue]] | None = {}
+            for sample in obj.get_data_column_names():
+                # attributes[sample] =  psql.PostgreSQLTraitValue.objectify_with_sample_id(sample_id: int)  # Fixme: Would be faster
+                try:  # Question: Rewrite downstream functions to not throw an exception if nothing exist and returns None?
+                    attributes[sample] = psql.PostgreSQLTraitValue.objectify_with_sample_label(dataset_id=db_rows[0][0], label=sample)
+                except dlib.ABCAttributeError:
+                    pass
+            obj.set_samples_attributes(attributes)
+
+            return obj
 
     @classmethod
-    def objectify_with_datatable(cls, datatable: dlib.ABCDataTable, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDataTable:
-        obj = PostgreSQLDataTable(parent_dataset = datatable._parent_dataset,
-                                  attributes_samples = datatable._attributes_samples)  # ToDo: Latter needs to be changed to postgresql attributes if needed
-        obj._data_columns = datatable._data_columns
-        obj._data_long = datatable._data_long
-        obj._data_wide = datatable._data_wide
-
-        # obj._parent_dataset = datatable._parent_dataset  # ToDo: cast datatype and checks?
-        # obj._attributes_samples = datatable._attributes_samples  # dict[str, List[dlib.ABCTraitValue]]
-
-        return obj
+    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDataTable | None:
+        return PostgreSQLDataTable._objectify_with_db_row(db_rows = PostgreSQLDataTable._db_select_db_row(dataset_id = dataset_id, db_cur_session = db_cur_session))
 
     @classmethod
     def objectify_with_dataset_label(cls, dataset_label: str, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDataTable:
-        pass
+        return PostgreSQLDataTable._objectify_with_db_row(db_rows=PostgreSQLDataTable._db_select_db_row(dataset_label=dataset_label,  db_cur_session=db_cur_session))
+
+    @classmethod
+    def objectify_with_datatable(cls, datatable: dlib.ABCDataTable, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDataTable:
+        obj = PostgreSQLDataTable(parent_dataset = datatable._parent_dataset)
+
+        obj._data_long = datatable._data_long
+        obj._data_wide = datatable._data_wide
+
+        obj._data_columns = datatable._data_columns
+        obj._data_features = datatable._data_features
+
+        obj._replicates = datatable._replicates
+        obj._batches = datatable._batches
+        obj._attributes_samples = datatable._attributes_samples  # ToDo: cast datatype and checks? (postgresql attributes) dict[str, List[dlib.ABCTraitValue]]
+
+        obj._parent_dataset = datatable._parent_dataset  # ToDo: cast datatype and checks?
+
+        return obj
+
 
     def read(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_select(db_cur_session = db_cur_session)

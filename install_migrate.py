@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta
 import os
 import sys
+from typing import Any, Dict, List, Type
 
 from config import get_system_settings
 
@@ -34,12 +35,14 @@ print(".........................................")
 print(db_features._cached_features.head().to_string())
 print("=========================================")
 
+print("\n\n\n")
+
 print("=========================================")
 print("Check for installed users")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
 print(".........................................")
-db_users: dlib.ABCUser = dlib.ABCUser.get_class()
+db_users: Type[dlib.ABCUser] = dlib.ABCUser.get_class()
 print(db_users.get_user_names())
 print(".........................................")
 users = db_users.get_users()
@@ -79,15 +82,13 @@ print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d
 print(".........................................")
 json_attributes = JSONAttributes(path_json_file = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources/installation/attributes_examples.json")
 json_attributes.read(ignore_missing_parent_attributes = True)
-print("? here")
 json_attributes.write()
-print("? here")
 print("=========================================")
 
 print("\n\n\n")
 
 print("=========================================")
-print("Import existing Datasets")
+print("Import 'existing' Datasets")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
 print(".........................................")
@@ -102,7 +103,6 @@ for str_dir in os.listdir(str_parent_folder):
         if os.path.isfile(os.path.join(str_parent_folder, str_dir, "params.json")):
             list_dataset_ids[str_dir] = os.path.join(str_parent_folder, str_dir)
 
-
 for dataset_id, dataset_path in list_dataset_ids.items():
     print("\n> processing {did} ({path})".format(did = dataset_id, path = dataset_path))
 
@@ -116,7 +116,7 @@ for dataset_id, dataset_path in list_dataset_ids.items():
                                        regex_rule_data_col="^[0-9]{8}[_\\.-]",
                                        name_index_col="Key")
 
-            print("  (i) imported 'data.txt' with n = {n} features".format(n=len(csv_dataset.get_features())))
+            print("  (i) imported 'data.txt' with n = {n} features".format(n=len(csv_dataset.get_unique_data_features())))
 
             json_dataset = JSONDataset.objectify_with_json(path = os.path.join(str_parent_folder, dataset_id, "params.json"),
                                                            owner_user = superuser,
@@ -125,8 +125,8 @@ for dataset_id, dataset_path in list_dataset_ids.items():
                                                            class_attribute_traits = psql.PostgreSQLTrait)  # Fixme: fix typing issue here
 
             psql_data = psql.PostgreSQLDataTable.objectify_with_datatable(csv_dataset)  # "Casts" the CSV data table to a postgresql data table
-            # psql_data.set_batches(xxx)
-            # psql_data.set_replicates(xxx)
+            # ToDo: psql_data.set_batches(xxx)
+            # ToDo: psql_data.set_replicates(xxx)
 
             print(psql_data)
 
@@ -135,8 +135,29 @@ for dataset_id, dataset_path in list_dataset_ids.items():
             pgsql_dataset.write(write_datatable = True)  # writes everything to the db. Attributes etc. require to be postgresql at this point but JSONDataset takes partly care of it already
 
             print("  (i) imported 'params.json' with n = {n} features".format(n=0))
+        else:
+            print("  (!) no CSV file. Skipping import of {}".format(dataset_id))
 
+print("=========================================")
 
+print("\n\n\n")
+
+print("=========================================")
+print("Testing reading 'existing' Datasets")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
+print(".........................................")
+list_dataset_ids = psql.PostgreSQLDataset.get_full_dataset_list()
+print(list_dataset_ids)
+print(".........................................")
+print(psql.PostgreSQLProject.get_project_list())
+print(psql.PostgreSQLProject.get_project_dataset_list())
+print(".........................................")
+
+for label, dataset_id in list_dataset_ids.items():
+    # dataset = dlib.ABCDataset.get_class().objectify_with_id(db_id=dataset_id)
+    dataset = dlib.ABCDataset.get_class().objectify_with_label(label=label)
+    print(dataset)
 print("=========================================")
 
 print("\n\n\n")

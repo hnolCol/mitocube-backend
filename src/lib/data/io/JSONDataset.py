@@ -56,6 +56,10 @@ class JSONDataset(dlib.ABCDataset):
     def does_exist_with_labels(labels: List[str]) -> Dict[str, bool]:
         return {key: False for key in labels}
 
+    @staticmethod
+    def get_full_dataset_list() -> Dict[str, int]:
+        raise dlib.ABCDatasetError("JSONDataset does not support database and has no permament dataset storage implemented.")
+
     @classmethod
     def objectify_with_id(cls, db_id: int) -> dlib.ABCDataset:
         raise dlib.ABCDatasetError("Objectify methods using ids are not implemented (possible) for the class JSON Dataset.")
@@ -121,19 +125,19 @@ class JSONDataset(dlib.ABCDataset):
             if data_table is not None:
                 # Assign replicates
                 # Just a list? same order as samples? with repeating numbers replicates?
-                replicates_samples: Dict[str, int] = {}
+                replicates_samples: Dict[str, str] = {}
                 for ix, item in enumerate(data["sample_names"]):
-                    replicates_samples[item] = data["replicates"][ix]
-                    # ToDo: Assign to DataTable Object
+                    replicates_samples[item] = str(data["replicates"][ix])
+                data_table.set_samples_replicates(replicates=replicates_samples)
 
         if "batches" in data:
             if data_table is not None:
                 # Assign replicates
                 # Just a list? same order as samples? with repeating numbers replicates?
-                batches_samples: Dict[str, int] = {}
+                batches_samples: Dict[str, str] = {}
                 for ix, item in enumerate(data["sample_names"]):
-                    batches_samples[item] = data["batches"][ix]
-                    # ToDo: Assign to DataTable Object
+                    batches_samples[item] = str(data["batches"][ix])
+                data_table.set_samples_batches(batches=batches_samples)
 
         dataset = cls(path_json_file = path, internal_id = None, external_id = data["label"],
                       data = data_table, parent_project = None, instrument = None,

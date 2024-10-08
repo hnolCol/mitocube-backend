@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple
 
 import psycopg2
 
@@ -143,6 +143,61 @@ class PostgreSQLProject(dlib.ABCProject):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return does_exist
+
+    @staticmethod
+    def get_project_list(db_cur_session: psycopg2.cursor | None = None) -> Dict[str, Dict[str, str]]:
+        datasets_ids: Dict[int, Dict[str, str]] = {}
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+                db_cur.execute("SELECT id, title, description FROM projects ORDER BY title ASC;")  # Question: Any particular sorting? here alphabetically
+
+                db_rows = db_cur.fetchall()
+
+                for row in db_rows:
+                    datasets_ids[row[0]] = {"title": row[1], "description": row[2]}
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return datasets_ids
+
+    @staticmethod
+    def get_project_dataset_list(db_cur_session: psycopg2.cursor | None = None) -> Dict[int, Dict[str, Any]]:
+        datasets_ids: Dict[int, Dict[str, Any]] = {}
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+                db_cur.execute("""SELECT p.id, p.title, d.id, d.label 
+                                    FROM projects AS p 
+                                        LEFT JOIN datasets AS d ON p.id = d.project_id 
+                                    ORDER BY title ASC;""")  # Question: Any particular sorting? here alphabetically
+
+                db_rows = db_cur.fetchall()
+
+                for row in db_rows:
+                    datasets_ids[row[0]] = {"title": row[1],
+                                            "dataset_id": row[2],
+                                            "dataset_label": row[3]}
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return datasets_ids
 
     def read(self, fetch_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):
         self.__db_select(db_cur_session = db_cur_session)

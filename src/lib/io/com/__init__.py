@@ -1,4 +1,4 @@
 # Define the __all__ variable
 # __all__ = ["module1", "module2"]
 
-from .SystemSettings import get_system_settings
+from .Email import EMailHandler

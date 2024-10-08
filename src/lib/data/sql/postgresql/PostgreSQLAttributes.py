@@ -386,30 +386,30 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
 
-            if dataset_id is not None:
+            if dataset_id and sample_label is None:
                 db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id 
                     FROM traits AS t 
                         LEFT JOIN nm_traits_datasets AS nm ON t.id = nm.trait_id 
                     WHERE nm.dataset_id = %(db_id)s;""",
                                {"db_id": dataset_id})
-            elif dataset_label is not None:
+            elif dataset_label:
                 db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
                     FROM traits AS t
                         LEFT JOIN nm_traits_datasets AS nm ON t.id = nm.trait_id
                         LEFT JOIN datasets AS d ON nm.dataset_id = d.id
                     WHERE d.label = %(label)s;""",
                                {"label": dataset_label})
-            elif sample_id is not None:
-                db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
+            elif sample_id:
+                db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.sample_id
                     FROM traits AS t LEFT JOIN nm_traits_samples AS nm ON t.id = nm.trait_id WHERE nm.sample_id = %(db_id)s;""",
                                {"db_id": sample_id})
-            elif sample_label is not None:
-                db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
+            elif sample_label and dataset_id:
+                db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.sample_id
                     FROM traits AS t
                         LEFT JOIN nm_traits_samples AS nm ON t.id = nm.trait_id
                         LEFT JOIN samples AS s ON nm.sample_id = s.id
-                    WHERE s.label = %(label)s;""",
-                               {"label": sample_label})
+                    WHERE s.dataset_id = %(dataset_id)s AND s.label = %(label)s;""",
+                               {"dataset_id": dataset_id, "label": sample_label})
             else:  # Should not be reachable
                 raise dlib.ABCAttributeError("Require at least the id or label of a dataset or sample to select respective Trait values. Unable to perform SELECT.")
 
@@ -559,7 +559,7 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
 
     @classmethod
     def objectify_with_sample_label(cls, dataset_id: int, label: str) -> List[PostgreSQLTraitValue]:
-        db_rows = PostgreSQLTraitValue.__get_db_select_row(sample_label = label)
+        db_rows = PostgreSQLTraitValue.__get_db_select_row(dataset_id = dataset_id, sample_label = label)
 
         trait_values: List[PostgreSQLTraitValue] = []
 

@@ -88,8 +88,8 @@ class PostgreSQLDataset(dlib.ABCDataset):
                 raise dlib.ABCDatasetError("No datable attached to PostgreSQLDataset. Unable to add datasets!")
 
             if db_conn:
-                db_conn.rollback()  # ToDo: swap me at the end!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                # db_conn.commit()
+                # db_conn.rollback()  # ToDo: swap me at the end!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                db_conn.commit()
         except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:
                 db_conn.rollback()
@@ -217,8 +217,10 @@ class PostgreSQLDataset(dlib.ABCDataset):
     def objectify_with_id(cls, db_id: int) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
         db_row = PostgreSQLDataset.__db_select_db_row(db_id = db_id)
 
+        data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id = db_id)
+
         dataset = cls(internal_id = db_row[0], external_id=db_row[1],
-                      data = None,  # ToDo: add final method call
+                      data = data,  # ToDo: add final method call
                       parent_project = psql.PostgreSQLProject.create_from_id(db_row[3], fetch_datasets=False) if db_row[3] else None,  # ToDo: Update to final method or function
                       instrument = psql.PostgreSQLInstrument.create_from_id(db_row[2]) if db_row[2] else None,  # ToDo: Update to final method or function
                       created_on = db_row[4],
@@ -289,6 +291,31 @@ class PostgreSQLDataset(dlib.ABCDataset):
         new_dataset._attributes = dataset._attributes  # ToDo: objectify with sql type if needed?
 
         return new_dataset
+
+    @staticmethod
+    def get_full_dataset_list(db_cur_session: psycopg2.cursor | None = None) -> Dict[str, int]:
+        datasets_ids: Dict[str, int] = {}
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+                db_cur.execute("SELECT id, label FROM datasets ORDER BY created_on DESC;")  # Question: Any particular sorting? here newest first
+
+                db_rows = db_cur.fetchall()
+
+                for row in db_rows:
+                    datasets_ids[row[1]] = row[0]
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return datasets_ids
 
     def does_exist(self, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Inherit from parent class?
         if self._internal_id is None:

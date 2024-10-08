@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Self
+from typing import Any, Dict, List, Self
 
 import lib.data as dlib
 
@@ -42,6 +42,16 @@ class ABCProject(ABC, dlib.FlexDataClass):
 
     def get_description(self) -> str | None:
         return self._description
+
+    @staticmethod
+    @abstractmethod
+    def get_project_dataset_list() -> Dict[int, Dict[str, Any]]:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_project_list() -> Dict[str, Dict[str, str]]:
+        pass
 
     @classmethod
     @abstractmethod

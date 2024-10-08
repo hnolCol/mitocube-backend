@@ -21,7 +21,7 @@ class ABCDataTableError(dlib.ABCDatasetError):
 class ABCDataTableState(ABC):  # Question: Just a place holder for abstract state that could control actions in some methods
 
     def __init__(self, datatable: ABCDataTable):
-        self._datatable = datatable
+        self.datatable_object = datatable
 
     @abstractmethod
     def read(self):
@@ -38,13 +38,44 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     _column_name_long_values: str = "intensity"
 
     def __init__(self, parent_dataset: dlib.ABCDataset | None = None,
-                 attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None = None):  # ToDo: id into this object?
-        self._data_columns: list[str] | None = None
-        self._data_features: list[str] | None = None
-        self._data_long: pd.DataFrame | None = None
-        self._data_wide: pd.DataFrame | None = None
+                 data_long: pd.DataFrame | None = None,
+                 data_wide: pd.DataFrame | None = None,
+                 replicates_samples: Dict[str, str] | None = None,
+                 batches_samples: Dict[str, str] | None = None,
+                 attributes_samples: Dict[str, List[dlib.ABCTraitValue]] | None = None):  # ToDo: id into this object?
+
         self._parent_dataset: dlib.ABCDataset | None = parent_dataset
-        self._attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None = attributes_samples  # sample names as keys
+
+        self._data_columns: List[str] | None = None
+        self._data_features: List[str] | None = None
+
+        self._replicates: Dict[str, str] | None = replicates_samples
+        self._batches: Dict[str, str] | None = batches_samples
+        self._attributes_samples: Dict[str, List[dlib.ABCTraitValue]] | None = attributes_samples  # sample names as keys
+
+        self._data_long: pd.DataFrame | None = data_long
+        self._data_wide: pd.DataFrame | None = data_wide
+
+        if self._data_wide is not None and self._data_long is not None:
+            raise ABCDataTableError("Constructor of ABCDataTable(...) does not allow to use data_long and data_wide simultaneously!")
+        else:
+            self._determine_data_column_names()  # fills self._data_columns
+            self.get_unique_data_features()  # fills self._data_features
+
+            if self._data_columns:
+                if self._replicates:
+                    if not all(sample in self._data_columns for sample in self._replicates.keys()):
+                        raise dlib.ABCDataTableError("Some sample names in provided replicates do not exist in the DataTable.")
+
+                if self._batches:
+                    if not all(sample in self._data_columns for sample in self._batches.keys()):
+                        raise dlib.ABCDataTableError("Some sample names in provided batches do not exist in the DataTable.")
+
+                if self._attributes_samples:
+                    if not all(sample in self._data_columns for sample in self._attributes_samples.keys()):
+                        raise dlib.ABCDataTableError("Some sample names in provided attributes list do not exist in the DataTable.")
+
+
 
     # FixMe: make it thread-safe!
     def _change_to_long(self, col_columns: str = "sample", col_feature: str = None, col_values: str | None = None):
@@ -97,14 +128,16 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     def is_stored(self) -> bool:
         return self.get_n_samples_with_dataset_id(self._parent_dataset.get_internal_id()) > 0 if self._parent_dataset else False
 
-    def get_unique_data_features(self) -> List[str]:
+    def get_unique_data_features(self) -> List[str] | None:
         if self._data_wide is not None:
-            return self._data_wide.index.to_list()
+            self._data_features = self._data_wide.index.to_list()
         elif self._data_long is not None:
-            return list(set(self._data_long[self._row_index_name]))
+            self._data_features = self._data_long["sample"].unique().tolist()
         else:
-            return []  # Question: Or should be an exception be raised?
+            self._data_features = None   # Question: Or should be an exception be raised?
             # raise ABCDataTableError("No data is stored in the DataTable object!")
+
+        return self._data_features
 
     @staticmethod
     @abstractmethod
@@ -116,11 +149,26 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     def get_n_samples_with_dataset_id(dataset_id: int) -> int:
         pass
 
-    def get_data_column_names(self) -> list[str] | None:
+    def get_data_column_names(self) -> List[str] | None:
+        if self._data_columns is None:
+            self._determine_data_column_names()
+
         return self._data_columns
 
+    def _determine_data_column_names(self):
+        self._data_columns = None  # Question: Should we make it thread safe? True for whole class?
+
+        if self._data_wide is not None:
+            self._data_columns = self._data_wide.columns.to_list()
+
+            if self._row_index_name in self._data_columns:
+                self._data_columns.remove(self._row_index_name)
+
+        elif self._data_long is not None:
+            self._data_columns = self._data_long["sample"].unique().tolist()
+
     # fixme: make it thread-safe!
-    def get_features(self) -> list[str]:
+    def get_features(self) -> List[str]:
         if not self.is_buffered():
             self.read()
 
@@ -128,6 +176,21 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
             return list(self._data_wide.index)
         elif self._data_long is not None:
             return list(self._data_long[self._row_index_name].unique())
+
+    def determine_features(self) -> List[str]:
+        if not self.is_buffered():
+            self.read()
+
+        if self._data_wide is not None:
+            return list(self._data_wide.index)
+        elif self._data_long is not None:
+            return list(self._data_long[self._row_index_name].unique())
+
+    def get_samples_replicates(self) -> Dict[str, str] | None:
+        return self._replicates
+
+    def get_samples_batches(self) -> Dict[str, str] | None:
+        return self._batches
 
     def get_long_table(self):
         if not self.is_buffered():
@@ -158,7 +221,7 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset_id(cls, dataset_id: int) -> ABCDataTable:
+    def objectify_with_dataset_id(cls, dataset_id: int) -> ABCDataTable | None:
         pass
 
     @classmethod
@@ -182,6 +245,28 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     def set_samples_attributes(self, attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None):
         ABCDataTable._test_attributes_samples_keys(data_table = self, attributes_samples = attributes_samples)
         self._attributes_samples = attributes_samples
+
+    def set_samples_replicates(self, replicates: Dict[str, str] | None):
+        if replicates:
+            if self._data_columns is None:
+                raise ABCDataTableError("Set data first before defining replicates.")
+            pass
+
+            if not all(sample in self._data_columns for sample in replicates.keys()):
+                raise dlib.ABCDataTableError("Some sample names in provided replicates do not exist in the DataTable.")
+
+        self._replicates = replicates
+
+    def set_samples_batches(self, batches: Dict[str, str] | None):
+        if batches:
+            if self._data_columns is None:
+                raise ABCDataTableError("Set data first before defining batches.")
+            pass
+
+            if not all(sample in self._data_columns for sample in batches.keys()):
+                raise dlib.ABCDataTableError("Some sample names in provided batches do not exist in the DataTable.")
+
+        self._batches = batches
 
     # fixme: make it thread-safe!
     def splitup_protein_groups(self, sep=","):

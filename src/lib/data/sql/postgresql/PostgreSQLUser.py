@@ -92,9 +92,12 @@ class PostgreSQLUser(dlib.ABCUser):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @staticmethod
-    def __get_db_select_row(db_id: int | None = None, username: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
-        if db_id is None and username is None:
-            raise dlib.ABCUserError("Neither id (db_id) nor username set for PostgreSQLUser. Unable to perform SELECT.")
+    def __get_db_select_row(db_id: int | None = None,
+                            email: str | None = None,
+                            username: str | None = None,
+                            db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
+        if db_id is None and username is None and email is None:
+            raise dlib.ABCUserError("Neither id (db_id), email nor username set for selection of PostgreSQLUser. Unable to perform SELECT.")
 
         db_conn = None
         db_cur = db_cur_session
@@ -104,12 +107,15 @@ class PostgreSQLUser(dlib.ABCUser):
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
 
-            if db_id is None:
+            if db_id is not None:
                 db_cur.execute("""SELECT id, username, research_group_id, firstname, lastname, email, email_verified, base64_image, profile_text, orcid, url, allow_login, personal_salt, created_on, updated_on, last_login_on, expires_after
                                     FROM sec_users WHERE username = %(username)s;""", {"username": username})
-            else:
+            elif email is not None:
                 db_cur.execute("""SELECT id, username, research_group_id, firstname, lastname, email, email_verified, base64_image, profile_text, orcid, url, allow_login, personal_salt, created_on, updated_on, last_login_on, expires_after
-                                    FROM sec_users WHERE id = %(db_id)s;""", {"db_id": db_id})
+                                    FROM sec_users WHERE email = %(email)s;""", {"email": email})
+            elif username is not None:
+                db_cur.execute("""SELECT id, username, research_group_id, firstname, lastname, email, email_verified, base64_image, profile_text, orcid, url, allow_login, personal_salt, created_on, updated_on, last_login_on, expires_after
+                                    FROM sec_users WHERE username = %(username)s;""", {"username": username})
 
             if db_cur.rowcount != 1:
                 raise dlib.ABCUserError("Provided user id or name does not match a single user. Number of returned rows = {n}".format(n=db_cur.rownumber))
@@ -266,7 +272,7 @@ class PostgreSQLUser(dlib.ABCUser):
                 db_cur = db_conn.cursor()
 
             if usernames is None:
-                pass
+                pass  # ToDo: Forgot to finish. return all or list of selected
             db_cur.execute("SELECT id, username, research_group_id, firstname, lastname, email, email_verified, base64_image, profile_text, orcid, url, allow_login, personal_salt, created_on, updated_on, last_login_on, expires_after FROM sec_users;")
             db_rows = db_cur.fetchall()
 
@@ -336,7 +342,7 @@ class PostgreSQLUser(dlib.ABCUser):
 
     @classmethod
     def objectify_with_id(cls, db_id: int) -> PostgreSQLUser:
-        db_row = PostgreSQLUser.__get_db_select_row(db_id = db_id)
+        db_row = PostgreSQLUser.__get_db_select_row(db_id = db_id)  # Fixme: Check if something is returned, also in other classes
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
                               research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
@@ -354,7 +360,7 @@ class PostgreSQLUser(dlib.ABCUser):
 
     @classmethod
     def objectify_with_username(cls, username: str) -> PostgreSQLUser:
-        db_row = PostgreSQLUser.__get_db_select_row(username = username)
+        db_row = PostgreSQLUser.__get_db_select_row(username = username)  # Fixme: Check if something is returned, also in other classes
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
                               research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
@@ -370,6 +376,23 @@ class PostgreSQLUser(dlib.ABCUser):
 
         return user
 
+    @classmethod
+    def objectify_with_email(cls, email: str) -> PostgreSQLUser:
+        db_row = PostgreSQLUser.__get_db_select_row(email = email)  # Fixme: Check if something is returned, also in other classes
+
+        user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
+                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
+                              base64_image = db_row[7], profile_text = db_row[8], orcid = db_row[9], url = db_row[10],
+                              allow_login = db_row[11], expires_after = db_row[16])
+
+        user._is_email_verified = db_row[6]
+        user._personal_salt = db_row[12]
+        user._created_on = db_row[13]
+        user._updated_on = db_row[14]
+        user._last_login_on = db_row[15]
+        user._expires_after = db_row[16]
+
+        return user
 
     @classmethod
     def objectify_with_object(cls, user: dlib.ABCUser) -> PostgreSQLUser:

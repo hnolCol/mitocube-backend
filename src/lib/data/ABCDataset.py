@@ -15,15 +15,16 @@ class DatasetState(IntEnum):
     Enums that are defined in the frontend which
     knows what to do with such input types.
     """
+    INACTIVE = -50  # set to -100?
     CANCELED = -20
     PAUSED = -10
-    INITIALISED = 0  # Question: Does that not makes more sense than (no data submitted yet)? was SUBMITTED = 0
+    INITIALISED = 0
     PROCESSED = 10
     MEASURING = 20
-    SUBMITTED = 25  # Question: New, or UPLOADED?
+    UPLOADED = 25
     ANALYSIS = 30
     DONE = 40   # set to 50?
-    PUBLISHED = 50  # set to 100?
+    ACTIVE = 50  # set to 100?  # before only dataset meta information is visible
 
 
 class ABCDatasetError(dlib.ABCDataError):
@@ -82,6 +83,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     @staticmethod
     @abstractmethod
     def does_exist_with_labels(labels: List[str]) -> Dict[str, bool]:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_full_dataset_list() -> Dict[str, int]:
         pass
 
     def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:
