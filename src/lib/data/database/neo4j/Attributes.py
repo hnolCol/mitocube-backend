@@ -5,7 +5,7 @@ from lib.data.database.abstract.Attributes import AttributesABC
 
 from config.enums.states import SubmissionStatesEnums
 
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitModel, AttributeUnitResponseModel
+from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitModel, AttributeUnitResponseModel, AttributeResponseModel
 from config.models.annotations.feature import FeatureModel 
 from config.models.feature import FeatureNeoModel
 
@@ -142,7 +142,7 @@ class Neo4JAttributes(AttributesABC):
 
     def values(self, tags : List[str]) -> List[AttributeValueModel]:
         """
-        Does not return features as attribute values.
+        CAUTION: Does not return features as attribute values.
 
         Parameters
         ----------
@@ -195,10 +195,26 @@ class Neo4JAttributes(AttributesABC):
        # attribute_values_props = [av.value() for av in attribute_values]
         return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av) for av in attribute_values]
     
+    def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag}) "
+            "MATCH (a:Attribute)<-[:HAS_VALUES_FOR_ATTRIBUTE]-(submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
+            "WITH a, av "
+            "ORDER BY a.priority DESC, a.min_state ASC " 
+            "WITH {attributes : collect(DISTINCT properties(a)), attribute_values : collect(DISTINCT properties(av))} as output "
+            "RETURN output"
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, submission_tag=submission_tag)
+    
+        return AttributeResponseModel(**r[0])
+    
+    
     def get_attribute_values_by_dataset_tags(self, dataset_tags : List[str], attribute_tags : list[str] = None, attribute_value_tags : List[str] = None) -> List[AttributeValuesBySubmissionModel]:
-        """Finds all the attribute values that are assigned to a dataset and returns the number of dataset
-        that match each attribute value. This is a convenient function to get the datasets tags that have 
-        an attribute value and how many are used, as used in a filtering approach. 
+        """Finds all the attribute values that are assigned to the submissions and returns the number of submissions
+        that match each attribute value. This is a convenient function to get the submission tags that have 
+        an attribute value and how many are used, as used in a filtering approach to indicate the fraction of datasets.
 
         Parameters
         ----------

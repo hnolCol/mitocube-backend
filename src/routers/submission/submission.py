@@ -72,6 +72,7 @@ def post_meta_text(submission_label : str, metatext : Dict[str,str], user : User
     metadata = dataset.getMetaJson()
     if user.role < UserRolesEnum.CURATOR and metadata.user_label != user.label:
         raise HTTPException(status_code=403,detail="Metatext can only be modified by the owner or a user that is at least curator.")
+    #TO DO should be in the DEPENDS model 
     metadata = metadata.model_dump()
     metadata["modified_on"] = time.time()
     metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Metatext updated.", state = metadata["state"]))
@@ -127,7 +128,7 @@ def get_users_associated_with_submission(submission_tag : str, user : UserModel 
         
     """
     if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    return DB.meta.get_users(dataset_tag=submission_tag)
+    return DB.meta.get_users(tag=submission_tag)
 
 
 @router.post("/submissions/{submission_tag}/collaborators")
@@ -535,6 +536,26 @@ def update_submission(background_task : BackgroundTasks,
 @router.patch("/submissions/{label}/sampleattributes")
 def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curator)):
     pass 
+
+
+
+
+@router.get("/submissions/{submission_tag}/summary")
+def get_submission_summary_string(submission_tag : str) -> str:
+    "Returns a string with dataset and sample attributes"
+    summary_strings = DB.submission_summary.get(submission_tag)
+    print(summary_strings)
+    
+    return "\n".join(summary_strings)
+
+@router.get("/submissions/{submission_tag}/samples")
+def get_submission_summary_string(submission_tag : str) -> str:
+    "Returns a string with dataset and sample attributes"
+    samples = DB.submissions.get_samples(tag=submission_tag)
+    samples_string = pd.DataFrame.from_dict(samples).sort_values(by="index")
+    print(samples_string)
+    return samples_string.to_csv(sep="\t", index = None)
+
 
 
 

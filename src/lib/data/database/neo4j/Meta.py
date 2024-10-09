@@ -18,6 +18,16 @@ class Neo4JMetaHandler(MetaABC):
         self._attributes = attributes
         self.create_title_search_index() ##put in creator!! TODO 
         
+        
+    def exists(self, tag: str) -> bool:
+        "Checks if the submission exists."
+        query = (
+            "WITH EXISTS {(submission:Submission {tag : $tag})} as submission_exists "
+            "RETURN submission_exists "
+        )    
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+        
     def get(self, tags : List[str]) -> List[MinimalMetadataModel]:
         """Returns the minimal meta information of a dataset node (e.g. properties)
         from Neo4J database. 
@@ -31,7 +41,7 @@ class Neo4JMetaHandler(MetaABC):
             "MATCH (submission:Submission) "
             "WHERE submission.tag in $tags "
             "OPTIONAL MATCH (submission)<-[:OWNS]-(u:User) "
-            "MATCH (submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute {tag:'att_proteome'}) "
+            "MATCH (submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute {tag:'att_proteome'}) " #THIS excludes datasets from being found if the prteooem does not exist.
             "WITH collect(av.tag) as proteome_tags, submission, EXISTS {(submission)<-[:QUANTIFIED_IN]-(:Protein)} as has_datatable, u "
             "WITH {user_tag : u.tag, proteome_tags : proteome_tags, has_datatable : has_datatable} as add_meta, submission "
             "RETURN apoc.map.merge(properties(submission), add_meta)"
@@ -334,13 +344,13 @@ class Neo4JMetaHandler(MetaABC):
 
         Parameters
         ----------
-        dataset_tag : str
+        tag : str
             _description_
 
         Returns
         -------
         UserModel
-            _description_
+            The owner
             
         Raises
         ------
@@ -353,12 +363,12 @@ class Neo4JMetaHandler(MetaABC):
             "MATCH (u:User)-[:OWNS]->(submission) "
             "RETURN properties(u)"
         )
-        r = self._driver.execute_query(query, ubmission_tag = tag, routing_="r", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, submission_tag = tag, routing_="r", result_transformer_=Result.value)
         if len(r) == 0: raise ValueError("User not found")
         return UserModel(**r[0])
 
     def get_users(self, tag : str) -> List[UserModel]:
-        ""
+        "Returns owners and collaborators."
         
         query = (
             "MATCH (submission:Submission) "

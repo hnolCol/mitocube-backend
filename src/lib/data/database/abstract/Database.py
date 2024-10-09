@@ -13,7 +13,7 @@ from lib.data.database.abstract.Attributes import AttributesABC
 from lib.data.database.abstract.Filter import FilterABC
 from lib.data.database.abstract.Users import UserABC 
 from lib.data.database.abstract.Meta import MetaABC 
-from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC
+from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC, SubmissionSummaryABC
 from lib.data.database.abstract.Features import FeaturesABC
 from lib.data.database.abstract.Dataset import DatasetABC
 from lib.data.database.abstract.Genotypes import GenotypeABC
@@ -62,6 +62,7 @@ class DatabaseABC(ABC):
     genotypes : GenotypeABC = None
     qc : QCABC = None 
     peptides : PeptidesABC = None 
+    submission_summary : SubmissionSummaryABC = None
    # performance : Per
     
 

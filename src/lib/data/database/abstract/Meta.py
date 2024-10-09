@@ -6,8 +6,15 @@ from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 import pandas as pd
 
+from config.models.user import UserModel
+
 
 class MetaABC(ABC):
+
+
+    @abstractmethod
+    def exists(self, tag : str) -> bool:
+        "Checks if there are metadata for the submission tag"
 
     
     @abstractmethod
@@ -73,13 +80,15 @@ class MetaABC(ABC):
         Returns
         -------
         List[Dict]
-            The minimal metadata of a dataset. 
+            The minimal metadata of a dataset in a list.
+            If all tags exist, the length is equal to len(tags) 
 
         Raises
         ------
         Exception
             If the database throws an Exception
         """
+        
         
     @abstractmethod
     def get_dataset_attributes(self, tag : str) -> Dict[str,List[str]]:
@@ -129,6 +138,15 @@ class MetaABC(ABC):
                 - 'content' (str) : The actual content of the metatext. 
         """
         
+        
+    @abstractmethod
+    def get_owner(self, tag : str) -> UserModel:
+        """Returns the owner of the submission tag. If submission does not
+        exist an ValueError is thrown."""
+        
+    @abstractmethod
+    def get_users(self, tag : str) -> List[UserModel]:
+        "Returns all users associated with the submission tag (owner, collaborators.)"
         
     @abstractmethod
     def get_sample_attributes(self, tag : str) -> Dict[str,Dict[str,List[int]]]:

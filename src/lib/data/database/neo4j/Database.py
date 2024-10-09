@@ -7,7 +7,7 @@ from lib.data.database.neo4j.Proteomes import Neo4JProteomes
 from lib.data.database.neo4j.Attributes import Neo4JAttributes
 from lib.data.database.neo4j.Dataset import Neo4JDataset
 from lib.data.database.neo4j.Filters import Neo4JFilter
-from lib.data.database.neo4j.Submission import Neo4JSubmissionFilter, Neo4JSubmissions
+from lib.data.database.neo4j.Submission import Neo4JSubmissionFilter, Neo4JSubmissions, Neo4JSubmissionSummary
 from lib.data.database.neo4j.Meta import Neo4JMetaHandler
 from lib.data.database.neo4j.Users import Neo4JUser
 from lib.data.database.neo4j.Features import Neo4JFeatures
@@ -40,10 +40,11 @@ class MCNeo4JDatabase(DatabaseABC):
         self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver)
         self.genotypes = Neo4JGenotype(driver=self.connection.driver)
         self.proteomes = Neo4JProteomes(driver = self.connection.driver)
-        self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta)
+        self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.qc = Neo4JQC(driver = self.connection.driver)
         self.peptides = Neo4JPeptides(driver = self.connection.driver)
+        self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)
         #checks if all is correctly defined 
         super(MCNeo4JDatabase, self).__init__()
         

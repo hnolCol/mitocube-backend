@@ -52,7 +52,7 @@ class NanConverter(JSONEncoder):
 
 attr = pd.read_excel(FILE,sheet_name=ATTRIBUTE_SHEET)
 attr_values = pd.read_excel(FILE,sheet_name=ATTRIBUTE_VALUES_SHEET)
-
+attr_values["tag"] = [f"{attr_tag}:{tag}" for attr_tag, tag in attr_values[["attribute_tag","tag"]].values]
 attrs = attr.dropna(how="all")
 attrs["id"] = np.arange(attrs.index.size)
 tag_mapper = dict([(tag,id) for tag, id in attrs[["tag","id"]].values])

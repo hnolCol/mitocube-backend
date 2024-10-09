@@ -25,7 +25,6 @@ class Neo4JDataset(DatasetABC):
         self.meta = meta 
         self.factory = Neo4JFactory(driver)
     
-    
     def exists(self, tag : str) -> bool:
         "Checks if the submission has data (e.g. quantified proteins). This is not meant to check if a submission exists."
         query = (
@@ -35,28 +34,15 @@ class Neo4JDataset(DatasetABC):
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return r[0]
     
-    def _get_variance_in_groups(self, tag : str, data_table : pd.DataFrame)-> Tuple[pd.DataFrame,pd.DataFrame]:
+    def _get_variance_in_groups(self, tag : str, data_table : pd.DataFrame)-> pd.Series:
         "Calculate the onway ANOVA F-value when splitting the data in the individual groups" 
        # total_variance = data_table.var(axis=1)
-        sample_attr,sample_attributes = self.meta.get_sample_attributes_and_genotypes(tag)
-        attribute_tags = [attr_tag for attr_tag in sample_attributes.columns.values if attr_tag != "sample_text"]
-        #variances = pd.DataFrame(index = data_table.index)
-        #for attr_tag in attribute_tags:
-        grouped_sample_attributes = sample_attributes.groupby(by=attribute_tags)
-        # test_data = np.empty(shape=(data_table.index.size,grouped_sample_attributes.ngroups))
-        # for n, (group, group_data) in enumerate(grouped_sample_attributes):
-        #     sample_indices = group_data.index 
-        #     d = data_table.iloc[:,sample_indices].values 
-        #     test_data[:,n] = d 
-            
-            # group_var = data_table.loc[:,sample_names].var(axis=1)
-            # variances.loc[:,"__".join(group)] = group_var
+        _, sample_attributes_map = self.meta.get_sample_attributes_and_genotypes(tag)
+        attribute_tags = [attr_tag for attr_tag in sample_attributes_map.columns.values if attr_tag != "sample_text"] #sample text is always returned. 
+        grouped_sample_attributes = sample_attributes_map.groupby(by=attribute_tags)
         data_for_test = [data_table.iloc[:,group_data.index].values for group, group_data in grouped_sample_attributes]
         #returns F-value and p-values
         F,p = f_oneway(*data_for_test,axis=1)
-        # print(test_data)
-        # print(f_oneway(test_data,axis=1))
-        
         F = pd.Series(F,index=data_table.index)
         return F
     
@@ -74,7 +60,6 @@ class Neo4JDataset(DatasetABC):
         #print(data_table.reset_index(names="p_tag").melt(id_vars="p_tag", var_name="sample_index"))
         X = data_table.reset_index(names="p_tag").melt(id_vars="p_tag", var_name="sample_index").dropna(subset=["value"]).groupby("sample_index")
        # print(X)
-        
         for sample_index, sample_data in X:
             query = (
                 "MATCH (submission:Submission {tag : $tag}) "
@@ -108,7 +93,6 @@ class Neo4JDataset(DatasetABC):
                   "sample_index" : [data_table.columns[idx] for idx in range(data_table.columns.size) if not is_nan[n,idx]]
                   } for n,tag in enumerate(tags)]
         
-        print(F)
         query = (
             "MATCH (submission:Submission {tag : $tag}) "
             "UNWIND $props as prop "

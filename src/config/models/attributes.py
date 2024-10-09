@@ -210,7 +210,7 @@ class AttributeResponseModel(BaseModel):
         The list of attribute_values. 
     """
     attributes : List[AttributeModel]
-    attribute_values : List[AttributeValueModel]
+    attribute_values : List[AttributeValueModel|FeatureNeoModel]
 
 
 
@@ -236,4 +236,5 @@ class AttributeUnitModel(BaseModel):
 class AttributeUnitResponseModel(BaseModel):
     attribute : AttributeModel
     units : List[AttributeUnitModel]
+
 

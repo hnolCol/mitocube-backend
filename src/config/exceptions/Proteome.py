@@ -1,0 +1,2 @@
+class ProteomeNotFoundError(Exception):
+    pass 

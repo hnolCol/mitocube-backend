@@ -55,7 +55,7 @@ def get_dataset_data(dataset_tag : str, user : UserModel = Depends(get_user_from
 @router.get("/datasets/{dataset_tag}/qc", 
             response_model=[], 
             summary="Quality control of data set. Includes a statistic summary.")
-def get_dataset_data(dataset_tag : str):
+def get_dataset_qc(dataset_tag : str):
     """
     Returns the summary statistic data for a specific dataset
     TO DO : Add response model.

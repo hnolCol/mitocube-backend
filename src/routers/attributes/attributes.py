@@ -89,22 +89,22 @@ def get_dataset_attributes(user : UserModel = Depends(get_user_from_token), min_
     return DB.attributes.get_dataset_attributes(min_state=min_state)
 
 @router.get("/attribute_values/q")
-def get_attribute_values(tags : str = None, attribute_value_tag : str = None, attribute_tag : str = None, count : bool = True, max_attributes : int = 999999):
-    """Returns a list of attribute values that are present in the given dataset tags. 
+def get_attribute_values(tags : str = None, attribute_value_tag : str = None, attribute_tag : str = None, max_attributes : int = 999999):
+    """Returns a list of attribute values that are present in the given submission tags. 
     Use the attribute_value_tag and attribute_tag params to return a subset of attribute_tags. 
+    
 
     Parameters
     ----------
     tags : str, optional
-        The submission dataset tag, by default None
+        The submission tag, by default None
     attribute_value_tag : str, optional
         _description_, by default None
     attribute_tag : str, optional
         _description_, by default None
-    count : bool, optional
-        _description_, by default True
     max_attributes : int, optional
         _description_, by default 999999
+        #TODO: implement a limit 
 
     Returns
     -------
@@ -115,7 +115,6 @@ def get_attribute_values(tags : str = None, attribute_value_tag : str = None, at
     # db_helper = MCDatabaseHelper.getDatabaseHelper()
     if tags is None:
         tags = DB.get_submission_tags()
-        print(tags)
     
     attribute_values_by_dataset = DB.attributes.get_attribute_values_by_dataset_tags(
         dataset_tags = APIParamString(param=tags).param,
@@ -128,14 +127,15 @@ def get_attribute_values(tags : str = None, attribute_value_tag : str = None, at
 
     return {"attribute_value_tags" : attribute_value_tags, "count" : submission_count_by_attribute_value_tag, "attribute_values_by_tag" : attribute_values_by_tag}
     
-@router.get("/q")
-def get_attributes(labels : str, count : bool = True, max_attributes : int = 999999):
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    db_attributes = MCAttributes.getAttributeDatabase() 
-    attribute_tags, submission_count_by_attribute_value_tag = db_helper.get_attribute_tags_by_labels(labels,count=count)
-    attributes = db_attributes.getAttributes(tags=list(attribute_tags))
-    attributes_by_tag = attributes.set_index("tag", drop=False).to_dict(orient="index")
-    return {"attribute_tags" : attribute_tags, "submission_count" : submission_count_by_attribute_value_tag, "attributes_by_tag" : attributes_by_tag}
+# @router.get("/q")
+# def get_attributes(labels : str, count : bool = True, max_attributes : int = 999999):
+    
+#     db_helper = MCDatabaseHelper.getDatabaseHelper()
+#     db_attributes = MCAttributes.getAttributeDatabase() 
+#     attribute_tags, submission_count_by_attribute_value_tag = db_helper.get_attribute_tags_by_labels(labels,count=count)
+#     attributes = db_attributes.getAttributes(tags=list(attribute_tags))
+#     attributes_by_tag = attributes.set_index("tag", drop=False).to_dict(orient="index")
+#     return {"attribute_tags" : attribute_tags, "submission_count" : submission_count_by_attribute_value_tag, "attributes_by_tag" : attributes_by_tag}
 
 
 
@@ -144,13 +144,17 @@ def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> Attr
     """
     Returns the stored attribute and attribute value definitions that can be assigned to a user.
     """
-    db_attributes = MCAttributes.getAttributeDatabase()
+    
+    attributes = DB.attributes.get_attributes_for_user()
+    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+    
+    # db_attributes = MCAttributes.getAttributeDatabase()
 
-    attributes = db_attributes.getAttributes()
-    attributes = attributes.loc[attributes["allow_for_user"], :]
+    # attributes = db_attributes.getAttributes()
+    # attributes = attributes.loc[attributes["allow_for_user"], :]
 
-    attribute_values = db_attributes.getAttributeValues()
-    attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
+    # attribute_values = db_attributes.getAttributeValues()
+    # attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
 
     # Todo: Do not understand what you mean with that.
     # if user.role == UserRolesEnum.ADMIN:
@@ -162,8 +166,8 @@ def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> Attr
     # else:
     #     attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
 
-    return AttributeResponseModel(attributes=attributes.to_dict(orient="records"),
-                                  attribute_values=attribute_values.to_dict(orient="records"))
+    return AttributeResponseModel(attributes=attributes,
+                                  attribute_values=attribute_values)
 
 
 

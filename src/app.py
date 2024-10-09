@@ -50,7 +50,7 @@ DB = Database.DB()
 print(DB)
 
 import pandas as pd 
-dataset_tag = "BuXOSlIl6G"#"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
+dataset_tag = "BuXOSlIl6G"#"0Ks1mc18NL" #"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
 m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
 print(m)
 meta = DatasetSubmissionModel(**m, tag = m["label"])
@@ -62,7 +62,8 @@ from config.models.genotype import GenotypeModel
 from config.models.performance import QCRunModel, QCPeptidesModel, QCPeptideModel
 users_from_db = UserDB.get_users()
 
-
+#DB.insert_meta(meta)
+#DB.insert_dataset(d,dataset_tag)
 
 DB.peptides.set_qc_peptides(peptides = QCPeptidesModel(user_tag="DsuV8w4t",peptides = [QCPeptideModel(sequence="DIPGLTDTTVPR",protein_tag="P62753"),QCPeptideModel(sequence="FDDAVVQSDFK", protein_tag="P11142")]), join = False)
 print(DB.peptides.get_qc_peptides())
@@ -74,9 +75,10 @@ DB.qc.insert(QCRunModel(tag = "asd23a23",
                         group_attr={'att_ms':['exploris480'],'att_lc_system':['e1200']},
                         rt_peptides={'ASTNDFR':12.2,"TNPOTRSK" : 28.2})
              )
-
-
-DB.users.add_users(users_from_db)
+print("========")
+DB.submission_summary.get(tag=dataset_tag)
+print("========")
+#DB.users.add_users(users_from_db)
 genotypes_from_file = [GenotypeModel(**x, proteome_tag=x["proteome_id"]) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
 
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="asda")
@@ -96,11 +98,10 @@ da = DB.meta.get_dataset_attributes(tag='BuXOSlIl6G')
 # print(overview)D
 
 #DB.news.insert(News(user_tag="nqVQzDvn", content="This is a the latest beatuiful news", submission_tags=["LOGtC9tNC13b"], feature_tags=["A4GXA9","A0A0C5B5G6"]))
-print(DB.news.get())
+#print(DB.news.get())
 #DB.genotypes.add_genotypes(genotypes_from_file)
 
-DB.insert_meta(meta)
-#DB.insert_dataset(d,dataset_tag)
+
 #DB.proteomes.insert_uniprot_proteome()
 #r = DB.datasets.get_datatable(tag = dataset_tag)
 

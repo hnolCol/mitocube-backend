@@ -14,6 +14,25 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from config.enums.states import SubmissionStatesEnums
 
 
+class SubmissionSummaryABC(ABC):
+
+    @abstractmethod
+    def get(self, tag : str) -> List[str]:
+        """Creates a summary as a string. 
+        This is helpful to extract all required information and 
+        put them in an Excel sheet. 
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag
+
+        Returns
+        -------
+        List[str]
+            _Submission summary strings. 
+        """
+
 class SubmissionABC(ABC):
     """Handles Submissions in the backend. 
     Notably, filtering submissions have an extra abstract class (see below)
@@ -64,6 +83,9 @@ class SubmissionABC(ABC):
         ValueError 
             If the tag does not exists 
         """
+    @abstractmethod
+    def get_samples(self, tag : str)-> List:
+        "Returns the samples of a submission"
     
     @abstractmethod
     def insert(self, submission : DatasetSubmissionModel) -> bool:
@@ -78,6 +100,13 @@ class SubmissionABC(ABC):
         -------
         bool
             _description_
+            
+            
+        Exception
+        ---------
+        ProteomeNotFoundError 
+            If the proteome is not yet in the database. 
+        
         """
     
     @abstractmethod

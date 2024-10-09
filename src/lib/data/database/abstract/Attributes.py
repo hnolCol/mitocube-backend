@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from config.enums.states import SubmissionStatesEnums
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeResponseModel
 from config.models.feature import FeatureNeoModel 
 
 class AttributesABC(ABC):
@@ -108,8 +108,10 @@ class AttributesABC(ABC):
         """
            
     
+    
     @abstractmethod
-    def get(self, tags : List[str] = None, 
+    def get(self, 
+            tags : List[str] = None, 
             param_name : Literal["allow_for_dataset","allow_as_filter",
                                 "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
@@ -137,6 +139,24 @@ class AttributesABC(ABC):
     @abstractmethod
     def get_values(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
         ""
+        
+        
+    @abstractmethod
+    def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
+        """Returns the attribute/value properties and values that are associated with a 
+        submission tag. This includes dataset as well as sample attributes. The attributes should be sorted by
+        the attribute priority and the min_state properties.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag
+
+        Returns
+        -------
+        Dict[]
+            _description_
+        """
         
     @abstractmethod    
     def get_attributes_and_values_by_search_string(self, 

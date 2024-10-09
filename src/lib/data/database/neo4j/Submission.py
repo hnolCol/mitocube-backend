@@ -1,19 +1,23 @@
 from typing import Literal, List 
 from neo4j import Driver, Result 
 import pandas as pd 
-
+import datetime
 from config.models.searches import FulltextSearchResult
 
-from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC
+from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC, SubmissionSummaryABC
 from lib.data.database.abstract.Meta import MetaABC
+from lib.data.database.abstract.Attributes import AttributesABC
+from lib.data.database.abstract.Proteomes import ProteomesABC
 from lib.data.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import DatasetSubmissionModel
+from config.exceptions.Proteome import ProteomeNotFoundError
 
 class Neo4JSubmissions(SubmissionABC):
-    def __init__(self, driver : Driver, meta : MetaABC) -> None:
+    def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC) -> None:
         self._meta = meta 
         self._driver = driver
+        self._proteomes = proteomes
         
     def count(self) -> int:
         "Counts the total number of submissions in the database"
@@ -32,7 +36,27 @@ class Neo4JSubmissions(SubmissionABC):
         return super().delete(tag)
     
     def exists(self, tag: str) -> bool:
-        return super().exists(tag)
+        "Checks if the submission exists."
+        query = (
+            "WITH EXISTS {(submission:Submission {tag : $tag})} as submission_exists "
+            "RETURN submission_exists "
+        )    
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+    
+    
+    def get_samples(self, tag : str) -> List[str]:
+        "" 
+        query = (
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
+            "WHERE submission.tag = $tag "
+            "RETURN collect(properties(sample)) "
+            
+        )
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag=tag)
+        
+        return r[0]
     
     def insert(self, submission: DatasetSubmissionModel) -> bool:
         ""
@@ -50,7 +74,15 @@ class Neo4JSubmissions(SubmissionABC):
             }
         #get the state tag 
         #state_tag =  SubmissionStatesEnums(submission.state).name
+        if "att_proteome" not in submission.dataset_attributes:
+            raise ProteomeNotFoundError("The proteome dataset attribute was not found.")
         
+        for proteome_tag in submission.dataset_attributes["att_proteome"]:
+            if not self._proteomes.exist(proteome_tag):
+                raise ProteomeNotFoundError(f"The proteome {proteome_tag} was not found in the database. Please add it before inserting the submission.")
+        
+        
+    
         samples = [{"tag" : sample_name, "props" : {"index" : idx, "replicate" : submission.replicates[idx], "text" : sample_name}} for idx,sample_name in enumerate(sample_names)]
         dataset_attributes =  [tag for tag in submission.dataset_attributes.keys()]
         dataset_attribute_values = [{"attribute_value_tag" : tag.split(":")[-1], "attribute_tag" : attribute_tag} 
@@ -319,5 +351,55 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         
         
+
+
+class Neo4JSubmissionSummary(SubmissionSummaryABC):
+    def __init__(self, driver : Driver, meta : MetaABC, attributes : AttributesABC) -> None:
         
+        self._driver = driver
+        self._meta = meta 
+        self._attributes = attributes
+        self._factory = Neo4JFactory(driver=driver)
          
+         
+         
+    def get(self, tag: str, sep_string  = "\t") -> List[str]:        
+        
+        if not self._meta.exists(tag=tag): raise ValueError("The submission tag does not exist.")
+        meta = self._meta.get(tags = [tag])
+        if len(meta) == 0: raise ValueError("The submission tag does not have meta data.")
+        submission_info = meta[0]
+        users = self._meta.get_users(tag = tag)
+        dataset_attributes = self._meta.get_dataset_attributes(tag = tag)
+        _, sample_map = self._meta.get_sample_attributes_and_genotypes(tag=tag, as_sample_map=True)
+       
+       
+        attributes = self._attributes.get_attributes_and_values_for_submission(submission_tag= tag) #TODO change methid to just return text ?
+        attributes.attribute_values
+        
+        attributes_by_tag = dict([(a.tag, a) for a in attributes.attributes])
+        attribute_values_by_tag = dict([(a.tag, a) for a in attributes.attribute_values])
+        
+        base_strings = [
+            submission_info.title, 
+            f"Researchers{sep_string}{', '.join([f'{u.firstname} {u.lastname}<{u.email}>' for u in users])}",
+            f"Summary created at{sep_string}{datetime.datetime.now()}",
+            f"WARNING: Be aware that meta data might be added during the project's life cycle."
+            f"Submission tag{sep_string}{submission_info.tag}",
+            f"Samples{sep_string}{submission_info.n_samples}",
+        ]
+        
+        for attribute_tag, attribute_value_tags in dataset_attributes.items():
+            if attribute_tag in attributes_by_tag:
+                attribute = attributes_by_tag[attribute_tag]
+                
+                for attribute_value_tag in attribute_value_tags:
+                    if attribute_value_tag in attribute_values_by_tag:
+                        attribute_value = attribute_values_by_tag[attribute_value_tag]
+                        if attribute.has_features_value:
+                            base_strings.append(f"{attribute.text}{sep_string}{attribute_value.gene_name}({attribute_value.tag})")
+                        else:
+                            base_strings.append(f"{attribute.text}{sep_string}{attribute_value.text}")
+        base_strings.append(sample_map.to_csv(sep=sep_string))
+        return base_strings
+        
