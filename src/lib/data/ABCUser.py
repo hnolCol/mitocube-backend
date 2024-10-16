@@ -41,17 +41,23 @@ class ABCUser(ABC, dlib.FlexDataClass):
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLUser}
 
-    def _refresh_last_login_date(self, forceWrite: bool = False):
+    def _refresh_last_login_date(self):
         self._last_login_on = datetime.now()
+        self._write_last_login_date()
 
-        if forceWrite:
-            self.write()
+    @abstractmethod
+    def _write_last_login_date(self):
+        pass
 
     def _refresh_update_date(self, forceWrite: bool = False):
         self._updated_on = datetime.now()
 
         if forceWrite:
             self.write()
+
+    @abstractmethod
+    def _test_password(self, password: str) -> bool:
+        pass
 
     def allow_login(self, forceWrite = False):
         self._refresh_update_date(forceWrite = False)
@@ -153,21 +159,16 @@ class ABCUser(ABC, dlib.FlexDataClass):
     def get_refresh_updated_on(self):
         return self._updated_on
 
-    def login(self, password: str) -> str:  # ToDo: Update Typing
+    def login(self, password: str):
         # ToDo: Test if User with specified Username exist
 
         if not self.is_login_allowed():
             raise ABCUserError("Login is deactivated for this user. Contact the administrator to enable login.")
 
-        if not self.test_password():
+        if not self._test_password(password = password):
             raise ABCUserError("Invalid credentials. Please check if the username and password were spelled correctly and try again.")
 
-        self._refresh_last_login_date(forceWrite = False)
-        str_token = "Nope!"  # token = self.create_login_token()  # ToDo: Implement create_login_token() and self._token
-
-        self.write()
-
-        return str_token  # self._token  # ToDo: Update return value
+        self._refresh_last_login_date()
 
     @classmethod
     @abstractmethod
@@ -268,10 +269,6 @@ class ABCUser(ABC, dlib.FlexDataClass):
     def set_expires_after(self, expires_after: datetime):
         self._refresh_update_date(forceWrite = False)
         self._expires_after = expires_after
-
-    @abstractmethod
-    def test_password(self, password: str) -> bool:
-        pass
 
     @abstractmethod
     def write(self):

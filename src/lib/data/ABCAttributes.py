@@ -10,7 +10,7 @@ class ABCAttributeError(dlib.ABCDataError):
 
 
 class ABCAttribute(ABC, dlib.FlexDataClass):
-    def __init__(self, parent_attribute: ABCAttribute, tag: str, text: str | None, priority: int = 500, db_id: int | None = None,
+    def __init__(self, parent_attribute: ABCAttribute | None, tag: str, text: str | None, priority: int = 500, db_id: int | None = None,
                  allow_as_filter: bool = True, allow_for_dataset: bool = True, allow_for_genotype: bool = True,
                  allow_for_performance: bool = True, allow_for_sample: bool = True, allow_trait_values: bool = True,
                  required_for_dataset_state: dlib.DatasetState = dlib.DatasetState.INITIALISED):
@@ -26,6 +26,9 @@ class ABCAttribute(ABC, dlib.FlexDataClass):
         self._allow_for_sample: bool = allow_for_sample
         self._allow_trait_values: bool = allow_trait_values
         self._required_for_dataset_state: dlib.DatasetState = required_for_dataset_state
+
+    def __repr__(self):
+        return "{}(id={}, tag={})".format(self.__class__.__name__, self._id, self._tag)
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:  # ToDo: Update return values!
@@ -53,6 +56,11 @@ class ABCAttribute(ABC, dlib.FlexDataClass):
     @staticmethod
     @abstractmethod
     def does_tag_exist(tag: str) -> bool:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_all_attributes() -> Dict[id, ABCAttribute]:
         pass
 
     def get_id(self) -> int | None:
@@ -83,7 +91,7 @@ class ABCAttribute(ABC, dlib.FlexDataClass):
     def objectify_with_tag(cls, tag: str) -> ABCAttribute:
         pass
 
-    def set(self, parent: ABCAttribute, tag: str, text: str | None, priority: int, allow_as_filter: bool,
+    def set(self, parent: ABCAttribute | None, tag: str, text: str | None, priority: int, allow_as_filter: bool,
             allow_for_dataset: bool, allow_for_genotype: bool, allow_for_performance: bool, allow_for_sample: bool,
             allow_trait_values: bool, required_for_dataset_state: dlib.DatasetState):
         self._parent = parent
@@ -98,7 +106,7 @@ class ABCAttribute(ABC, dlib.FlexDataClass):
         self._allow_trait_values = allow_trait_values
         self._required_for_dataset_state = required_for_dataset_state
 
-    def set_permissions(self,  allow_as_filter: bool, allow_for_dataset: bool, allow_for_genotype: bool,
+    def set_permissions(self, allow_as_filter: bool, allow_for_dataset: bool, allow_for_genotype: bool,
                         allow_for_performance: bool, allow_for_sample: bool, allow_trait_values: bool,
                         required_for_dataset_state: dlib.DatasetState):
         self._allow_as_filter = allow_as_filter
@@ -160,6 +168,10 @@ class ABCTrait(ABC, dlib.FlexDataClass):
         self._keyword: str | None = keyword
         self._description: str | None = description
 
+    def __repr__(self):
+        return "{}(id={}, tag={})".format(self.__class__.__name__, self._id, self.get_full_tag())
+
+
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:  # ToDo: Update return values!
         import lib.data.sql.postgresql as sqllib
@@ -168,6 +180,11 @@ class ABCTrait(ABC, dlib.FlexDataClass):
     @staticmethod
     @abstractmethod
     def does_tag_exist(attribute: dlib.ABCAttribute, tag: str) -> bool:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_all_traits(attributes: Dict[int, ABCAttribute] | None = None) -> Dict[id, ABCTrait]:
         pass
 
     @staticmethod
@@ -195,16 +212,6 @@ class ABCTrait(ABC, dlib.FlexDataClass):
 
     def get_description(self) -> str | None:
         return self._description
-
-    @classmethod
-    @abstractmethod
-    def objectify_with_attribute_id(cls, db_id: int) -> Dict[str, ABCTrait]:
-        pass
-
-    @classmethod
-    @abstractmethod
-    def objectify_with_attribute_tag(cls, tag: str) -> Dict[str, ABCTrait]:
-        pass
 
     @classmethod
     @abstractmethod

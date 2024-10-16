@@ -1,4 +1,5 @@
-from typing import Any, Callable, Set, List, Literal, Optional
+from functools import lru_cache
+from typing import Any, Callable, Dict, Set, List, Literal, Optional
 
 from functools import lru_cache
 
@@ -17,6 +18,7 @@ set_key(dotenv_path=env_file_path, key_to_set="USERNAME", value_to_set="John")
 set_key(dotenv_path=env_file_path, key_to_set="EMAIL", value_to_set="abc@gmail.com")  
 '''
 
+
 class SystemSettings(BaseSettings):
     """System Settings"""
     model_config = SettingsConfigDict(case_sensitive = True,
@@ -24,15 +26,19 @@ class SystemSettings(BaseSettings):
                                       env_file_encoding="utf-8",
                                       extra="forbid")
 
-    # general Settings
+    # General Settings
     app_name: str = "Nova MitoCube"
     app_description: str = "MitoCube backend "
-    backend_version: str = "0.0.1 (Caterpillar)"
+    app_version: str = "0.0.1 (Caterpillar)"
+    app_json_use_terms: str = "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/terms/usage.json"  # ToDo: Find a different solution...
+    app_lead_contact: EmailStr = "andreas.lindner@uni-bonn.de"  # Fixme: Change me
+
+    # Application Settings
     allowed_middleware_url: str = "https://127.0.0.1:5000"
     # service_backend_url: str = "https://127.0.0.1:5000"
     dir_assets: str = "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-frontend/dist/assets"
 
-    # mail settings
+    # eMail settings
     mail_default_sender: str = "immunocube@gmail.com"
     mail_server: SecretStr = "smtp.googlemail.com"
     mail_port: int = 465
@@ -51,14 +57,14 @@ class SystemSettings(BaseSettings):
     mail_template_submission_complete: str = "submission_complete.html"
     mail_template_account_generated: str = "account_generated.html"
 
-    # db settings
+    # DB settings
     db_handler: Literal["panda_files", "postgresql"] = "postgresql"
 
-    # db file settings
+    # DB File Settings
     path_annotations: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources"  # Fixme: Change string ... "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/features"
     path_features: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources/features"  # Fixme: Change string
 
-    # db settings: postgresql
+    # DB PostgreSQL Settings
     db_ip: Optional[IPvAnyAddress] = "127.0.0.1"  # ToDo: create validation conditions if db_handler is postgresql? Good idea. I would use the @field_validator function which is also availabe in  pydantic Settings
     db_port: Optional[int] = 5432
     db_user: Optional[SecretStr] = "immunocube"  # None

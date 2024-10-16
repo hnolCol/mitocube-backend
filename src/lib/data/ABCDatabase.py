@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 # from abc import abstractmethod
 from collections import OrderedDict
-from typing import Dict, Type, Self
+from typing import Dict, List, Type, Self, Tuple
 
 # from datetime import datetime, timedelta
-# from deprecated import deprecated
 
 import lib.data as dlib
 
@@ -28,72 +28,37 @@ class ABCDatabaseError(ABCDataError):
     pass
 
 class ABCDatabase(dlib.FlexDataClass, metaclass=SingletonABCMeta):
-
-    def __init__(self):
-        self._cached_attributes: OrderedDict[str, dlib.ABCAttribute] = OrderedDict()
-        self._cached_datasets: OrderedDict[str, dlib.ABCDataset] = OrderedDict()
-        self._cached_instruments: OrderedDict[str, dlib.ABCInstrument] = OrderedDict()
-        self._cached_traits: OrderedDict[str, dlib.ABCTrait] = OrderedDict()
-
-    def clear_cache(self):
-        self.clear_cached_attributes()
-        self.clear_cached_datasets()
-        self.clear_cached_instruments()
-        self.clear_cached_traits()
-
-    def clear_cached_attributes(self):
-        self._cached_attributes.clear()
-
-    def clear_cached_datasets(self):
-        self._cached_datasets.clear()
-
-    def clear_cached_instruments(self):
-        self._cached_instruments.clear()
-
-    def clear_cached_traits(self):
-        self._cached_traits.clear()
-
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLDatabase}
 
-    # def get_dataset(self, label: str) -> dlib.ABCDataset:
-    #     dataset: dlib.ABCDataset | None = None
-    #
-    #     if label in self._cached_datasets.keys():
-    #         dataset = self._cached_datasets[label]
-    #         self._cached_datasets.move_to_end(label, last=True)
-    #         return dataset
-    #
-    #     CONF = get_system_settings()
-    #
-    #     if CONF.db_handler == "postgresql":
-    #         from lib.data.sql.postgresql.PostgreSQLDatabase import
-    #         database
-    #     elif CONF.db_handler == "pandafiles":  # todo: Implement "pandafiles" db_handler
-    #         raise ABCDatabaseError("pandafiles is not implemented yet!")
-    #         #from lib.data.dataset.PandaDataset import PandaFileDataset
-    #         # dataset = None  # PandaFileDataset(label=label, loadFromDatabase=True)
-    #     else:
-    #         raise ABCDatabaseError("getDataset(...) is not implemented yet!")
-    #
-    #     if len(self._cached_datasets) > 42:  # todo: change me to int(DB_SETTINGS.db_ip):
-    #         self._cached_datasets.popitem(last=False)
-    #
-    #     self._cached_datasets[label] = dataset
-    #
-    #     return dataset
+    def get_attribute_by_id(self, db_id: int) -> dlib.ABCAttribute:
+        return dlib.ABCAttribute.get_class().objectify_with_id[db_id]
 
-    # @staticmethod
-    # def get_database() -> ABCDatabase:
-    #     CONF = get_system_settings()
-    #
-    #     if CONF.db_handler == "postgresql":
-    #         from lib.data.sql.postgresql import PostgreSQLDatabase
-    #         return lib.data.sql.postgresql.PostgreSQLDatabase()
-    #     elif CONF.db_handler == "panda_files":
-    #         raise ABCDatabaseError("The db handler panda_files is not implemented yet!")
-    #     else:
-    #         raise ABCDatabaseError("Invalid MitoCubeDatabase configuration. Only 'postgresql' and 'pandafiles' are supported.")
-    #
+    def get_attribute_by_tag(self, tag: str) -> dlib.ABCAttribute:
+        return dlib.ABCAttribute.get_class().objectify_with_tag(tag)
+
+    def get_trait_by_id(self, db_id: int) -> dlib.ABCTrait:
+        return dlib.ABCTrait.get_class().objectify_with_id(db_id)
+
+    def get_trait_by_tag(self, tag: str) -> dlib.ABCTrait:
+        return dlib.ABCTrait.get_class().objectify_with_id(tag)
+
+    @staticmethod
+    @abstractmethod
+    def query_trait_ids(trait_query: str | None = None, trait_tags: List[str] | None = None) -> List[id]:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def query_datasets_ids(query: str | None = None,
+                           states: List[int] | None = None,
+                           feature_keys: List[str] | None = None,
+                           trait_tags: List[str] | None = None,
+                           trait_ids: List[int] | None = None,
+                           genotype_labels: List[str] | None = None,
+                           usernames: List[str] | None = None,
+                           limit_to_n: int | None = None,
+                           limit_offset: int = 0) -> Tuple[List[id], List[str]]:
+        pass

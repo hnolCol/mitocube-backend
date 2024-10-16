@@ -65,12 +65,12 @@ class ABCResearchGroup(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_from_id(cls, db_id: int) -> dlib.ABCResearchGroup:
+    def objectify_with_id(cls, db_id: int) -> dlib.ABCResearchGroup:
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_from_object(cls, rgroup: dlib.ABCResearchGroup) -> dlib.ABCResearchGroup:
+    def objectify_with_object(cls, rgroup: dlib.ABCResearchGroup) -> dlib.ABCResearchGroup:
         pass
 
     @abstractmethod

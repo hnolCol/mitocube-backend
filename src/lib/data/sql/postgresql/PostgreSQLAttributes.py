@@ -142,6 +142,42 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
         return db_row
 
     @staticmethod
+    def get_all_attributes(db_cur_session: psycopg2.cursor | None = None) -> Dict[id, PostgreSQLAttribute]:
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        attributes: Dict[int, PostgreSQLAttribute] = {}
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state FROM attributes ORDER by id ASC;""")
+
+            db_rows = db_cur.fetchall()
+
+            for db_row in db_rows:
+                attributes[db_row[0]] = PostgreSQLAttribute(db_id=db_row[0],
+                                                            parent_attribute = attributes[db_row[1]] if db_row[1] else None, # Should work since list is sorted ASC for ids!
+                                                            tag=db_row[2], text=db_row[3], priority=db_row[4],
+                                                            allow_as_filter=db_row[5],
+                                                            allow_for_dataset=db_row[6],
+                                                            allow_for_genotype=db_row[7],
+                                                            allow_for_performance=db_row[8],
+                                                            allow_trait_values=db_row[10],
+                                                            allow_for_sample=db_row[9],
+                                                            required_for_dataset_state=db_row[11])
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        # attributes = Dict[str, PostgreSQLAttribute] = {obj.get_tag():obj for key, obj in attributes.items()}
+        return attributes
+
+    @staticmethod
     def does_tag_exist(tag: str, db_cur_session: psycopg2.cursor | None = None) -> bool:
         db_conn = None
         db_cur = db_cur_session
@@ -312,6 +348,38 @@ class PostgreSQLTrait(dlib.ABCTrait):
         return does_exist
 
     @staticmethod
+    def get_all_traits(attributes: Dict[int, PostgreSQLAttribute] | None = None,
+                       db_cur_session: psycopg2.cursor | None = None) -> Dict[id, PostgreSQLTrait]:
+        db_conn = None
+        db_cur = db_cur_session
+
+        if attributes is None:
+            attributes = PostgreSQLAttribute.get_all_attributes(db_cur_session)
+
+        traits: Dict[int, PostgreSQLTrait] = {}
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("SELECT id, attribute_id, tag, text, keyword, description FROM traits ORDER BY id ASC;")
+
+            db_rows = db_cur.fetchall()
+
+            for db_row in db_rows:
+                traits[db_row[0]] = PostgreSQLTrait(db_id = db_row[0], parent_attribute = attributes[db_row[1]],
+                                                    tag = db_row[2], text = db_row[3], keyword = db_row[4],
+                                                    description = db_row[5])
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        # traits = Dict[str, PostgreSQLTrait] = {obj.get_tag():obj for key, obj in traits.items()}
+        return traits
+
+    @staticmethod
     def is_keyword_taken(keyword: str, db_cur_session: psycopg2.cursor | None = None) -> bool:
         db_conn = None
         db_cur = db_cur_session
@@ -351,17 +419,17 @@ class PostgreSQLTrait(dlib.ABCTrait):
         return cls(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1], catch_parent = True),
                    tag=db_row[2], text=db_row[3], keyword=db_row[4], description=db_row[5], db_id=db_row[0])
 
-    @classmethod
-    def objectify_with_attribute_id(cls, db_id: int) -> Dict[str, dlib.ABCTrait]:  # ToDo: Implement
-        """SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
-           FROM traits AS t LEFT JOIN nm_traits_datasets AS nm ON t.id = nm.trait_id WHERE t.id = {db_id};"""
-        pass
+    #@classmethod
+    #def objectify_with_attribute_id(cls, db_id: int) -> Dict[str, dlib.ABCTrait]:  # ToDo: Implement?
+    #    """SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
+    #       FROM traits AS t LEFT JOIN nm_traits_datasets AS nm ON t.id = nm.trait_id WHERE t.id = {db_id};"""
+    #    pass
 
-    @classmethod
-    def objectify_with_attribute_tag(cls, tag: str) -> Dict[str, dlib.ABCTrait]:  # ToDo: Implement
-        """SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
-           FROM traits AS t LEFT JOIN nm_traits_datasets AS nm ON t.id = nm.trait_id WHERE t.id = {db_id};"""
-        pass
+    #@classmethod
+    #def objectify_with_attribute_tag(cls, tag: str) -> Dict[str, dlib.ABCTrait]:  # ToDo: Implement?
+    #    """SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.dataset_id
+    #       FROM traits AS t LEFT JOIN nm_traits_datasets AS nm ON t.id = nm.trait_id WHERE t.id = {db_id};"""
+    #    pass
 
     def read(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_select(db_cur_session=db_cur_session)

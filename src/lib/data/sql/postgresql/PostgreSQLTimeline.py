@@ -20,7 +20,39 @@ class PostgreSQLTimeline(dlib.ABCTimeline):
         return event
 
     @classmethod
-    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLDatasetTimelineEvent]:
+    def objectify_with_dataset_label(cls, dataset_label: str, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLDatasetTimelineEvent]:
+        events: List[PostgreSQLDatasetTimelineEvent] = []
+        users: Dict[int, psql.PostgreSQLUser] = {}
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("SELECT e.id, e.event_on, e.created_by, e.type, e.state, e.comment, e.dataset_id FROM dataset_timeline_events AS e "
+                           "LEFT JOIN datasets AS d ON d.id = e.dataset_id"
+                           "WHERE d.label = %(dataset_label)s ORDER BY e.event_on DESC;",
+                           {"dataset_label": dataset_label})
+
+            for db_row in db_cur:  # db_cur.rowcount  # db_cur.rowcount
+                if db_row[2] not in users:
+                    users[db_row[2]] = psql.PostgreSQLUser.objectify_with_id(db_row[2])  # ToDo: Improve Create / Receive user object by id
+
+                events.append(PostgreSQLDatasetTimelineEvent(db_id=db_row[0], timestamp=db_row[1], user=users[db_row[2]],
+                                                             state=db_row[4], text=db_row[5], event_type=db_row[3], dataset_id=db_row[6]))
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return events
+        pass
+
+    @classmethod
+    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLDatasetTimelineEvent]:  # ToDo: merge with the objectify_with_dataset_label method
         events: List[PostgreSQLDatasetTimelineEvent] = []
         users: Dict[int, psql.PostgreSQLUser] = {}
 

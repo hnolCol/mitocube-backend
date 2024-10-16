@@ -136,7 +136,7 @@ class PostgreSQLResearchGroup(dlib.ABCResearchGroup):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @classmethod
-    def objectify_from_id(cls, db_id: int) -> PostgreSQLResearchGroup:
+    def objectify_with_id(cls, db_id: int) -> PostgreSQLResearchGroup:
         db_row = PostgreSQLResearchGroup.__get_db_select_row(self._id)
 
         return cls(name = db_row[0], name_short = db_row[1], institute = db_row[2], base64_image = db_row[3],
@@ -144,7 +144,7 @@ class PostgreSQLResearchGroup(dlib.ABCResearchGroup):
                    db_id = db_id)
 
     @classmethod
-    def objectify_from_object(cls, rgroup: dlib.ABCResearchGroup) -> PostgreSQLResearchGroup:
+    def objectify_with_object(cls, rgroup: dlib.ABCResearchGroup) -> PostgreSQLResearchGroup:
         return cls(name = rgroup._name, name_short = rgroup._name_short, institute = rgroup._institute,
                    base64_image = rgroup._base64_image,  # Question: Do we need a deep copy of the object here?
                    profile_text = rgroup._profile_text,

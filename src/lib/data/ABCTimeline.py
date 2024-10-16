@@ -63,6 +63,10 @@ class ABCTimeline(ABC, dlib.FlexDataClass):
     def objectify_with_dataset_id(cls, dataset_id: int) -> List[dlib.ABCDatasetTimelineEvent]:
         pass
 
+    @classmethod
+    @abstractmethod
+    def objectify_with_dataset_label(cls, dataset_label: str) -> List[dlib.ABCDatasetTimelineEvent]:
+        pass
 
 class ABCTimelineEvent(ABC, dlib.FlexDataClass):
 
@@ -84,7 +88,7 @@ class ABCTimelineEvent(ABC, dlib.FlexDataClass):
     def get_timestamp(self) -> datetime:
         return self._timestamp
 
-    def get_user_id(self) -> None | dlib.ABCUser:
+    def get_user(self) -> None | dlib.ABCUser:
         return self._user
 
     def get_state(self) -> TimelineEventState | None:

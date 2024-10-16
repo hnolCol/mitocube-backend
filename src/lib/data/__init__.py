@@ -8,6 +8,9 @@ from .ABCDataset import ABCDataset, ABCDatasetError, DatasetState  # ToDo: Needs
 from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait  # ToDo: Needs to be third due to issues with circular imports ...
 
 from .ABCDatabase import ABCDatabase, ABCDatabaseError
+from .ABCStatDatabase import ABCStatDatabase, ABCStatDatabaseError
+from .CachedDatabase import CachedDatabase
+from .CachedStatDatabase import CachedStatDatabase
 from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait, ABCTraitValue
 from .ABCDataTable import ABCDataTable, ABCDataTableError
 from .ABCFeatureDatabase import ABCFeatureDatabaseError, ABCFeatureDatabase

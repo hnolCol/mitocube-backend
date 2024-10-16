@@ -38,6 +38,45 @@ print("=========================================")
 print("\n\n\n")
 
 print("=========================================")
+print("Check for installed instruments")
+print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
+print(".........................................")
+db_instruments: Type[dlib.ABCInstrument] = dlib.ABCInstrument.get_class()
+print(db_instruments.get_instruments())
+print(".........................................")
+
+if not db_instruments.does_exist_with_label(label="boris"):
+    boris = psql.PostgreSQLInstrument(label="boris", name="Boris", location="iii, 2 OG, MS Room",
+                                      description = "Orbitrap Exploris 480, Thermo Fisher", base64_image = None)
+    boris.write()
+else:
+    boris = db_instruments.objectify_with_label(label="boris")
+
+print(boris)
+print(".........................................")
+if not db_instruments.does_exist_with_label(label="doris"):
+    doris = psql.PostgreSQLInstrument(label="doris", name="Doris", location="iii, 2 OG, MS Room",
+                                      description = "Orbitrap Exploris 480, Thermo Fisher", base64_image = None)
+    doris.write()
+else:
+    doris = db_instruments.objectify_with_label(label="doris")
+
+print(doris)
+print(".........................................")
+if not db_instruments.does_exist_with_label(label="kristof"):
+    kristof = psql.PostgreSQLInstrument(label="kristof", name="KrisTOF", location="iii, 2 OG, MS Room",
+                                        description = "timsTOF Pro 2, Bruker", base64_image = None)
+    kristof.write()
+else:
+    kristof = db_instruments.objectify_with_label(label="kristof")
+
+print(kristof)
+print("=========================================")
+
+print("\n\n\n")
+
+print("=========================================")
 print("Check for installed users")
 print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
 print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d (week %V), %X")))
@@ -62,7 +101,7 @@ else:
 
 print(superuser)
 
-if not superuser.test_password("bamboozle"):
+if not superuser._test_password("bamboozle"):
     print("  (!) configured password for 'superuser' is not correctly stored in db!")
 else:
     print("  (i) configured password is correctly stored for 'superuser'")

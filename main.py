@@ -2,25 +2,24 @@ from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-
-from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse  # PlainTextResponse
 
 from config import SystemSettings
 
-import api.routes.application as routes_app
-import api.routes.auth.auth as routes_auth
+import lib.rest.routes.application as routes_app
+import lib.rest.routes.attributes.attributes as routes_attributes
+import lib.rest.routes.auth.auth as routes_auth
+import lib.rest.routes.genotypes.genotypes as routes_genotypes
+import lib.rest.routes.submissions.submissions as routes_submissions
+import lib.rest.routes.users.users as routes_users
 
 import uvicorn
 
 system_settings = SystemSettings.get_system_settings()
 
 app = FastAPI(title = system_settings.app_name,
-              version = system_settings.backend_version,
-              description = system_settings.backend_version,
+              version = system_settings.app_version,
+              description = system_settings.app_description,
               redoc_url = "/api/doc",
               default_response_class = ORJSONResponse)
 
@@ -41,7 +40,7 @@ app.add_middleware(CORSMiddleware,  # FixMe: Wrong type?
     # return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 # add routers from packages
-for item in [routes_app, routes_auth]:
+for item in [routes_auth, routes_app, routes_attributes, routes_genotypes, routes_submissions, routes_users]:
     if hasattr(item, "router"):
         app.include_router(getattr(item, "router"))
 

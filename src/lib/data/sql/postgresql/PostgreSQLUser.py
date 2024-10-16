@@ -9,6 +9,7 @@ import lib.data.sql.postgresql as psql
 
 
 class PostgreSQLUser(dlib.ABCUser):
+
     def __db_insert(self, use_id: bool = False, password: str | None = None, db_cur_session: psycopg2.cursor | None = None):
 
         if self.does_exist():
@@ -109,7 +110,7 @@ class PostgreSQLUser(dlib.ABCUser):
 
             if db_id is not None:
                 db_cur.execute("""SELECT id, username, research_group_id, firstname, lastname, email, email_verified, base64_image, profile_text, orcid, url, allow_login, personal_salt, created_on, updated_on, last_login_on, expires_after
-                                    FROM sec_users WHERE username = %(username)s;""", {"username": username})
+                                    FROM sec_users WHERE id = %(db_id)s;""", {"db_id": db_id})
             elif email is not None:
                 db_cur.execute("""SELECT id, username, research_group_id, firstname, lastname, email, email_verified, base64_image, profile_text, orcid, url, allow_login, personal_salt, created_on, updated_on, last_login_on, expires_after
                                     FROM sec_users WHERE email = %(email)s;""", {"email": email})
@@ -164,14 +165,21 @@ class PostgreSQLUser(dlib.ABCUser):
                                     firstname = %(firstname)s, lastname = %(lastname)s, email = %(email)s, 
                                     email_verified = %(email_verified)s, base64_image = %(base64_image)s, 
                                     profile_text = %(profile_text)s, orcid = %(orcid)s, url = %(url)s, 
-                                    allow_login = %(allow_login)s, updated_on = NOW(), expires_after = %(expires_after)s) 
+                                    allow_login = %(allow_login)s, updated_on = NOW(), expires_after = %(expires_after)s 
                                 WHERE id = %(db_id)s RETURNING updated_on;""",
-                           {"db_id": self._id, "username": self._username, "research_group_id": self._research_group.get_id(),
-                            "firstname": self._firstname, "lastname": self._lastname,
-                            "email": self._email, "email_verified": self._is_email_verified,
+                           {"db_id": self._id,
+                            "username": self._username,
+                            "research_group_id": self._research_group.get_id() if self._research_group else None,
+                            "firstname": self._firstname,
+                            "lastname": self._lastname,
+                            "email": self._email,
+                            "email_verified": self._is_email_verified,
                             "base64_image": self._base64_image,
-                            "profile_text": self._profile_text, "orcid": self._orcid, "url": self._url,
-                            "allow_login": self._db_allow_login, "expires_after": self._expires_after
+                            "profile_text": self._profile_text,
+                            "orcid": self._orcid,
+                            "url": self._url,
+                            "allow_login": self._db_allow_login,
+                            "expires_after": self._expires_after.strftime("%Y-%m-%d %H:%M:%S")
                             })
 
             self._updated_on = db_cur.fetchone()[0]
@@ -205,6 +213,60 @@ class PostgreSQLUser(dlib.ABCUser):
 
             self._updated_on = db_cur.fetchone()[0]
 
+            if db_conn:
+                db_conn.commit()
+        except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                db_conn.rollback()
+            raise err
+        finally:
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+    def _test_password(self, password: str, db_cur_session: psycopg2.cursor | None = None) -> bool:  # ToDo: change password test to crypt (?) python package, see older code
+        if self._id is None and self._username is None:
+            raise dlib.ABCUserError("Neither id (db_id) nor username set for PostgreSQLUser. Unable to perform password check.")
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            if self._id is None:
+                db_cur.execute("""SELECT (password = crypt(%(password)s, password)) FROM sec_users WHERE username = %(username)s;""",
+                               {"username": self._username, "password": password})
+            else:
+                db_cur.execute("""SELECT (password = crypt(%(password)s, password)) FROM sec_users WHERE id = %(db_id)s;""",
+                               {"db_id": self._id, "password": password})
+
+            db_row = db_cur.fetchone()
+            is_password_valid = db_row[0]
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return is_password_valid
+
+    def _write_last_login_date(self, db_cur_session: psycopg2.cursor | None = None):
+        if not self.does_exist():
+            raise dlib.ABCUserError("Unable to perform database UPDATE on PostgreSQLUser that does not exist in database.")
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            db_cur.execute("UPDATE sec_users SET last_login_on = %(last_login_on)s WHERE id = %(db_id)s;",
+                           {"db_id": self._id,
+                            "last_login_on": self._last_login_on.strftime("%Y-%m-%d %H:%M:%S")
+                            })
             if db_conn:
                 db_conn.commit()
         except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
@@ -414,34 +476,6 @@ class PostgreSQLUser(dlib.ABCUser):
 
     def read(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_select(db_cur_session = db_cur_session)
-
-    def test_password(self, password: str, db_cur_session: psycopg2.cursor | None = None) -> bool:  # ToDo: change password test to crypt (?) python package, see older code
-        if self._id is None and self._username is None:
-            raise dlib.ABCUserError("Neither id (db_id) nor username set for PostgreSQLUser. Unable to perform password check.")
-
-        db_conn = None
-        db_cur = db_cur_session
-
-        try:
-            if db_cur is None:
-                db_conn = psql.PostgreSQLConnection().getConnection()
-                db_cur = db_conn.cursor()
-
-            if self._id is None:
-                db_cur.execute("""SELECT (password = crypt(%(password)s, password)) FROM sec_users WHERE username = %(username)s;""",
-                               {"username": self._username, "password": password})
-            else:
-                db_cur.execute("""SELECT (password = crypt(%(password)s, password)) FROM sec_users WHERE id = %(db_id)s;""",
-                               {"db_id": self._id, "password": password})
-
-            db_row = db_cur.fetchone()
-            is_password_valid = db_row[0]
-
-        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
-            if db_conn:
-                psql.PostgreSQLConnection().returnConnection(db_conn)
-
-        return is_password_valid
 
     # ToDo: Implement methods to update  salts
     def write(self, db_cur_session: psycopg2.cursor | None = None):

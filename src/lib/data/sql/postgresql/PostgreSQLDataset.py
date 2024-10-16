@@ -136,13 +136,13 @@ class PostgreSQLDataset(dlib.ABCDataset):
         self._internal_id = db_row[0]
         self._external_id = db_row[1]
 
-        self._instrument = psql.PostgreSQLInstrument.create_from_id(db_row[2]) if db_row[2] else None  # ToDo: Update to final method or function
-        self._parent_project = psql.PostgreSQLProject.create_from_id(db_row[3], fetch_datasets=False) if db_row[3] else None  # ToDo: Update to final method or function
+        self._instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None  # ToDo: Update to final method or function
+        self._parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None  # ToDo: Update to final method or function
 
         self._created_on = db_row[4]
         self._title = db_row[5]
         self._owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None  # ToDo: Update to final method or function
-        self._owner_group = psql.PostgreSQLResearchGroup.create_from_id(db_row[7]) if db_row[7] else None  # ToDo: Update to final method or function
+        self._owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_row[7]) if db_row[7] else None  # ToDo: Update to final method or function
 
         self._contact_email = db_row[8]
         self._state = db_row[9]

@@ -52,14 +52,14 @@ class ABCDataset(ABC, dlib.FlexDataClass):
             self._data.set_parent_dataset(self)
 
         self._contact_email: str = contact_email
-        self._created_on: datetime = datetime.now(tz=None) if created_on is None else None
+        self._created_on: datetime = datetime.now(tz=None) if created_on is None else created_on
         self._owner_group: dlib.ABCResearchGroup | None = owner_group
         self._owner_user: dlib.ABCUser = owner_user
         self._state: DatasetState = state
         self._title: str = title
         self._uploaded_on: datetime | None = uploaded_on
 
-        self._attributes: Dict[str, dlib.ABCTrait] = attributes
+        self._traits: Dict[str, dlib.ABCTrait] = attributes  # ToDo: rename attributes argument to traits, and change to trait values, redesign trait values?
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
@@ -90,8 +90,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def get_full_dataset_list() -> Dict[str, int]:
         pass
 
-    def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:
-        return self._attributes
+    def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:  # Deprecated: use get_traits(...) instead
+        return self._traits
+
+    def get_traits(self) -> Dict[str, dlib.ABCTrait] | None:
+        return self._traits
 
     def get_internal_id(self) -> int | None:
         return self._internal_id

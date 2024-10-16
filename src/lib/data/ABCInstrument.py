@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Self
+from typing import Dict, Self, List
 
 import lib.data as dlib
 
@@ -9,7 +9,8 @@ class ABCInstrumentError(dlib.ABCDataError):
     pass
 
 class ABCInstrument(ABC, dlib.FlexDataClass):
-    def __init__(self, db_id: int | None, label: str, name: str, location: str | None, description: str | None, base64_image: str | None):
+    def __init__(self, label: str, name: str, db_id: int | None = None,
+                 location: str | None = None, description: str | None = None, base64_image: str | None = None):
         self._id: int | None = db_id
         self._label: str = label
         self._name: str = name
@@ -29,6 +30,16 @@ class ABCInstrument(ABC, dlib.FlexDataClass):
     @staticmethod
     @abstractmethod
     def does_exist_with_id(db_id: int) -> bool:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def does_exist_with_label(label: str) -> bool:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def get_instruments(self) -> List[ABCInstrument]:
         pass
 
     def get_id(self) -> int | None:
@@ -52,6 +63,11 @@ class ABCInstrument(ABC, dlib.FlexDataClass):
     @classmethod
     @abstractmethod
     def objectify_with_id(cls, db_id: int) -> dlib.ABCInstrument:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_label(cls, label: str) -> dlib.ABCInstrument:
         pass
 
     @abstractmethod
