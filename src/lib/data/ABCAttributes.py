@@ -8,6 +8,15 @@ import lib.data as dlib
 class ABCAttributeError(dlib.ABCDataError):
     pass
 
+class ABCAttributeNotFoundError(ABCAttributeError):
+    pass
+
+class ABCTraitNotFoundError(ABCAttributeError):
+    pass
+
+class ABCTraitValueNotFoundError(ABCAttributeError):
+    pass
+
 
 class ABCAttribute(ABC, dlib.FlexDataClass):
     def __init__(self, parent_attribute: ABCAttribute | None, tag: str, text: str | None, priority: int = 500, db_id: int | None = None,
@@ -264,7 +273,7 @@ class ABCTraitValue(ABC, dlib.FlexDataClass):
     def __init__(self, trait: dlib.ABCTrait, value: str | None = None, unit: str | None = None):
         self._trait: dlib.ABCTrait = trait
         self._value: str | None = value
-        self._unit: str | None = unit
+        self._unit: str | None = unit  # Deprecated, can be solved like att_timepoint:h(2) for 2 hours timepoint for att_timepoint:m(120)
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
@@ -277,13 +286,13 @@ class ABCTraitValue(ABC, dlib.FlexDataClass):
     def get_value(self) -> str | None:
         return self._value
 
-    def get_unit(self) -> str | None:
+    def get_unit(self) -> str | None:  # Deprecated, can be solved like att_timepoint:h(2) for 2 hours timepoint for att_timepoint:m(120)
         return self._unit
 
     def set(self, trait: dlib.ABCTrait, value: str | None = None, unit: str | None = None):
         self._trait: dlib.ABCTrait = trait
         self._value: str | None = value
-        self._unit: str | None = unit
+        self._unit: str | None = unit  # Deprecated, can be solved like att_timepoint:h(2) for 2 hours timepoint for att_timepoint:m(120)
 
     @abstractmethod
     def add_to_dataset_id(self, dataset_id: int) -> List[ABCTraitValue]:
@@ -303,7 +312,7 @@ class ABCTraitValue(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset_id(cls, db_id: int) -> List[ABCTraitValue]:
+    def objectify_with_dataset_id(cls, db_id: int) -> Dict[str, ABCTraitValue]:
         pass
 
     @classmethod

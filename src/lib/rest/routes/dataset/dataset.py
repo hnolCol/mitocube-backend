@@ -24,15 +24,15 @@ def get_dataset(dataset: dlib.ABCDataset):  # ToDo: create PRM
             "uploaded_on": time.mktime(dataset.get_uploaded_on_date().timetuple()),
             "genotypes": [],  # ToDo: implement Genotypes and add Dict[str, GenotypeModel]
             "state": dataset.get_state(),  # ToDo: check SubmissionStates in old code
-            "metatext": {m.get_tag(): m.get_text() for m in dataset.get_metatexts()} if dataset.get_metatexts() else None,  # Dict[str,str]
-            "urls": [url.get_url() for url in dataset.get_urls()] if dataset.get_urls() else None,
+            "metatext": {m.get_tag(): m.get_text() for m in dataset.get_metatexts()} if dataset.get_metatexts() else {},  # Dict[str,str]
+            "urls": [url.get_url() for url in dataset.get_urls()] if dataset.get_urls() else [],
             "runlist": None,  # Question, what is a RunListModel? Optional[RunListModel]
-            "trait_tags": [tag for tag, trait in dataset.get_attributes().items()] if dataset.get_attributes() else None,  # Question, get all trait_tags? includign samples?
+            "trait_tags": [tag for tag, trait in dataset.get_attributes().items()] if dataset.get_attributes() else [],  # Question, get all trait_tags? includign samples?
             "traits": get_dataset_traits(dataset),
             "n_samples" : len(dataset.get_data().get_data_column_names()),
             "sample_names": dataset.get_data().get_data_column_names(),
-            "replicates" : dataset.get_data().get_samples_replicates() if dataset.get_data().get_samples_replicates() else None,  # Dict[str, str]  # Question: move to samples?
-            "batches": dataset.get_data().get_samples_batches() if dataset.get_data().get_samples_batches() else None,  # Dict[str, str]  # Question: move to samples?
+            "replicates" : dataset.get_data().get_samples_replicates() if dataset.get_data().get_samples_replicates() else {},  # Dict[str, str]  # Question: move to samples?
+            "batches": dataset.get_data().get_samples_batches() if dataset.get_data().get_samples_batches() else {},  # Dict[str, str]  # Question: move to samples?
                         # samples_attributes : Dict[str,Dict[str,List[int]]]  # Question, dublicate defition?  # ToDo: Mach hier weiter!
                         # # samples_attributes : Dict[str,SampleAttributesResponse]  # Question, dublicate defition?  # ToDo: Mach hier weiter!
                         # samples_attributes: Dict[str, SampleAttributesResponse]  # Question, dublicate defition?  # ToDo: Mach hier weiter!
@@ -41,12 +41,14 @@ def get_dataset(dataset: dlib.ABCDataset):  # ToDo: create PRM
             }  # ToDo: Mach hier weiter!
 
 @router.get("/{label}")  # , response_model=xxx)
-def rest_get_dataset(label: str):  # ToDo: create PRM
+def rest_get_dataset(label: str,
+                     session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: create PRM
     ds: dlib.ABCDataset = dlib.ABCDataset.get_class()
     return get_dataset(ds.objectify_with_label(label=label))
 
 @router.get("/{label}/timeline")  # , response_model=xxx)
-def rest_get_dataset_timeline(label: str):  # ToDo: create PRM
+def rest_get_dataset_timeline(label: str,
+                              session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: create PRM
     tl: dlib.ABCTimeline = dlib.ABCTimeline.get_class()
     timeline: List[dlib.ABCDatasetTimelineEvent] = tl.objectify_with_dataset_label(dataset_label = label)
 
@@ -67,7 +69,9 @@ def get_dataset_traits(dataset: dlib.ABCDataset):  # ToDo: create PRM
                   "keyword": trait.get_keyword(),
                   "text": trait.get_tag(),
                   "description": trait.get_description()} for tag, trait in dataset.get_traits().items()}
-@router.get("/{label}/traits")  # , response_model=xxx)
-def rest_get_dataset_traits(label: str):  # ToDo: create PRM
+
+@router.get("/{label}/traits")  # , response_model=xxx)  # ToDo: rewrite to ABCDataSetValues
+def rest_get_dataset_traits(label: str,
+                            session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: create PRM
     ds: dlib.ABCDataset = dlib.ABCDataset.get_class()
     return get_dataset_traits(dataset = ds.objectify_with_label(label=label))

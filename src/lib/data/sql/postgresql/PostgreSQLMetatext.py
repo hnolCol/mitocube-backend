@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import psycopg2
 
@@ -127,8 +127,8 @@ class PostgreSQLMetatext(dlib.ABCMetatext):
         return does_exist
 
     @classmethod
-    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> List[PostgreSQLMetatext]:
-        metatexts: List[PostgreSQLMetatext] = []
+    def objectify_with_dataset_id(cls, dataset_id: int, db_cur_session: psycopg2.cursor | None = None) -> Dict[str, PostgreSQLMetatext]:
+        metatexts: Dict[str,PostgreSQLMetatext] = {}
 
         db_conn = None
         db_cur = db_cur_session
@@ -141,7 +141,7 @@ class PostgreSQLMetatext(dlib.ABCMetatext):
             db_cur.execute("SELECT tag, text FROM metatexts WHERE dataset_id = %(dataset_id)s;", {"dataset_id": dataset_id})
 
             for db_row in db_cur:  # db_cur.rowcount  # db_cur.rowcount
-                metatexts.append(cls(dataset_id=dataset_id, tag=db_row[0], text=db_row[1]))
+                metatexts[db_row[0]] = cls(dataset_id=dataset_id, tag=db_row[0], text=db_row[1])
 
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:

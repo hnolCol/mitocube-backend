@@ -30,6 +30,9 @@ class DatasetState(IntEnum):
 class ABCDatasetError(dlib.ABCDataError):
     pass
 
+class ABCDatasetNotFoundError(ABCDatasetError):
+    pass
+
 
 class ABCDataset(ABC, dlib.FlexDataClass):
     def __init__(self, external_id: str | None, state: DatasetState, title: str, owner_user: dlib.ABCUser,
@@ -38,7 +41,8 @@ class ABCDataset(ABC, dlib.FlexDataClass):
                  created_on: datetime | None = None,  uploaded_on: datetime | None = None,
                  owner_group: dlib.ABCResearchGroup | None = None, metatexts: Dict[str, dlib.ABCMetatext] = None,
                  urls: List[dlib.ABCUrl] = None,
-                 attributes: Dict[str, dlib.ABCTrait] | None = None):  # ToDo: Counter check typing below and return values of get methods (and argument typing set methods)
+                 # attributes: Dict[str, dlib.ABCTrait] | None = None,  # ToDo: Counter check typing below and return values of get methods (and argument typing set methods)
+                 trait_values: Dict[str, dlib.ABCTraitValue] | None = None):
         self._internal_id: int | None = internal_id
         self._external_id: str | None = external_id
 
@@ -59,7 +63,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._title: str = title
         self._uploaded_on: datetime | None = uploaded_on
 
-        self._traits: Dict[str, dlib.ABCTrait] = attributes  # ToDo: rename attributes argument to traits, and change to trait values, redesign trait values?
+        # Fixme: maybe remove that completely, just get messy with JSON dataset...
+        # management outside would make it easier to remove, add traits (rather to check within dataset what is maybe different)
+        # adding traits but save them automatically as trait value?
+        # self._traits: Dict[str, dlib.ABCTrait] = attributes  # ToDo: rename attributes argument to traits, and change to trait values, redesign trait values?
+        self._trait_values: Dict[str, dlib.ABCTraitValue] = trait_values
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
@@ -90,11 +98,14 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def get_full_dataset_list() -> Dict[str, int]:
         pass
 
-    def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:  # Deprecated: use get_traits(...) instead
-        return self._traits
+    # def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:  # Deprecated: use get_trait_values(...) instead
+    #     return self._traits
 
-    def get_traits(self) -> Dict[str, dlib.ABCTrait] | None:
-        return self._traits
+    # def get_traits(self) -> Dict[str, dlib.ABCTrait] | None:  # Deprecated: use get_trait_values(...) instead
+    #     return self._traits
+
+    def get_trait_values(self) -> Dict[str, dlib.ABCTraitValue] | None:
+        return self._trait_values
 
     def get_internal_id(self) -> int | None:
         return self._internal_id
@@ -171,8 +182,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._owner_user = owner_user
         self._title = title
 
-    def set_attributes(self, attributes: Dict[str, dlib.ABCTrait] | None):
-        self._attributes = attributes
+    def set_trait_values(self, trait_values: Dict[str, dlib.ABCTraitValue] | None):
+        self._trait_values = trait_values
+
+    def set_trait_values_with_list(self, trait_values: List[dlib.ABCTraitValue] | None):
+        self.set_trait_values(trait_values = {obj.get_trait().get_tag(): obj for obj in trait_values})
 
     def set_data(self, data: dlib.ABCDataTable | None):
         if self._data:

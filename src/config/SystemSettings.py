@@ -28,8 +28,23 @@ class SystemSettings(BaseSettings):
 
     # General Settings
     app_name: str = "Nova MitoCube"
-    app_description: str = "MitoCube backend "
-    app_version: str = "0.0.1 (Caterpillar)"
+    app_summary: str = "MitoCube backend"
+    app_description: str = """Nova MitoCube API helps you do awesome stuff if your proteomic data. 👩‍🔬"""
+    app_api_description: str = """---
+Nova MitoCube API helps you do awesome stuff if your proteomic data. 👩‍🔬
+
+## Something
+
+You can do **something**.
+
+## Something else
+
+You will be able to:
+
+* **ABC** (_not implemented_).
+* **DEF** (_not implemented_).
+"""
+    app_version: str = "0.0.1; Caterpillar"
     app_json_use_terms: str = "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/terms/usage.json"  # ToDo: Find a different solution...
     app_lead_contact: EmailStr = "andreas.lindner@uni-bonn.de"  # Fixme: Change me
 

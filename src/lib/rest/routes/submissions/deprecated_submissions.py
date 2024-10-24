@@ -6,10 +6,10 @@ import lib.data as dlib
 
 from lib.rest.security import rest_verify_user_token, RestSessionInformation
 
-from fastapi import APIRouter, Depends, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, Request, BackgroundTasks, status
 from fastapi.exceptions import HTTPException
 
-router = APIRouter(prefix="/api/submissions", tags=["Datasets"])
+router = APIRouter(prefix="/api/submissions", tags=["Datasets", "Deprecated"])
 
 
 # ToDo: Implement Routines
@@ -33,7 +33,7 @@ def deprecated_api(message):  # ToDo: Replace with from warnings import deprecat
     warnings.warn(message, DeprecationWarning, stacklevel=2)
 
 
-@router.get("/q")  # response_model=SubmissionQueryResponse) # Deprecated /submissions/q
+@router.get("/q", deprecated=True)  # response_model=SubmissionQueryResponse) # Deprecated /submissions/q --> /datasets/q
 def rest_get_query_datasets(state: int | None = None,
                             query: str | None = None,  # query : Annotated[str | None, Query(min_length=1)] = None,
                             feature_key: str | None = None,
@@ -68,6 +68,7 @@ def rest_get_query_datasets(state: int | None = None,
         tl: dlib.ABCTimeline = dlib.ABCTimeline.get_class()
         timeline: List[dlib.ABCDatasetTimelineEvent] = tl.objectify_with_dataset_id(dataset_id=dataset_ids[ix])
 
+        # Fixme: Crashes currently in the Frontend. Cannot read created_on
         timeline_migrated = {"created_on": time.mktime(dataset.get_created_on_date().timetuple()),  # Question: Dataset created or timeline?
                              "modified_on": time.mktime(timeline[0].get_timestamp().timetuple()),  # deprecated, should be first entry in entries
                              "label": dataset_labels[ix],
@@ -93,7 +94,7 @@ def rest_get_query_datasets(state: int | None = None,
                             "modified_on": time.mktime(timeline[0].get_timestamp().timetuple()),  # deprecated, should be first entry in entries
                             "genotypes": [],  # ToDo: implement Genotypes and add Dict[str, GenotypeModel]
                             "state": dataset.get_state(),  # ToDo: check SubmissionStates in old code
-                            "metatext" : {m.get_tag(): m.get_text() for m in dataset.get_metatexts()} if dataset.get_metatexts() else None,  # Dict[str,str]
+                            "metatext" : {tag: m.get_text() for tag, m in dataset.get_metatexts().items()} if dataset.get_metatexts() else None,  # Dict[str,str]
                             "links": [{"id": -1, "url": url.get_url(), "comment": None} for url in dataset.get_urls()] if dataset.get_urls() else None,  # deprecated, changed to url, id and comment not required
                             "urls": [url.get_url() for url in dataset.get_urls()] if dataset.get_urls() else None,
                             "runlist": None,  # Question, what is a RunListModel? Optional[RunListModel]
@@ -109,6 +110,8 @@ def rest_get_query_datasets(state: int | None = None,
                             "samples_genotypes": {}  # Dict[str,List[int]]  # ToDo: Implement after implementing Genotypes
                             })
 
+    raise Exception("Figure out where the exception in the Frontend comes from ...")
+
     # was SubmissionQueryResponse # ToDo: Implement PRM
     return {"submissions": submissions,  # Question: What is in the list? Dict? was metadata, was List[DatasetSubmissionResponseModel]
             "ids": dataset_ids,  # dataset ids, List[int]
@@ -117,10 +120,10 @@ def rest_get_query_datasets(state: int | None = None,
             "total_count": 0}  # Question: what is the different between query count and total count? total datasets between selected?
 
 
-@router.get("/states", summary="Returns the states enum as well as colors associated with the state.")
-def get_project_states(session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: Implement PRM
-    deprecated_api("/api/submissions/states is deprecated, use /api/datasets/states instead")  # ToDo: Implement  /api/datasets/states
-    dlib.DatasetState
+@router.get("/states", deprecated=True, summary="Returns the states enum as well as colors associated with the state.")
+def rest_get_project_states(session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: Implement PRM
+    deprecated_api("/api/submissions/states is deprecated, use /api/datasets/states instead")  # Deprecated / ToDo: Implement  /api/datasets/states
+    # dlib.DatasetState
 
     # ToDo: Currently manualy, make int configurable and implement it automattically from an enum (different enum type or with own static functions?)
 
@@ -136,3 +139,75 @@ def get_project_states(session: RestSessionInformation = Depends(rest_verify_use
             "colors_inv": {-50: "#C7253E", -20: "#821131", -10: "#B7B7B7",
                            0: "#A3D8FF", 10: "#FFFF80", 20: "#F9E400", 25: "#FFAF00",
                            30: "#640D5F", 40: "#091057", 50: "#024CAA"}}  # Dict[int,str] = get_enum_as_dict(SubmissionStateColors,SubmissionStates)}
+
+@router.get("/count", deprecated=True)  # ToDo: Implement PRM
+def rest_get_count_datasets_with_label(labels: str = None,
+                                       group: Literal["state", "user", "attribute_tag", "attribute_value_tag",
+                                                      "feature", "genotype"] | None = None,  # Is None even allowed?
+                                       session: RestSessionInformation = Depends(rest_verify_user_token)):
+    # Question, Deprecated: would it not make more sense to implement something like /users/count, /states/count?
+
+    # Fixme: Returning something makes the Frontend Crash, so through Exception here in the meanwhile
+    #raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED,  # ToDo: Collect to central spot / library
+    #                    detail="Returning something here makes the GUI say by by. Ignoring it until solution found.",
+    #                    headers={"WWW-Authenticate": "Bearer"})
+
+    list_labels: List[str] | None = None
+
+    if labels is not None:  # Question is List not possible? Also, what labels? usernames? dataset labels?
+        list_labels = list(set(labels.split(";")))
+
+    # counts: List[int] = []
+    # for label in labels:
+    #     counts.append(42)  # ToDo: Determine counts
+
+    if group:  # Question: Should submissions not be included in group and set to default if missing?
+        return {group: {"submission_labels": [],  # List[str]  # Question,
+                        "submission_count": []}}  # Question: What is actually counted? dataset with a certain label?
+    else:
+        # Dict[str|int,SubmissionCountResponse]
+        return {"submissions": {"submission_labels": list_labels,  # List[str]  # Question,
+                                "submission_count": len(list_labels)}}  # int  # Question: What is actually counted? dataset with a certain label?
+
+@router.get("/metatext", deprecated=True,  # Deprecated, Todo: Confusing, move to /metatexts/headers
+            summary="Returns the metatext information that can be used to describe a submission.")
+def rest_get_meta_text(session: RestSessionInformation = Depends(rest_verify_user_token)):
+    """"""
+    # ToDo: Hard copy, move to a configuration, but make it like a json Dict[tag, {title, placeholder, ...}]
+    # Maybe make a database table, makes it easier to edit over time. plus information could be gathered with the other select for metatexts and provided
+    return {"tags" : {"Research Aim": "research_aim",
+                      "Experimental Procedure": "experimental_procedure",
+                      "Additional Information": "add_info",
+                      "Protein Digestion": "protein_digestion",
+                      "Liquid Chromatography and Mass Spectrometry": "lcms"},
+            "names": {"research_aim": "Research Aim",
+                      "experimental_procedure": "Experimental Procedure",
+                      "add_info": "Additional Information",
+                      "protein_digestion": "Protein Digestion",
+                      "lcms": "Liquid Chromatography and Mass Spectrometry"},
+            "titles": ["Research Aim",
+                       "Experimental Procedure",
+                       "Additional Information",
+                       "Protein Digestion",
+                       "Liquid Chromatography and Mass Spectrometry"],
+            "placeholders": {"research_aim": "Please enter some background information about your project. Think about it like a small abstract in a paper.",
+                             "experimental_procedure": "Please provide detailed information about the experimental procedure/sample preparation.",
+                             "add_info": "Here you can add additional information such as batch effects.",
+                             "protein_digestion": "Please describe the protein digestion method.",
+                             "lcms": "Please add information about the LC-MS/MS method."},
+            "required" : {"research_aim": True,
+                          "experimental_procedure": True,
+                          "add_info": False,
+                          "protein_digestion": True,
+                          "lcms": True},
+            "min_text_length" : {"research_aim": 100,
+                                 "experimental_procedure": 50,
+                                 "add_info": 0,
+                                 "protein_digestion": 50,
+                                 "lcms": 50},
+            "allowed_for_state": {"research_aim": dlib.DatasetState.UPLOADED,
+                                  "experimental_procedure": dlib.DatasetState.UPLOADED,
+                                  "add_info": dlib.DatasetState.UPLOADED,
+                                  "protein_digestion": dlib.DatasetState.PROCESSED,
+                                  "lcms": dlib.DatasetState.MEASURING}  # Question, should it not me like required for dataset state? not sure when it is displayed by the name
+            }

@@ -14,14 +14,18 @@ from lib.rest.pmodels.auth.tokens import TokenVerificationCodePPM  # Pydantic Po
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
+# Fixme: merge the three functions to create the token with username and password, validate login, and session token in one function.
+# request same url with different information 1) username & password 2) login_token 3) session_token
+# session_token will be generated in 1), but also in 2) if not send by client.
 
 # Question: rename or alternative path for login? How to differentiate between user_token and api_token?
 # Question: rename to user_token (or login_token)?  /share to api_token or rest_token?
-@router.post("/token", response_description="Returns a jwt token after login .", response_model=UserTokenPRM)
+@router.post("/token", tags = ["Login"],
+             response_description="Returns a jwt token after login .", response_model=UserTokenPRM)
 def rest_post_request_email_login_token(background_task: BackgroundTasks,
-                                   request: Request,
-                                   user_agent: Annotated[str | None, Header()] = None,
-                                   form_data: OAuth2PasswordRequestForm = Depends()) -> UserTokenPRM:  # Question, was UserModel, does it has to be a pedantic model?
+                                        request: Request,
+                                        user_agent: Annotated[str | None, Header()] = None,
+                                        form_data: OAuth2PasswordRequestForm = Depends()) -> UserTokenPRM:  # Question, was UserModel, does it has to be a pedantic model?
 
     # ToDo: Create Function within rest.security.verify_login
     # Question, should always a token be requested? theoretically one could gues password until login token request screen pops up
@@ -82,7 +86,7 @@ def rest_post_request_email_login_token(background_task: BackgroundTasks,
                         msg=None)
 
 
-@router.post("/token/verify",
+@router.post("/token/verify", tags = ["Login"],
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.",
              response_model=UserTokenPRM)
 def rest_post_verify_email_login_token(token_to_verify: TokenVerificationCodePPM,

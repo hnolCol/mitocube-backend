@@ -12,6 +12,9 @@ from config import get_system_settings
 class ABCUserError(dlib.ABCDataError):
     pass
 
+class ABCUserNotFoundError(ABCUserError):
+    pass
+
 class ABCUser(ABC, dlib.FlexDataClass):
     def __init__(self, username: str, firstname: str, lastname: str, email: str,
                  research_group: dlib.ABCResearchGroup | None = None, base64_image: str | None = None,

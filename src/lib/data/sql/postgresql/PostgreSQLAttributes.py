@@ -132,7 +132,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                     FROM attributes WHERE id = %(db_id)s;""", {"db_id": db_id})
 
             if db_cur.rowcount != 1:
-                raise dlib.ABCAttributeError("Provided id nor name does not match a single Attribute. Number of returned rows = {n}".format(n=db_cur.rownumber))
+                raise dlib.ABCAttributeNotFoundError("Provided id nor name does not match a single Attribute. Number of returned rows = {n}".format(n=db_cur.rownumber))
 
             db_row = db_cur.fetchone()
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
@@ -142,7 +142,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
         return db_row
 
     @staticmethod
-    def get_all_attributes(db_cur_session: psycopg2.cursor | None = None) -> Dict[id, PostgreSQLAttribute]:
+    def get_all_attributes(db_cur_session: psycopg2.cursor | None = None) -> Dict[int, PostgreSQLAttribute]:
 
         db_conn = None
         db_cur = db_cur_session
@@ -319,7 +319,7 @@ class PostgreSQLTrait(dlib.ABCTrait):
                 db_cur.execute("""SELECT id, attribute_id, tag, text, keyword, description FROM traits WHERE keyword = {keyword};""", {"keyword": keyword})
 
             if db_cur.rowcount != 1:
-                raise dlib.ABCAttributeError("Provided id, tags nor keyword match a single Trait. Number of returned rows = {n}".format(n=db_cur.rownumber))
+                raise dlib.ABCTraitNotFoundError("Provided id, tags nor keyword match a single Trait. Number of returned rows = {n}".format(n=db_cur.rownumber))
 
             db_row = db_cur.fetchone()
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
@@ -349,7 +349,7 @@ class PostgreSQLTrait(dlib.ABCTrait):
 
     @staticmethod
     def get_all_traits(attributes: Dict[int, PostgreSQLAttribute] | None = None,
-                       db_cur_session: psycopg2.cursor | None = None) -> Dict[id, PostgreSQLTrait]:
+                       db_cur_session: psycopg2.cursor | None = None) -> Dict[int, PostgreSQLTrait]:
         db_conn = None
         db_cur = db_cur_session
 
@@ -482,7 +482,7 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
                 raise dlib.ABCAttributeError("Require at least the id or label of a dataset or sample to select respective Trait values. Unable to perform SELECT.")
 
             if db_cur.rowcount < 1:
-                raise dlib.ABCAttributeError("Provided id or labels did not match a single Trait. Number of returned rows = {n}".format(n=db_cur.rownumber))
+                raise dlib.ABCTraitValueNotFoundError("Provided id or labels did not match a single Trait. Number of returned rows = {n}".format(n=db_cur.rownumber))
 
             db_rows = db_cur.fetchall()
 
@@ -581,17 +581,17 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @classmethod
-    def objectify_with_dataset_id(cls, db_id: int) -> List[PostgreSQLTraitValue]:
+    def objectify_with_dataset_id(cls, db_id: int) -> Dict[str, PostgreSQLTraitValue]:
         db_rows = PostgreSQLTraitValue.__get_db_select_row(dataset_id = db_id)
 
-        trait_values: List[PostgreSQLTraitValue] = []
+        trait_values: Dict[str, PostgreSQLTraitValue] = []
 
-        for db_row in db_rows:
-            trait_values.append(cls(trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
-                                                                                                                     catch_parent= True),
-                                                            tag = db_row[2], text = db_row[3], keyword = db_row[4],
-                                                            description = db_row[5], db_id = db_row[0]),
-                                    value = db_row[6], unit = db_row[7]))
+        for db_row in db_rows:  # ToDo: allow to provide a object list/dict to faster access traits and attributes rather doing a lot of queries, tho, should not so bad for single dataset
+            trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
+                                                                                             catch_parent= True),
+                                    tag = db_row[2], text = db_row[3], keyword = db_row[4],
+                                    description = db_row[5], db_id = db_row[0])
+            trait_values[trait.get_full_tag()] = cls(trait = trait, value = db_row[6], unit = db_row[7])
 
         return trait_values
 
@@ -601,7 +601,7 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
 
         trait_values: List[PostgreSQLTraitValue] = []
 
-        for db_row in db_rows:
+        for db_row in db_rows:  # ToDo: allow to provide a object list/dict to faster access traits and attributes rather doing a lot of queries, tho, should not so bad for single dataset
             trait_values.append(cls(trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
                                                                                                                      catch_parent= True),
                                                             tag = db_row[2], text = db_row[3], keyword = db_row[4],
@@ -616,7 +616,7 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
 
         trait_values: List[PostgreSQLTraitValue] = []
 
-        for db_row in db_rows:
+        for db_row in db_rows:  # ToDo: allow to provide a object list/dict to faster access traits and attributes rather doing a lot of queries, tho, should not so bad for single dataset
             trait_values.append(cls(trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
                                                                                                                      catch_parent= True),
                                                             tag = db_row[2], text = db_row[3], keyword = db_row[4],
@@ -631,7 +631,7 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
 
         trait_values: List[PostgreSQLTraitValue] = []
 
-        for db_row in db_rows:
+        for db_row in db_rows:  # ToDo: allow to provide a object list/dict to faster access traits and attributes rather doing a lot of queries, tho, should not so bad for single dataset
             trait_values.append(cls(trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
                                                                                                                      catch_parent= True),
                                                             tag = db_row[2], text = db_row[3], keyword = db_row[4],

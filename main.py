@@ -1,28 +1,48 @@
+from lib.util import DummyText
+
+import uvicorn
+
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-
 from fastapi.staticfiles import StaticFiles
 
-from config import SystemSettings
+import lib.data.sql.postgresql as psql
 
 import lib.rest.routes.application as routes_app
 import lib.rest.routes.attributes.attributes as routes_attributes
 import lib.rest.routes.auth.auth as routes_auth
 import lib.rest.routes.genotypes.genotypes as routes_genotypes
-import lib.rest.routes.submissions.submissions as routes_submissions
+import lib.rest.routes.dataset.dataset as routes_dataset  # ToDo: add to routes
+import lib.rest.routes.datasets.datasets as routes_datasets  # ToDo: add to routes
+import lib.rest.routes.datasets.deprecated_datasets as routes_deprecated_datasets
+import lib.rest.routes.features.features as routes_features
+import lib.rest.routes.features.deprecated_features as routes_deprecated_features
+import lib.rest.routes.submissions.deprecated_submissions as routes_submissions
+import lib.rest.routes.user.user as routes_user  # ToDo: add tp routes
 import lib.rest.routes.users.users as routes_users
 
-import uvicorn
+from config import SystemSettings
 
 system_settings = SystemSettings.get_system_settings()
 
+db_features = psql.PostgreSQLFeatureDatabase()  # todo: create 'init'/first loading method
+db_features.read()
+
+
 app = FastAPI(title = system_settings.app_name,
               version = system_settings.app_version,
-              description = system_settings.app_description,
-              redoc_url = "/api/doc",
+              description = system_settings.app_api_description,
+              # terms_of_service="http://example.com/terms/",  # Link to terms?
+              # contact={ "name":"Deadpoolio the Amazing", "url": "http://x-force.example.com/contact/", "email": "dp@x-force.example.com"},
+              # license_info={"name": "Apache 2.0", "identifier": "MIT", "URL": "http://x-force.example.com/contact/"},
+              summary = DummyText.get_joke(),  # ToDo: replace with system_settings.app_description,
+              openapi_url = "/openapi.json",
+              docs_url = "/docs",  # Fixme: Set to 'docs_url' None to disable in live system. ToDo: make config variable to set system to live.
+              redoc_url = "/redocs",  # Fixme: Set to 'redoc_url' None to disable in live system. ToDo: make config variable to set system to live.
               default_response_class = ORJSONResponse)
 
+# Question, is it possible to use multiple Middle wares?
 app.add_middleware(CORSMiddleware,  # FixMe: Wrong type?
                    allow_origins = [system_settings.allowed_middleware_url],
                    allow_credentials = True,
@@ -40,7 +60,8 @@ app.add_middleware(CORSMiddleware,  # FixMe: Wrong type?
     # return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 # add routers from packages
-for item in [routes_auth, routes_app, routes_attributes, routes_genotypes, routes_submissions, routes_users]:
+for item in [routes_auth, routes_app, routes_attributes, routes_features, routes_genotypes, routes_submissions, routes_users,
+             routes_deprecated_datasets, routes_deprecated_features]:
     if hasattr(item, "router"):
         app.include_router(getattr(item, "router"))
 

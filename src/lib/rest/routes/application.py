@@ -9,7 +9,6 @@ from config import SystemSettings
 import lib.data as dlib
 
 from lib.rest.security import rest_verify_user_token, RestSessionInformation
-from lib.rest.pmodels.application import ApplicationInformationPRM
 
 
 router = APIRouter(prefix="", tags=["App Information"])
@@ -24,19 +23,17 @@ async def rest_get_frontend(request: Request):
 
 
 @router.get("/api/info/app",
-            summary = "Returns basic information about the application.",
-            response_model = ApplicationInformationPRM)
-def rest_get_application_info() -> ApplicationInformationPRM:
+            summary = "Returns basic information about the application.")
+def rest_get_application_info():  # ToDo: Implement PRM
     """"""
     system_settings = SystemSettings.get_system_settings()
 
-    return ApplicationInformationPRM(app_name = system_settings.app_name,
-                                     app_description = system_settings.app_description,
-                                     version = system_settings.app_version,
-                                     lead_contact = system_settings.app_lead_contact,)
+    return {"app_name": system_settings.app_name,
+            "app_description": system_settings.app_description,
+            "version": system_settings.app_version,
+            "lead_contact": system_settings.app_lead_contact}
 
-
-@router.get("/api/info/keyfigures",
+@router.get("/api/info/keyfigures",  # Question: rename to /api/info/dashboard_stats?
             summary="Returns the key figures of the backend")
 def rest_get_db_stats(session: RestSessionInformation = Depends(rest_verify_user_token)) -> List[Dict[str, Any]]:  # ToDo: Create PRM
 

@@ -37,7 +37,7 @@ class ABCMetatext(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset_id(cls, dataset_id: int) -> List[ABCMetatext]:
+    def objectify_with_dataset_id(cls, dataset_id: int) -> Dict[str, ABCMetatext]:
         pass
 
     @abstractmethod

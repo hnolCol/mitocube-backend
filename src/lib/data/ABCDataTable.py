@@ -42,7 +42,7 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
                  data_wide: pd.DataFrame | None = None,
                  replicates_samples: Dict[str, str] | None = None,
                  batches_samples: Dict[str, str] | None = None,
-                 attributes_samples: Dict[str, List[dlib.ABCTraitValue]] | None = None):  # ToDo: id into this object?
+                 trait_values_samples: Dict[str, List[dlib.ABCTraitValue]] | None = None):  # ToDo: id into this object?
 
         self._parent_dataset: dlib.ABCDataset | None = parent_dataset
 
@@ -51,7 +51,7 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
 
         self._replicates: Dict[str, str] | None = replicates_samples
         self._batches: Dict[str, str] | None = batches_samples
-        self._attributes_samples: Dict[str, List[dlib.ABCTraitValue]] | None = attributes_samples  # sample names as keys
+        self._trait_values_samples: Dict[str, List[dlib.ABCTraitValue]] | None = trait_values_samples  # sample names as keys
 
         self._data_long: pd.DataFrame | None = data_long
         self._data_wide: pd.DataFrame | None = data_wide
@@ -71,11 +71,9 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
                     if not all(sample in self._data_columns for sample in self._batches.keys()):
                         raise dlib.ABCDataTableError("Some sample names in provided batches do not exist in the DataTable.")
 
-                if self._attributes_samples:
-                    if not all(sample in self._data_columns for sample in self._attributes_samples.keys()):
+                if self._trait_values_samples:
+                    if not all(sample in self._data_columns for sample in self._trait_values_samples.keys()):
                         raise dlib.ABCDataTableError("Some sample names in provided attributes list do not exist in the DataTable.")
-
-
 
     # FixMe: make it thread-safe!
     def _change_to_long(self, col_columns: str = "sample", col_feature: str = None, col_values: str | None = None):
@@ -242,9 +240,9 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     def set_parent_dataset(self, parent: dlib.ABCDataset | None):  # Question: Should it be possible for the dataset to reject change of parent? Exception here?
         self._parent_dataset = parent
 
-    def set_samples_attributes(self, attributes_samples: dict[str, List[dlib.ABCTraitValue]] | None):
-        ABCDataTable._test_attributes_samples_keys(data_table = self, attributes_samples = attributes_samples)
-        self._attributes_samples = attributes_samples
+    def set_samples_trait_values(self, trait_values_samples: dict[str, List[dlib.ABCTraitValue]] | None):
+        ABCDataTable._test_attributes_samples_keys(data_table = self, attributes_samples = trait_values_samples)
+        self._trait_values_samples = trait_values_samples
 
     def set_samples_replicates(self, replicates: Dict[str, str] | None):
         if replicates:

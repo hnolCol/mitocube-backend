@@ -11,7 +11,7 @@ import lib.data.sql.postgresql as psql
 class PostgreSQLDataTable(dlib.ABCDataTable):
 
     @staticmethod
-    def _db_select_db_row(dataset_id: int | None = None, dataset_label: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
+    def _db_select_db_row(dataset_id: int | None = None, dataset_label: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> List[Tuple[Any]]:
         if dataset_id is None and dataset_label is None:
             raise dlib.ABCDatasetError("No dataset id nor label is set for PostgreSQLDataTable. Unable to perform SELECT.")
 
@@ -99,7 +99,7 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                 # intensity: 22.416995
 
                 # Stores the sample label with the internal database id
-                dbids_samples: Dict[str, int] = {}  # self._data_columns  # Question: change to dict to save index?
+                db_ids_samples: Dict[str, int] = {}  # self._data_columns  # Question: change to dict to save index?
 
                 # Insert samples into database and saves database id into samples
                 for sample in self._data_columns:
@@ -107,42 +107,42 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                                    {"dataset_id": dataset_id, "label": sample})
                     db_row = db_cur.fetchone()
 
-                    dbids_samples[db_row[1]] = db_row[0]
+                    db_ids_samples[db_row[1]] = db_row[0]
 
                 # Query features' sql database ids
                 unique_features = self.get_unique_data_features()
-                dbids_features: Dict[str, int] = {}
+                db_ids_features: Dict[str, int] = {}
                 for item in unique_features:
-                    dbids_features[item] = int(fdb.query_feature(feature=item).iloc[0]["sql_id"])
+                    db_ids_features[item] = int(fdb.query_feature(feature=item).iloc[0]["sql_id"])
 
                 # Insert values into the database
                 # Question: transformation. Currently assuming no transformation, should it be saved? user input required! Bigger issue
                 sql_values = []
                 for ix, row in tbl.iterrows():  # Fixme, too slow!
                     sql_values.append((dataset_id,
-                                       dbids_samples[row["sample"]],
-                                       dbids_features[row[self._row_index_name]],
+                                       db_ids_samples[row["sample"]],
+                                       db_ids_features[row[self._row_index_name]],
                                        row["intensity"]))
                 # Sends individual inserts to db manager. It might be faster to create one huge SQL statement, but this way is safer, currently.
                 db_cur.executemany("INSERT INTO feature_pg_values(dataset_id, sample_id, feature_id, feature_value) VALUES(%s, %s, %s, %s);", sql_values)
 
                 # Add attributes assigned to individual samples to the database
-                if self._attributes_samples:
-                    for sample, traits in self._attributes_samples.items():
+                if self._trait_values_samples:
+                    for sample, traits in self._trait_values_samples.items():
                         for trait in traits:
-                            trait.add_to_sample_id(sample_id=dbids_samples[sample], db_cur_session=db_cur)  # #FixMe: should trait me more specfic here? Typing issue
+                            trait.add_to_sample_id(sample_id=db_ids_samples[sample], db_cur_session=db_cur)  # #FixMe: should trait me more specfic here? Typing issue
 
                 # Write Replicates to DB
                 if self._replicates:
                     for sample, replicate in self._replicates.items():
                         db_cur.execute("""INSERT INTO sample_replicates (sample_id, replicate_label) VALUES (%(sample_id)s, %(replicate_label)s);""",
-                                       {"sample_id": dbids_samples[sample], "replicate_label": replicate})
+                                       {"sample_id": db_ids_samples[sample], "replicate_label": replicate})
 
                 # Write Batches to DB
                 if self._batches:
                     for sample, batch in self._batches.items():
                         db_cur.execute("""INSERT INTO sample_batches (sample_id, batch_label) VALUES (%(sample_id)s, %(batch_label)s);""",
-                                       {"sample_id": dbids_samples[sample], "batch_label": batch})
+                                       {"sample_id": db_ids_samples[sample], "batch_label": batch})
 
                 if db_conn:
                     db_conn.commit()
@@ -274,17 +274,17 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
 
             obj = cls(parent_dataset=None, data_long=data_long,
                       replicates_samples=replicates, batches_samples=batches,
-                      attributes_samples=None)
+                      trait_values_samples=None)
 
             # Receive and Set attributes for samples
-            attributes: Dict[str, List[dlib.ABCTraitValue]] | None = {}
+            trait_values: Dict[str, List[dlib.ABCTraitValue]] | None = {}
             for sample in obj.get_data_column_names():
                 # attributes[sample] =  psql.PostgreSQLTraitValue.objectify_with_sample_id(sample_id: int)  # Fixme: Would be faster
                 try:  # Question: Rewrite downstream functions to not throw an exception if nothing exist and returns None?
-                    attributes[sample] = psql.PostgreSQLTraitValue.objectify_with_sample_label(dataset_id=db_rows[0][0], label=sample)
+                    trait_values[sample] = psql.PostgreSQLTraitValue.objectify_with_sample_label(dataset_id=db_rows[0][0], label=sample)
                 except dlib.ABCAttributeError:
                     pass
-            obj.set_samples_attributes(attributes)
+            obj.set_samples_trait_values(trait_values_samples = trait_values)
 
             return obj
 
@@ -308,12 +308,11 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
 
         obj._replicates = datatable._replicates
         obj._batches = datatable._batches
-        obj._attributes_samples = datatable._attributes_samples  # ToDo: cast datatype and checks? (postgresql attributes) dict[str, List[dlib.ABCTraitValue]]
+        obj._trait_values_samples = datatable._trait_values_samples  # ToDo: cast datatype and checks? (postgresql attributes) dict[str, List[dlib.ABCTraitValue]]
 
         obj._parent_dataset = datatable._parent_dataset  # ToDo: cast datatype and checks?
 
         return obj
-
 
     def read(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_select(db_cur_session = db_cur_session)
@@ -323,6 +322,3 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
             raise dlib.ABCDatasetError("Unable to update / write already uploaded dataset.")
         else:
             self.__db_insert(db_cur_session=db_cur_session)
-
-
-

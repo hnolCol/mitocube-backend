@@ -119,7 +119,7 @@ class PostgreSQLUser(dlib.ABCUser):
                                     FROM sec_users WHERE username = %(username)s;""", {"username": username})
 
             if db_cur.rowcount != 1:
-                raise dlib.ABCUserError("Provided user id or name does not match a single user. Number of returned rows = {n}".format(n=db_cur.rownumber))
+                raise dlib.ABCUserNotFoundError("Provided user id or name does not match a single user. Number of returned rows = {n}".format(n=db_cur.rownumber))
 
             db_row = db_cur.fetchone()
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?

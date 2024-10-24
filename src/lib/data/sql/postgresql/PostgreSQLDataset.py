@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any, Dict, Tuple, List
 
 import psycopg2
@@ -64,7 +65,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
                 for url in self._urls:
                     url.set_dataset_id(dataset_id = self._internal_id)
                     url.append_to_dataset(db_cur_session=db_cur)
-
 
             psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
                                                                    user=self._owner_user if self._owner_user else None,
@@ -136,25 +136,23 @@ class PostgreSQLDataset(dlib.ABCDataset):
         self._internal_id = db_row[0]
         self._external_id = db_row[1]
 
-        self._instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None  # ToDo: Update to final method or function
-        self._parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None  # ToDo: Update to final method or function
+        self._instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None
+        self._parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None
 
         self._created_on = db_row[4]
         self._title = db_row[5]
-        self._owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None  # ToDo: Update to final method or function
-        self._owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_row[7]) if db_row[7] else None  # ToDo: Update to final method or function
+        self._owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None
+        self._owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_row[7]) if db_row[7] else None  #
 
         self._contact_email = db_row[8]
         self._state = db_row[9]
 
-        self._metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(self._internal_id)  # ToDo: Update to final method or function
+        self._metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(self._internal_id)
         self._urls = psql.PostgreSQLUrl.objectify_with_dataset_id(self._internal_id)
 
-        self._traits = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id=self._internal_id)  # ToDo: Implement / Update to final method or function
+        self._trait_values = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id=self._internal_id)
 
-        # ToDo: implement reading datasets
-        # self._data = psql.PostgreSQLDataTable.create_from_dataset(dataset=self)  # ToDo: Implement / Update with final method / function
-        # self._data = psql.PostgreSQLDataTable.create_from_id(dataset_id=self._internal_id)  # ToDo: Update with final method / function
+        self._data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id=db_row[0])
 
         raise dlib.ABCDatasetError("Not Finished yet!")
 
@@ -181,7 +179,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                             "research_group_id": self._owner_group.get_id()})
 
             if update_metatexts and self._metatexts:
-                for metatext in self._metatexts:
+                for tag, metatext in self._metatexts.items():
                     metatext.write()  # Also performs a delete if text is == ""
 
                     # Question: Is the following save to do while iterating?
@@ -197,11 +195,11 @@ class PostgreSQLDataset(dlib.ABCDataset):
                     for url in self._urls:
                         url.append_to_dataset()
 
-            psql.PostgreSQLTimeline.add_new_dataset_timeline_event(user=self._owner_user if self._owner_user else None,
-                                                                   state=dlib.TimelineEventState.INFO,
-                                                                   text=None,  # ToDo: What text should be saved?
-                                                                   event_type=dlib.DatasetTimelineEventType.UPDATE_META,
-                                                                   dataset_id=self._id)
+            psql.PostgreSQLTimeline.add_new_dataset_timeline_event(user = self._owner_user if self._owner_user else None,
+                                                                   state = dlib.TimelineEventState.INFO,
+                                                                   text = None,  # ToDo: What text should be saved?
+                                                                   event_type = dlib.DatasetTimelineEventType.UPDATE_META,
+                                                                   dataset_id = self._internal_id)
 
             if db_conn:
                 db_conn.commit()
@@ -217,26 +215,24 @@ class PostgreSQLDataset(dlib.ABCDataset):
     def objectify_with_id(cls, db_id: int) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
         db_row = PostgreSQLDataset.__db_select_db_row(db_id = db_id)
 
-        data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id = db_id)
+        trait_values = {}
+        with suppress(dlib.ABCTraitValueNotFoundError):
+            trait_values = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id = db_row[0])
 
-        dataset = cls(internal_id = db_row[0], external_id=db_row[1],
-                      data = data,  # ToDo: add final method call
-                      parent_project = psql.PostgreSQLProject.create_from_id(db_row[3], fetch_datasets=False) if db_row[3] else None,  # ToDo: Update to final method or function
-                      instrument = psql.PostgreSQLInstrument.create_from_id(db_row[2]) if db_row[2] else None,  # ToDo: Update to final method or function
+        dataset = cls(internal_id = db_row[0], external_id = db_row[1],
+                      data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id = db_id),
+                      parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None,
+                      instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None,
                       created_on = db_row[4],
                       uploaded_on = None,  # ToDo: Figure out
                       state = db_row[9],  # ToDo:  dlib.DatasetState  # ToDo: "state" 5 ?
                       title = db_row[5],
-                      owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None, # ToDo: Update to final method or function
-                      owner_group = psql.PostgreSQLResearchGroup.create_from_id(db_row[7]) if db_row[7] else None,  # ToDo: Update to final method or function
-                      contact_email = db_row[8])
-        # metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(db_row[0]),  # ToDo: Update to final method or function,
-        # urls = self._urls = psql.PostgreSQLUrl.objectify_with_dataset_id(db_row[0])  # ToDo: Implement / Update to final method or function
-
-        # ToDo: implement reading datasets
-        # self._traits = psql.PostgreSQLTrait.objectify_with_dataset_id(db_id = self._internal_id)  # ToDo: Implement / Update to final method or function
-        # self._data = psql.PostgreSQLDataTable.create_from_dataset(dataset=self)  # ToDo: Implement / Update with final method / function
-        # self._data = psql.PostgreSQLDataTable.create_from_id(dataset_id=self._internal_id)  # ToDo: Update with final method / function
+                      owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None,
+                      owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_row[7]) if db_row[7] else None,
+                      contact_email = db_row[8],
+                      metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(db_row[0]),
+                      urls = psql.PostgreSQLUrl.objectify_with_dataset_id(dataset_id = db_row[0]),
+                      trait_values = trait_values)
 
         return dataset
 
@@ -244,24 +240,24 @@ class PostgreSQLDataset(dlib.ABCDataset):
     def objectify_with_label(cls, label: str) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
         db_row = PostgreSQLDataset.__db_select_db_row(label = label)
 
+        trait_values = {}
+        with suppress(dlib.ABCTraitValueNotFoundError):
+            trait_values = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id = db_row[0])
+
         dataset = cls(internal_id = db_row[0], external_id = db_row[1],
-                      data = None,  # ToDo: add final method call
-                      parent_project = psql.PostgreSQLProject.create_from_id(db_row[3], fetch_datasets=False) if db_row[3] else None,  # ToDo: Update to final method or function
-                      instrument = psql.PostgreSQLInstrument.create_from_id(db_row[2]) if db_row[2] else None,  # ToDo: Update to final method or function
+                      data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id=db_row[0]),
+                      parent_project = psql.PostgreSQLProject.objectify_with_id(db_id=db_row[3], fetch_datasets=False) if db_row[3] else None,
+                      instrument = psql.PostgreSQLInstrument.objectify_with_id(db_id=db_row[2]) if db_row[2] else None,
                       created_on = db_row[4],
                       uploaded_on=None,  # ToDo: Figure out
                       state = db_row[9],  # ToDo:  dlib.DatasetState  # ToDo: "state" 5 ?
                       title = db_row[5],
-                      owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None, # ToDo: Update to final method or function
-                      owner_group = psql.PostgreSQLResearchGroup.create_from_id(db_row[7]) if db_row[7] else None,  # ToDo: Update to final method or function
-                      contact_email = db_row[8])
-        # metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(db_row[0]),  # ToDo: Update to final method or function,
-        # urls = self._urls = psql.PostgreSQLUrl.objectify_with_dataset_id(db_row[0])  # ToDo: Implement / Update to final method or function
-
-        # ToDo: implement reading datasets
-        # self._traits = psql.PostgreSQLTrait.objectify_with_dataset_id(db_id = self._internal_id)  # ToDo: Implement / Update to final method or function
-        # self._data = psql.PostgreSQLDataTable.create_from_dataset(dataset=self)  # ToDo: Implement / Update with final method / function
-        # self._data = psql.PostgreSQLDataTable.create_from_id(dataset_id=self._internal_id)  # ToDo: Update with final method / function
+                      owner_user = psql.PostgreSQLUser.objectify_with_id(db_id=db_row[6]) if db_row[6] else None,
+                      owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_id=db_row[7]) if db_row[7] else None,
+                      contact_email = db_row[8],
+                      metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(db_row[0]),
+                      urls = psql.PostgreSQLUrl.objectify_with_dataset_id(dataset_id = db_row[0]),
+                      trait_values = trait_values)
 
         return dataset
 
@@ -274,6 +270,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
         #     else:
         #       return obj._objectify_with_id(id)
 
+        # Question, FixMe: hard copy of some objects? e.g. data, and remove links to old dataset?
         new_dataset = cls(internal_id = None, external_id = dataset._external_id,
                           data = dataset._data,  # ToDo: objectify with sql type if needed? dataset._data.set_parent_dataset(self)
                           parent_project = dataset._parent_project,  # ToDo: objectify with sql type if needed?
@@ -284,11 +281,10 @@ class PostgreSQLDataset(dlib.ABCDataset):
                           title = dataset._title,
                           owner_user = dataset._owner_user,  # ToDo: objectify with sql type if needed?
                           owner_group = dataset._owner_group,  # ToDo: objectify with sql type if needed?
-                          contact_email = dataset._contact_email)
-
-        new_dataset._metatexts = dataset._metatexts  # ToDo: objectify with sql type if needed?
-        new_dataset._urls = dataset._urls  # ToDo: objectify with sql type if needed?
-        new_dataset._attributes = dataset._attributes  # ToDo: objectify with sql type if needed?
+                          contact_email = dataset._contact_email,
+                          metatexts = dataset._metatexts,  # ToDo: objectify with sql type if needed?
+                          urls = dataset._urls,  # ToDo: objectify with sql type if needed?
+                          trait_values = dataset._trait_values)  # ToDo: objectify with sql type if needed?
 
         return new_dataset
 
@@ -321,7 +317,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
         if self._internal_id is None:
             return False
         else:
-            return PostgreSQLDataset.does_exist_with_id(self._id, db_cur_session=db_cur_session)
+            return PostgreSQLDataset.does_exist_with_id(self._internal_id, db_cur_session=db_cur_session)
 
     @staticmethod
     def does_exist_with_id(db_id: int, db_cur_session: psycopg2.cursor | None = None) -> bool:
