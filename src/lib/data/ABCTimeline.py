@@ -32,6 +32,7 @@ class DatasetTimelineEventType(StrEnum):  # remember Flag https://docs.python.or
     UPDATE_ATTRIBUTES = "update_attributes"
     UPDATE_DATA = "update_data"
     UPDATE_STATE = "update_state"
+    DATASET_MEASURED = "dataset_measured"
     UPDATE_META = "update_meta"
     ACTIVATED = "activated"
     RETRACTED = "retracted"

@@ -5,10 +5,12 @@ from fastapi.exceptions import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 
 import lib.data as dlib
+from config import SystemSettings
 from lib.data.mem import MemLoginTokens, MemUserTokens, ABCLoginTokenError
 import lib.data.sql.postgresql as psql
+from lib.io.com import EMailHandler
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 from lib.rest.pmodels.auth.tokens import UserTokenPRM  # Pydantic Response Models
 from lib.rest.pmodels.auth.tokens import TokenVerificationCodePPM  # Pydantic Post Models
 
@@ -32,7 +34,6 @@ def rest_post_request_email_login_token(background_task: BackgroundTasks,
     # GUI Solution, best way, send username only to request token, and send token plus username password on second page, disadvantage, someone could bother one with emails... requires a timeout for emails
     # BACKEND Solution:, save password with the login token and validate it after second step ... someone could bother one with emails... requires a timeout for emails
 
-    # system_settings = SystemSettings.get_system_settings()
     # ToDo: Option to disallow logins? makes no sense currently due to restart of system required anyway to update config...
     user: dlib.ABCUser
 
@@ -66,14 +67,15 @@ def rest_post_request_email_login_token(background_task: BackgroundTasks,
     print("> Send the code '{code}' to '{email}'.".format(email=user.get_email(),
                                                           code=verification_code, ))  # Fixme: Remove this line after debugging!!!
 
-    # EMailHandler.send_email_in_background(background_tasks=background_task,  # Fixme: Enable me!
-    #                                       subject="Token Verification",  # ToDo: Move to configuration
-    #                                       email_to=[user.get_email()],
-    #                                       include_setting_cc=False,
-    #                                       body={"app_name": system_settings.app_name,
-    #                                             "first_name": user.get_lastname(),
-    #                                             "verification_code": verification_code},
-    #                                       template_name=system_settings.mail_template_verification)
+    system_settings = SystemSettings.get_system_settings()
+    EMailHandler.send_email_in_background(background_tasks=background_task,  # Fixme: Enable me!
+                                          subject="Token Verification",  # ToDo: Move to configuration
+                                          email_to=[user.get_email()],
+                                          include_setting_cc=False,
+                                          body={"app_name": system_settings.app_name,
+                                                "first_name": user.get_lastname(),
+                                                "verification_code": verification_code},
+                                          template_name=system_settings.mail_template_verification)
 
     return UserTokenPRM(success=True,
                         token=token_session,  # Question Is that actually used?
@@ -154,7 +156,7 @@ def rest_post_verify_email_login_token(token_to_verify: TokenVerificationCodePPM
 @router.get("/token/valid",
             response_description="Checks if a token from local storage is valid and returns the user's role and details",
             response_model=UserTokenPRM)
-def rest_get_verify_user_token(session: RestSessionInformation = Depends(rest_verify_user_token)) -> UserTokenPRM:
+def rest_get_verify_user_token(session: RestSessionInformation = Depends(RestPermissionSteward())) -> UserTokenPRM:
     user = session.get_user()
 
     return UserTokenPRM(success=True,

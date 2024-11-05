@@ -8,7 +8,7 @@ from config import SystemSettings
 
 import lib.data as dlib
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 
 router = APIRouter(prefix="", tags=["App Information"])
@@ -35,7 +35,7 @@ def rest_get_application_info():  # ToDo: Implement PRM
 
 @router.get("/api/info/keyfigures",  # Question: rename to /api/info/dashboard_stats?
             summary="Returns the key figures of the backend")
-def rest_get_db_stats(session: RestSessionInformation = Depends(rest_verify_user_token)) -> List[Dict[str, Any]]:  # ToDo: Create PRM
+def rest_get_db_stats(session: RestSessionInformation = Depends(RestPermissionSteward())) -> List[Dict[str, Any]]:  # ToDo: Create PRM
 
     db = dlib.ABCStatDatabase.get_class()()
     key_figures: List[Dict[str, Any]] = list()

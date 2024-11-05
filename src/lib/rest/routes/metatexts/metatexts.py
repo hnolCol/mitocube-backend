@@ -1,13 +1,13 @@
 import lib.data as dlib
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 from fastapi import APIRouter, Depends
 
 router = APIRouter(prefix="/api/metatexts", tags=["Metatext"])
 
 @router.get("/", summary="Returns the metatext configuration / information that can be used to describe a submission.")
-def rest_get_meta_text(session: RestSessionInformation = Depends(rest_verify_user_token)):
+def rest_get_meta_text(session: RestSessionInformation = Depends(RestPermissionSteward())):
 
     # ToDo: Hard copy, move to a configuration, but make it like a json Dict[tag, {title, placeholder, ...}]
     # Maybe make a database table, makes it easier to edit over time. plus information could be gathered with the other select for metatexts and provided

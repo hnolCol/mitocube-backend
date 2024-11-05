@@ -213,6 +213,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
     @classmethod
     def objectify_with_id(cls, db_id: int) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
+        # Fixme: Add option to only select certain features
         db_row = PostgreSQLDataset.__db_select_db_row(db_id = db_id)
 
         trait_values = {}
@@ -224,7 +225,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
                       parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None,
                       instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None,
                       created_on = db_row[4],
-                      uploaded_on = None,  # ToDo: Figure out
                       state = db_row[9],  # ToDo:  dlib.DatasetState  # ToDo: "state" 5 ?
                       title = db_row[5],
                       owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None,
@@ -238,6 +238,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
     @classmethod
     def objectify_with_label(cls, label: str) -> PostgreSQLDataset:  # ToDo: inherit it from the parent class, is it possible to overwrite return type? any restrictions form parent class?
+        # Fixme: Add option to only select certain features
         db_row = PostgreSQLDataset.__db_select_db_row(label = label)
 
         trait_values = {}
@@ -249,8 +250,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                       parent_project = psql.PostgreSQLProject.objectify_with_id(db_id=db_row[3], fetch_datasets=False) if db_row[3] else None,
                       instrument = psql.PostgreSQLInstrument.objectify_with_id(db_id=db_row[2]) if db_row[2] else None,
                       created_on = db_row[4],
-                      uploaded_on=None,  # ToDo: Figure out
-                      state = db_row[9],  # ToDo:  dlib.DatasetState  # ToDo: "state" 5 ?
+                      state = db_row[9],
                       title = db_row[5],
                       owner_user = psql.PostgreSQLUser.objectify_with_id(db_id=db_row[6]) if db_row[6] else None,
                       owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_id=db_row[7]) if db_row[7] else None,
@@ -262,7 +262,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
         return dataset
 
     @classmethod
-    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> PostgreSQLDataset:
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> PostgreSQLDataset:  # Fixme: Add option to only select certain features
 
         # def migrate_obj(obj, id, target_class) -> target_class:
         #     if object is target_class:
@@ -276,7 +276,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
                           parent_project = dataset._parent_project,  # ToDo: objectify with sql type if needed?
                           instrument = dataset._instrument,  # ToDo: objectify with sql type if needed?
                           created_on = dataset._created_on,
-                          uploaded_on = dataset._uploaded_on,
                           state = dataset._state,
                           title = dataset._title,
                           owner_user = dataset._owner_user,  # ToDo: objectify with sql type if needed?

@@ -130,7 +130,7 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                 if self._trait_values_samples:
                     for sample, traits in self._trait_values_samples.items():
                         for trait in traits:
-                            trait.add_to_sample_id(sample_id=db_ids_samples[sample], db_cur_session=db_cur)  # #FixMe: should trait me more specfic here? Typing issue
+                            trait.add_to_sample_id(sample_id=db_ids_samples[sample], db_cur_session = db_cur)  # #FixMe: should trait me more specfic here? Typing issue
 
                 # Write Replicates to DB
                 if self._replicates:
@@ -175,7 +175,6 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                                              "proteome_id",  # db_row[6]
                                              "intensity"])  # db_row[7]
         print(tbl)
-
 
     def __db_update(self, db_cur_session: psycopg2.cursor | None = None):  # Question: Do we allow updates?
         if self._parent_dataset and self._parent_dataset.get_internal_id():

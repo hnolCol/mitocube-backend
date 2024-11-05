@@ -66,7 +66,7 @@ class EventObservable(ABC):
             for observer in local_observers:
                 observer.process_event(event=event)
 
-        t = Thread(target=notify_within_thread, args=(event, observers))
+        t = Thread(target = notify_within_thread, args = (event, observers))
         t.start()
 
 

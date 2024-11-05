@@ -1,10 +1,17 @@
-from typing import List, Annotated, Literal, Dict
+from typing import List, Annotated, Literal, Dict, Type
 import time
+import string
+import random
+
+from datetime import datetime
 import warnings
 
 import lib.data as dlib
+import lib.data.sql.postgresql as psql
+import psycopg2
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 from fastapi import APIRouter, Depends, Request, BackgroundTasks, status
 from fastapi.exceptions import HTTPException
@@ -43,7 +50,13 @@ def rest_get_query_datasets(state: int | None = None,
                             user_label: str | None = None,
                             max_submissions: int | None = 50,
                             join: Literal["inner","outer"] = "inner",  # Question: What does that mean?
-                            session: RestSessionInformation = Depends(rest_verify_user_token)):
+                            session: RestSessionInformation = Depends(RestPermissionSteward())):
+
+    if query and len(query) < 3:
+        # Throw Exception to prevent unnecessary long runtime, e.g. query = "a" would return several hundred or thousands of features anyway
+        raise HTTPException(status_code = status.HTTP_400_BAD_REQUEST,  # ToDo: Collect to central spot / library
+                            detail = "The query string `{}` is too short. 2 characters required at least".format(query),
+                            headers = {"WWW-Authenticate": "Bearer"})
 
     deprecated_api("/api/submissions/q is deprecated, use /api/datasets/q instead")
 
@@ -110,8 +123,6 @@ def rest_get_query_datasets(state: int | None = None,
                             "samples_genotypes": {}  # Dict[str,List[int]]  # ToDo: Implement after implementing Genotypes
                             })
 
-    raise Exception("Figure out where the exception in the Frontend comes from ...")
-
     # was SubmissionQueryResponse # ToDo: Implement PRM
     return {"submissions": submissions,  # Question: What is in the list? Dict? was metadata, was List[DatasetSubmissionResponseModel]
             "ids": dataset_ids,  # dataset ids, List[int]
@@ -121,7 +132,7 @@ def rest_get_query_datasets(state: int | None = None,
 
 
 @router.get("/states", deprecated=True, summary="Returns the states enum as well as colors associated with the state.")
-def rest_get_project_states(session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: Implement PRM
+def rest_get_project_states(session: RestSessionInformation = Depends(RestPermissionSteward())):  # ToDo: Implement PRM
     deprecated_api("/api/submissions/states is deprecated, use /api/datasets/states instead")  # Deprecated / ToDo: Implement  /api/datasets/states
     # dlib.DatasetState
 
@@ -142,20 +153,84 @@ def rest_get_project_states(session: RestSessionInformation = Depends(rest_verif
 
 @router.get("/count", deprecated=True)  # ToDo: Implement PRM
 def rest_get_count_datasets_with_label(labels: str = None,
-                                       group: Literal["state", "user", "attribute_tag", "attribute_value_tag",
+                                       group: Literal["state", "user", "attribute_tag", "attribute_value_tag", "trait",
                                                       "feature", "genotype"] | None = None,  # Is None even allowed?
-                                       session: RestSessionInformation = Depends(rest_verify_user_token)):
+                                       session: RestSessionInformation = Depends(RestPermissionSteward())):
     # Question, Deprecated: would it not make more sense to implement something like /users/count, /states/count?
 
-    # Fixme: Returning something makes the Frontend Crash, so through Exception here in the meanwhile
-    #raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED,  # ToDo: Collect to central spot / library
-    #                    detail="Returning something here makes the GUI say by by. Ignoring it until solution found.",
-    #                    headers={"WWW-Authenticate": "Bearer"})
+    db_conn = None
+    try:  ## ToDo: Move Postgresql statements to respective ABC classes, also Deprecated code !
+        # if db_cur is None: # db_cur = db_cur_session # db_cur_session: psycopg2.cursor | None = None
+        db_conn = psql.PostgreSQLConnection().getConnection()
+        db_cur = db_conn.cursor()
 
-    list_labels: List[str] | None = None
+        if group == "state":
+            db_cur.execute("""SELECT ds.state, COUNT(*) AS n, 
+                                        ARRAY_AGG(ds.id ORDER BY ds.created_on DESC) AS ids, 
+                                        ARRAY_AGG(ds.label ORDER BY ds.created_on DESC) AS labels 
+                                    FROM datasets AS ds GROUP BY ds.state HAVING COUNT(*) > 0;""")
 
-    if labels is not None:  # Question is List not possible? Also, what labels? usernames? dataset labels?
-        list_labels = list(set(labels.split(";")))
+            return {db_row[0]: {"submission_ids": db_row[2],
+                                "submission_labels": db_row[3],
+                                "submission_count": db_row[1]} for db_row in db_cur.fetchall()}
+        elif group == "user":
+            db_cur.execute("""SELECT u.id, u.username, COUNT(*) AS n, 
+                                        ARRAY_AGG(ds.id ORDER BY ds.created_on DESC) AS IDS, 
+                                        ARRAY_AGG(ds.label ORDER BY ds.created_on DESC) AS LABELS  
+                                    FROM sec_users AS u INNER JOIN datasets AS ds ON u.id = ds.user_id
+                                    GROUP BY u.id, u.username HAVING COUNT(*) > 0;""")
+
+            return {db_row[1]: {"submission_ids": db_row[3],
+                                "user_id": db_row[0],
+                                "submission_labels": db_row[4],
+                                "submission_count": db_row[2]} for db_row in db_cur.fetchall()}
+        elif group in ("trait", "attribute_tag", "attribute_value_tag"):
+            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED,  # ToDo: Collect to central spot / library
+                                detail="Returning something here makes the GUI say by by. Ignoring it until solution found.",
+                                headers={"WWW-Authenticate": "Bearer"})
+
+            db_cur.execute("""SELECT at.id AS attribute_id, tr.id AS trait_id, CONCAT(at.tag, ':', tr.tag) AS tag, COUNT(*) AS n, 
+                                ARRAY_AGG(ds.id ORDER BY ds.created_on DESC) AS IDS, 
+                                ARRAY_AGG(ds.label ORDER BY ds.created_on DESC) AS LABELS 
+                            FROM (SELECT DISTINCT nm.trait_id, sa.dataset_id FROM nm_traits_samples AS nm LEFT JOIN samples AS sa ON sa.id = nm.sample_id 
+                                    UNION SELECT trait_id, dataset_id FROM nm_traits_datasets) AS nm 
+                                LEFT JOIN datasets AS ds ON ds.id = nm.dataset_id 
+                                LEFT JOIN traits AS tr ON tr.id = nm.trait_id 
+                                LEFT JOIN attributes AS at ON at.id = tr.attribute_id 
+                            WHERE at.allow_as_filter  ---- Question: Should that be here? 
+                            GROUP BY tr.id, at.id, CONCAT(at.tag, ':', tr.tag) HAVING COUNT(*) > 0;""")
+            # Question: Above, "WHERE at.allow_as_filter", would make practically sense how the old front end is using it. Remove?
+
+            return {db_row[2]: {"submission_ids": db_row[4],
+                                "attribute_id": db_row[0],
+                                "trait_id": db_row[1],
+                                "submission_labels": db_row[5],
+                                "submission_count": db_row[3]} for db_row in db_cur.fetchall()}
+        elif group == "feature":
+            db_cur.execute("""SELECT pg.id, pg.label, COUNT(*) AS n, 
+                                ARRAY_AGG(ds.id ORDER BY ds.created_on DESC) AS IDS, 
+                                ARRAY_AGG(ds.label ORDER BY ds.created_on DESC) AS LABELS 
+                            FROM (SELECT DISTINCT feature_id, dataset_id FROM feature_pg_values) AS va 
+                                LEFT JOIN feature_pgs AS pg ON pg.id = va.feature_id 
+                                LEFT JOIN datasets AS ds ON ds.id = va.dataset_id
+                            GROUP BY pg.id, pg.label HAVING COUNT(*) > 0;""")
+
+            return {db_row[1]: {"submission_ids": db_row[3],
+                                "feature_id": db_row[0],
+                                "submission_labels": db_row[4],
+                                "submission_count": db_row[2]} for db_row in db_cur.fetchall()}
+        elif group == "genotype":
+            raise HTTPException(status_code = status.HTTP_501_NOT_IMPLEMENTED,  # ToDo: Collect to central spot / library
+                                detail = "Returning something here makes the GUI say by by. Ignoring it until solution found.",
+                                headers = {"WWW-Authenticate": "Bearer"})
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,  # ToDo: Collect to central spot / library
+                                detail = "Invalid `{}` group as argument.".format(group),
+                                headers = {"WWW-Authenticate": "Bearer"})
+
+    finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+        if db_conn:
+            psql.PostgreSQLConnection().returnConnection(db_conn)
 
     # counts: List[int] = []
     # for label in labels:
@@ -171,7 +246,7 @@ def rest_get_count_datasets_with_label(labels: str = None,
 
 @router.get("/metatext", deprecated=True,  # Deprecated, Todo: Confusing, move to /metatexts/headers
             summary="Returns the metatext information that can be used to describe a submission.")
-def rest_get_meta_text(session: RestSessionInformation = Depends(rest_verify_user_token)):
+def rest_get_meta_text(session: RestSessionInformation = Depends(RestPermissionSteward())):
     """"""
     # ToDo: Hard copy, move to a configuration, but make it like a json Dict[tag, {title, placeholder, ...}]
     # Maybe make a database table, makes it easier to edit over time. plus information could be gathered with the other select for metatexts and provided

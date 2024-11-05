@@ -437,7 +437,6 @@ class PostgreSQLTrait(dlib.ABCTrait):
     def write(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_insert(db_cur_session=db_cur_session) if self._id is None else self.__db_update(db_cur_session=db_cur_session)
 
-
 class PostgreSQLTraitValue(dlib.ABCTraitValue):
     @staticmethod
     def __get_db_select_row(dataset_id: int | None = None, dataset_label: str | None = None,
@@ -491,6 +490,50 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return db_rows
+
+    @staticmethod
+    def __get_db_select_sample_rows(dataset_id: int | None = None, dataset_label: str | None = None,
+                                    db_cur_session: psycopg2.cursor | None = None) -> List[Tuple[Any]]:
+        if dataset_id is None and dataset_label is None:
+            raise dlib.ABCAttributeError("Require at least the id or label of a dataset to select respective Trait values. Unable to perform SELECT.")
+
+        db_conn = None
+        db_cur = db_cur_session
+
+        try:
+            if db_cur is None:
+                db_conn = psql.PostgreSQLConnection().getConnection()
+                db_cur = db_conn.cursor()
+
+            if dataset_id:
+                db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.sample_id, s.label 
+                    FROM traits AS t
+                        LEFT JOIN nm_traits_samples AS nm ON t.id = nm.trait_id 
+                        LEFT JOIN samples AS s ON nm.sample_id = s.id 
+                    WHERE s.dataset_id = %(dataset_id)s ORDER BY nm.sample_id ASC;""",
+                               {"dataset_id": dataset_id})
+            elif dataset_label:
+                db_cur.execute("""SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.sample_id, s.label 
+                    FROM traits AS t
+                        LEFT JOIN nm_traits_samples AS nm ON t.id = nm.trait_id 
+                        LEFT JOIN samples AS s ON nm.sample_id = s.id 
+                        LEFT JOIN datasets AS d ON s.dataset_id = d.id
+                    WHERE d.label = %(label)s ORDER BY nm.sample_id ASC;""",
+                               {"label": dataset_label})
+            else:  # Should not be reachable
+                raise dlib.ABCAttributeError("Require at least the id or label of a dataset to select respective Trait values. Unable to perform SELECT.")
+
+            if db_cur.rowcount < 1:
+                raise dlib.ABCTraitValueNotFoundError("Provided dataset id or label did not match a single Trait. Number of returned rows = {n}".format(n=db_cur.rownumber))
+
+            db_rows = db_cur.fetchall()
+
+        finally:  # fixme: switch to psycopg 3 to be able to use with statements?
+            if db_conn:
+                psql.PostgreSQLConnection().returnConnection(db_conn)
+
+        return db_rows
+
 
     def add_to_dataset_id(self, dataset_id: int, db_cur_session: psycopg2.cursor | None = None):
         db_conn = None
@@ -639,3 +682,50 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
                                     value = db_row[6], unit = db_row[7]))
 
         return trait_values
+
+    @classmethod
+    def objectify_sample_trait_values_with_dataset_id(cls, dataset_id: int) -> Dict[str, List[PostgreSQLTraitValue]]:
+        #  def __get_db_select_sample_rows(dataset_id: int | None = None, dataset_label: str | None = None,
+        #                                     db_cur_session: psycopg2.cursor | None = None) -> List[Tuple[Any]]:
+        #        0     1               2      3       4          5              6               7              8             9
+        # SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.sample_id, s.label
+        db_rows = PostgreSQLTraitValue.__get_db_select_sample_rows(dataset_id=dataset_id)
+
+        trait_values: Dict[str, List[PostgreSQLTraitValue]] = {}
+
+        for db_row in db_rows:
+            if db_row[9] not in trait_values.keys():
+                trait_values[db_row[9]] = []
+
+            trait_values[db_row[9]].append(cls(trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
+                                                                                                                                catch_parent= True),
+                                                                       tag = db_row[2], text = db_row[3], keyword = db_row[4],
+                                                                       description = db_row[5], db_id = db_row[0]),
+                                               value = db_row[6], unit = db_row[7]))
+
+        return trait_values
+
+    @classmethod
+    def objectify_sample_trait_values_with_dataset_label(cls, dataset_label: str) -> Dict[str, List[PostgreSQLTraitValue]]:
+        #  def __get_db_select_sample_rows(dataset_id: int | None = None, dataset_label: str | None = None,
+        #                                     db_cur_session: psycopg2.cursor | None = None) -> List[Tuple[Any]]:
+        #        0     1               2      3       4          5              6               7              8             9
+        # SELECT t.id, t.attribute_id, t.tag, t.text, t.keyword, t.description, nm.trait_value, nm.trait_unit, nm.sample_id, s.label
+        db_rows = PostgreSQLTraitValue.__get_db_select_sample_rows(dataset_label=dataset_label)
+
+        trait_values: Dict[str, List[PostgreSQLTraitValue]] = {}
+
+        for db_row in db_rows:
+            if db_row[9] not in trait_values.keys():
+                trait_values[db_row[9]] = []
+
+            trait_values[db_row[9]].append(cls(trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
+                                                                                                                                catch_parent= True),
+                                                                       tag = db_row[2], text = db_row[3], keyword = db_row[4],
+                                                                       description = db_row[5], db_id = db_row[0]),
+                                               value = db_row[6], unit = db_row[7]))
+
+        return trait_values
+
+
+

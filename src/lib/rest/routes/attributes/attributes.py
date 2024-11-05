@@ -5,7 +5,7 @@ from fastapi.exceptions import HTTPException
 
 import lib.data as dlib
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 router = APIRouter(prefix="/api/attributes", tags=["Attributes", "Traits"])
 
@@ -59,11 +59,11 @@ def get_all_traits(attributes: Dict[int, dlib.ABCAttribute] | None = None) -> Li
              "text": obj.get_text(),
              "description": obj.get_description(),
              "tag": obj.get_full_tag(),
-             "value": None,  # ToDo: Check implementation of TraitValue and return those here
+             "value": None,  # Deprecated, list of Trait does not include values nor Features (line below)
              "feature": None} for db_id, obj in traits.items()]  # Deprecated, feature will be a normal string value if saved
 
 @router.get("")  # ToDo: Implement PRM
-def rest_get_all_attributes(session: RestSessionInformation = Depends(rest_verify_user_token)):
+def rest_get_all_attributes(session: RestSessionInformation = Depends(RestPermissionSteward())):
 
     attribute_list, attribute_dict = get_all_attributes()
 

@@ -272,6 +272,7 @@ class ABCTraitValue(ABC, dlib.FlexDataClass):
 
     def __init__(self, trait: dlib.ABCTrait, value: str | None = None, unit: str | None = None):
         self._trait: dlib.ABCTrait = trait
+        # self._parent_trait: ABCTrait = parent_trait  # Question, think about it
         self._value: str | None = value
         self._unit: str | None = unit  # Deprecated, can be solved like att_timepoint:h(2) for 2 hours timepoint for att_timepoint:m(120)
 
@@ -279,6 +280,12 @@ class ABCTraitValue(ABC, dlib.FlexDataClass):
     def _get_class_rulings(cls) -> Dict[str, Self]:
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLTraitValue}
+
+    def get_full_tag(self) -> str:
+        if self._value:
+            return "{tag}({value})".format(tag = self._trait.get_full_tag(), value = self._value)
+        else:
+            return self._trait.get_full_tag()
 
     def get_trait(self) -> dlib.ABCTrait:
         return self._trait
@@ -328,4 +335,14 @@ class ABCTraitValue(ABC, dlib.FlexDataClass):
     @classmethod
     @abstractmethod
     def objectify_with_sample_label(cls, dataset_id: int, label: str) -> List[ABCTraitValue]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_sample_trait_values_with_dataset_id(cls, dataset_id: int) -> Dict[str, List[ABCTraitValue]]:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_sample_trait_values_with_dataset_label(cls, dataset_label: str) -> Dict[str, List[ABCTraitValue]]:
         pass

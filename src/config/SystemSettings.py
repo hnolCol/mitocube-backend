@@ -29,9 +29,9 @@ class SystemSettings(BaseSettings):
     # General Settings
     app_name: str = "Nova MitoCube"
     app_summary: str = "MitoCube backend"
-    app_description: str = """Nova MitoCube API helps you do awesome stuff if your proteomic data. 👩‍🔬"""
+    app_description: str = """Nova MitoCube API helps you do awesome stuff with your proteomic data. 👩‍🔬"""
     app_api_description: str = """---
-Nova MitoCube API helps you do awesome stuff if your proteomic data. 👩‍🔬
+Nova MitoCube API helps you do awesome stuff with your proteomic data. 👩‍🔬
 
 ## Something
 
@@ -60,7 +60,7 @@ You will be able to:
     mail_use_tls_ssl: str = "True"
     mail_start_tls: str = "False"
     mail_username: SecretStr = "immunocube@gmail.com"
-    mail_password: SecretStr = "dsjKfl42!shFsDhgs?rjrcLyx!lI1cvj69ghoeijfndx"  # "mlbazxurazxqsvvs"
+    mail_password: SecretStr = "pqpwacwvoemgfnrb"  # "dsjKfl42!shFsDhgs?rjrcLyx!lI1cvj69ghoeijfndx"  # "mlbazxurazxqsvvs"
     mail_use_credentials: bool = True
     mail_validate_certs: bool = False
     mail_from_name: str = "MitoCube Support"

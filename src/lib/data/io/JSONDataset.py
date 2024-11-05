@@ -14,21 +14,21 @@ class JSONDataset(dlib.ABCDataset):
                  owner_user: dlib.ABCUser, contact_email: str, internal_id: int | None = None,
                  data: dlib.ABCDataTable | None = None, parent_project: dlib.ABCProject | None = None,
                  instrument: dlib.ABCInstrument | None = None, created_on: datetime | None = None,
-                 uploaded_on: datetime | None = None, owner_group: dlib.ABCResearchGroup | None = None,
+                 owner_group: dlib.ABCResearchGroup | None = None,
                  metatexts: Dict[str, dlib.ABCMetatext] = None, urls: List[dlib.ABCUrl] = None,
                  # attributes: Dict[str, dlib.ABCTrait] | None = None,
                  trait_values: Dict[str, dlib.ABCTraitValue] | None = None,
                  class_target: Type[dlib.ABCDataset] = psql.PostgreSQLDataset):
 
         super().__init__(external_id, state, title, owner_user, contact_email, internal_id, data, parent_project,
-                         instrument, created_on, uploaded_on, owner_group, metatexts, urls, trait_values)
+                         instrument, created_on, owner_group, metatexts, urls, trait_values)
 
         self._path_json_file: str = path_json_file
         self._class_target: Type[dlib.ABCDataset] | None = class_target
 
         self._object_target: dlib.ABCDataset = class_target(external_id, state, title, owner_user,
                                                             contact_email, internal_id, data, parent_project,
-                                                            instrument, created_on, uploaded_on, owner_group,
+                                                            instrument, created_on, owner_group,
                                                             metatexts, urls, trait_values)
 
     @staticmethod
@@ -143,7 +143,6 @@ class JSONDataset(dlib.ABCDataset):
         dataset = cls(path_json_file = path, internal_id = None, external_id = data["label"],
                       data = data_table, parent_project = None, instrument = None,
                       created_on = datetime.fromtimestamp(data["created_on"]),  # ToDo: To int to date
-                      uploaded_on = None,  # ToDo: Figure out
                       state = data["state"],  # ToDo:  dlib.DatasetState  # ToDo: "state" 5 ?
                       title = data["title"],
                       owner_user = owner_user,  # ToDo: Fix Class selection

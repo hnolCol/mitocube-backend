@@ -4,7 +4,7 @@ import warnings
 
 import lib.data as dlib
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 from fastapi import APIRouter, Depends, Request, BackgroundTasks
 from fastapi.exceptions import HTTPException
@@ -42,13 +42,13 @@ def get_dataset(dataset: dlib.ABCDataset):  # ToDo: create PRM
 
 @router.get("/{label}")  # , response_model=xxx)
 def rest_get_dataset(label: str,
-                     session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: create PRM
+                     session: RestSessionInformation = Depends(RestPermissionSteward())):  # ToDo: create PRM
     ds: dlib.ABCDataset = dlib.ABCDataset.get_class()
     return get_dataset(ds.objectify_with_label(label=label))
 
 @router.get("/{label}/timeline")  # , response_model=xxx)
 def rest_get_dataset_timeline(label: str,
-                              session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: create PRM
+                              session: RestSessionInformation = Depends(RestPermissionSteward())):  # ToDo: create PRM
     tl: dlib.ABCTimeline = dlib.ABCTimeline.get_class()
     timeline: List[dlib.ABCDatasetTimelineEvent] = tl.objectify_with_dataset_label(dataset_label = label)
 
@@ -72,6 +72,6 @@ def get_dataset_traits(dataset: dlib.ABCDataset):  # ToDo: create PRM
 
 @router.get("/{label}/traits")  # , response_model=xxx)  # ToDo: rewrite to ABCDataSetValues
 def rest_get_dataset_traits(label: str,
-                            session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: create PRM
+                            session: RestSessionInformation = Depends(RestPermissionSteward())):  # ToDo: create PRM
     ds: dlib.ABCDataset = dlib.ABCDataset.get_class()
     return get_dataset_traits(dataset = ds.objectify_with_label(label=label))

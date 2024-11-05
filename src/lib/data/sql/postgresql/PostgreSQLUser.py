@@ -375,7 +375,7 @@ class PostgreSQLUser(dlib.ABCUser):
             db_rows = db_cur.fetchall()
 
             for db_row in db_rows:
-                print(db_row)
+                usernames[db_row[1]] = db_row[0]
 
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:

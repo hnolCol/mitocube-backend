@@ -38,11 +38,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def __init__(self, external_id: str | None, state: DatasetState, title: str, owner_user: dlib.ABCUser,
                  contact_email: str, internal_id: int | None = None, data: dlib.ABCDataTable | None = None,
                  parent_project: dlib.ABCProject | None = None, instrument: dlib.ABCInstrument | None = None,
-                 created_on: datetime | None = None,  uploaded_on: datetime | None = None,
+                 created_on: datetime | None = None,
                  owner_group: dlib.ABCResearchGroup | None = None, metatexts: Dict[str, dlib.ABCMetatext] = None,
                  urls: List[dlib.ABCUrl] = None,
                  # attributes: Dict[str, dlib.ABCTrait] | None = None,  # ToDo: Counter check typing below and return values of get methods (and argument typing set methods)
-                 trait_values: Dict[str, dlib.ABCTraitValue] | None = None):
+                 trait_values: Dict[str, dlib.ABCTraitValue] | None = None):  # ToDo: is_subset
         self._internal_id: int | None = internal_id
         self._external_id: str | None = external_id
 
@@ -52,8 +52,8 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._urls: List[dlib.ABCUrl] | None = urls
         self._data: dlib.ABCDataTable = data
 
-        if self._data:
-            self._data.set_parent_dataset(self)
+        if self._data:  # Fixme: Change to cached_data
+            self._data.set_parent_dataset(self)  # ToDo: Only set if it is not a subset
 
         self._contact_email: str = contact_email
         self._created_on: datetime = datetime.now(tz=None) if created_on is None else created_on
@@ -61,7 +61,6 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._owner_user: dlib.ABCUser = owner_user
         self._state: DatasetState = state
         self._title: str = title
-        self._uploaded_on: datetime | None = uploaded_on
 
         # Fixme: maybe remove that completely, just get messy with JSON dataset...
         # management outside would make it easier to remove, add traits (rather to check within dataset what is maybe different)
@@ -113,7 +112,7 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def get_external_id(self) -> int | None:
         return self._external_id
 
-    def get_data(self) -> dlib.ABCDataTable | None:
+    def get_data(self) -> dlib.ABCDataTable | None:  # Fixme: Through exception if no data is available, and retrieve data object if not cached
         return self._data
 
     def get_parent_project(self) -> dlib.ABCProject:
@@ -140,9 +139,6 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def get_title(self) -> str:
         return self._title
 
-    def get_uploaded_on_date(self) -> datetime | None:
-        return self._uploaded_on
-
     def get_metatexts(self) -> Dict[dlib.ABCMetatext] | None:
         return self._metatexts
 
@@ -154,17 +150,17 @@ class ABCDataset(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_id(cls, db_id: int) -> dlib.ABCDataset:
+    def objectify_with_id(cls, db_id: int) -> dlib.ABCDataset:  # Fixme: Add option to only select certain features
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_label(cls, label: str) -> dlib.ABCDataset:
+    def objectify_with_label(cls, label: str) -> dlib.ABCDataset:  # Fixme: Add option to only select certain features
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> dlib.ABCDataset:
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> dlib.ABCDataset:  # Fixme: Add option to only select certain features
         pass
 
     @abstractmethod

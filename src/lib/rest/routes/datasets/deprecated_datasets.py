@@ -6,7 +6,7 @@ import warnings
 from fastapi import APIRouter, Depends, HTTPException
 
 import lib.data as dlib
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 router = APIRouter(prefix="/api/datasets",tags=["Dataset", "Deprecated"])
 
@@ -19,7 +19,7 @@ def deprecated_api(message):  # ToDo: Replace with from warnings import deprecat
 # tags=["Parameters" ,"Meta data"])
 @router.get("/{dataset_label}/meta", deprecated=True)
 def get_dataset_params(dataset_label : str,  # deprecated, Todo: /dataset/{label}/meta Is it the same as /datasets/{dataset_label}/ or different?
-                       session: RestSessionInformation = Depends(rest_verify_user_token)):  # ToDo: Implement PRM
+                       session: RestSessionInformation = Depends(RestPermissionSteward())):  # ToDo: Implement PRM
     ds: dlib.ABCDataset = dlib.ABCDataset.get_class()
     dataset = ds.objectify_with_label(label=dataset_label)
 

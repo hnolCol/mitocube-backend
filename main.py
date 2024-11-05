@@ -13,13 +13,15 @@ import lib.rest.routes.application as routes_app
 import lib.rest.routes.attributes.attributes as routes_attributes
 import lib.rest.routes.auth.auth as routes_auth
 import lib.rest.routes.genotypes.genotypes as routes_genotypes
-import lib.rest.routes.dataset.dataset as routes_dataset  # ToDo: add to routes
-import lib.rest.routes.datasets.datasets as routes_datasets  # ToDo: add to routes
+# import lib.rest.routes.dataset.dataset as routes_dataset  # ToDo: add to routes
+# import lib.rest.routes.datasets.datasets as routes_datasets  # ToDo: add to routes
 import lib.rest.routes.datasets.deprecated_datasets as routes_deprecated_datasets
 import lib.rest.routes.features.features as routes_features
 import lib.rest.routes.features.deprecated_features as routes_deprecated_features
-import lib.rest.routes.submissions.deprecated_submissions as routes_submissions
-import lib.rest.routes.user.user as routes_user  # ToDo: add tp routes
+import lib.rest.routes.instruments.deprecated_instruments as routes_deprecated_instruments
+import lib.rest.routes.submissions.deprecated_submission as routes_deprecated_submission
+import lib.rest.routes.submissions.deprecated_submissions as routes_deprecated_submissions
+# import lib.rest.routes.user.user as routes_user  # ToDo: add to routes
 import lib.rest.routes.users.users as routes_users
 
 from config import SystemSettings
@@ -60,7 +62,7 @@ app.add_middleware(CORSMiddleware,  # FixMe: Wrong type?
     # return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 # add routers from packages
-for item in [routes_auth, routes_app, routes_attributes, routes_features, routes_genotypes, routes_submissions, routes_users,
+for item in [routes_auth, routes_app, routes_attributes, routes_features, routes_genotypes, routes_deprecated_instruments, routes_deprecated_submission, routes_deprecated_submissions, routes_users,
              routes_deprecated_datasets, routes_deprecated_features]:
     if hasattr(item, "router"):
         app.include_router(getattr(item, "router"))

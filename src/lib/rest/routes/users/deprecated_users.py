@@ -7,7 +7,7 @@ from fastapi.exceptions import HTTPException
 import lib.data as dlib
 import lib.data.sql.postgresql as psql
 
-from lib.rest.security import rest_verify_user_token, RestSessionInformation
+from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 from config import get_system_settings
 
@@ -19,7 +19,7 @@ def deprecated_api(message):  # ToDo: Replace with from warnings import deprecat
 
 
 @router.get("/users/roles", deprecated=True, summary="Returns the available user roles and names")  #, response_model=UseRoleReponseModel)
-def rest_get_user_roles(session: RestSessionInformation = Depends(rest_verify_user_token)):  # deprecated: rest_get_user_roles
+def rest_get_user_roles(session: RestSessionInformation = Depends(RestPermissionSteward())):  # deprecated: rest_get_user_roles
     # user : UserModel = Depends(get_user_from_token)):
     """Returns the user role enumerator."""
     # ToDo: Figure out what to return here? list/dict of possible roles? Replace with permission definitions
@@ -28,7 +28,7 @@ def rest_get_user_roles(session: RestSessionInformation = Depends(rest_verify_us
 
 
 @router.get("/attributes/user", deprecated=True)  # , response_model=AttributeResponseModel)
-def rest_get_user_attributes(session: RestSessionInformation = Depends(rest_verify_user_token)):  # Deprecated: will not be used in the future, just returns dummy data now
+def rest_get_user_attributes(session: RestSessionInformation = Depends(RestPermissionSteward())):  # Deprecated: will not be used in the future, just returns dummy data now
     deprecated_api("/api/attributes/user -> lib.rest.routes.users.[users.py].rest_get_user_attributes()")
     user = session.get_user()
     # ToDo: Replace with simple dictionary structure

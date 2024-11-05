@@ -14,7 +14,7 @@ class PostgreSQLTimeline(dlib.ABCTimeline):
     def add_new_dataset_timeline_event(cls, user: dlib.ABCUser | None, state: dlib.TimelineEventState, text: str | None,
                                        event_type: dlib.DatasetTimelineEventType, dataset_id: int | None,
                                        timestamp: datetime = datetime.now(tz=None),
-                                       test: str | None = None, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDatasetTimelineEvent:
+                                       db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDatasetTimelineEvent:
         event = PostgreSQLDatasetTimelineEvent(db_id=None, timestamp=timestamp, user=user, state=state, text=text, event_type=event_type, dataset_id=dataset_id)
         event.write(db_cur_session=db_cur_session)
         return event
