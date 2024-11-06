@@ -24,13 +24,19 @@ router = APIRouter(
 #heatmap endpoints 
 @router.get("/filters",
             tags=["Filter"])
-def get_available_filters(proteome_tags : str = None, user : UserModel = Depends(get_user_from_token)) -> List[FilterModel]:
+def get_available_filters(proteome_tags : str = None, 
+                          user : UserModel = Depends(get_user_from_token),
+                          feature_tag : str = None, 
+                          ) -> List[FilterModel]:
     """Returns the filter set that are available in the database.
 
     Parameters
     ----------
     proteome_tags : str, optional
         The Uniprot proteome tag. For multiple proteoms - separate by ';', by default None
+    feature_tag : str, optional, 
+        If a feature_tag is given, the filters for the specific featurer are returned. 
+        Cannot handle multiple feature_tags (e.g. divided b ";" as in the proteome)
     user : UserModel, optional
         User inferred from the token, by default Depends(get_user_from_token)
 
@@ -40,7 +46,8 @@ def get_available_filters(proteome_tags : str = None, user : UserModel = Depends
         Filters available in the database.
     """
     
-    filters = DB.filters.get(proteome_tags=APIParamString(param=proteome_tags).param)
+    filters = DB.filters.get(proteome_tags=APIParamString(param=proteome_tags).param,
+                            feature_tag=feature_tag)
     return filters
 
 

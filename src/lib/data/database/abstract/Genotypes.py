@@ -51,6 +51,7 @@ class GenotypeABC(ABC):
     
         
     def find(self, query : str) -> List[MinimalGenotypeModel]:
+        #TEST!! 
         query_string = query.lower() 
         query = (
             "MATCH (g:Genotype) "

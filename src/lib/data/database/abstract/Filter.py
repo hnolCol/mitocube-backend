@@ -74,7 +74,7 @@ class FilterABC(ABC):
             List of proteome tags. If just proteome tags are given, then all 
             filters of a specific proteome are returned, ignored of tag is given. 
         feature_tag : str 
-            A feature tag that must be in the filter, ignore if tag is or proteome_tags is provided.     
+            A feature tag that must be in the filter, ignored if tag is not None or proteome_tags is provided.     
         
         Returns
         -------

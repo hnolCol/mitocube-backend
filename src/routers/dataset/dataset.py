@@ -152,7 +152,7 @@ def get_dataset_sample_info(dataset_tag : str):
     attribute_tags = [attribute_tag for attribute_tag in sample_map.columns if attribute_tag not in ["sample_text"]]
     attribute_value_tags = pd.Series(sample_map.values.flatten()).unique().tolist()
     attributes = DB.attributes.get(tags = attribute_tags)
-    attribute_values = DB.attributes.get_values(submission_tag = dataset_tag, tags = attribute_value_tags)
+    attribute_values = DB.attributes.get_values_by_submission_tag(submission_tag = dataset_tag, tags = attribute_value_tags)
     if has_genotype:
         genotypes = DB.genotypes.get(tags = sample_map.loc[:,"att_genotype"].to_list())
         attribute_values.extend(genotypes)

@@ -445,7 +445,7 @@ def get_submission_attributes(submission_tag : str,
     dataset_attribute_tags = DB.meta.get_dataset_attributes(tag = submission_tag)
     dataset_attribute_value_tags = [av_tag for av_tags in dataset_attribute_tags.values() for av_tag in av_tags]
     attributes = DB.attributes.get(tags = list(dataset_attribute_tags))
-    values = DB.attributes.get_values(submission_tag=submission_tag, tags = dataset_attribute_value_tags)
+    values = DB.attributes.get_values_by_submission_tag(submission_tag=submission_tag, tags = dataset_attribute_value_tags)
 
     DatasetAttributesResponse(tag = submission_tag, attribute_values= values, attributes= attributes, tags = dataset_attribute_tags)
     return {'tags' : dataset_attribute_tags, 

@@ -21,6 +21,7 @@ from services.submission import map_tags
 from lib.data.database.Database import Database
 
 from config.models.prefix import PrefixModel
+from config.models.feature import FeatureNeoModel
 
 DB = Database.DB()
 
@@ -39,19 +40,19 @@ def get_attributes(search_string : Optional[str] = None,
     """
     if search_string is not None:
         return DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name )
-        
+
     else: 
         attributes = DB.attributes.get(param_name=param_name,min_state=min_state)
         attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
-
-        
+       
     return AttributeResponseModel(attributes=attributes,
                                   attribute_values=attribute_values)
 
 @router.get("/values")
-def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel]:
+def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel|FeatureNeoModel]:
     ""
     r = DB.attributes.values(tags = [tag])
+    
     return r 
     # if len(r) == 0: return r 
     # return r[0][1]

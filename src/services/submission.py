@@ -310,7 +310,9 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
                         "sample_index" : sample_index,
                         "input" : props
                     })  
-        
+    
+    print(submission.samplesAttributesInput)
+    print(user_input)
     json["samples_attributes_input"] = user_input
 
     

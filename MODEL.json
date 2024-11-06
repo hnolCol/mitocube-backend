@@ -1,32 +1,34 @@
 {
-    "created_on": 1726232829940.9778,
+    "created_on": 1728559433013.001,
     "modified_on": null,
     "state": 0,
     "label": null,
-    "tag": "pRk3Tcuuzp",
-    "title": "The unit test :) ",
+    "tag": "MHpeDeyaFY",
+    "title": "A unit test , where to save this information?",
     "user_tag": "VpVff4sS",
     "collaborators": [],
     "replicates": [
         1,
-        1,
         2,
+        3,
+        1,
         2
     ],
     "sample_names": [
-        "20240913_pRk3Tcuuzp_01_5_fluorouracil",
-        "20240913_pRk3Tcuuzp_02_anisomycin",
-        "20240913_pRk3Tcuuzp_03_anisomycin",
-        "20240913_pRk3Tcuuzp_04_5_fluorouracil"
+        "20241010_MHpeDeyaFY_01_dmso",
+        "20241010_MHpeDeyaFY_02_dmso",
+        "20241010_MHpeDeyaFY_03_anisomycin",
+        "20241010_MHpeDeyaFY_04_anisomycin",
+        "20241010_MHpeDeyaFY_05_anisomycin"
     ],
-    "n_samples": 4,
+    "n_samples": 5,
     "metatext": {
-        "metatext:research_aim": "asdad this is a uit testasdad this is a uit testasdad this is a uit testasdad this is a uit testasdad this is a uit test",
-        "metatext:experimental_procedure": "asdad this is a uit testasdad this is a uit testasdad this is a uit test"
+        "metatext:research_aim": "asdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadad",
+        "metatext:experimental_procedure": "asdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadad"
     },
     "dataset_attributes": {
         "att_experiment": [
-            "phosphoproteome"
+            "expression_proteome"
         ],
         "att_omics_type": [
             "proteomics"
@@ -40,27 +42,28 @@
     },
     "samples_attributes": {
         "att_compound": {
-            "5_fluorouracil": [
+            "dmso": [
                 0,
-                3
+                1
             ],
             "anisomycin": [
-                1,
-                2
+                2,
+                3,
+                4
             ]
         }
     },
     "samples_genotypes": {},
     "links": [],
     "timeline": {
-        "created_on": 1726232829.959477,
-        "modified_on": 1726232829.959477,
-        "label": "MHbGWqfU8yghj7smIvHc",
+        "created_on": 1728559433.021355,
+        "modified_on": 1728559433.021355,
+        "label": "J9ZBWaMsZqy0MAYVO6E2",
         "entries": [
             {
                 "id": 0,
-                "label": "6NZAg4K7mrnPquBuhveu",
-                "created_on": 1726232829.959452,
+                "label": "SCLeZ2q7BwoixoiuUhol",
+                "created_on": 1728559433.021332,
                 "user_tag": "VpVff4sS",
                 "user_label": null,
                 "state": 0,
@@ -72,23 +75,23 @@
     "samples_attributes_input": {
         "att_compound": [
             {
-                "attribute_value_tag": "5_fluorouracil",
+                "attribute_value_tag": "dmso",
                 "sample_index": 0,
                 "input": [
                     {
-                        "time": 1.9999999999999998e-05
+                        "concentration": 2.0
                     },
                     {
-                        "concentration": 2.0
+                        "time": 2.0
                     }
                 ]
             },
             {
-                "attribute_value_tag": "anisomycin",
+                "attribute_value_tag": "dmso",
                 "sample_index": 1,
                 "input": [
                     {
-                        "concentration": 22.0
+                        "concentration": 2.0
                     },
                     {
                         "time": 2.0
@@ -100,19 +103,31 @@
                 "sample_index": 2,
                 "input": [
                     {
-                        "concentration": 22.0
+                        "concentration": 4.0
                     },
                     {
-                        "time": 2.0
+                        "time": 4.0
                     }
                 ]
             },
             {
-                "attribute_value_tag": "5_fluorouracil",
+                "attribute_value_tag": "anisomycin",
                 "sample_index": 3,
                 "input": [
                     {
-                        "concentration": 20.0
+                        "concentration": 4.0
+                    },
+                    {
+                        "time": 4.0
+                    }
+                ]
+            },
+            {
+                "attribute_value_tag": "anisomycin",
+                "sample_index": 4,
+                "input": [
+                    {
+                        "concentration": 4.0
                     },
                     {
                         "time": 4.0

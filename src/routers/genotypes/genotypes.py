@@ -41,7 +41,7 @@ def get_genotype_by_label(genotype_label : str):
     
 
 @router.get("/genotypes", response_model=List[MinimalGenotypeModel])
-def get_genotypes(proteome_ids : Optional[str] = None, feature_tag : Optional[str] = None, user : UserModel = Depends(get_user_from_token)):
+def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[str] = None, user : UserModel = Depends(get_user_from_token)):
     """Returns the genotypes defined using the params: ``proteome_id`` or ``feature_key``. 
     If feature_key is provided, the proteome_id is ingored. If ``proteome_id`` is given, then
     all genotypes that are defined for a given proteome_id is provided. 
@@ -54,7 +54,8 @@ def get_genotypes(proteome_ids : Optional[str] = None, feature_tag : Optional[st
         The feature key can be used to access genotypes that affect a certain feature_key, by default Optional[str]=None
     """
     r = DB.genotypes.get(
-        proteome_ids=APIParamString(param = proteome_ids).param, 
+        
+        proteome_tags=APIParamString(param = proteome_tags).param, 
         protein_tags=APIParamString(param = feature_tag).param
         )
     return r 

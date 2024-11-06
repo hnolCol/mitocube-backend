@@ -140,9 +140,11 @@ class Neo4JAttributes(AttributesABC):
         return [AttributeModel(**k) for k in attributes]
 
 
-    def values(self, tags : List[str]) -> List[AttributeValueModel]:
+    def values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
         """
-        CAUTION: Does not return features as attribute values.
+        Returns the value of the given attribute tags. 
+        CAUTION: for attributes that allow for features, only the previosuly selected features 
+        are returned and not the complete proteome. 
 
         Parameters
         ----------
@@ -156,16 +158,42 @@ class Neo4JAttributes(AttributesABC):
         """
         query = (
             "MATCH (a:Attribute)-[:HAS_VALUE]->(av:AttributeValue) "
-            "WHERE NOT 'Protein' in labels(av) AND a.tag in $tags "
+            "WHERE a.tag in $tags " #WHERE NOT 'Protein' in labels(av) AND 
             "RETURN properties(av)"
         )
-        attribute_values = self._driver.execute_query(query_=query,routing_="r",result_transformer_=Result.value, tags = tags )
-        return [AttributeValueModel(**av) for av in attribute_values]
-        
+        attribute_values = self._driver.execute_query(query_=query,routing_="r",result_transformer_ = Result.value, tags = tags )
+        return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av)  for av in attribute_values]
         
     
-    def get_values(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
-        "Returns the props of the attributes its values. Note that it will return dataset and sample attribute values"
+    def get_values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
+        """Returns the attribute values by a list of attribute value tags.
+
+        Parameters
+        ----------
+        tags : List[str]
+            _description_
+
+        Returns
+        -------
+        List[AttributeValueModel|FeatureNeoModel]
+            _description_
+        """
+        query = (
+            "MATCH (av:AttributeValue) "
+            "WHERE av.tag in $tags " #WHERE NOT 'Protein' in labels(av) AND 
+            "RETURN properties(av)"
+        )
+        attribute_values = self._driver.execute_query(
+            query_=query,
+            routing_="r",
+            result_transformer_ = Result.value, 
+            tags = tags )
+        
+        return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av)  for av in attribute_values]
+        
+    
+    def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
+        "Returns the props of the attributes its values. Note that it will return features and sample attribute values"
         
         if tags is not None:
             query = (
@@ -401,7 +429,7 @@ class Neo4JAttributes(AttributesABC):
         return self._driver.execute_query(query)
         
         
-    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
+    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel|FeatureNeoModel]]]:
         """Finds the attirbute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
 

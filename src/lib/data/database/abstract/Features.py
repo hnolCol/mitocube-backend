@@ -117,8 +117,58 @@ class FeaturesABC(ABC):
                 - sample_index(int): The sample index 
                 - attribute_value_tag (str): The tag that the particular sample is associated with. 
                 - attribute_tag (str): The tag associating the sample index with an attribute 
+                
+                
+        Example
+        -------
+         tag    value submission_tag  sample_index attribute_tag attribute_value_tag
+        187  Q9Y3P9  24.0935   LOGtC9tNC13b             5  att_genotype               fTBLi
+        188  Q9Y3P9  24.1095   LOGtC9tNC13b             4  att_genotype               fTBLi
+        189  Q9Y3P9  24.1565   LOGtC9tNC13b             3  att_genotype               fTBLi
+        190  Q9Y3P9  24.0691   LOGtC9tNC13b             2  att_genotype               fTBLi
+        191  Q9Y3P9  24.1410   LOGtC9tNC13b             1  att_genotype               fTBLi
+        """
+        
+    @abstractmethod
+    def get_avg_abundance(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:
+        """Returns the average abundance in every submission the feature has been quantified. 
+
+        Parameters
+        ----------
+        tags : List[str]
+            List of feature tags 
+        submission_tags : List[str], optional
+            Submission tags that should be considered (e.g. if a filtering is applied). If None
+            all datasets will be considered, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The average abundance as a pandas data frame. 
+                - tag (str) : feature tag 
+                - value (float) : Average abundance 
+                - submission_tag (str) : The submission tag the abundance was taken from.
         """
     
+    @abstractmethod
+    def get_f_value(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
+        """Parameters
+        ----------
+        tags : List[str]
+            List of feature tags 
+        submission_tags : List[str], optional
+            Submission tags that should be considered (e.g. if a filtering is applied). If None
+            all datasets will be considered, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The average abundance as a pandas data frame. 
+                - tag (str) : feature tag 
+                - F (float) : F-statistics
+                - submission_tag (str) : The submission tag the F-stats was taken from.
+        """
+        
     @abstractmethod
     def get_protein_sequence(self, tags : str) -> List[str]:
         """Returns the protein sequences for the given tags

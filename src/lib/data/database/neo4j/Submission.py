@@ -373,7 +373,6 @@ class Neo4JSubmissionSummary(SubmissionSummaryABC):
         dataset_attributes = self._meta.get_dataset_attributes(tag = tag)
         _, sample_map = self._meta.get_sample_attributes_and_genotypes(tag=tag, as_sample_map=True)
        
-       
         attributes = self._attributes.get_attributes_and_values_for_submission(submission_tag= tag) #TODO change methid to just return text ?
         attributes.attribute_values
         
@@ -384,7 +383,7 @@ class Neo4JSubmissionSummary(SubmissionSummaryABC):
             submission_info.title, 
             f"Researchers{sep_string}{', '.join([f'{u.firstname} {u.lastname}<{u.email}>' for u in users])}",
             f"Summary created at{sep_string}{datetime.datetime.now()}",
-            f"WARNING: Be aware that meta data might be added during the project's life cycle."
+            f"WARNING: Be aware that meta data might be added during the project's life cycle.",
             f"Submission tag{sep_string}{submission_info.tag}",
             f"Samples{sep_string}{submission_info.n_samples}",
         ]

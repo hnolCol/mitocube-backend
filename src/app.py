@@ -76,6 +76,14 @@ DB.qc.insert(QCRunModel(tag = "asd23a23",
                         rt_peptides={'ASTNDFR':12.2,"TNPOTRSK" : 28.2})
              )
 print("========")
+abundacen = DB.features.get_avg_abundance(tags = ["Q9NZI8"])
+print(abundacen)
+f = DB.features.get_f_value(tags = ["Q9NZI8"])
+data = DB.features.get_data(tags=["Q9NZI8","Q9Y3P9"])
+print("PIVOT")
+
+    
+print(f)
 DB.submission_summary.get(tag=dataset_tag)
 print("========")
 #DB.users.add_users(users_from_db)

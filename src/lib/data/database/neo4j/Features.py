@@ -35,10 +35,10 @@ class Neo4JFeatures(FeaturesABC):
         return r[0]
     
 
-    def count_quantifications(self, tags : List[str]) -> pd.DataFrame: 
+    def count_quantifications(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame: 
         """Counts the total number of quantifications
         as well as the number of samples in which the protein 
-        could also have been detected (e.g. same genotype).
+        could also have been detected (e.g. same proteome).
 
         Parameters
         ----------
@@ -53,20 +53,26 @@ class Neo4JFeatures(FeaturesABC):
                 - tag (str) : the feature tag
                 - n (int) : The number of samples that quantified the feature 
                 - total (int) : The number of total samples that could potentially quantify the sample
-                (e.g. samples that are analysed the same proteome.)
+                (e.g. samples that are analysed using the same proteome.)
                 - submissions (List[str]) : Submission tags in which the protein has been quantified. 
         """
         
         query = (
             "MATCH (p:Protein)-[:IN_PROTEOME]-(:AttributeValue)-[:HAS_ATTRIBUTE_VALUE]-(submission:Submission)-[:HAS_SAMPLE]-(sample:Sample) "
             "WHERE p.tag in $tags "
+            )
+        
+        if submission_tags is not None:
+            query += "AND submission.tag in submission_tags"
+        
+        query += (
             "WITH collect(sample) as all_samples_proteome, p, "
             "[submission IN collect(DISTINCT submission) WHERE (submission)-[:HAS_SAMPLE]-(:Sample)-[:QUANTIFIED]->(p) | submission.tag] as submissions "
             "RETURN p.tag as tag, SIZE(all_samples_proteome) as total, SIZE([sample IN all_samples_proteome WHERE (sample)-[:QUANTIFIED]->(p)]) as n, submissions"
             ""
         )
     
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tags = tags)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tags = tags, submission_tags = submission_tags)
         return r 
         
     def get_protein_sequence(self, tags : str) -> List[str]:
@@ -127,33 +133,107 @@ class Neo4JFeatures(FeaturesABC):
         return [FeatureNeoModel(**ri) for ri in r]
         
         
-    def get_data(self, tags : List[str], submission_tags : List[str] = None) -> List[Dict]:
+    def get_data(self, tags : List[str], submission_tags : List[str] = None, limit : int = 1) -> List[Dict]:
         ""
-        
-        base_submission_query = "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
-        
-        if submission_tags is None:
-            base_submission_query += "WHERE p.tag in $tags "
-        
+        if submission_tags is None and limit is None:
+            base_submission_query = (
+                "MATCH (submission:Submission)<-[:QUANTIFIED_IN]-(p:Protein) "
+                "WHERE p.tag in $tags "
+                "WITH collect(DISTINCT submission.tag) as filteredSubmissions "
+            )
+        elif submission_tags is not None and limit is None:
+            base_submission_query = (
+                "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
+                "WHERE p.tag in $tags AND submission.tag in $submission_tags "
+                "WITH collect(DISTINCT submission.tag) as filteredSubmissions "
+                )
+        elif submission_tags is not None and limit is not None: #if submission tags is given and limit 
+            base_submission_query = (
+                "MATCH (submission:Submission) "
+                "WHERE submission.tag in $submission_tags "
+                "WITH collect(DISTINCT submission.tag)[0..$limit] as filteredSubmissions "
+            )
         else:
-            base_submission_query += "WHERE p.tag in $tags AND submission.tag in $submission_tags"
-        
+            base_submission_query = (
+                "MATCH (submission:Submission)<-[:QUANTIFIED_IN]-(p:Protein) "
+                "WHERE p.tag in $tags "
+                "WITH collect(DISTINCT submission.tag)[0..$limit] as filteredSubmissions "
+            )
+            
+
+   # // Now use these filtered submissions in both parts of the UNION
         query = (
-            base_submission_query + 
-            "MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]-(av:AttributeValue)-[hav:HAS_ATTRIBUTE_VALUE]-(submission)"
-            "RETURN p.tag as tag, r.value as value, submission.tag as submission_tag, sample.index as sample_index, hav.attribute_tag as attribute_tag, av.tag as attribute_value_tag "
-            "UNION " + 
             base_submission_query +
+            "CALL { " #call is required to make filteredSubmission available for UNION
+            "WITH filteredSubmissions "
+            "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
+            "WHERE p.tag IN $tags AND submission.tag IN filteredSubmissions "
+            "MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[hav:HAS_ATTRIBUTE_VALUE]-(submission) "
+            "RETURN p.tag AS tag, r.value AS value, submission.tag AS submission_tag, "
+            "sample.index AS sample_index, hav.attribute_tag AS attribute_tag, "
+            "av.tag AS attribute_value_tag "
+
+            "UNION "
+            #get the genotypes in the second union statement. 
+            "WITH filteredSubmissions "
+            "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
+            "WHERE p.tag IN $tags AND submission.tag IN filteredSubmissions "
             "MATCH (sample)-[rhg:HAS_GENOTYPE]->(g:Genotype) "
-            "RETURN p.tag as tag, r.value as value, submission.tag as submission_tag, sample.index as sample_index, rhg.attribute_tag as attribute_tag, g.tag as attribute_value_tag "
-        )
-        
+            "RETURN p.tag AS tag, r.value AS value, submission.tag AS submission_tag,  "
+            "sample.index AS sample_index, rhg.attribute_tag AS attribute_tag, "
+            "g.tag AS attribute_value_tag "
+            "} "
+            "RETURN tag, value, submission_tag, sample_index, attribute_tag, attribute_value_tag "
+            )
+            
+           
+            
         r = self._driver.execute_query(query,
                                        routing_="r", 
                                        result_transformer_=Result.to_df, 
                                        tags = tags, 
+                                       limit = limit,
                                        submission_tags = submission_tags)
         return r 
+        
+        
+    def get_avg_abundance(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
+        "Neo4J implementation to retrieve the average abundance"
+        query = ("MATCH (p:Protein)-[r:QUANTIFIED_IN]->(submission:Submission) "
+                 "WHERE p.tag in $tags ")
+        
+        if submission_tags is not None:
+            query += "AND submission.tag in $submission_tags "
+            
+        query += "RETURN p.tag as tag, r.avg_log2_abundance as value, submission.tag as submission_tag"
+
+        r = self._driver.execute_query(query, 
+                                   routing_="r",
+                                   tags = tags, 
+                                   submission_tags = submission_tags, 
+                                   result_transformer_= Result.to_df)
+        
+        return r 
+    
+    
+    def get_f_value(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
+        "Neo4J Implementation"
+        query = ("MATCH (p:Protein)-[r:QUANTIFIED_IN]->(submission:Submission) "
+                 "WHERE p.tag in $tags ")
+        
+        if submission_tags is not None:
+            query += "AND submission.tag in $submission_tags "
+            
+        query += "RETURN p.tag as tag, r.F as F, submission.tag as submission_tag"
+
+        r = self._driver.execute_query(query, 
+                                   routing_="r",
+                                   tags = tags, 
+                                   submission_tags = submission_tags, 
+                                   result_transformer_= Result.to_df)
+        
+        return r 
+    
         
     def get_regulation_summary(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:
         
@@ -318,7 +398,6 @@ class Neo4JFeatures(FeaturesABC):
         except Exception as e:
             print("Query finding resulted in an error " + str(e))
             return []
-        print(r)
         return [FeatureNeoModel(**f) for f in r]
                
         

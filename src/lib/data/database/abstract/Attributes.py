@@ -116,7 +116,7 @@ class AttributesABC(ABC):
                                 "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
             min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[AttributeModel]:
-        """Finds attributes by their tags. If the tag is not in the 
+        """Returns attributes by their tags. If the tag is not in the 
         database it is simply ignored. 
 
         Parameters
@@ -136,8 +136,25 @@ class AttributesABC(ABC):
         Exception
             _description_
         """
+        
+    @abstractmethod  
+    def get_values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
+        """Returns the attribute values given by a tag. 
+        If a tag is not found in the database, it is simply ignored.
+
+        Parameters
+        ----------
+        tags : List[str]
+            _description_
+
+        Returns
+        -------
+        List[AttributeValueModel|FeatureNeoModel]
+            _description_
+        """
+        
     @abstractmethod
-    def get_values(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
+    def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
         ""
         
         
@@ -171,6 +188,7 @@ class AttributesABC(ABC):
                                                                         "mandatory_for_active"] = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
+        TODO: Rename to find? 
 
         Parameters
         ----------
@@ -234,6 +252,11 @@ class AttributesABC(ABC):
         Exception
             If the database query returns an error. 
         """
+        
+    @abstractmethod
+    def get_attributes_for_user(self) -> List[AttributeModel]:
+        "Returns the attributes that can be used for the user."
+        
         
     @abstractmethod
     def insert(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
@@ -332,3 +355,19 @@ class AttributesABC(ABC):
             _description_
         """
         
+        
+    @abstractmethod
+    def values(self, tags : List[str]) -> List[AttributeValueModel| FeatureNeoModel]:
+        """Returns the attribute values given by their tags.
+        If a tag is not present in the database, it is simply ignored. 
+
+        Parameters
+        ----------
+        tags : List[str]
+            The list of attribute values
+
+        Returns
+        -------
+        [AttributeValueModel|FeatureNeoModel]
+            The list of attribute values / features. 
+        """

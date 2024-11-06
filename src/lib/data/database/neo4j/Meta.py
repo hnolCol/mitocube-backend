@@ -144,7 +144,7 @@ class Neo4JMetaHandler(MetaABC):
                             "attribute_value_tag" :  attr_value_tag##matching proteins by tag.
                         }
                     )
-
+        print(attributes_to_connect,"ATTRS TO CONNECT")
         # print(sample_attributes_data)
         # print(attributes_to_connect)
 
