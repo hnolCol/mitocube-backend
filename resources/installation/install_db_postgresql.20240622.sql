@@ -58,7 +58,7 @@ BEGIN
           NOCREATEROLE
           NOREPLICATION
           NOBYPASSRLS
-          ENCRYPTED PASSWORD 'md514b63385e6c74d8b93884ad1d4d85e7f'; -- 'md50bd388bd3a63009cfb897fa74d5e696a';
+          ENCRYPTED PASSWORD 'md514b63385e6c74d8b93884ad1d4d85e7f'; -- 'md50bd388bd3a63009cfb897fa74d5e696a';  ---- jflw$4Uv%9j8X4?jpeXuXYZgjpr!de2
       COMMENT ON ROLE immunocube IS 'User used by the immunocube service to access the database.';
    END IF;
 END
@@ -227,13 +227,13 @@ CREATE TABLE traits (
     id serial NOT NULL,
     attribute_id integer NOT NULL,
     tag character varying NOT NULL,
-    full_tag character varying NOT NULL,
+    ---- full_tag character varying NOT NULL,
     text character varying,
     keyword character varying,
     description text,
     PRIMARY KEY(id),
     UNIQUE(tag, attribute_id),
-    UNIQUE(full_tag),
+    --- UNIQUE(full_tag),
     UNIQUE(keyword),  -- NULLS NOT DISTINCT
     FOREIGN KEY(attribute_id) REFERENCES attributes(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
