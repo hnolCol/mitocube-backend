@@ -1,9 +1,9 @@
 -- =====================================================================================================================
--- Database Installations Scipt: ImmunoCubeV3
+-- Database Installations Scipt: ImmunoCubeV4
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Version: 2024-06-22
 -- Author: Andreas U Lindner, andreas.lindner@ukbonn.de
--- Last Change: 2024-06-01, Andreas Lindner
+-- Last Change: 2024-11-11, Andreas Lindner
 -- Target DB: postgreSQL 12.17, Ubuntu
 -- =====================================================================================================================
 
@@ -90,13 +90,17 @@ ALTER TYPE proteome_ids OWNER TO postgres;
 CREATE TABLE sec_permission_groups (
     id serial NOT NULL,
     label character varying NOT NULL,
-    is_super_admin boolean DEFAULT false,
-    -- allow_admin_datasets boolean DEFAULT false,
-    -- allow_read_datasets boolean DEFAULT false,
-    -- allow_submit_dataset boolean DEFAULT false,
-    -- allow_admin_system boolean DEFAULT false,
-    -- allow_admin_users boolean DEFAULT false,
-    -- allow_login boolean DEFAULT false,
+    is_super_admin boolean DEFAULT false NOT NULL,
+    permission_to_manage_system boolean DEFAULT false NOT NULL,
+    permission_to_manage_attributes_traits boolean DEFAULT false NOT NULL,
+    permission_to_manage_all_datasets boolean DEFAULT false NOT NULL,
+    permission_to_manage_owned_datasets boolean DEFAULT false NOT NULL,
+    permission_to_manage_instruments boolean DEFAULT false NOT NULL,
+    permission_to_manage_genoytpes boolean DEFAULT false NOT NULL,
+    permission_to_manage_features boolean DEFAULT false NOT NULL,
+    permission_to_manage_research_groups boolean DEFAULT false NOT NULL,
+    permission_to_manage_users boolean DEFAULT false NOT NULL,
+    permission_to_submit_datasets boolean DEFAULT false NOT NULL,
     PRIMARY KEY(id),
     UNIQUE(label)
 );
@@ -179,6 +183,16 @@ CREATE TABLE sec_nm_permissions_users (
 ALTER TABLE sec_nm_permissions_users OWNER TO postgres;
 
 CREATE INDEX index_sec_nm_permissions_users_pk ON sec_nm_permissions_users USING btree(permission_group_id, user_id);
+
+INSERT INTO sec_permission_groups(id, label, is_super_admin, permission_to_manage_system, permission_to_manage_attributes_traits,
+        permission_to_manage_all_datasets, permission_to_manage_owned_datasets, permission_to_manage_instruments,
+        permission_to_manage_genoytpes, permission_to_manage_features, permission_to_manage_research_groups,
+        permission_to_manage_users, permission_to_submit_datasets)
+    VALUES (1, 'GUEST', False, False, False, False, False, False, False, False, False, False, False),
+        (2, 'STANDARD', False, False, False, False, True, False, False, False, False, False, True),
+        (3, 'CURATOR', False, False, False, True, True, True, True, True, True, False, False),
+        (4, 'ADMIN', False, True, True, False, False, True, False, True, True, True, True),
+        (5, 'SUPERADMIN', True, True, True, True, True, True, True, True, True, True, True); ---- ToDo: Check and rename groups
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -480,7 +494,7 @@ CREATE TABLE genotypes (
 ALTER TABLE genotypes OWNER TO postgres;
 
 CREATE INDEX index_genotypes_pk ON genotypes USING btree(id);
-CREATE INDEX index_genotypes_proteome_id ON genotypes USING btree(proteome_id);
+---- CREATE INDEX index_genotypes_proteome_id ON genotypes USING btree(proteome_id);
 CREATE INDEX index_genotypes_name ON genotypes USING hash(name);
 
 CREATE TABLE nm_genotypes (
@@ -521,10 +535,10 @@ CREATE TABLE nm_genotypes_pg_traits (
     FOREIGN KEY(genotype_id) REFERENCES genotypes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     FOREIGN KEY(trait_id) REFERENCES traits(id) ON UPDATE CASCADE ON DELETE RESTRICT
 ) INHERITS (nm_genotypes);
-ALTER TABLE nm_genotypes_traits OWNER TO postgres;
+ALTER TABLE nm_genotypes_pg_traits OWNER TO postgres;
 
-CREATE INDEX index_nm_genotypes_traits_pk ON nm_genotypes_traits USING btree(genotype_id, trait_id);
-CREATE INDEX index_nm_genotypes_traits_fk_trait_id ON nm_genotypes_traits USING btree(trait_id);
+CREATE INDEX index_nm_genotypes_traits_pk ON nm_genotypes_pg_traits USING btree(genotype_id, trait_id);
+CREATE INDEX index_nm_genotypes_traits_fk_trait_id ON nm_genotypes_pg_traits USING btree(trait_id);
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
