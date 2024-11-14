@@ -335,6 +335,32 @@ class AttributesABC(ABC):
             _description_
         """
     
+    
+    @abstractmethod
+    def get_unittype(self, tags : List[str]) -> Dict[str,List[str]]:
+        """Returns the unittype(s) by an attribute tag list. 
+        A UnitType is for example 'Concentration'. For example 
+        a chemical component might have the UnitType 'concentration' and
+        'time'. To define the duration of the treatment and the used concentration. 
+        Each UnitType has several pre define Units (mg/ml, M, %). 
+        Of note, 'Features' are also considered as a UnitType and allow to define 
+        a specific feature to an attribute. 
+        
+        Parameters
+        ----------
+        tags : List[str]
+            List of attribute tags to get the UnitType for. 
+            
+        Returns 
+        -------
+        Dict[str,List[str]]
+            Key are the attribute tags 
+            and the List (values) contains the tags of the unittypes 
+
+        """
+    
+    
+    
     @abstractmethod
     def unit(self, tag : str) -> List[AttributeUnitResponseModel]:
         """_summary_
@@ -346,7 +372,7 @@ class AttributesABC(ABC):
 
         Returns
         -------
-        Dict
+        List[AttributeUnitResponseModel]
             _description_
 
         Raises

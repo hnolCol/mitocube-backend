@@ -29,7 +29,7 @@ router = APIRouter(
     prefix="/api/attributes",
     tags=["Attributes"]
     )
-
+##rather use /q here? 
 @router.get("") #AttributeResponseModel
 def get_attributes(search_string : Optional[str] = None, 
                    min_state : SubmissionStatesEnums = None, 
@@ -48,25 +48,24 @@ def get_attributes(search_string : Optional[str] = None,
     return AttributeResponseModel(attributes=attributes,
                                   attribute_values=attribute_values)
 
-@router.get("/values")
-def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel|FeatureNeoModel]:
-    ""
-    r = DB.attributes.values(tags = [tag])
+
+
+@router.get("/user", response_model=AttributeResponseModel)
+def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
+    """
+    Returns the stored attribute and attribute value definitions that can be assigned to a user.
+    """
     
-    return r 
-    # if len(r) == 0: return r 
-    # return r[0][1]
+    attributes = DB.attributes.get_attributes_for_user()
+    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+
+    return AttributeResponseModel(attributes=attributes,
+                                  attribute_values=attribute_values)
 
 
-@router.get("/units")
-def get_attribute_value_units(tag : str):
-    ""     
-    r = DB.attributes.unit(tags = APIParamString(param=tag).param)
-    
-    if len(r) == 0: return {"units" : [], "prefixes" : PrefixModel()}
-    return {"units" : r, "prefixes" : PrefixModel()}
 
 
+#change to a more userfull endpoint (pool with datasetattributes )
 @router.get("/mandatory")
 def get_mandatory_attributes(user : UserModel = Depends(get_user_from_token)) -> List[AttributeModel]:
     """Returns the mandatory attributes for a submissions. E.g. the attributes that must be 
@@ -84,10 +83,81 @@ def get_mandatory_attributes(user : UserModel = Depends(get_user_from_token)) ->
     """
     return DB.attributes.get_mandatory_attributes()
 
+
+
 @router.get("/dataset")
 def get_dataset_attributes(user : UserModel = Depends(get_user_from_token), min_state : Optional[SubmissionStatesEnums] = None) -> List[AttributeModel]:
     
     return DB.attributes.get_dataset_attributes(min_state=min_state)
+
+
+
+@router.get("/values")
+def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel|FeatureNeoModel]:
+    "Returns the attribute values"
+    r = DB.attributes.values(tags = [tag])
+    
+    return r 
+    # if len(r) == 0: return r 
+    # return r[0][1]
+
+
+@router.get("/{attribute_tag}")
+def get_attribute_by_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> AttributeModel:
+    "Returns a single attribute by its tag"     
+    attributes = DB.attributes.get(tags=[attribute_tag])
+    if len(attributes) == 0:
+         raise HTTPException(status_code=404, detail=f"Attribute with the tag {attribute_tag} not found.")
+    return attributes[0]
+
+@router.get("/traits/{trait_tag}")
+def get_attribute_by_tag(trait_tag : str, user : UserModel = Depends(get_user_from_token)) -> AttributeValueModel:
+    "Returns a single attribute by its tag"     
+    traits = DB.attributes.get_values(tags=[trait_tag])
+    if len(traits) == 0:
+         raise HTTPException(status_code=404, detail=f"Trait with the tag {traits} not found.")
+    return traits[0]
+
+
+
+
+
+
+@router.get("/{attribute_tag}/unittypes")
+def get_unittypes_by_attribute_tag(attribute_tag : str):
+    """_summary_
+
+    Parameters
+    ----------
+    attribute_tag : str
+        The attribute's tag to get the unittype for. 
+
+    Returns
+    -------
+    _type_
+
+
+    Raises
+    ------
+    HTTPException
+        _description_
+    """
+    
+    if not DB.unittypes.has_attribute_unit_types(attribute_tag=attribute_tag):
+        raise HTTPException(status_code=404, detail="The attribute is not associated with a unittype.")
+    
+    unit_types = DB.attributes.get_unittype(tags = [attribute_tag])
+    return unit_types
+
+@router.get("/units", deprecated=True)
+def get_attribute_value_units(tag : str):
+    ""     
+    r = DB.attributes.unit(tags = APIParamString(param=tag).param)
+    if len(r) == 0: return {"units" : [], "prefixes" : PrefixModel()}
+    return {"units" : r, "prefixes" : PrefixModel()}
+
+
+
 
 @router.get("/attribute_values/q")
 def get_attribute_values(tags : str = None, attribute_value_tag : str = None, attribute_tag : str = None, max_attributes : int = 999999):
@@ -140,37 +210,6 @@ def get_attribute_values(tags : str = None, attribute_value_tag : str = None, at
 
 
 
-@router.get("/user", response_model=AttributeResponseModel)
-def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
-    """
-    Returns the stored attribute and attribute value definitions that can be assigned to a user.
-    """
-    
-    attributes = DB.attributes.get_attributes_for_user()
-    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
-    
-    # db_attributes = MCAttributes.getAttributeDatabase()
-
-    # attributes = db_attributes.getAttributes()
-    # attributes = attributes.loc[attributes["allow_for_user"], :]
-
-    # attribute_values = db_attributes.getAttributeValues()
-    # attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
-
-    # Todo: Do not understand what you mean with that.
-    # if user.role == UserRolesEnum.ADMIN:
-    #     # only admin can change the user role
-    #     max_attr_value_id = db.attribute_values["id"].max()
-    #     role_attr = [attr for attr in attrs if attr.tag == "att_user_role"][0]
-    #     user_roles = get_enum_as_dict(UserRolesEnum)
-    #     attrValues.extend([{"id" : max_attr_value_id + 1, "attribute_id" : role_attr.id, "details" : role_name.title(), "name" : role, "tag" : f"att_user_role:{role}"} for n,(role_name, role) in enumerate(user_roles.items())])
-    # else:
-    #     attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
-
-    return AttributeResponseModel(attributes=attributes,
-                                  attribute_values=attribute_values)
-
-
 
 @router.post("/{attribute_tag}/value")
 def add_attribute_value(attribute_tag : str, attribute_value : AttribteValueInsertModel, user : UserModel = Depends(is_user_at_least_curator)): 
@@ -198,5 +237,8 @@ def update_attribute_value(attribute_tag : str,
                            attribute_value_props : dict, 
                            user : UserModel = Depends(is_user_at_least_curator)):
     ""
-    print(attribute_value_props)
     ok = DB.attributes.update_value(tag = attribute_value_tag, attribute_value_props = attribute_value_props )
+    
+    
+    
+    

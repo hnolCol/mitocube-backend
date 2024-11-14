@@ -46,7 +46,7 @@ class AttributeModel(BaseModel):
     has_unit : bool, default False
         If true, the user can define a unit for the attribute.
     
-    unit : Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"], default None
+    unit : Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow rate","arbitrary","fraction"], default None
         The unit type
     """
     id : int
@@ -59,8 +59,8 @@ class AttributeModel(BaseModel):
     s : Optional[str] = None
     mandatory_for_submission : bool = False  # must be defined by an attribute value for a submission
     mandatory_for_active : bool = False  # must be defined by an attribute value for an active (published) state
-    has_features_value : bool = False  # if true, features (e.g. proteins) can be selected for this attribute
-    has_numeric_input : bool = False  # if true, attribute can be defined by the user (numeric input)
+    has_features_value : Optional[bool] = False  # if true, features (e.g. proteins) can be selected for this attribute
+    has_numeric_input : Optional[bool] = False  # if true, attribute can be defined by the user (numeric input)
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
     allow_for_qc : bool = False  # attributes that are required for qc runs
     allow_as_filter : bool = True  # attributes allow to filter datasets
@@ -69,7 +69,7 @@ class AttributeModel(BaseModel):
     allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
     allow_for_user : bool = False
     has_unit : bool = False 
-    unit : Optional[List[Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow","arbitrary"]]] = None # ToDo: define units like this? 
+    unit : Optional[List[Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow rate","arbitrary","feature","length","fraction"]]] = None # ToDo: define units like this? 
 
 
     @field_validator('s', mode="before")
@@ -234,7 +234,11 @@ class AttributeUnitModel(BaseModel):
     
 
 class AttributeUnitResponseModel(BaseModel):
-    attribute : AttributeModel
-    units : List[AttributeUnitModel]
+    attribute_tag : str 
+    unit_type_tag : str
+    unit_type_text: str 
+     
+    # attribute : AttributeModel
+    # units : List[AttributeUnitModel]
 
 

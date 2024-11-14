@@ -274,10 +274,11 @@ class Neo4JMetaHandler(MetaABC):
     def get_sample_attributes(self, tag : str, as_sample_map : bool = True) -> Tuple[Dict,pd.DataFrame]|Dict:
         
         query = (
-            "MATCH (d:Dataset {tag : $tag}) "
-            "MATCH (d)-[:HAS_SAMPLE]->(s:Sample)-[r:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue|Protein)<-[:HAS_VALUE]-(a:Attribute) "
-            "RETURN s.index as sample_index, s.text as sample_text, av.tag as attribute_value_tag, r.index as index, a.tag as attribute_tag, 'Protein' in labels(av) as is_feature "
-            "ORDER BY r.index, s.index"
+            "MATCH (submission:Submission {tag : $tag}) "
+            "MATCH (submission)-[:HAS_SAMPLE]->(s:Sample) "
+            "MATCH (s)-[r:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue|Protein)<-[:HAS_VALUE]-(a:Attribute) "
+            "RETURN s.index as sample_index, s.text as sample_text, av.tag as tag, r.index as attribute_index, a.tag as attribute_tag, av.text as text, 'Protein' in labels(av) as is_feature  " #g.tag as ag, g.tex as text, 
+            "ORDER BY attribute_index, sample_index"
         )
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.to_df)
         if as_sample_map:

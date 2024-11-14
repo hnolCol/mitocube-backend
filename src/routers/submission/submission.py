@@ -537,8 +537,12 @@ def update_submission(background_task : BackgroundTasks,
 def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curator)):
     pass 
 
-
-
+@router.get("/submissions/{submission_tag}/sampleattributes")
+def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    
+    r = DB.meta.get_sample_attributes(tag = submission_tag)
+    
+    print(r)
 
 @router.get("/submissions/{submission_tag}/summary")
 def get_submission_summary_string(submission_tag : str) -> str:

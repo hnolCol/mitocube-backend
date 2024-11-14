@@ -239,6 +239,29 @@ class Neo4JConstructor:
         ""
         self._add_attributes_from_file()
 
+
+    def set_up_units(self):
+        "" 
+        json_file = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/units/units.json")
+        
+        query = (
+            "UNWIND $units as unit_prop "
+            "MERGE (unittype:UnitType {tag : unit_prop.tag}) "
+            "SET unittype.text = unit_prop.text, unittype.priority = unit_prop.priority "
+            "WITH unittype, unit_prop "
+            "UNWIND unit_prop.units as unit "
+            "MERGE (u:Unit {tag:unit.tag}) "
+            "ON CREATE "
+            "SET u.created_at = timestamp(), u.text = unit.text, u.priority = unit.priority "
+            "ON MATCH "
+            "SET u.text = unit.text, u.modified_at = timestamp(), u.priority = unit.priority "
+            "MERGE (unittype)-[:HAS_UNIT]-(u) "
+            )
+        
+        
+        self._driver.execute_query(query, routing_="w", units = json_file)
+        
+        
         
     def _add_indices(self):
         
@@ -285,7 +308,6 @@ class Neo4JConstructor:
             "MATCH (s:State {tag : prop.min_state}) " 
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
         )
-        print(min_state_attributes)
         self._driver.execute_query(query,props = min_state_attributes)
         
         
@@ -293,15 +315,15 @@ class Neo4JConstructor:
         query = (
             "MATCH (a:Attribute) "
             "WHERE a.has_unit "
-            "UNWIND a.unit as a_unit_tag "
-            "MATCH (unit:Unit) "
-            "WHERE unit.tag = a_unit_tag "
-            "MERGE (a)-[:HAS_UNIT]->(unit) "
-            "RETURN a, unit "
+            "UNWIND a.unit as a_unit_type_tag "
+            "MATCH (unittype:UnitType) "
+            "WHERE unittype.tag = a_unit_type_tag "
+            "MERGE (a)-[:HAS_UNIT_TYPE]->(unittype) "
+            "RETURN a, unittype "
             )
         
         r,_,_ = self._driver.execute_query(query)
-        print(r)
+        
         
         
     def _add_full_text_dataset_search(self):

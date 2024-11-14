@@ -29,7 +29,6 @@ ATTRIBUTE_VALUES_SHEET = "attribute_values"
 
 
 
-
 def nan2None(obj):
     if isinstance(obj, dict):
         return {k:nan2None(v) for k,v in obj.items()}
@@ -57,6 +56,7 @@ attrs = attr.dropna(how="all")
 attrs["id"] = np.arange(attrs.index.size)
 tag_mapper = dict([(tag,id) for tag, id in attrs[["tag","id"]].values])
 parent_ids = attrs["parent_tag"].map(tag_mapper)
+
 
 
 attrs.loc[:,"parent_id"] = parent_ids  # ToDo: issue, saved as float, parent_ids.astype(int, errors="ignore") does not work

@@ -35,11 +35,12 @@ from routers.rc import rc
 from routers.proteomes import proteomes
 from routers.news import news
 from routers.performance import performance
+from routers.unittypes import unittypes
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
 
-router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments, network, filter, rc, proteomes, news, performance]
+router_sources = [dataset, submission, token, user, features, info, annotations, heatmap, volcano, genotypes, attributes, instruments, network, filter, rc, proteomes, news, performance, unittypes]
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
@@ -82,16 +83,24 @@ f = DB.features.get_f_value(tags = ["Q9NZI8"])
 data = DB.features.get_data(tags=["Q9NZI8","Q9Y3P9"])
 print("PIVOT")
 
+#DB.attributes.get_unittype(tags = ["att_compound","att_digestion_time"])
     
-print(f)
-DB.submission_summary.get(tag=dataset_tag)
-print("========")
+# print(f)
+# DB.submission_summary.get(tag=dataset_tag)
+# print("========")
 #DB.users.add_users(users_from_db)
 genotypes_from_file = [GenotypeModel(**x, proteome_tag=x["proteome_id"]) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
 
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="asda")
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="UP000005640")
 da = DB.meta.get_dataset_attributes(tag='BuXOSlIl6G')
+
+
+
+print(DB.attributes.unit(tags=["att_compound","att_digestion_time"]))
+print("REALLY COOL")
+#DB.unittypes.get_units(tags=["concentration","time"])
+
 # print(da)
 # print("WUHU")
 # df = DB.features.get_data(tags=['A0JNW5','P41587'])

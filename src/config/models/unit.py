@@ -1,5 +1,5 @@
 from pydantic import BaseModel, model_serializer
-from typing import Literal
+from typing import Literal, List
 
 
 class InputModel(BaseModel):
@@ -15,7 +15,15 @@ class InputModel(BaseModel):
 class UnitModel(BaseModel):
     tag : str 
     text : str 
-    unit : str #base Unit
+    priority : int 
+    
+    
+class UnitTypeResponseModel(BaseModel):
+    tag : str 
+    text : str 
+    priority : int
+    units : List[UnitModel]
+    
 
 
 class UserUnitInput(BaseModel):
@@ -24,6 +32,9 @@ class UserUnitInput(BaseModel):
     value : float 
     unit  : UnitModel
     
+    
+    
+
     
 
     

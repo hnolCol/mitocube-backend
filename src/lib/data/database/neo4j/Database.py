@@ -16,7 +16,7 @@ from lib.data.database.neo4j.News import Neo4JNews
 from lib.data.database.neo4j.Peptides import Neo4JPeptides
 from lib.data.database.Neo4JDatabase import Neo4JFactory, Neo4JConnection, Neo4JConstructor
 from lib.data.database.neo4j.QC import Neo4JQC
-
+from lib.data.database.neo4j.UnitTypes import Neo4JUnitTypes
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 import pandas as pd 
@@ -45,6 +45,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.qc = Neo4JQC(driver = self.connection.driver)
         self.peptides = Neo4JPeptides(driver = self.connection.driver)
         self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)
+        self.unittypes = Neo4JUnitTypes(driver = self.connection.driver)
         #checks if all is correctly defined 
         super(MCNeo4JDatabase, self).__init__()
         
@@ -52,7 +53,9 @@ class MCNeo4JDatabase(DatabaseABC):
         
         #self.constructor._add_states()
         #self.constructor._add_user_roles()
+        self.constructor.set_up_units()
         self.constructor.set_up_attributes()
+        
         
 
     def get_feature_data(self, tag : str) -> List[Dict]:

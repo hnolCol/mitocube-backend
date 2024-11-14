@@ -19,6 +19,7 @@ from lib.data.database.abstract.Dataset import DatasetABC
 from lib.data.database.abstract.Genotypes import GenotypeABC
 from lib.data.database.abstract.Peptides import PeptidesABC
 from lib.data.database.abstract.QC import QCABC
+from lib.data.database.abstract.UnitTypes import UnitTypesABC
 
 from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeUnitResponseModel
@@ -63,6 +64,7 @@ class DatabaseABC(ABC):
     qc : QCABC = None 
     peptides : PeptidesABC = None 
     submission_summary : SubmissionSummaryABC = None
+    unittypes : UnitTypesABC = None
    # performance : Per
     
 

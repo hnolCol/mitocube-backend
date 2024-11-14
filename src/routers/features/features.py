@@ -124,7 +124,6 @@ def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datas
     submission_meta = DB.meta.get(tags=submission_tags)
     
     attributes = DB.attributes.get(tags = attribute_tags)
-    print(attribute_value_tags)
     attribute_values = DB.attributes.get_values(tags = attribute_value_tags)
     print(attribute_values,"WHATS GOING ON HERE?")
     genotypes = DB.genotypes.get(tags = genotype_tags)

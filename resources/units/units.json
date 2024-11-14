@@ -1,0 +1,281 @@
+[
+    {
+        "text": "Arbitrary",
+        "tag": "arbitrary",
+        "priority": 500,
+        "units": [
+            {
+                "tag": "uid",
+                "text": "Unique identifier",
+                "priority": 550
+            },
+            {
+                "tag": "intensity",
+                "text": "Intensity",
+                "priority": 500
+            },
+            {
+                "tag": "r_200",
+                "text": "Resolution (at 200 m/z)",
+                "priority": 520
+            },
+            {
+                "tag": "r_400",
+                "text": "Resolution (at 400 m/z)",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Concentration",
+        "tag": "concentration",
+        "priority": 600,
+        "units": [
+            {
+                "tag": "mg/mL",
+                "text": "milligramm per milliliter",
+                "priority": 500
+            },
+            {
+                "tag": "mol/L",
+                "text": "mol per litre",
+                "priority": 500
+            },
+            {
+                "tag": "\u00b5g/mL",
+                "text": "microgramm per millilitre",
+                "priority": 500
+            },
+            {
+                "tag": "M",
+                "text": "molar",
+                "priority": 500
+            },
+            {
+                "tag": "\u00b5M",
+                "text": "micromolar",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Feature",
+        "tag": "feature",
+        "priority": 800,
+        "units": [
+            {
+                "tag": "UP000005640",
+                "text": "Homo sapiens",
+                "priority": 550
+            },
+            {
+                "tag": "UP000000589",
+                "text": "Mus musculus",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Flow rate",
+        "tag": "flow rate",
+        "priority": 500,
+        "units": [
+            {
+                "tag": "mL/min",
+                "text": "milli litle per minute",
+                "priority": 500
+            },
+            {
+                "tag": "nL/min",
+                "text": "nano litre per minute",
+                "priority": 550
+            },
+            {
+                "tag": "L/min",
+                "text": "litre per minute",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Fraction",
+        "tag": "fraction",
+        "priority": 600,
+        "units": [
+            {
+                "tag": "%",
+                "text": "Percentage",
+                "priority": 600
+            },
+            {
+                "tag": "\u2030",
+                "text": "Per mille",
+                "priority": 500
+            },
+            {
+                "tag": ":",
+                "text": "Ratio",
+                "priority": 550
+            }
+        ]
+    },
+    {
+        "text": "Length",
+        "tag": "length",
+        "priority": 500,
+        "units": [
+            {
+                "tag": "m",
+                "text": "metre",
+                "priority": 500
+            },
+            {
+                "tag": "\u00b5m",
+                "text": "mico-metre",
+                "priority": 700
+            },
+            {
+                "tag": "cm",
+                "text": "centimetre",
+                "priority": 800
+            },
+            {
+                "tag": "dm",
+                "text": "decimetre",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Mass",
+        "tag": "mass",
+        "priority": 550,
+        "units": [
+            {
+                "tag": "kg",
+                "text": "kilogram",
+                "priority": 500
+            },
+            {
+                "tag": "g",
+                "text": "gramm",
+                "priority": 500
+            },
+            {
+                "tag": "\u00b5g",
+                "text": "microgramm",
+                "priority": 550
+            },
+            {
+                "tag": "ng",
+                "text": "nanogramm",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Mass To Charge",
+        "tag": "masstocharge",
+        "priority": 550,
+        "units": [
+            {
+                "tag": "m/z",
+                "text": "mass to chrage (Thomson)",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Temperature",
+        "tag": "temperature",
+        "priority": 600,
+        "units": [
+            {
+                "tag": "K",
+                "text": "Kelvin",
+                "priority": 500
+            },
+            {
+                "tag": "\u00b0C",
+                "text": "Celsius",
+                "priority": 700
+            }
+        ]
+    },
+    {
+        "text": "Time/Age/Duration",
+        "tag": "time",
+        "priority": 500,
+        "units": [
+            {
+                "tag": "s",
+                "text": "second",
+                "priority": 550
+            },
+            {
+                "tag": "d",
+                "text": "day",
+                "priority": 500
+            },
+            {
+                "tag": "h ",
+                "text": "hour",
+                "priority": 650
+            },
+            {
+                "tag": "min",
+                "text": "minute",
+                "priority": 600
+            },
+            {
+                "tag": "w",
+                "text": "week",
+                "priority": 580
+            },
+            {
+                "tag": "a",
+                "text": "year ",
+                "priority": 500
+            }
+        ]
+    },
+    {
+        "text": "Voltage",
+        "tag": "voltage",
+        "priority": 500,
+        "units": [
+            {
+                "tag": "V",
+                "text": "volt",
+                "priority": 500
+            },
+            {
+                "tag": "kV",
+                "text": "kilovolt",
+                "priority": 550
+            }
+        ]
+    },
+    {
+        "text": "Volume",
+        "tag": "volume",
+        "priority": 500,
+        "units": [
+            {
+                "tag": "dl",
+                "text": "decilitre",
+                "priority": 500
+            },
+            {
+                "tag": "\u00b5L",
+                "text": "microlitre",
+                "priority": 500
+            },
+            {
+                "tag": "nL",
+                "text": "nanolitre",
+                "priority": 500
+            }
+        ]
+    }
+]

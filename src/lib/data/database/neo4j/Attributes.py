@@ -1,4 +1,5 @@
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Literal, Dict
+from collections import OrderedDict
 from neo4j import Driver, Result
 
 from lib.data.database.abstract.Attributes import AttributesABC
@@ -519,15 +520,17 @@ class Neo4JAttributes(AttributesABC):
         """
         
         query = (
-            "MATCH (a:Attribute) "
-            "WHERE a.tag in $tags AND a.has_unit "
-            "MATCH (u:Unit) "
-            "WHERE u.tag in a.unit "
-            "RETURN a as attribute, collect(properties(u)) as units "
+            "MATCH (a:Attribute)-[:HAS_UNIT_TYPE]-(ut:UnitType) "
+            "WHERE a.tag IN $tags "
+            "WITH a, ut "
+            "ORDER BY a.priority, ut.priority DESC "
+            "RETURN a.tag AS attribute_tag, "
+            "       ut.tag AS unit_type_tag, "
+            "       ut.text AS unit_type_text"
         )
+
         
         r = self._driver.execute_query(query, tags = tags, result_transformer_=Result.data)
-        
         return [AttributeUnitResponseModel(**ri) for ri in r ]
 
 
@@ -560,7 +563,6 @@ class Neo4JAttributes(AttributesABC):
                                    attribute = attribute.model_dump(exclude_none=True),
                                    attribute_values = [av.model_dump(exclude_none=True) for av in attribute_values],
                                    result_transformer_=Result.value)
-        print(r)
         return r 
         
     
@@ -591,3 +593,18 @@ class Neo4JAttributes(AttributesABC):
         r = self._driver.execute_query(query, attribute_value_props = attribute_value_props, tag = tag, result_transformer_= Result.value, routing_="w")
         
         return True 
+    
+    
+    def get_unittype(self, tags: List[str]) -> Dict[str,List[str]]:
+        
+        query = (
+            "MATCH (a:Attribute) "
+            "WHERE a.tag in $tags "
+            "MATCH (a)-[:HAS_UNIT_TYPE]-(unittype:UnitType) "
+            "WITH a, unittype ORDER BY unittype.priority DESC "
+            "RETURN a.tag, collect(unittype.tag) "
+        )
+        
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.values, tags = tags)
+        return OrderedDict([(attribute_tag, unit_type_tags) for attribute_tag, unit_type_tags in r])
