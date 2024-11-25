@@ -26,6 +26,7 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
              response_description="Returns a jwt token after login .", response_model=UserTokenPRM)
 def rest_post_request_email_login_token(background_task: BackgroundTasks,
                                         request: Request,
+
                                         user_agent: Annotated[str | None, Header()] = None,
                                         form_data: OAuth2PasswordRequestForm = Depends()) -> UserTokenPRM:  # Question, was UserModel, does it has to be a pedantic model?
 

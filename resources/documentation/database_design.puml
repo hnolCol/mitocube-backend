@@ -1,0 +1,219 @@
+@startuml
+'https://plantuml.com/sequence-diagram
+
+' configuration
+hide circle
+skinparam linetype ortho
+
+entity "attributes" as attributes {
+    **id**: int
+    parent_id: int <<FK>>
+    --
+    * tag: varchar
+    text: varchar
+    priority: smallint
+    allow_for_dataset: bool
+    allow_for_sample: bool
+    allow_for_genotype: bool
+    allow_for_trait_values: bool
+    required_for_dataset_state: smallint
+}
+
+entity "traits" as traits {
+    **id**: int
+    attribute_id: int <<FK>>
+    --
+    * tag: varchar
+    text: varchar
+    * keyword: varchar
+    description: text
+}
+
+entity "nm_traits_datasets" as nm_traits_datasets {
+    **trait_id**: int <<FK>>
+    **dataset_id**: int <<FK>>
+    --
+    trait_value: varchar
+}
+
+entity "nm_traits_samples" as nm_traits_samples {
+    **trait_id**: int <<FK>>
+    **sample_id**: bigint <<FK>>
+    --
+    trait_value: varchar
+}
+
+
+entity "projects" as projects {
+    **id**: int
+    --
+    title: varchar
+    description: varchar
+}
+
+entity "datasets" as datasets {
+    **id**: int
+    instrument_id: smallint <<FK>>
+    project_id: int <<FK>>
+    user_id: int <<FK>>
+    research_group_id: int <<FK>>
+    --
+    url: varchar
+    * label: varchar
+    created_on: timestamp
+    title: varchar
+    contact_email: varchar
+    state: smallint
+}
+
+entity "dataset_timeline_events" as timeline {
+    **id**: number
+    dataset_id: int <<FK>>
+    --
+    event_on: timestamp
+    created_by: int
+    state: varchar
+    comment: varchar
+    type: varchar
+}
+
+entity "dataset_urls" as urls {
+    dataset_id: int <<FK>>
+    --
+    url: varchar
+}
+
+entity "instruments" as instruments {
+    **id**: int
+    --
+    * label: varchar
+    name: varchar
+    location: varchar
+    description: varchar
+    base64_image: bytea
+}
+
+entity "metatexts" as metatexts {
+    * dataset_id: int  <<FK>>
+    --
+    * tag: varchar
+    text: varchar
+}
+
+entity "samples" as samples {
+    **id**: bigint
+    dataset_id: int <<FK>>
+    --
+    label: varchar
+}
+
+entity "sample_batches" as sample_batches {
+    * sample_id: bigint <<FK>>
+    --
+    * batch_label: varchar
+}
+
+entity "sample_replicates" as sample_replicates {
+    * sample_id: bigint <<FK>>
+    --
+    * replicates_label: varchar
+}
+
+entity "feature_pg_values" as feature_values {
+    **feature_id: bigint** <<FK>>
+    **sample_id: bigint** <<FK>>
+    dataset_id: int <<FK>>
+    --
+    feature_value: real
+}
+
+entity "feature_pgs" as features {
+    **id**: bigint
+    * proteome_id: proteome_ids
+    --
+    * label: varchar
+    is_grouped: bool
+}
+
+entity "feature_pgs_nm" as feature_nm {
+    **parent_pg_id**: bigint <<FK>>
+    **pg_id**: proteome_ids <<FK>>
+}
+
+entity "sec_research_groups" as research_groups {
+    **id**: bigint
+    --
+    research_group: varchar
+    research_group_short: varchar
+    institute: varchar
+    base64_image: bytea
+    profile_text: varchar
+    contact_address: varchar
+    contact_email: varchar
+    url: varchar
+}
+
+entity "sec_users" as users {
+    **id**: bigint
+    research_group_id: int <<FK>>
+    --
+    * username: varchar
+    firstname: varchar
+    lastname: varchar
+    * email: varchar
+    email_verified: bool
+    base64_image: bytea
+    profile_text: varchar
+    orcid: varchar
+    url: varchar
+    allow_login: bool
+    password: varchar
+    personal_salt: varchar
+    created_on: timestamp
+    updated_on: timestamp
+    last_login_on: timestamp
+    expires_after: timestamp
+}
+
+entity "sec_permission_groups" as permission_groups {
+    **id**: int
+    --
+    * label: varchar
+    is_super_admin: bool
+    permission_to_manage_system: bool
+    permission_to_manage_all_datasets: bool
+    ...
+}
+
+entity "sec_nm_permissions_users" as nm_permissions_users {
+    **permission_group_id**: int <<FK>>
+    **user_id**: int <<FK>>
+}
+
+users ||--|{ nm_permissions_users
+permission_groups }|--|{ nm_permissions_users
+
+datasets  }|-[bold]-o|  projects
+datasets  }|--o| research_groups
+datasets  ||--o{ urls
+datasets  ||--o{ metatexts
+datasets  }|--|| instruments
+datasets  }|--|| users
+datasets  }|--|| timeline
+datasets }--|| nm_traits_datasets
+
+samples  }|-[bold]-||  datasets
+samples  }|--o|  sample_batches
+samples  }|--o|  sample_replicates
+samples  ||-[bold]-o{ nm_traits_samples
+samples  ||-[bold]-|{  feature_values
+
+feature_values }|-[bold]-||  features
+features  }o--o{  feature_nm
+
+traits ||-[bold]-o{ nm_traits_datasets
+traits ||-[bold]-o{ nm_traits_samples
+traits }|-[bold]-|| attributes
+attributes }o--|| attributes
+
+@enduml

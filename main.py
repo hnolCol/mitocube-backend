@@ -23,6 +23,7 @@ import lib.rest.routes.submissions.deprecated_submission as routes_deprecated_su
 import lib.rest.routes.submissions.deprecated_submissions as routes_deprecated_submissions
 # import lib.rest.routes.user.user as routes_user  # ToDo: add to routes
 import lib.rest.routes.users.users as routes_users
+import lib.rest.routes.users.deprecated_users as routes_deprecated_users
 
 from config import SystemSettings
 
@@ -45,11 +46,13 @@ app = FastAPI(title = system_settings.app_name,
               default_response_class = ORJSONResponse)
 
 # Question, is it possible to use multiple Middle wares?
-app.add_middleware(CORSMiddleware,  # FixMe: Wrong type?
-                   allow_origins = [system_settings.allowed_middleware_url],
+app.add_middleware(CORSMiddleware,
                    allow_credentials = True,
                    allow_methods = ["*"],
-                   allow_headers = ["*"])
+                   allow_headers = ["*"],
+                   allow_origins = ["http://0.0.0.0:3000", "http://0.0.0.0:3001", "http://0.0.0.0:5000",
+                                    "http://120.0.0.1:3000", "http://120.0.0.1:3001", "http://120.0.0.1:5000",
+                                    "http://localhost:3000", "http://localhost:3001", "http://localhost:5000"])
 
 # Basic Error Handling
 # ToDo: idea would be to redirect to the main page or a url that helps to go to the right page
@@ -62,8 +65,9 @@ app.add_middleware(CORSMiddleware,  # FixMe: Wrong type?
     # return PlainTextResponse(str(exc.detail), status_code=exc.status_code)
 
 # add routers from packages
-for item in [routes_auth, routes_app, routes_attributes, routes_features, routes_genotypes, routes_deprecated_instruments, routes_deprecated_submission, routes_deprecated_submissions, routes_users,
-             routes_deprecated_datasets, routes_deprecated_features]:
+for item in [routes_auth, routes_app, routes_attributes, routes_features, routes_genotypes, routes_users,
+             routes_deprecated_instruments, routes_deprecated_submission, routes_deprecated_submissions,
+             routes_deprecated_users, routes_deprecated_datasets, routes_deprecated_features]:
     if hasattr(item, "router"):
         app.include_router(getattr(item, "router"))
 

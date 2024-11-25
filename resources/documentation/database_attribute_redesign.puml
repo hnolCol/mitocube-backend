@@ -1,0 +1,67 @@
+@startuml
+' configuration
+hide circle
+skinparam linetype ortho
+
+
+entity "attributes" as attributes {
+    **id**: int
+    parent_id: int <<FK>>
+    --
+    * tag: varchar
+    text: varchar
+    priority: smallint
+    allow_for_dataset: bool
+    allow_for_sample: bool
+    allow_for_genotype: bool
+    allow_for_trait_values: bool
+    required_for_dataset_state: smallint
+}
+
+entity "traits" as traits {
+    **id**: int
+    attribute_id: int <<FK>>
+    --
+    * tag: varchar
+    text: varchar
+    * keyword: varchar
+    description: text
+}
+
+entity "nm_traits_datasets" as nm_traits_datasets {
+    **trait_node_id**: bigint <<FK>>
+    **dataset_id**: int <<FK>>
+}
+
+entity "nm_traits_samples" as nm_traits_samples {
+    **trait_node_id**: bigint <<FK>>
+    **sample_id**: bigint <<FK>>
+}
+
+entity "genotype" as genotype {
+    **id**: int
+    --
+    * label: varchar
+    description: varchar
+}
+
+entity "trait_node" as trait_node {
+    **id**: bigint
+    parent_node: bigint <<FK>>
+    * label: varchar <<?>>
+    trait_value: varchar
+}
+
+
+trait_node }|--|| nm_traits_datasets
+trait_node }|--|| nm_traits_samples
+trait_node }|--|| genotype
+
+traits }o--|| trait_node
+trait_node }o--|| trait_node
+
+traits }|--|| attributes
+attributes }o--|| attributes
+
+
+@enduml

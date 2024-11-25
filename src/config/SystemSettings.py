@@ -1,5 +1,6 @@
 from functools import lru_cache
 from typing import Any, Callable, Dict, Set, List, Literal, Optional
+import re
 
 from functools import lru_cache
 
@@ -27,11 +28,11 @@ class SystemSettings(BaseSettings):
                                       extra="forbid")
 
     # General Settings
-    app_name: str = "Nova MitoCube"
-    app_summary: str = "MitoCube backend"
-    app_description: str = """Nova MitoCube API helps you do awesome stuff with your proteomic data. 👩‍🔬"""
+    app_name: str = "ImmunoCube"
+    app_summary: str = "ImmunoCube backend"
+    app_description: str = """Nova ImmunoCube API helps you do awesome stuff with your proteomic data. 👩‍🔬"""
     app_api_description: str = """---
-Nova MitoCube API helps you do awesome stuff with your proteomic data. 👩‍🔬
+Nova ImmunoCube API helps you do awesome stuff with your immunological proteome data. 👩‍🔬
 
 ## Something
 
@@ -49,7 +50,7 @@ You will be able to:
     app_lead_contact: EmailStr = "andreas.lindner@uni-bonn.de"  # Fixme: Change me
 
     # Application Settings
-    allowed_middleware_url: str = "https://127.0.0.1:5000"
+    # allowed_middleware_url: str = "https://127.0.0.1:5000"
     # service_backend_url: str = "https://127.0.0.1:5000"
     dir_assets: str = "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-frontend/dist/assets"
 
@@ -63,7 +64,7 @@ You will be able to:
     mail_password: SecretStr = "pqpwacwvoemgfnrb"  # "dsjKfl42!shFsDhgs?rjrcLyx!lI1cvj69ghoeijfndx"  # "mlbazxurazxqsvvs"
     mail_use_credentials: bool = True
     mail_validate_certs: bool = False
-    mail_from_name: str = "MitoCube Support"
+    mail_from_name: str = "ImmunoCube Support"
     mail_cc: List[EmailStr] = ["andreas.lindner@uni-bonn.de"] #"dominique.diehl@age.mpg.de",   # Fixme: change string
     mail_template_dir: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/templates/email"  # Fixme: change string
     mail_template_verification: str = "verification_code.html"
@@ -83,7 +84,7 @@ You will be able to:
     db_ip: Optional[IPvAnyAddress] = "127.0.0.1"  # ToDo: create validation conditions if db_handler is postgresql? Good idea. I would use the @field_validator function which is also availabe in  pydantic Settings
     db_port: Optional[int] = 5432
     db_user: Optional[SecretStr] = "immunocube"  # None
-    db_name: Optional[SecretStr] = "ImmunoCubeV3"  # None
+    db_name: Optional[SecretStr] = "ImmunoCubeV4"  # None
     db_pw: Optional[SecretStr] = "jflw$4Uv%9j8X4?jpeXuXYZgjpr!de2"  # None
     db_pool_connections_n_min: int = 4
     db_pool_connections_n_max: int = 16

@@ -9,12 +9,21 @@ class DummyText:
                              "What do you call it when a cow grows facial hair? A moo-stache.",
                              "What did the beach say when the tide came in? Long time no sea.",
                              "What did the 0 say to the 8? Nice belt!",
+                             "This is no time for jokes, guys. Let's B. cereus.",
+                             "I've always wanted to publish a review on the role of Wnt antagonists in caudal outgrowth and specification in vertebrates. I'd title it 'Sonic Hedgehog and Tails'.",
                              "Why is 69 so scared of 70? Because once they fought and seven won.",
                              "Why was six afraid of seven? Because seven ate nine!",
+                             "Two blood cells met and fell in love. Sadly, it was all in vein.",
                              "Why did the computer show up at work late? It had a hard drive.",
                              "Autocorrect can go straight to he’ll.",
+                             "Biologists can also be great philosophers. They give fantastic life lessons.",
+                             "Y’all want to hear a potassium joke? K.",
+                             "Why do ants never get sick? Because they have little anty bodies.",
+                             "No matter how popular they get, antibiotics will never be viral.",
+                             "Which biochemicals wash up on beaches? Nucleotides.",
                              "What do you get when you cross a unit of data with a female pop singer?, A Gaga byte."
-                             "My boss told me to have a good day, so I went home.")
+                             "My boss told me to have a good day, so I went home.",
+                             "The rotation of earth really makes my day.")
 
     def __init__(self, dummy_text: Tuple[str]):
         self._dummy_text: Tuple[str] = dummy_text

@@ -54,7 +54,7 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
         self._trait_values_samples: Dict[str, List[dlib.ABCTraitValue]] | None = trait_values_samples  # sample names as keys
 
         self._data_long: pd.DataFrame | None = data_long
-        self._data_wide: pd.DataFrame | None = data_wide
+        self._data_wide: pd.DataFrame | None = data_wide  # Bug: Here it is expectd that the Column Key (_row_index_name) is already the index. set the index to key if not already set or complain if Key is not in the table!
 
         if self._data_wide is not None and self._data_long is not None:
             raise ABCDataTableError("Constructor of ABCDataTable(...) does not allow to use data_long and data_wide simultaneously!")
@@ -62,7 +62,7 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
             self._determine_data_column_names()  # fills self._data_columns
             self.get_unique_data_features()  # fills self._data_features
 
-            if self._data_columns:
+            if self._data_columns:  # Bug Need to catch columns with only NAs... either here or at data submission / import...
                 if self._replicates:
                     if not all(sample in self._data_columns for sample in self._replicates.keys()):
                         raise dlib.ABCDataTableError("Some sample names in provided replicates do not exist in the DataTable.")
@@ -219,17 +219,17 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset_id(cls, dataset_id: int) -> ABCDataTable | None:
+    def objectify_with_dataset_id(cls, dataset_id: int) -> ABCDataTable | None:  # ToDo: Add features: List[str] | None = None - suppose to limit to those features only
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset_label(cls, dataset_label: str) -> ABCDataTable:
+    def objectify_with_dataset_label(cls, dataset_label: str) -> ABCDataTable: # ToDo: Add features: List[str] | None = None - suppose to limit to those features only
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_datatable(cls, datatable: ABCDataTable) -> ABCDataTable:
+    def objectify_with_datatable(cls, datatable: ABCDataTable) -> ABCDataTable:  # ToDo: Add features: List[str] | None = None - suppose to limit to those features only
         pass
 
     # FixMe: make it thread-safe!

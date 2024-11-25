@@ -312,7 +312,7 @@ CREATE TABLE datasets (
     project_id integer,
     label character varying NOT NULL,
     created_on timestamp without time zone NOT NULL,
-    uploaded_on timestamp without time zone DEFAULT now() NOT NULL,
+    ---- uploaded_on timestamp without time zone DEFAULT now() NOT NULL,
     title character varying NOT NULL,
     contact_email character varying,
     user_id integer,
@@ -449,7 +449,7 @@ CREATE INDEX index_dataset_timeline_events_fk ON dataset_timeline_events USING b
 CREATE TABLE nm_traits (
     trait_id serial NOT NULL,
     trait_value character varying,
-    trait_unit character varying
+    ---- trait_unit character varying
 );
 ALTER TABLE nm_traits OWNER TO postgres;
 

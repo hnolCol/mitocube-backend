@@ -84,7 +84,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                                                        event_type=dlib.DatasetTimelineEventType.UPLOADED,
                                                                        dataset_id=self._internal_id,
                                                                        db_cur_session=db_cur)  # Question: Second timeline event here for upload at the same time? Or just one?
-            else:
+            elif write_datatable:
                 raise dlib.ABCDatasetError("No datable attached to PostgreSQLDataset. Unable to add datasets!")
 
             if db_conn:

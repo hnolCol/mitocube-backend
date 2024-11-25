@@ -121,6 +121,10 @@ class PostgreSQLFeatureDatabase(PandaFeatureDatabase):
 
     def identify_not_stored_feature_keys(self, features_to_test: List[str]) -> List[str]:
         missing_features = []
+
+        if self._cached_features is None:
+            raise dlib.ABCFeatureDatabaseError("There are no cached features. Were features imported?")
+
         existing_features = self._cached_features["key"].to_list()
 
         for feature in features_to_test:
@@ -204,6 +208,7 @@ class PostgreSQLFeatureDatabase(PandaFeatureDatabase):
 
             if sql_tbl.shape[0] < 1:
                 self._cached_features["sql_id"] = np.nan
+                ## self._sync_db(db_cur_session=db_cur_session)  # Bug: Something here is not working if nothing is installed... worked before ... this line needs to be called manually and than the method called again to rerun the query.
             else:
                 # self._cached_features["proteom_id"] = self._cached_features.index
                 self._cached_features = self._cached_features.merge(sql_tbl, how="left", left_on="ix_key", right_on="sql_label")

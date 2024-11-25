@@ -64,7 +64,7 @@ def rest_get_query_datasets(state: int | None = None,
     ds: dlib.ABCDataset = dlib.ABCDataset.get_class()
 
     dataset_ids, dataset_labels = db.query_datasets_ids(query = query,
-                                                        states = [state] if state else None,
+                                                        states = None,  # Fixme: Ignore the state until further notice [state] if state else None,
                                                         feature_keys = [feature_key] if feature_key else None,
                                                         trait_tags = [attribute_value_tag] if attribute_value_tag else None,
                                                         trait_ids = None,
@@ -136,7 +136,7 @@ def rest_get_project_states(session: RestSessionInformation = Depends(RestPermis
     deprecated_api("/api/submissions/states is deprecated, use /api/datasets/states instead")  # Deprecated / ToDo: Implement  /api/datasets/states
     # dlib.DatasetState
 
-    # ToDo: Currently manualy, make int configurable and implement it automattically from an enum (different enum type or with own static functions?)
+    # ToDo: Currently manually, make int configurable and implement it automatically from an enum (different enum type or with own static functions?)
 
     return {"states": {"INACTIVE": -50, "CANCELED": -20, "PAUSED": -10,
                        "INITIALISED": 0, "PROCESSED": 10, "MEASURING": 20, "UPLOADED": 25,
@@ -152,10 +152,10 @@ def rest_get_project_states(session: RestSessionInformation = Depends(RestPermis
                            30: "#640D5F", 40: "#091057", 50: "#024CAA"}}  # Dict[int,str] = get_enum_as_dict(SubmissionStateColors,SubmissionStates)}
 
 @router.get("/count", deprecated=True)  # ToDo: Implement PRM
-def rest_get_count_datasets_with_label(labels: str = None,
-                                       group: Literal["state", "user", "attribute_tag", "attribute_value_tag", "trait",
-                                                      "feature", "genotype"] | None = None,  # Is None even allowed?
-                                       session: RestSessionInformation = Depends(RestPermissionSteward())):
+def rest_get_count_datasets_by_rule(labels: str = None,
+                                    group: Literal["state", "user", "attribute_tag", "attribute_value_tag", "trait",
+                                    "feature", "genotype"] | None = None,  # Is None even allowed?
+                                    session: RestSessionInformation = Depends(RestPermissionSteward())):
     # Question, Deprecated: would it not make more sense to implement something like /users/count, /states/count?
 
     db_conn = None
@@ -184,11 +184,24 @@ def rest_get_count_datasets_with_label(labels: str = None,
                                 "user_id": db_row[0],
                                 "submission_labels": db_row[4],
                                 "submission_count": db_row[2]} for db_row in db_cur.fetchall()}
-        elif group in ("trait", "attribute_tag", "attribute_value_tag"):
-            raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED,  # ToDo: Collect to central spot / library
-                                detail="Returning something here makes the GUI say by by. Ignoring it until solution found.",
-                                headers={"WWW-Authenticate": "Bearer"})
+        elif group in ("attribute_tag"):
+            db_cur.execute("""SELECT at.id, at.tag, COUNT(*) AS n, 
+                                ARRAY_AGG(ds.id ORDER BY ds.created_on DESC) AS IDS, 
+                                ARRAY_AGG(ds.label ORDER BY ds.created_on DESC) AS LABELS 
+                            FROM (SELECT DISTINCT nm.trait_id, sa.dataset_id FROM nm_traits_samples AS nm 
+                                        LEFT JOIN samples AS sa ON sa.id = nm.sample_id 
+                                    UNION SELECT trait_id, dataset_id FROM nm_traits_datasets) AS nm
+                                LEFT JOIN datasets AS ds ON ds.id = nm.dataset_id 
+                                LEFT JOIN traits AS tr ON tr.id = nm.trait_id 
+                                LEFT JOIN attributes AS at ON at.id = tr.attribute_id 
+                            WHERE at.allow_as_filter  ---- Question: Should that be here?  
+                            GROUP BY at.id, at.tag HAVING COUNT(*) > 0;""")
 
+            return {db_row[1]: {"submission_ids": db_row[3],
+                                "attribute_id": db_row[0],
+                                "submission_labels": db_row[4],
+                                "submission_count": db_row[2]} for db_row in db_cur.fetchall()}
+        elif group in ("trait", "attribute_tag", "attribute_value_tag"):
             db_cur.execute("""SELECT at.id AS attribute_id, tr.id AS trait_id, CONCAT(at.tag, ':', tr.tag) AS tag, COUNT(*) AS n, 
                                 ARRAY_AGG(ds.id ORDER BY ds.created_on DESC) AS IDS, 
                                 ARRAY_AGG(ds.label ORDER BY ds.created_on DESC) AS LABELS 

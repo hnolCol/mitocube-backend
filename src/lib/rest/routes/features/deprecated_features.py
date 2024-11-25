@@ -91,6 +91,7 @@ def rest_get_dataset_data_by_feature(feature_key: str,  # Deprecated, implement 
                                                                                              "feature": None})
         # END of deprecated code
 
+        db_conn = None
         try:  # ToDo: Outsource me to another Class (Change Feature Table), also Deprecated code !
             # if db_cur is None: # db_cur = db_cur_session # db_cur_session: psycopg2.cursor | None = None
             db_conn = psql.PostgreSQLConnection().getConnection()
@@ -113,6 +114,8 @@ def rest_get_dataset_data_by_feature(feature_key: str,  # Deprecated, implement 
             for db_row in db_rows:
                 row_obj = {"index": db_row[1], "value": db_row[6]}
 
+                if db_row[1] not in for_return_samples_attributes_by_sample.keys():
+                    continue  # Bug, this scenario makes the frontend go bye bye ( i think this happens if no grouping / no trait , or all are the same, exist for the sample)
                 for attribute_tag, items in for_return_samples_attributes_by_sample[db_row[1]].items():
                     for item in items:
                         row_obj[attribute_tag] = item["tag"]  # Bug: Dirty Solution for now, issue if attributes with multiple traits occurre!

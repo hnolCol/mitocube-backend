@@ -627,7 +627,7 @@ class PostgreSQLTraitValue(dlib.ABCTraitValue):
     def objectify_with_dataset_id(cls, db_id: int) -> Dict[str, PostgreSQLTraitValue]:
         db_rows = PostgreSQLTraitValue.__get_db_select_row(dataset_id = db_id)
 
-        trait_values: Dict[str, PostgreSQLTraitValue] = []
+        trait_values: Dict[str, PostgreSQLTraitValue] = {}
 
         for db_row in db_rows:  # ToDo: allow to provide a object list/dict to faster access traits and attributes rather doing a lot of queries, tho, should not so bad for single dataset
             trait = PostgreSQLTrait(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_id = db_row[1],
