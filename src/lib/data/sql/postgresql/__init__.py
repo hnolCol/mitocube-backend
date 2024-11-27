@@ -9,8 +9,12 @@ from .PostgreSQLConnection import PostgreSQLConnection
 from .PostgreSQLDatabase import PostgreSQLDatabase
 from .PostgreSQLStatDatabase import PostgreSQLStatDatabase
 from .PostgreSQLDataset import PostgreSQLDataset
-from .PostgreSQLAttributes import PostgreSQLAttribute, PostgreSQLTrait, PostgreSQLTraitValue
+from .PostgreSQLAttribute import PostgreSQLAttribute
+from .PostgreSQLTrait import PostgreSQLTrait
+from .PostgreSQLTraitNode import PostgreSQLTraitNode
+from .PostgreSQLTraitTree import PostgreSQLTraitTree
 from .PostgreSQLDataTable import PostgreSQLDataTable
+from .PostgreSQLDataRow import PostgreSQLDataRow
 from .PostgreSQLFeatureDatabase import PostgreSQLFeatureDatabase
 from .PostgreSQLInstrument import PostgreSQLInstrument
 from .PostgreSQLProject import PostgreSQLProject
@@ -19,3 +23,5 @@ from .PostgreSQLTimeline import PostgreSQLTimeline, PostgreSQLDatasetTimelineEve
 from .PostgreSQLUser import PostgreSQLUser
 from .PostgreSQLUrl import PostgreSQLUrl
 from .PostgreSQLMetatext import PostgreSQLMetatext
+from .PostgreSQLGenotype import PostgresSQLGenotype
+

@@ -73,10 +73,6 @@ class ABCResearchGroup(ABC, dlib.FlexDataClass):
     def objectify_with_object(cls, rgroup: dlib.ABCResearchGroup) -> dlib.ABCResearchGroup:
         pass
 
-    @abstractmethod
-    def read(self):
-        pass
-
     def set(self, db_id: int | None, name: str, name_short: str , institute: str, base64_image: str | None,
                  profile_text: str | None, contact_address: str | None, contact_email: str | None, url: str | None):
         self._id = db_id
@@ -117,5 +113,5 @@ class ABCResearchGroup(ABC, dlib.FlexDataClass):
         self._url = url
 
     @abstractmethod
-    def write(self):
+    def write_to_db(self):
         pass

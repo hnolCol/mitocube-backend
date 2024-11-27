@@ -137,10 +137,7 @@ class PostgreSQLDatasetTimelineEvent(dlib.ABCDatasetTimelineEvent):
             if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def read(self, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_select(db_cur_session = db_cur_session)
-
-    def write(self, db_cur_session: psycopg2.cursor | None = None):
+    def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
         if self._id is None:  # Question: Can we assume that? It should be 'always' True if only PostgreSQLInstruments classes are used.
             self.__db_insert(db_cur_session = db_cur_session)
         else:

@@ -188,10 +188,6 @@ class ABCUser(ABC, dlib.FlexDataClass):
     def objectify_with_object(cls, user: dlib.ABCUser) -> dlib.ABCUser:
         pass
 
-    @abstractmethod
-    def read(self):
-        pass
-
     def set(self, db_id: int | None, username: str, research_group: dlib.ABCResearchGroup | None, firstname: str,
             lastname: str, email: str, base64_image: str | None, profile_text: str | None, orcid: str | None,
             url: str | None, allow_login: bool, expires_after: datetime):
@@ -274,7 +270,7 @@ class ABCUser(ABC, dlib.FlexDataClass):
         self._expires_after = expires_after
 
     @abstractmethod
-    def write(self):
+    def write_to_db(self):
         pass
 
     @abstractmethod

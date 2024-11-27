@@ -58,10 +58,6 @@ class ABCProject(ABC, dlib.FlexDataClass):
     def objectify_with_id(cls, db_id: int, fetch_datasets: bool = False) -> dlib.ABCProject:
         pass
 
-    @abstractmethod
-    def read(self, fetch_datasets: bool = False):
-        pass
-
     def set(self, db_id: int | None, title: str, description: str | None, datasets: List[dlib.ABCDataset] | None = None):
         self._id = db_id
         self._title = title
@@ -81,5 +77,5 @@ class ABCProject(ABC, dlib.FlexDataClass):
         self._description: str | None = description
 
     @abstractmethod
-    def write(self, write_datasets: bool = False):
+    def write_to_db(self):
         pass

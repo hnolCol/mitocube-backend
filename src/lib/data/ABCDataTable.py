@@ -18,20 +18,6 @@ class ABCDataTableError(dlib.ABCDatasetError):
     pass
 
 
-class ABCDataTableState(ABC):  # Question: Just a place holder for abstract state that could control actions in some methods
-
-    def __init__(self, datatable: ABCDataTable):
-        self.datatable_object = datatable
-
-    @abstractmethod
-    def read(self):
-        pass
-
-    @abstractmethod
-    def write(self):
-        pass
-
-
 class ABCDataTable(ABC, dlib.FlexDataClass):
 
     _row_index_name: str = "Key"
@@ -232,9 +218,12 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
     def objectify_with_datatable(cls, datatable: ABCDataTable) -> ABCDataTable:  # ToDo: Add features: List[str] | None = None - suppose to limit to those features only
         pass
 
-    # FixMe: make it thread-safe!
     @abstractmethod
-    def read(self):
+    def create(self):
+        pass
+
+    @abstractmethod
+    def update(self):
         pass
 
     def set_parent_dataset(self, parent: dlib.ABCDataset | None):  # Question: Should it be possible for the dataset to reject change of parent? Exception here?
@@ -288,7 +277,3 @@ class ABCDataTable(ABC, dlib.FlexDataClass):
         #                     #
         #     ix += 1
         # print(self._data_wide.shape)
-
-    @abstractmethod
-    def write(self):
-        pass

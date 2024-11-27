@@ -1,9 +1,11 @@
 -- =====================================================================================================================
 -- Database Installations Scipt: ImmunoCubeV4
 -- ---------------------------------------------------------------------------------------------------------------------
--- Version: 2024-06-22
+-- Setup to populate database with tables and everything else needed
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Version: 2024-11-27
 -- Author: Andreas U Lindner, andreas.lindner@ukbonn.de
--- Last Change: 2024-11-11, Andreas Lindner
+-- Last Change: 2024-11-27, Andreas Lindner
 -- Target DB: postgreSQL 12.17, Ubuntu
 -- =====================================================================================================================
 
@@ -13,63 +15,6 @@
 -- CREATE INDEX index_xxx ON abc USING GIST(compareme);
 -- CREATE INDEX index_xxx ON abc USING GIST(text_or_time);
 -- CREATE INDEX index_xxx ON abc USING BRIN(time_or_ordered);
-
--- ---------------------------------------------------------------------------------------------------------------------
--- Setup Database
--- ---------------------------------------------------------------------------------------------------------------------
-
--- DROP DATABASE IF EXISTS "ImmunoCubeV3";
-
-CREATE DATABASE "ImmunoCubeV3"
-    WITH
-    OWNER = postgres
-    ENCODING = 'UTF8'
-    LC_COLLATE = 'en_GB.UTF-8'
-    LC_CTYPE = 'en_GB.UTF-8'
-    TABLESPACE = pg_default
-    CONNECTION LIMIT = -1
-    IS_TEMPLATE = False;
-
--- GRANT TEMPORARY, CONNECT ON DATABASE "ImmunoCubeV3" TO PUBLIC;
-
-\connect "ImmunoCubeV3"
-
--- ---------------------------------------------------------------------------------------------------------------------
--- Install extensions
--- ---------------------------------------------------------------------------------------------------------------------
--- SELECT * FROM pg_available_extensions;  -- Check for available extensions
-CREATE EXTENSION pgcrypto;  -- requires 'sudo apt-get install postgresql-contrib'
-
--- ---------------------------------------------------------------------------------------------------------------------
--- Setup Rights
--- ---------------------------------------------------------------------------------------------------------------------
-
-DO
-$do$
-BEGIN
-   IF EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'immunocube') THEN
-      RAISE NOTICE 'Role "immunocube" already exists. Skipping.';
-   ELSE
-      CREATE ROLE immunocube WITH
-          LOGIN
-          NOSUPERUSER
-          INHERIT
-          NOCREATEDB
-          NOCREATEROLE
-          NOREPLICATION
-          NOBYPASSRLS
-          ENCRYPTED PASSWORD 'md514b63385e6c74d8b93884ad1d4d85e7f'; -- 'md50bd388bd3a63009cfb897fa74d5e696a';  ---- jflw$4Uv%9j8X4?jpeXuXYZgjpr!de2
-      COMMENT ON ROLE immunocube IS 'User used by the immunocube service to access the database.';
-   END IF;
-END
-$do$;
-
-GRANT CONNECT ON DATABASE "ImmunoCubeV3" TO immunocube;
-GRANT ALL ON DATABASE "ImmunoCubeV3" TO postgres;
-
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT, INSERT, REFERENCES, TRIGGER, UPDATE ON TABLES TO immunocube;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT, USAGE ON SEQUENCES TO immunocube;
-
 
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Setup (ENUM) Types
@@ -188,15 +133,15 @@ INSERT INTO sec_permission_groups(id, label, is_super_admin, permission_to_manag
         permission_to_manage_all_datasets, permission_to_manage_owned_datasets, permission_to_manage_instruments,
         permission_to_manage_genoytpes, permission_to_manage_features, permission_to_manage_research_groups,
         permission_to_manage_users, permission_to_submit_datasets)
-    VALUES (1, 'GUEST', False, False, False, False, False, False, False, False, False, False, False),
-        (2, 'STANDARD', False, False, False, False, True, False, False, False, False, False, True),
-        (3, 'CURATOR', False, False, False, True, True, True, True, True, True, False, False),
-        (4, 'ADMIN', False, True, True, False, False, True, False, True, True, True, True),
-        (5, 'SUPERADMIN', True, True, True, True, True, True, True, True, True, True, True); ---- ToDo: Check and rename groups
+    VALUES (1, 'Guests', False, False, False, False, False, False, False, False, False, False, False),
+        (2, 'Populace', False, False, False, False, True, False, False, False, False, False, True),
+        (3, 'Curators', False, False, False, True, True, True, True, True, True, False, False),
+        (4, 'Sys-Admins', False, True, True, False, False, True, False, True, True, True, True),
+        (5, 'Super-Admins', True, True, True, True, True, True, True, True, True, True, True); ---- ToDo: Check and rename groups
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- Setup Attributes
+-- Setup Attributes and Traits
 -- ---------------------------------------------------------------------------------------------------------------------
 
 CREATE TABLE attributes (
@@ -205,13 +150,16 @@ CREATE TABLE attributes (
     tag character varying NOT NULL,
     text character varying NOT NULL,
     priority smallint DEFAULT 1000 NOT NULL,
+    required_for_dataset_state smallint,
     allow_as_filter boolean DEFAULT false NOT NULL,
     allow_for_dataset boolean DEFAULT false NOT NULL,
     allow_for_genotype boolean DEFAULT false NOT NULL,
     allow_for_performance boolean DEFAULT false NOT NULL,
     allow_for_sample boolean DEFAULT false NOT NULL,
     allow_trait_values boolean DEFAULT false NOT NULL,
-    required_for_dataset_state smallint,
+    allow_values boolean DEFAULT false NOT NULL,
+    values_are_numeric boolean DEFAULT false NOT NULL,
+    values_are_feature_labels boolean DEFAULT false NOT NULL,
     PRIMARY KEY(id),
     UNIQUE(tag),
     FOREIGN KEY(parent_id) REFERENCES attributes(id) ON UPDATE CASCADE ON DELETE RESTRICT
@@ -227,13 +175,11 @@ CREATE TABLE traits (
     id serial NOT NULL,
     attribute_id integer NOT NULL,
     tag character varying NOT NULL,
-    ---- full_tag character varying NOT NULL,
     text character varying,
     keyword character varying,
     description text,
     PRIMARY KEY(id),
     UNIQUE(tag, attribute_id),
-    --- UNIQUE(full_tag),
     UNIQUE(keyword),  -- NULLS NOT DISTINCT
     FOREIGN KEY(attribute_id) REFERENCES attributes(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -242,6 +188,23 @@ ALTER TABLE traits OWNER TO postgres;
 CREATE INDEX index_traits_pk ON traits USING btree(id);
 CREATE INDEX index_traits_fk ON traits USING btree(attribute_id);
 CREATE INDEX index_traits_tag ON traits USING hash(tag);
+
+
+CREATE TABLE trait_nodes (
+    id serial NOT NULL,
+    trait_id integer NOT NULL,
+    parent_node_id integer,
+    name character varying,
+    trait_value character varying,
+    PRIMARY KEY(id),
+    FOREIGN KEY(trait_id) REFERENCES traits(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    FOREIGN KEY(parent_node_id) REFERENCES trait_nodes(id) ON UPDATE CASCADE ON DELETE RESTRICT
+);
+ALTER TABLE trait_nodes OWNER TO postgres;
+
+CREATE INDEX index_trait_nodes_pk ON trait_nodes USING btree(id);
+CREATE INDEX index_trait_nodes_fk ON trait_nodes USING btree(parent_node_id);
+CREATE INDEX index_traits_nodes_fk ON trait_nodes USING btree(trait_id);
 
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -312,7 +275,6 @@ CREATE TABLE datasets (
     project_id integer,
     label character varying NOT NULL,
     created_on timestamp without time zone NOT NULL,
-    ---- uploaded_on timestamp without time zone DEFAULT now() NOT NULL,
     title character varying NOT NULL,
     contact_email character varying,
     user_id integer,
@@ -350,7 +312,7 @@ CREATE INDEX index_samples_fk ON samples USING btree(dataset_id);
 
 CREATE TABLE sample_replicates (
     sample_id bigint NOT NULL,
-    replicate_label character varying NOT NULL,  -- Question, extra replicate table?
+    replicate_label character varying NOT NULL,
     PRIMARY KEY(sample_id),
     FOREIGN KEY(sample_id) REFERENCES samples(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -361,7 +323,7 @@ CREATE INDEX index_sample_replicates_pk ON sample_replicates USING btree(sample_
 
 CREATE TABLE sample_batches (
     sample_id bigint NOT NULL,
-    batch_label character varying NOT NULL,  -- Question, extra batch table?
+    batch_label character varying NOT NULL,
     PRIMARY KEY(sample_id),
     FOREIGN KEY(sample_id) REFERENCES samples(id) ON UPDATE CASCADE ON DELETE RESTRICT
 );
@@ -447,33 +409,31 @@ CREATE INDEX index_dataset_timeline_events_fk ON dataset_timeline_events USING b
 -- ---------------------------------------------------------------------------------------------------------------------
 
 CREATE TABLE nm_traits (
-    trait_id serial NOT NULL,
-    trait_value character varying,
-    ---- trait_unit character varying
+    trait_node_id serial NOT NULL
 );
 ALTER TABLE nm_traits OWNER TO postgres;
 
 CREATE TABLE nm_traits_datasets (
     dataset_id integer NOT NULL,
-    PRIMARY KEY(trait_id, dataset_id),
-    FOREIGN KEY(trait_id) REFERENCES traits(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    PRIMARY KEY(trait_node_id, dataset_id),
+    FOREIGN KEY(trait_node_id) REFERENCES trait_nodes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     FOREIGN KEY(dataset_id) REFERENCES datasets(id) ON UPDATE CASCADE ON DELETE RESTRICT
 ) INHERITS (nm_traits);
 ALTER TABLE nm_traits_datasets OWNER TO postgres;
 
-CREATE INDEX index_nm_traits_datasets_pk ON nm_traits_datasets USING btree(trait_id, dataset_id);
+CREATE INDEX index_nm_traits_datasets_pk ON nm_traits_datasets USING btree(trait_node_id, dataset_id);
 CREATE INDEX index_nm_traits_datasets_fk_dataset ON nm_traits_datasets USING btree(dataset_id);
 
 
 CREATE TABLE nm_traits_samples (
     sample_id integer NOT NULL,
-    PRIMARY KEY(trait_id, sample_id),
-    FOREIGN KEY(trait_id) REFERENCES traits(id) ON UPDATE CASCADE ON DELETE RESTRICT,
+    PRIMARY KEY(trait_node_id, sample_id),
+    FOREIGN KEY(trait_node_id) REFERENCES trait_nodes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     FOREIGN KEY(sample_id) REFERENCES samples(id) ON UPDATE CASCADE ON DELETE RESTRICT
 ) INHERITS (nm_traits);
 ALTER TABLE nm_traits_samples OWNER TO postgres;
 
-CREATE INDEX index_nm_traits_samples_pk ON nm_traits_samples USING btree(trait_id, sample_id);
+CREATE INDEX index_nm_traits_samples_pk ON nm_traits_samples USING btree(trait_node_id, sample_id);
 CREATE INDEX index_nm_traits_samples_fk_sample ON nm_traits_samples USING btree(sample_id);
 
 
@@ -483,18 +443,20 @@ CREATE INDEX index_nm_traits_samples_fk_sample ON nm_traits_samples USING btree(
 
 CREATE TABLE genotypes (
     id serial NOT NULL,
+    trait_node_id integer NOT NULL,
     name character varying NOT NULL,
     description character varying,
     is_selectable boolean DEFAULT false,
     created_by integer,
     created_on timestamp without time zone NOT NULL,
     PRIMARY KEY(id),
+    FOREIGN KEY(trait_node_id) REFERENCES trait_nodes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
     UNIQUE(name)
 );
 ALTER TABLE genotypes OWNER TO postgres;
 
 CREATE INDEX index_genotypes_pk ON genotypes USING btree(id);
----- CREATE INDEX index_genotypes_proteome_id ON genotypes USING btree(proteome_id);
+CREATE INDEX index_genotypes_fk ON genotypes USING btree(id);
 CREATE INDEX index_genotypes_name ON genotypes USING hash(name);
 
 CREATE TABLE nm_genotypes (
@@ -525,22 +487,6 @@ ALTER TABLE nm_genotypes_samples OWNER TO postgres;
 CREATE INDEX index_nm_genotypes_samples_pk ON nm_genotypes_samples USING btree(genotype_id, sample_id);
 CREATE INDEX index_nm_genotypes_samples_fk_sample ON nm_genotypes_samples USING btree(sample_id);
 
-
-CREATE TABLE nm_genotypes_pg_traits (
-    trait_id integer NOT NULL,
-    feature_id bigint,
-    proteome_id proteome_ids NOT NULL,
-    genotype_value character varying,
-    PRIMARY KEY(genotype_id, trait_id),
-    FOREIGN KEY(genotype_id) REFERENCES genotypes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
-    FOREIGN KEY(trait_id) REFERENCES traits(id) ON UPDATE CASCADE ON DELETE RESTRICT
-) INHERITS (nm_genotypes);
-ALTER TABLE nm_genotypes_pg_traits OWNER TO postgres;
-
-CREATE INDEX index_nm_genotypes_traits_pk ON nm_genotypes_pg_traits USING btree(genotype_id, trait_id);
-CREATE INDEX index_nm_genotypes_traits_fk_trait_id ON nm_genotypes_pg_traits USING btree(trait_id);
-
-
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Setup Functions
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -550,8 +496,8 @@ CREATE FUNCTION get_db_size_bytes() RETURNS integer
     AS $$DECLARE
 	size_in_bytes integer;
 BEGIN
-	SELECT pg_database_size('ImmunoCubeV3') INTO size_in_bytes;
-	--SELECT 	pg_database_size('ImmunoCubeV2') -
+	SELECT pg_database_size('ImmunoCubeV5') INTO size_in_bytes;
+	--SELECT 	pg_database_size('ImmunoCubeV5') -
 	--	pg_total_relation_size('sec_tokens') -
 	--	pg_total_relation_size('sec_users') -
 	--	pg_total_relation_size('nm_users_attribute_value')

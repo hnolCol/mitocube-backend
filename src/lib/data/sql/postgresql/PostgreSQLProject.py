@@ -199,15 +199,7 @@ class PostgreSQLProject(dlib.ABCProject):
 
         return datasets_ids
 
-    def read(self, fetch_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_select(db_cur_session = db_cur_session)
-
-        if fetch_datasets:
-            raise dlib.ABCProjectError("Fetching datasets for a project is not implemented yet.")  # ToDo: implement fetch_datasets for projects
-        else:
-            self._datasets = None
-
-    def write(self, write_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):
+    def write_to_db(self, write_datasets: bool = False, db_cur_session: psycopg2.cursor | None = None):
         self.__db_insert(use_id=False, db_cur_session=db_cur_session) if self._id is None else self.__db_update(db_cur_session=db_cur_session)
 
         if write_datasets:

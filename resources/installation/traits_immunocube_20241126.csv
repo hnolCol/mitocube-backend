@@ -1,0 +1,261 @@
+tag,attribute_tag,keyword,text,description
+5fu,att_compound,5fu,5-Fluorouracil,"5-FU is a pyrimidine analog that causes DNA and RNA stress by the incorporation of its derived metabo- lites into DNA and RNA and by the inhibition of thymidylate synthase, inducing deoxyribonucleotide pool imbalance."
+anisomycin,att_compound,anisomycin,Anisomycin,
+antimycin,att_compound,antimycin,Antimycin A,Antimycin A - Cytochrome c reductase (CIII) Inhibitor (QiSite Binding) from Streptomyces bacteria.
+atp,att_compound,atp,ATP,Adenosine triphosphate
+berzosertib,att_compound,berzosertib,Berzosertib,
+bortezomib,att_compound,bortezomib,Bortezomib,
+cccp,att_compound,cccp,CCCP,Carbonyl cyanide m-chlorophenyl hydrazone. CCCP causes an uncoupling of the proton gradient that is established during the normal activity of electron carriers in the electron transport chain. CCCP acts essentially as an ionophore and reduces the ability of ATP synthase to function optimally.
+cgas,att_compound,cgas,cGAS,
+cycloheximide,att_compound,cycloheximide,Cycloheximide,
+diabzi,att_compound,diabzi,diABZI,
+dmso,att_compound,dmso,DMSO,Dimethyl sulfoxide used as a control in compound treatment.
+doxorubicin,att_compound,doxorubicin,Doxorubicin,Doxorubicin is type of chemotherapy drug called an anthracycline. It slows or stops the growth of cancer cells by blocking an enzyme called topo isomerase 2.\
+doxycycline,att_compound,doxycycline,Doxycycline,Doxycycline is a broad-spectrum antibiotic of the tetracycline class used in the treatment of infections caused by bacteria and certain parasites.
+etoposide,att_compound,etoposide,Etoposide,
+lactimidomycin,att_compound,lactimidomycin,Lactimidomycin,
+lps,att_compound,lps,Lipopolysaccharide,
+niap,att_compound,niap,nIAP,
+pam,att_compound,pam,Polyacrylamide,
+r837,att_compound,r837,r837,Imiquimod; stimulates the innate immune system by activating toll-like receptor 7 (TLR7)
+r848,att_compound,r848,r848,Resiquimod; Imidazoquinolinamine and Toll-like receptor (TLR) agonist
+tamoxifen,att_compound,tamoxifen,Tamoxifen,
+trametinib,att_compound,trametinib,Trametinib,
+unstimulated,att_compound,unstimulated,unstimulated,
+control,att_compound,control,Control,
+786_0,att_celllines,786_0,786-0,Human NCI-60 cell line; Renal Cancer
+a498,att_celllines,a498,A498,Human NCI-60 cell line; Renal Cancer
+a549,att_celllines,a549,A549,Human NCI-60 cell line; Non-Small Cell Lung cancer
+achn,att_celllines,achn,ACHN,Human NCI-60 cell line; Renal Cancer
+bmdc,att_celllines,bmdc,BMDC,Bone-marrow-derived Cells
+bmm,att_celllines,bmm,BMM,Bone-marrow-derived macrophages
+bt549,att_celllines,bt549,BT-549,Human NCI-60 cell line; Breast Cancer
+caki1,att_celllines,caki1,CAKI-1,Human NCI-60 cell line; Renal Cancer
+cho,att_celllines,cho,CHO,Chinese hamster ovary
+colo205,att_celllines,colo205,COLO205,Human NCI-60 cell line; Colon cancer
+crfcem,att_celllines,crfcem,CRF-CEM,Human NCI-60 cell line; Leukemia
+du145,att_celllines,du145,DU-145,Human NCI-60 cell line; Prostate Cancer
+ekvx,att_celllines,ekvx,EKVX,Human NCI-60 cell line; Non-Small Cell Lung cancer
+hcc2998,att_celllines,hcc2998,HCC-2998,Human NCI-60 cell line; Colon cancer
+hct116,att_celllines,hct116,HCT-116,Human NCI-60 cell line; Colon cancer
+hct15,att_celllines,hct15,HCT-15,Human NCI-60 cell line; Colon cancer
+hek293,att_celllines,hek293,HEK293,Human Embryonic Kidney cancer cells; epithelial
+hek293t,att_celllines,hek293t,HEK293T,Human Embryonic Kidney cancer cells; epithelial; derivates from HEK293
+hela,att_celllines,hela,HeLa,Human epithelial cell; cervical cancer; Henrietta Lacks
+hl60,att_celllines,hl60,HL-60,Human NCI-60 cell line; Leukemia
+hop62,att_celllines,hop62,HOP-62,Human NCI-60 cell line; Non-Small Cell Lung cancer
+hop92,att_celllines,hop92,HOP-92,Human NCI-60 cell line; Non-Small Cell Lung cancer
+hs578t,att_celllines,hs578t,HS 578T,Human NCI-60 cell line; Breast Cancer
+ht29,att_celllines,ht29,HT29,Human NCI-60 cell line; Colon cancer
+igrov1,att_celllines,igrov1,IGR-OV1,Human NCI-60 cell line; Ovarian Cancer
+jeko1,att_celllines,jeko1,JeKo-1,Human Mantle cell lymphoma
+jurkat,att_celllines,jurkat,JURKAT,Acute T cell leukemia; human T lymphocytes
+jvm13,att_celllines,jvm13,JVM-13,Human Mantle cell lymphoma
+jvm2,att_celllines,jvm2,JVM-2,Human Mantle cell lymphoma
+k562,att_celllines,k562,K-562,Human NCI-60 cell line; Leukemia
+km12,att_celllines,km12,KM12,Human NCI-60 cell line; Colon cancer
+lox_imvi,att_celllines,lox_imvi,LOX IMVI,Human NCI-60 cell line; Melanoma
+m14,att_celllines,m14,M14,Human NCI-60 cell line; Melanoma
+malme3m,att_celllines,malme3m,MALME-3M,Human NCI-60 cell line; Melanoma
+maver1,att_celllines,maver1,MAVER-1,Human Mantle cell lymphoma
+mcf7,att_celllines,mcf7,MCF7,Human NCI-60 cell line; Breast Cancer
+mdamb231,att_celllines,mdamb231,MDA-MB-231,Human NCI-60 cell line; Breast Cancer
+mdamb435,att_celllines,mdamb435,MDA-MB-435,Human NCI-60 cell line; Melanoma
+mdamb468,att_celllines,mdamb468,MDA-MB-468,Human NCI-60 cell line; Breast Cancer
+mino,att_celllines,mino,Mino,Human Mantle cell lymphoma
+molt4,att_celllines,molt4,MOLT-4,Human NCI-60 cell line; Leukemia
+nceb1,att_celllines,nceb1,NCEB-1,Human Mantle cell lymphoma
+nci_adrres,att_celllines,nci_adrres,NCI ADR-RES,Human NCI-60 cell line; Ovarian Cancer
+nci_h226,att_celllines,nci_h226,NCI-H226,Human NCI-60 cell line; Non-Small Cell Lung cancer
+nci_h23,att_celllines,nci_h23,NCI-H23,Human NCI-60 cell line; Non-Small Cell Lung cancer
+nci_h322m,att_celllines,nci_h322m,NCI-H322M,Human NCI-60 cell line; Non-Small Cell Lung cancer
+nci_h460,att_celllines,nci_h460,NCI-H460,Human NCI-60 cell line; Non-Small Cell Lung cancer
+nci_h522,att_celllines,nci_h522,NCI-H522,Human NCI-60 cell line; Non-Small Cell Lung cancer
+ovcar3,att_celllines,ovcar3,OVCAR-3,Human NCI-60 cell line; Ovarian Cancer
+ovcar4,att_celllines,ovcar4,OVCAR-4,Human NCI-60 cell line; Ovarian Cancer
+ovcar5,att_celllines,ovcar5,OVCAR-5,Human NCI-60 cell line; Ovarian Cancer
+ovcar8,att_celllines,ovcar8,OVCAR-8,Human NCI-60 cell line; Ovarian Cancer
+p388,att_celllines,p388,P388,Leukemia
+pc3,att_celllines,pc3,PC-3,Human NCI-60 cell line; Prostate Cancer
+rec1,att_celllines,rec1,REC-1,Human Mantle cell lymphoma
+rpmi8226,att_celllines,rpmi8226,RPMI-8226,Human NCI-60 cell line; Leukemia
+rxf393,att_celllines,rxf393,RXF 393,Human NCI-60 cell line; Renal Cancer
+sf268,att_celllines,sf268,SF-268,Human NCI-60 cell line; central nervous system (CNS) tumor 
+sf295,att_celllines,sf295,SF-295,Human NCI-60 cell line; central nervous system (CNS) tumor 
+sf539,att_celllines,sf539,SF-539,Human NCI-60 cell line; central nervous system (CNS) tumor 
+skmel2,att_celllines,skmel2,SK-MEL-2,Human NCI-60 cell line; Melanoma
+skmel28,att_celllines,skmel28,SK-MEL-28,Human NCI-60 cell line; Melanoma
+skmel5,att_celllines,skmel5,SK-MEL-5,Human NCI-60 cell line; Melanoma
+skov3,att_celllines,skov3,SK-OV-3,Human NCI-60 cell line; Ovarian Cancer
+sn12c,att_celllines,sn12c,SN12C,Human NCI-60 cell line; Renal Cancer
+snb19,att_celllines,snb19,SNB-19,Human NCI-60 cell line; central nervous system (CNS) tumor 
+snb75,att_celllines,snb75,SNB-75,Human NCI-60 cell line; central nervous system (CNS) tumor 
+sr,att_celllines,sr,SR,Human NCI-60 cell line; Leukemia
+sw620,att_celllines,sw620,SW-620,Human NCI-60 cell line; Colon cancer
+t47d,att_celllines,t47d,T-47D,Human NCI-60 cell line; Breast Cancer
+thp1,att_celllines,thp1,THP1,Human acute monocytic leukemia cell line
+tk10,att_celllines,tk10,TK-10,Human NCI-60 cell line; Renal Cancer
+u251,att_celllines,u251,U251,Human NCI-60 cell line; central nervous system (CNS) tumor 
+u937,att_celllines,u937,U937,Pro-monocytic model cell line isolated from histiocytic lymphoma
+uacc257,att_celllines,uacc257,UACC-257,Human NCI-60 cell line; Melanoma
+uacc62,att_celllines,uacc62,UACC-62,Human NCI-60 cell line; Melanoma
+uo31,att_celllines,uo31,UO-31,Human NCI-60 cell line; Renal Cancer
+z138,att_celllines,z138,Z-138,Human Mantle cell lymphoma
+adipose_macrophages,att_cells,adipose_macrophages,Adipose Macrophages,Adipose tissue macrophages
+astrocytes,att_cells,astrocytes,Astrocytes,
+bcells,att_cells,bcells,B cells,
+basophils,att_cells,basophils,Basophils,< 1% of leukocytes
+cytotoxict,att_cells,cytotoxict,Cytotoxic T cells,CD8+ cytotoxic T cells
+endothelial,att_cells,endothelial,Endothelial,Interior surface cells of blood vessels and lymphatic vessels
+eosinophils,att_cells,eosinophils,Eosinophils,2% of leukocytes
+epithelioid,att_cells,epithelioid,Epithelioid,Epithelioid
+erythrocytes,att_cells,erythrocytes,Erythrocytes,Red blood cells
+gammadeltat,att_cells,gammadeltat,Gamma Delta T cells,Gamma delta T cells
+hofbauer,att_cells,hofbauer,Hofbauer,Hofbauer cells; Placenta
+keratinocytes,att_cells,keratinocytes,Keratinocytes,Most prominent cell within the epidermis.
+kupffer,att_cells,kupffer,Kupffer,Kupffer cells; Liver
+langerhans,att_cells,langerhans,Langerhans,Langerhans cells; Skin
+leukocytes,att_cells,leukocytes,Leukocytes,White blood cells
+lymphocytes,att_cells,lymphocytes,Lymphocytes,30% of leukocytes; includes B cells and T cells
+macrophage,att_cells,macrophage,Macrophage,
+microglia,att_cells,microglia,Microglia,Microglia; Central nervous system
+monoblast,att_cells,monoblast,Monoblast,
+monocytes,att_cells,monocytes,Monocytes,5% of leukocytes
+nk,att_cells,nk,Natural Killer cells,Natural killer cells (NK)
+neutrophils,att_cells,neutrophils,Neutrophils,62% of leukocytes
+osteoblast,att_cells,osteoblast,Osteoblast,forms bone matrix
+osteoclast,att_cells,osteoclast,Osteoclast,resorbs bone
+osteocytes,att_cells,osteocytes,Osteocytes,maintains bone tissue
+osteogenic,att_cells,osteogenic,Osteogenic,Stem cell
+regt,att_cells,regt,Regulatory T cells (RegT),Regulatory T Cell
+stemcells,att_cells,stemcells,Stem Cells,Stem or Blast cells
+tcells,att_cells,tcells,T cells,
+thelper,att_cells,thelper,T Helper cells (Th),CD4+ T helper cells
+thrombocytes,att_cells,thrombocytes,Thrombocytes,Platelets
+als,att_disease,als,ALS,Amyotrophic lateral sclerosis
+alzheimer,att_disease,alzheimer,Alzheimer,Alzheimer's disease
+autoimmune,att_disease,autoimmune,Autoimmune,Autoimmune disease
+cancer,att_disease,cancer,Cancer,Diseases of abnormal cells grow
+cardiovascular_diseases,att_disease,cardiovascular_diseases,Cardiovascular_Diseases,Cardiovascular and circulatory diseases
+chronic_inflammation,att_disease,chronic_inflammation,Chronic_Inflammation,"Slow, long-term inflammation lasting for prolonged periods"
+coeliac,att_disease,coeliac,Coeliac,Coeliac disease
+covid19,att_disease,covid19,COVID19,coronavirus disease
+dementia,att_disease,dementia,Dementia,
+demyelinating,att_disease,demyelinating,Demyelinating,Demyelinating disease
+diabetes,att_disease,diabetes,Diabetes,
+glioblastoma,att_disease,glioblastoma,Glioblastoma,Grade IV Astrocytoma
+hiv,att_disease,hiv,HIV,HIV disease
+huntington,att_disease,huntington,Huntington,Huntington's disease
+ibd,att_disease,ibd,IBD,Inflammatory bowel disease
+infection,att_disease,infection,Infection,"Infection occurs when viruses, bacteria, or other microbes enter your body and begin to multiply."
+influenza,att_disease,influenza,Influenza,Flue; contagious respiratory illness caused by influenza viruses.
+leukemia,att_disease,leukemia,Leukemia,Cancer of the body's blood-forming tissues
+lymphoma,att_disease,lymphoma,Lymphoma,Cancer that begins in cells of the lymph system
+malaria,att_disease,malaria,Malaria,Fatal disease caused by a parasite
+ms,att_disease,ms,MS,Multiple sclerosis
+msa,att_disease,msa,MSA,Multiple system atrophy
+neurodegenerative,att_disease,neurodegenerative,Neurodegenerative,Neurodegenerative disease
+parkinson,att_disease,parkinson,Parkinson,Parkinson's disease
+prion,att_disease,prion,Prion,Prion disease
+rheumatoid,att_disease,rheumatoid,Rheumatoid,Rheumatoid arthritis
+stress,att_disease,stress,Stress,How one reacts when feeling under pressure or threatened
+stroke,att_disease,stroke,Stroke,Disease that affects the arteries leading to and within the brain
+tuberculosis,att_disease,tuberculosis,Tuberculosis,Caused by a bacterium called Mycobacterium tuberculosis
+cerebrospinal,att_fluid,cerebrospinal,Cerebrospinal,Cerebrospinal fluid (CSF)
+feces,att_fluid,feces,Feces,Poop
+interstitial,att_fluid,interstitial,Interstitial,Interstitial fluid
+lymph,att_fluid,lymph,Lymph,Lymph; fluid that flows through the lymphatic system
+peritoneal,att_fluid,peritoneal,Peritoneal,Peritoneal fluid
+plasma,att_fluid,plasma,Plasma,Blood Plasma
+pleural,att_fluid,pleural,Pleural,Pleural fluid
+saliva,att_fluid,saliva,Saliva,Spit
+seminal,att_fluid,seminal,Seminal,Semen; Seminal fluid
+serum,att_fluid,serum,Serum,Blood Serum
+urine,att_fluid,urine,Urine,Pee
+invitro,att_model,invitro,In vitro,in the glass
+invivo,att_model,invivo,In vivo,within the living
+insilico,att_model,insilico,In Silico,Virtual
+xenografts,att_model,xenografts,xenografts,Tissue or cells implanted into a model animal
+easy,att_ms_setting,easy,Easy,MS-Setting: Easy
+faims,att_ms_setting,faims,Faims,MS-Setting: Faims
+trap,att_ms_setting,trap,Trap,MS-Setting: Trap
+vanquish,att_ms_setting,vanquish,Vanquish,MS-Setting: Vanquish
+appendix,att_organ,appendix,Appendix,
+arteries,att_organ,arteries,Arteries,
+bladder,att_organ,bladder,Bladder,
+bone_marrow,att_organ,bone_marrow,Bone Marrow,
+brain,att_organ,brain,Brain,
+bronchi,att_organ,bronchi,Bronchi,
+cecum,att_organ,cecum,Cecum,
+cerebellum,att_organ,cerebellum,Cerebellum,
+cerebrum,att_organ,cerebrum,Cerebrum,
+ear,att_organ,ear,Ear,
+esophagus,att_organ,esophagus,Esophagus,
+eye,att_organ,eye,Eye,
+gallbladder,att_organ,gallbladder,Gallbladder,
+ganglia,att_organ,ganglia,Ganglia,
+heart,att_organ,heart,Heart,
+hypothalamus,att_organ,hypothalamus,Hypothalamus,
+kidney,att_organ,kidney,Kidney,
+large_intestine,att_organ,large_intestine,Large Intestine,Large Intestine / Colon; between the Anus and small Intestine
+liver,att_organ,liver,Liver,
+lung,att_organ,lung,Lung,
+lymph_node,att_organ,lymph_node,Lymph Node,
+medulla,att_organ,medulla,Medulla,
+mesentery,att_organ,mesentery,Mesentery,
+midbrain,att_organ,midbrain,Midbrain,
+ovaries,att_organ,ovaries,Ovaries,
+pancreas,att_organ,pancreas,Pancreas,
+pons,att_organ,pons,Pons,
+prostate,att_organ,prostate,Prostate,
+rectum,att_organ,rectum,Rectum,
+small_intestine,att_organ,small_intestine,Small Intestine,Small Intestine; Between the Stomach and the Colon
+spinal_cord,att_organ,spinal_cord,Spinal Cord,
+spleen,att_organ,spleen,Spleen,
+stomach,att_organ,stomach,Stomach,
+testicles,att_organ,testicles,Testicles,
+thalamus,att_organ,thalamus,Thalamus,
+thymus,att_organ,thymus,Thymus,
+tongue,att_organ,tongue,Tongue,
+tonsils,att_organ,tonsils,Tonsils,
+uterus,att_organ,uterus,Uterus,
+veins,att_organ,veins,Veins,
+cardiovascular,att_organsystem,cardiovascular,Cardiovascular,Cardiovascular System
+digestive,att_organsystem,digestive,Digestive,Digestive System
+endocrine,att_organsystem,endocrine,Endocrine,Endocrine System
+excretory,att_organsystem,excretory,Excretory,Excretory System
+integumentary,att_organsystem,integumentary,Integumentary,Integumentary System
+lymphatic,att_organsystem,lymphatic,Lymphatic,Lymphatic System
+muscular,att_organsystem,muscular,Muscular,Muscular System
+nervous,att_organsystem,nervous,Nervous,Nervous System
+reproductive,att_organsystem,reproductive,Reproductive,Reproductive System
+respiratory,att_organsystem,respiratory,Respiratory,Respiratory System
+skeletal,att_organsystem,skeletal,Skeletal,Skeletal System
+urinary,att_organsystem,urinary,Urinary,Urinary system
+beads,att_procedures,beads,Beads,Beads (Ips)
+biopsy,att_procedures,biopsy,Biopsy,
+cell_pellets,att_procedures,cell_pellets,Cell Pellets,
+resection,att_procedures,resection,Resection,
+supernatan,att_procedures,supernatan,Supernatants,
+apoptosis,att_signalling,apoptosis,Apoptosis,Apoptosis or programmed cell death Signallilng
+autocrine,att_signalling,autocrine,Autocrine,Signaling in which a cell secretes a hormone or a chemical substance that binds to the receptors
+complement,att_signalling,complement,Complement,Complement system
+cytokines,att_signalling,cytokines,Cytokines,Small proteins that are crucial in controlling the growth and activity of immune system cells
+inflammation,att_signalling,inflammation,Inflammation,"Biological response of body tissues to harmful stimuli,"
+insulin,att_signalling,insulin,Insulin,Insulin Signaling
+juxtacrine,att_signalling,juxtacrine,Juxtacrine,Contact-dependent signalling
+necrosis,att_signalling,necrosis,Necrosis,Uncontrolled cell death.
+paracrine,att_signalling,paracrine,Paracrine,Cell-to-Cell Communication
+signaling,att_signalling,signaling,Signaling,"General Protein, Gen or Cell Signaling"
+adipose,att_tissue,adipose,Adipose,Adipose connective tissue
+areolar,att_tissue,areolar,Areolar,Areolar connective tissue
+blood,att_tissue,blood,Blood,
+connective,att_tissue,connective,Connective,Connective tissue
+dermis,att_tissue,dermis,Dermis,
+epidermis,att_tissue,epidermis,Epidermis,
+epithelial,att_tissue,epithelial,Epithelial,Epithelial tissue
+hypodermis,att_tissue,hypodermis,Hypodermis,
+muscle,att_tissue,muscle,Muscle,Muscle tissue
+nervous,att_tissue,nervous,Nervous,Nervous tissue
+reticular,att_tissue,reticular,Reticular,Reticular connective tissue
+stromal,att_tissue,stromal,Stromal,Stroma tissue

@@ -40,10 +40,6 @@ class ABCMetatext(ABC, dlib.FlexDataClass):
     def objectify_with_dataset_id(cls, dataset_id: int) -> Dict[str, ABCMetatext]:
         pass
 
-    @abstractmethod
-    def read(self):
-        pass
-
     def set(self, dataset_id: int | None, tag: str, text: str):
         self._dataset_id = dataset_id
         self._tag = tag
@@ -59,5 +55,5 @@ class ABCMetatext(ABC, dlib.FlexDataClass):
         self._text = text
 
     @abstractmethod
-    def write(self):
+    def write_to_db(self):
         pass

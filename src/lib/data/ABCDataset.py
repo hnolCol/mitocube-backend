@@ -36,13 +36,13 @@ class ABCDatasetNotFoundError(ABCDatasetError):
 
 class ABCDataset(ABC, dlib.FlexDataClass):
     def __init__(self, external_id: str | None, state: DatasetState, title: str, owner_user: dlib.ABCUser,
-                 contact_email: str, internal_id: int | None = None, data: dlib.ABCDataTable | None = None,
-                 parent_project: dlib.ABCProject | None = None, instrument: dlib.ABCInstrument | None = None,
+                 contact_email: str, internal_id: int | None = None,
+                 parent_project: dlib.ABCProject | None = None,
+                 instrument: dlib.ABCInstrument | None = None,
                  created_on: datetime | None = None,
-                 owner_group: dlib.ABCResearchGroup | None = None, metatexts: Dict[str, dlib.ABCMetatext] = None,
-                 urls: List[dlib.ABCUrl] = None,
-                 # attributes: Dict[str, dlib.ABCTrait] | None = None,  # ToDo: Counter check typing below and return values of get methods (and argument typing set methods)
-                 trait_values: Dict[str, dlib.ABCTraitValue] | None = None):  # ToDo: is_subset
+                 owner_group: dlib.ABCResearchGroup | None = None,
+                 metatexts: Dict[str, dlib.ABCMetatext] = None,
+                 urls: List[dlib.ABCUrl] = None):
         self._internal_id: int | None = internal_id
         self._external_id: str | None = external_id
 
@@ -50,23 +50,13 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._instrument: dlib.ABCInstrument | None = instrument
         self._metatexts: Dict[str, dlib.ABCMetatext] | None = metatexts
         self._urls: List[dlib.ABCUrl] | None = urls
-        self._data: dlib.ABCDataTable = data
-
-        if self._data:  # Fixme: Change to cached_data
-            self._data.set_parent_dataset(self)  # ToDo: Only set if it is not a subset
 
         self._contact_email: str = contact_email
-        self._created_on: datetime = datetime.now(tz=None) if created_on is None else created_on
+        self._created_on: datetime = datetime.now(tz = None) if created_on is None else created_on
         self._owner_group: dlib.ABCResearchGroup | None = owner_group
         self._owner_user: dlib.ABCUser = owner_user
         self._state: DatasetState = state
         self._title: str = title
-
-        # Fixme: maybe remove that completely, just get messy with JSON dataset...
-        # management outside would make it easier to remove, add traits (rather to check within dataset what is maybe different)
-        # adding traits but save them automatically as trait value?
-        # self._traits: Dict[str, dlib.ABCTrait] = attributes  # ToDo: rename attributes argument to traits, and change to trait values, redesign trait values?
-        self._trait_values: Dict[str, dlib.ABCTraitValue] = trait_values
 
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
@@ -79,7 +69,7 @@ class ABCDataset(ABC, dlib.FlexDataClass):
 
     @staticmethod
     @abstractmethod
-    def does_exist_with_id(db_id: int) -> bool:
+    def does_exist_with_id(internal_id: int) -> bool:
         pass
 
     @staticmethod
@@ -97,23 +87,11 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def get_full_dataset_list() -> Dict[str, int]:
         pass
 
-    # def get_attributes(self) -> Dict[str, dlib.ABCTrait] | None:  # Deprecated: use get_trait_values(...) instead
-    #     return self._traits
-
-    # def get_traits(self) -> Dict[str, dlib.ABCTrait] | None:  # Deprecated: use get_trait_values(...) instead
-    #     return self._traits
-
-    def get_trait_values(self) -> Dict[str, dlib.ABCTraitValue] | None:
-        return self._trait_values
-
     def get_internal_id(self) -> int | None:
         return self._internal_id
 
     def get_external_id(self) -> int | None:
         return self._external_id
-
-    def get_data(self) -> dlib.ABCDataTable | None:  # Fixme: Through exception if no data is available, and retrieve data object if not cached
-        return self._data
 
     def get_parent_project(self) -> dlib.ABCProject:
         return self._parent_project
@@ -150,21 +128,17 @@ class ABCDataset(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_id(cls, db_id: int) -> dlib.ABCDataset:  # Fixme: Add option to only select certain features
+    def objectify_with_id(cls, db_id: int) -> dlib.ABCDataset:
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_label(cls, label: str) -> dlib.ABCDataset:  # Fixme: Add option to only select certain features
+    def objectify_with_label(cls, label: str) -> dlib.ABCDataset:
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> dlib.ABCDataset:  # Fixme: Add option to only select certain features
-        pass
-
-    @abstractmethod
-    def read(self, fetch_datatable: bool = False):
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> dlib.ABCDataset:
         pass
 
     def set(self, parent_project: dlib.ABCProject | None, instrument: dlib.ABCInstrument | None, title: str,
@@ -177,21 +151,6 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         self._owner_group = owner_group
         self._owner_user = owner_user
         self._title = title
-
-    def set_trait_values(self, trait_values: Dict[str, dlib.ABCTraitValue] | None):
-        self._trait_values = trait_values
-
-    def set_trait_values_with_list(self, trait_values: List[dlib.ABCTraitValue] | None):
-        self.set_trait_values(trait_values = {obj.get_trait().get_tag(): obj for obj in trait_values})
-
-    def set_data(self, data: dlib.ABCDataTable | None):
-        if self._data:
-            self._data.set_parent_dataset(parent=None)
-
-        self._data = data
-
-        if self._data:
-            self._data.set_parent_dataset(parent=self)
 
     def set_email(self, email: str):
         self._contact_email = email
@@ -228,5 +187,5 @@ class ABCDataset(ABC, dlib.FlexDataClass):
         pass
 
     @abstractmethod
-    def write(self, write_datatable: bool = False):
+    def write_to_db(self):
         pass

@@ -155,11 +155,8 @@ class JSONDataset(dlib.ABCDataset):
 
         return dataset
 
-    def read(self, fetch_datatable: bool = False):  # ToDo: Implement Exception?
-        pass
-
     def update_state(self, state: dlib.DatasetState | None, allow_downgrade: bool = False):  # ToDo: Implement Exception?
         pass
 
-    def write(self, write_datatable: bool = False):
+    def write_to_db(self, write_datatable: bool = False):
         raise dlib.ABCDatasetError("JSONDataset is read only!")

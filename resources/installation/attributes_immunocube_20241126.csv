@@ -1,0 +1,12 @@
+tag,parent_tag,text,priority,group_tag,required_for_state,allow_as_filter,allow_for_dataset,allow_for_sample,allow_for_genotype,allow_for_qc,allow_values,values_are_numeric,values_are_feature_labels
+att_compound,,Treatment,100,sample_description,,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE
+att_celllines,,Celllines,100,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_cells,,Cells,100,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_disease,,Disease,100,sample_description,,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE
+att_fluid,,Fluid,500,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_model,,Model,500,experiment,,TRUE,TRUE,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE
+att_ms_setting,,MS-Setting,1000,ms,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_organsystem,,Organ System,1000,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_procedures,,Sample Procedures,1000,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_signalling,,Signallling Pathway,1000,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE
+att_tissue,,Tissue,1000,sample_description,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE

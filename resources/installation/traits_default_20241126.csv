@@ -1,0 +1,125 @@
+tag,attribute_tag,keyword,text,description
+ns,att_time,,Nanoseconds,Nanoseconds
+ms,att_time,,Millisecond,Millisecond
+s,att_time,,Seconds,Seconds
+m,att_time,,Minutse,Minutse
+h,att_time,,Hours,Hours
+days,att_time,,Days,Days
+weeks,att_time,,Weeks,Weeks
+months,att_time,,Months,Months
+years,att_time,,Years,Years
+ns,att_duration,,Nanoseconds,Nanoseconds
+ms,att_duration,,Millisecond,Millisecond
+s,att_duration,,Seconds,Seconds
+m,att_duration,,Minutse,Minutse
+h,att_duration,,Hours,Hours
+days,att_duration,,Days,Days
+weeks,att_duration,,Weeks,Weeks
+months,att_time,,Months,Months
+years,att_duration,,Years,Years
+fm,att_length,,fm,Femtometre
+nm,att_length,,nm,Nanometre
+um,att_length,,um,Micrometre
+mm,att_length,,mm,Millimetre
+cm,att_length,,cm,Centimetre
+m,att_length,,m,Metre
+km,att_length,,km,Kilometre
+aa,att_length,,aa,Length in amino acids
+bp,att_length,,bp,Length in base pairs
+a,att_length,,Å,Ångström; equal to 0.1 nm
+fg,att_mass,,fg,Femtogram
+ng,att_mass,,ng,Nanogram
+ug,att_mass,,ug,Microgram
+mg,att_mass,,mg,Milligram
+g,att_mass,,g,Gram
+kg,att_mass,,kg,Kilogram
+kda,att_mass,,kDa,Kilodalton
+da,att_mass,,Da,Dalton
+na,att_current,,nAno,Nanoampere
+ua,att_current,,uA,Microampere
+ma,att_current,,mA,Millilampere
+a,att_current,,A,Ampere
+ka,att_current,,kA,Kiloampere
+k,att_temperature,,K,Kelvin
+c,att_temperature,,C°,Celsius
+fmol,att_amount,,fmol,Femtomol
+pmol,att_amount,,pmol,Picomol
+nmol,att_amount,,nmol,Nanomole
+umol,att_amount,,umol,Micromole
+mmol,att_amount,,mmol,Millimole
+mol,att_amount,,mol,Mole
+kmol,att_amount,,kmol,Kilomole
+nl,att_volume,,nL,Nanolitre
+ul,att_volume,,uL,Microlitre
+ml,att_volume,,mL,Millilitre
+l,att_volume,,Light,Litre
+pm,att_concentration,,pmol/L,Picomolar
+nm,att_concentration,,nmol/L,Nanomolar
+um,att_concentration,,umol/L,Micromolar
+mm,att_concentration,,mmol/L,Millimolar
+m,att_concentration,,mol/L,Molar
+km,att_concentration,,kmol/L,Kilomolar
+dark,att_light,,No Light,No Light
+Light,att_light,,Light,Light
+bright,att_light,,Bright Light,Bright Light
+red,att_colour,,Red,625-750 nm
+blue,att_colour,,Blue,450-485 nm
+green,att_colour,,Green,500-565 nm
+yellow,att_colour,,Yellow,565-590 nm
+orange,att_colour,,Orange,590-625 nm
+cyan,att_colour,,Cyan,485-500 nm
+violet,att_colour,,Violet,380-450 nm
+yfp,att_colour,,YFP,Yellow fluorescent protein at 527 nm
+gfp,att_colour,,GFP,Gellow fluorescent protein at 475 nm
+cfp,att_colour,,CFP,Cyan fluorescent protein at 480 nm
+mcherry,att_colour,,mCherry,mCherry absorbs light between 540 and 590 nm and emits light in the range of 550 and 650 nm
+luciferase,att_colour,,Luciferase,Firefly luciferase max wavelength 475 nm
+nj,att_energy,,nJ,Nanojoule
+uj,att_energy,,uJ,Microjoule
+mj,att_energy,,mJ,Milllijoule
+j,att_energy,,J,Joule
+kj,att_energy,,kJ,Kilojoule
+nv,att_voltage,,nV,Nanovolt
+uv,att_voltage,,uV,Microvolt
+mv,att_voltage,,mV,Millivolt
+v,att_voltage,,V,Volt
+kv,att_voltage,,kV,Kilovolt
+nw,att_power,,nW,Nanowatt
+uw,att_power,,uW,Microwatt
+mw,att_power,,mW,Milliwatt
+w,att_power,,W,Watt
+kw,att_power,,kW,Kilowatt
+megaw,att_power,,MW,Megawatt
+gw,att_power,,GW,Gigawatt
+nohm,att_resistance,,nΩ,Nanoohm
+uohm,att_resistance,,uΩ,Microohm
+mohm,att_resistance,,mΩ,Milliohm
+ohm,att_resistance,,Ω,Ohm
+kohm,att_resistance,,kΩ,Kiloohm
+megaohm,att_resistance,,MΩ,Megaohm
+na,att_current,,nA,Nanoampere
+ua,att_current,,uA,Microampere
+ma,att_current,,mA,Milliampere
+a,att_current,,A,Ampere
+ka,att_current,,kA,Kiloampere
+megaa,att_current,,MA,Megaampere
+kd,att_engineering,,KD,Gene knock-down
+ko,att_engineering,,KO,Gene knock-out
+kin,att_engineering,,KIN,Gene knock-in
+deletion,att_engineering,,del,Gene deletion
+inducible_expression,att_engineering,,Inducible Expression,Inducible gene expression
+stable_expression,att_engineering,,Stable Expression,Stable gene expression
+argc,att_protease,,ArgC,ArgC - Cleaves C-term of arginine (R) residues
+aspn,att_protease,,AspN,"AspN N-terminal of Asp, optimal pH = 4-9"
+chymotrypsin,att_protease,,Chymotrypsin,"Chymotrypsin, cleaves C-terminal of Tyr, Phe, Trp"
+elastase,att_protease,,Elastase,"Elastase, C-terminal of Ala, Val, Ser, Gly, Leu and ile, optimal pH = 9.0"
+gluc,att_protease,,GluC,GlucC - Cleaves C-term of glutamine residues
+lysc,att_protease,,LysC,LysC (Wako) - Cleaves C-term of lysine
+raspn,att_protease,,rAsp-N,"rAsp-N, N-terminal of Asp, optimal pH = 6 - 9"
+trypsin,att_protease,,Trypsin,Trypsin (Sigma) - Cleave C-term of arginine (R) and lysine (K)
+elegans,att_organism,elegans,C. Elegans,Caenorhabditis elegans
+gut,att_organism,gut,Gut Microbiom,Gut Microbiomm (Specify in Additional Info)
+human,att_organism,human,Human,Homo sapiens (Human)
+mouse,att_organism,mouse,Mouse,Mus musculus (Mouse)
+rat,att_organism,rat,Rat,Rattus norvegicus (Rat)
+yeast,att_organism,yeast,Yeast,Saccharomyces cerevisiae (Baker's Yeast)

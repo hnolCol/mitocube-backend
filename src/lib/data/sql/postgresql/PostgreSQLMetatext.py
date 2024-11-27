@@ -149,10 +149,7 @@ class PostgreSQLMetatext(dlib.ABCMetatext):
 
         return metatexts
 
-    def read(self, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_select(db_cur_session=db_cur_session)
-
-    def write(self, db_cur_session: psycopg2.cursor | None = None):
+    def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
         if self._text is None or len(self._text) < 1:
             self.__db_delete(db_cur_session=db_cur_session)
         elif PostgreSQLMetatext.is_tag_used(dataset_id = self._dataset_id, tag = self._tag):

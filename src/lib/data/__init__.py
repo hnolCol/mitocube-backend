@@ -5,13 +5,15 @@ from .FlexDataClass import FlexDataClass
 
 from .ABCDatabase import ABCDataError  # ToDo: Needs to be first due to issues with circular imports ...
 from .ABCDataset import ABCDataset, ABCDatasetError, ABCDatasetNotFoundError, DatasetState  # ToDo: Needs to be second due to issues with circular imports ...
-from .ABCAttributes import ABCAttributeError, ABCAttributeNotFoundError, ABCTraitNotFoundError, ABCTraitValueNotFoundError, ABCAttribute, ABCTrait  # ToDo: Needs to be third due to issues with circular imports ...
+from .ABCAttribute import ABCAttributeError, ABCAttributeNotFoundError, ABCAttribute  # ToDo: Needs to be third due to issues with circular imports ...
+from .ABCTrait import ABCTraitNotFoundError, ABCTrait
+from .ABCTraitNode import ABCTraitNodeError, ABCTraitNodeNotFoundError, ABCTraitNode
+from .ABCTraitTree import ABCTraitTreeError, ABCTraitTreeNotFoundError, ABCTraitTree
 
 from .ABCDatabase import ABCDatabase, ABCDatabaseError
 from .ABCStatDatabase import ABCStatDatabase, ABCStatDatabaseError
 from .CachedDatabase import CachedDatabase
 from .CachedStatDatabase import CachedStatDatabase
-from .ABCAttributes import ABCAttributeError, ABCAttribute, ABCTrait, ABCTraitValue
 from .ABCDataTable import ABCDataTable, ABCDataTableError
 from .ABCFeatureDatabase import ABCFeatureDatabaseError, ABCFeatureDatabase
 from .ABCInstrument import ABCInstrument, ABCInstrumentError
@@ -21,3 +23,4 @@ from .ABCResearchGroup import ABCResearchGroup, ABCResearchGroupError
 from .ABCTimeline import ABCTimeline, ABCTimelineEvent, ABCDatasetTimelineEvent, TimelineEventState, DatasetTimelineEventType, ABCTimelineError
 from .ABCUser import ABCUser, ABCUserError, ABCUserNotFoundError
 from .ABCUrl import ABCUrl, ABCUrlError
+from .ABCGenotype import ABCGenotypeError, ABCGenotypeNotFoundError, ABCGenotype

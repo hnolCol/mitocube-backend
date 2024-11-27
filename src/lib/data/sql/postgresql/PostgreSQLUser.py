@@ -474,11 +474,8 @@ class PostgreSQLUser(dlib.ABCUser):
 
         return user
 
-    def read(self, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_select(db_cur_session = db_cur_session)
-
     # ToDo: Implement methods to update  salts
-    def write(self, db_cur_session: psycopg2.cursor | None = None):
+    def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_insert(use_id=False, password=None, db_cur_session = db_cur_session) if self._id is None else self.__db_update(db_cur_session = db_cur_session)
 
     def write_password(self, password: str, db_cur_session: psycopg2.cursor | None = None):

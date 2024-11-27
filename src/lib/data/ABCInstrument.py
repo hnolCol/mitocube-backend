@@ -70,10 +70,6 @@ class ABCInstrument(ABC, dlib.FlexDataClass):
     def objectify_with_label(cls, label: str) -> dlib.ABCInstrument:
         pass
 
-    @abstractmethod
-    def read(self):
-        pass
-
     def set(self, label: str, name: str, db_id: int | None = None , location: str | None = None, description: str | None = None, base64_image: str | None = None):
         self._id = db_id
         self._label = label
@@ -101,5 +97,5 @@ class ABCInstrument(ABC, dlib.FlexDataClass):
         self._base64_image = base64_image
 
     @abstractmethod
-    def write(self):
+    def write_to_db(self):
         pass

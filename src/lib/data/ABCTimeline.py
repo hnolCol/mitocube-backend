@@ -98,10 +98,6 @@ class ABCTimelineEvent(ABC, dlib.FlexDataClass):
     def get_text(self) -> str | None:
         return self._text
 
-    @abstractmethod
-    def read(self):
-        pass
-
     def set(self, timestamp: datetime, user: dlib.ABCUser | None, state: TimelineEventState, text: str | None):
         self._timestamp = timestamp
         self._user = user
@@ -124,7 +120,7 @@ class ABCTimelineEvent(ABC, dlib.FlexDataClass):
         self._text = text
 
     @abstractmethod
-    def write(self):
+    def write_to_db(self):
         pass
 
 
@@ -143,11 +139,7 @@ class ABCDatasetTimelineEvent(ABCTimelineEvent):
         return self._event_type
 
     @abstractmethod
-    def read(self):
-        pass
-
-    @abstractmethod
-    def write(self):
+    def write_to_db(self):
         pass
 
     def set(self, timestamp: datetime, user: dlib.ABCUser | None, state: TimelineEventState, text: str | None,

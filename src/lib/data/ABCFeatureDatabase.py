@@ -24,11 +24,4 @@ class ABCFeatureDatabase(dlib.FlexDataClass, metaclass=SingletonABCMeta):
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLFeatureDatabase}
 
-    @abstractmethod
-    def read(self):
-        pass
-
-    @abstractmethod
-    def reset(self):
-        pass
 
