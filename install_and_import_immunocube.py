@@ -75,7 +75,7 @@ for username, item in data_import_users.items():
                         orcid = item["orcid"], url = item["url"],
                         allow_login = item["allow_login"],
                         expires_after = item["expires_after"])
-        user.write()
+        user.write_to_db()
 
         user = db_users.objectify_with_username("superuser")
 

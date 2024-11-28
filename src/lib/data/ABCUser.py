@@ -56,7 +56,7 @@ class ABCUser(ABC, dlib.FlexDataClass):
         self._updated_on = datetime.now()
 
         if forceWrite:
-            self.write()
+            self.write_to_db()
 
     @abstractmethod
     def _test_password(self, password: str) -> bool:
@@ -67,7 +67,7 @@ class ABCUser(ABC, dlib.FlexDataClass):
         self._db_allow_login = True
 
         if forceWrite:
-            self.write()
+            self.write_to_db()
 
     @abstractmethod
     def does_exist(self) -> bool:
@@ -102,7 +102,7 @@ class ABCUser(ABC, dlib.FlexDataClass):
         # ToDo: invalidate login-token
 
         if forceWrite:
-            self.write()
+            self.write_to_db()
 
     @staticmethod
     @abstractmethod

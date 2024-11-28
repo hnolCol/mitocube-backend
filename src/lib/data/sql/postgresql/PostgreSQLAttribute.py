@@ -23,10 +23,13 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
             if db_cur is None:
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
-            db_cur.execute("""INSERT INTO attributes(parent_id, tag, text, priority, allow_as_filter, allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state) 
+            db_cur.execute("""INSERT INTO attributes(parent_id, tag, text, priority, allow_as_filter, allow_for_dataset, 
+                                        allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state,
+                                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric) 
                                     VALUES (%(parent_id)s, %(tag)s, %(text)s, %(priority)s, %(allow_as_filter)s, 
-                                    %(allow_for_dataset)s, %(allow_for_genotype)s, %(allow_for_performance)s, 
-                                    %(allow_for_sample)s, %(allow_trait_values)s, %(required_for_dataset_state)s) RETURNING id;""",
+                                        %(allow_for_dataset)s, %(allow_for_genotype)s, %(allow_for_performance)s, 
+                                        %(allow_for_sample)s, %(allow_trait_values)s, %(required_for_dataset_state)s,
+                                        %(values_are_feature_labels)s, %(values_are_genotype_labels)s, %(values_are_numeric)s) RETURNING id;""",
                            {"parent_id": self._parent.get_id() if self._parent is not None else None,
                             "tag": self._tag,
                             "text": self._text,
@@ -37,7 +40,10 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                             "allow_for_performance": self._allow_for_performance,
                             "allow_for_sample": self._allow_for_sample,
                             "allow_trait_values": self._allow_trait_values,
-                            "required_for_dataset_state": self._required_for_dataset_state})
+                            "required_for_dataset_state": self._required_for_dataset_state,
+                            "values_are_feature_labels": self._values_are_feature_labels,
+                            "values_are_genotype_labels": self._values_are_genotype_labels,
+                            "values_are_numeric": self._values_are_numeric})
 
             db_row = db_cur.fetchone()
             self._id = db_row[0]
@@ -56,7 +62,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
         db_row = PostgreSQLAttribute.__get_db_select_row(db_id=self._id, tag=self._tag, db_cur_session=db_cur_session)
 
         self._id = db_row[0]
-        self._parent = None  # ToDo: db_row[1]  None if db_row[2] is None else psql.PostgreSQLResearchGroup.create_from_id(db_id=db_row[2])  # ToDo: Update with final method / function
+        self._parent = PostgreSQLAttribute.objectify_with_id(db_id = db_row[2], db_cur_session = db_cur_session) if db_row[2] else None
         self._tag = db_row[2]
         self._text = db_row[3]
         self._priority = db_row[4]
@@ -66,9 +72,11 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
         self._allow_for_performance = db_row[8]
         self._allow_for_sample = db_row[9]
         self._allow_trait_values = db_row[10]
-        self._required_for_dataset_state = db_row[11]  # ToDo: Check
+        self._required_for_dataset_state = db_row[11]
+        self._values_are_feature_labels = db_row[12]
+        self._values_are_genotype_labels = db_row[13]
+        self._values_are_numeric = db_row[14]
 
-    @staticmethod
     def __db_update(self, db_cur_session: psycopg2.cursor | None = None):
         if not self.does_exist():  # ToDo: Implement
             raise dlib.ABCAttributeError("Unable to perform database UPDATE on PostgreAttribute that does not exist in database.")
@@ -81,22 +89,29 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
 
-            # ToDo: Change
-            db_cur.execute("""UPDATE attributes SET username = %(username)s, research_group_id = %(research_group_id)s, 
-                                    firstname = %(firstname)s, lastname = %(lastname)s, email = %(email)s, 
-                                    email_verified = %(email_verified)s, base64_image = %(base64_image)s, 
-                                    profile_text = %(profile_text)s, orcid = %(orcid)s, url = %(url)s, 
-                                    allow_login = %(allow_login)s, updated_on = NOW(), expires_after = %(expires_after)s) 
-                                WHERE id = %(db_id)s RETURNING updated_on;""",
-                           {"db_id": self._id, "username": self._username, "research_group_id": self._research_group.get_id(),
-                            "firstname": self._firstname, "lastname": self._lastname,
-                            "email": self._email, "email_verified": self._is_email_verified,
-                            "base64_image": self._base64_image,
-                            "profile_text": self._profile_text, "orcid": self._orcid, "url": self._url,
-                            "allow_login": self._db_allow_login, "expires_after": self._expires_after
-                            })
-
-            self._updated_on = db_cur.fetchone()[0]
+            db_cur.execute("""UPDATE attributes SET 
+                                    parent_id = %(parent_id)s, tag = %(tag)s, text = %(text)s, priority = %(priority)s,
+                                    required_for_dataset_state = %(required_for_dataset_state)s, 
+                                    allow_as_filter = %(allow_as_filter), allow_for_dataset = %(allow_for_dataset)s, 
+                                    allow_for_genotype = %(allow_for_genotype)s, allow_for_performance = %(allow_for_performance)s, 
+                                    allow_for_sample = %(allow_for_sample)s, allow_trait_values = %(allow_trait_values)s, 
+                                    values_are_feature_labels = %(values_are_feature_labels)s, 
+                                    values_are_genotype_labels = %(values_are_genotype_labels)s, 
+                                    values_are_numeric = %(values_are_numeric)s 
+                                WHERE id = %(db_id)s;""",
+                           {"db_id": self._id,
+                            "parent_id": self._parent.get_id() if self._parent is not None else None,
+                            "tag": self._tag, "text": self._text, "priority": self._priority,
+                            "allow_as_filter": self._allow_as_filter,
+                            "allow_for_dataset": self._allow_for_dataset,
+                            "allow_for_genotype": self._allow_for_genotype,
+                            "allow_for_performance": self._allow_for_performance,
+                            "allow_for_sample": self._allow_for_sample,
+                            "allow_trait_values": self._allow_trait_values,
+                            "required_for_dataset_state": self._required_for_dataset_state,
+                            "values_are_feature_labels": self._values_are_feature_labels,
+                            "values_are_genotype_labels": self._values_are_genotype_labels,
+                            "values_are_numeric": self._values_are_numeric})
 
             if db_conn:
                 db_conn.commit()
@@ -123,11 +138,13 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
 
             if db_id is None:
                 db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, 
-                        allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state 
+                        allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state,
+                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric 
                     FROM attributes WHERE tag = %(tag)s;""", {"tag": tag})
             else:
                 db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, 
-                        allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state 
+                        allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state,
+                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric 
                     FROM attributes WHERE id = %(db_id)s;""", {"db_id": db_id})
 
             if db_cur.rowcount != 1:
@@ -153,21 +170,29 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                 db_conn = psql.PostgreSQLConnection().getConnection()
                 db_cur = db_conn.cursor()
 
-            db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state FROM attributes ORDER by id ASC;""")
+            db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, 
+                                allow_for_dataset, allow_for_genotype, allow_for_performance, 
+                                allow_for_sample, allow_trait_values, required_for_dataset_state, 
+                                values_are_feature_labels, values_are_genotype_labels, values_are_numeric 
+                            FROM attributes ORDER by id ASC;""")
 
             db_rows = db_cur.fetchall()
 
             for db_row in db_rows:
-                attributes[db_row[0]] = PostgreSQLAttribute(db_id=db_row[0],
-                                                            parent_attribute = attributes[db_row[1]] if db_row[1] else None, # Should work since list is sorted ASC for ids!
-                                                            tag=db_row[2], text=db_row[3], priority=db_row[4],
-                                                            allow_as_filter=db_row[5],
-                                                            allow_for_dataset=db_row[6],
-                                                            allow_for_genotype=db_row[7],
-                                                            allow_for_performance=db_row[8],
-                                                            allow_trait_values=db_row[10],
-                                                            allow_for_sample=db_row[9],
-                                                            required_for_dataset_state=db_row[11])
+                attributes[db_row[0]] = PostgreSQLAttribute(db_id = db_row[0],
+                                                            parent_attribute = attributes[db_row[1]] if db_row[1] else None,
+                                                            tag = db_row[2], text = db_row[3],
+                                                            priority = db_row[4],
+                                                            allow_as_filter = db_row[5],
+                                                            allow_for_dataset = db_row[6],
+                                                            allow_for_genotype = db_row[7],
+                                                            allow_for_performance = db_row[8],
+                                                            allow_trait_values = db_row[10],
+                                                            allow_for_sample = db_row[9],
+                                                            required_for_dataset_state = db_row[11],
+                                                            values_are_feature_labels = db_row[12],
+                                                            values_are_genotype_labels = db_row[13],
+                                                            values_are_numeric = db_row[14])
 
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:
@@ -196,26 +221,27 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
         return does_exist
 
     @classmethod
-    def objectify_with_id(cls, db_id: int, catch_parent: bool = False) -> PostgreSQLAttribute:
-        db_row = PostgreSQLAttribute.__get_db_select_row(db_id = db_id)
+    def objectify_with_id(cls, db_id: int, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLAttribute:
+        db_row = PostgreSQLAttribute.__get_db_select_row(db_id = db_id, db_cur_session = db_cur_session)
 
         # Question: catch_parent = catch_parent or = False? Latter would prevent a possible circular import / endless loop
-        return cls(PostgreSQLAttribute.objectify_with_id(db_row[1], catch_parent = catch_parent) if db_row[1] is not None and catch_parent else None,
+        return cls(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_row[1]) if db_row[1] else None,
                    tag = db_row[2], text = db_row[3], priority = db_row[4], db_id = db_row[0],
                    allow_as_filter = db_row[5], allow_for_dataset = db_row[6], allow_for_genotype = db_row[7],
                    allow_for_performance = db_row[8], allow_for_sample = db_row[9], allow_trait_values = db_row[10],
-                   required_for_dataset_state = db_row[11])  # ToDo: Check
+                   required_for_dataset_state = db_row[11], values_are_feature_labels=db_row[12],
+                   values_are_genotype_labels=db_row[13], values_are_numeric=db_row[14])
 
     @classmethod
-    def objectify_with_tag(cls, tag: str, catch_parent: bool = False) -> PostgreSQLAttribute:
+    def objectify_with_tag(cls, tag: str) -> PostgreSQLAttribute:
         db_row = PostgreSQLAttribute.__get_db_select_row(tag = tag)
 
-        # Question: catch_parent = catch_parent or = False? Latter would prevent a possible circular import / endless loop
-        return cls(None if catch_parent is None else PostgreSQLAttribute.objectify_with_id(db_row[1], catch_parent = catch_parent),
+        return cls(parent_attribute = PostgreSQLAttribute.objectify_with_id(db_row[1]) if db_row[1] else None,
                    tag = db_row[2], text = db_row[3], priority = db_row[4], db_id = db_row[0],
                    allow_as_filter = db_row[5], allow_for_dataset = db_row[6], allow_for_genotype = db_row[7],
                    allow_for_performance = db_row[8], allow_for_sample = db_row[9], allow_trait_values = db_row[10],
-                   required_for_dataset_state = db_row[11])  # ToDo: Check
+                   required_for_dataset_state = db_row[11], values_are_feature_labels = db_row[12],
+                   values_are_genotype_labels = db_row[13], values_are_numeric = db_row[14])
 
     def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_insert(db_cur_session=db_cur_session) if self._id is None else self.__db_update(db_cur_session=db_cur_session)

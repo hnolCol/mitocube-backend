@@ -59,7 +59,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
             if self._metatexts:
                 for metatext_tag, metatext in self._metatexts.items():
                     metatext.set_dataset_id(dataset_id = self._internal_id)
-                    metatext.write(db_cur_session=db_cur)
+                    metatext.write_to_db(db_cur_session=db_cur)
 
             if self._urls:
                 for url in self._urls:
@@ -75,7 +75,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                                                    db_cur_session=db_cur)  # ToDo: Another event downstream?
 
             if write_datatable and self._data:
-                self._data.write(db_cur_session=db_cur)
+                self._data.write_to_db(db_cur_session=db_cur)
 
                 psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
                                                                        user=self._owner_user if self._owner_user else None,
@@ -180,7 +180,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
             if update_metatexts and self._metatexts:
                 for tag, metatext in self._metatexts.items():
-                    metatext.write()  # Also performs a delete if text is == ""
+                    metatext.write_to_db()  # Also performs a delete if text is == ""
 
                     # Question: Is the following save to do while iterating?
                     if len(metatext.get_text()) < 1:
@@ -475,5 +475,5 @@ class PostgreSQLDataset(dlib.ABCDataset):
             if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def write(self, write_datatable: bool = True, db_cur_session: psycopg2.cursor | None = None):
+    def write_to_db(self, write_datatable: bool = True, db_cur_session: psycopg2.cursor | None = None):
         self.__db_insert(use_id=False, write_datatable=write_datatable, db_cur_session=db_cur_session) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True, db_cur_session=db_cur_session)

@@ -1,0 +1,13 @@
+tag,attribute_tag,keyword,text,description
+easy,att_ms_setting,easy,Easy,MS-Setting: Easy
+faims,att_ms_setting,faims,Faims,MS-Setting: Faims
+trap,att_ms_setting,trap,Trap,MS-Setting: Trap
+vanquish,att_ms_setting,vanquish,Vanquish,MS-Setting: Vanquish
+argc,att_protease,,ArgC,ArgC - Cleaves C-term of arginine (R) residues
+aspn,att_protease,,AspN,"AspN N-terminal of Asp, optimal pH = 4-9"
+chymotrypsin,att_protease,,Chymotrypsin,"Chymotrypsin, cleaves C-terminal of Tyr, Phe, Trp"
+elastase,att_protease,,Elastase,"Elastase, C-terminal of Ala, Val, Ser, Gly, Leu and ile, optimal pH = 9.0"
+gluc,att_protease,,GluC,GlucC - Cleaves C-term of glutamine residues
+lysc,att_protease,,LysC,LysC (Wako) - Cleaves C-term of lysine
+raspn,att_protease,,rAsp-N,"rAsp-N, N-terminal of Asp, optimal pH = 6 - 9"
+trypsin,att_protease,,Trypsin,Trypsin (Sigma) - Cleave C-term of arginine (R) and lysine (K)

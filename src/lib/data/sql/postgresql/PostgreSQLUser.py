@@ -403,8 +403,8 @@ class PostgreSQLUser(dlib.ABCUser):
         return does_exist
 
     @classmethod
-    def objectify_with_id(cls, db_id: int) -> PostgreSQLUser:
-        db_row = PostgreSQLUser.__get_db_select_row(db_id = db_id)  # Fixme: Check if something is returned, also in other classes
+    def objectify_with_id(cls, db_id: int, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLUser:
+        db_row = PostgreSQLUser.__get_db_select_row(db_id = db_id, db_cur_session = db_cur_session)
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
                               research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
@@ -421,11 +421,11 @@ class PostgreSQLUser(dlib.ABCUser):
         return user
 
     @classmethod
-    def objectify_with_username(cls, username: str) -> PostgreSQLUser:
-        db_row = PostgreSQLUser.__get_db_select_row(username = username)  # Fixme: Check if something is returned, also in other classes
+    def objectify_with_username(cls, username: str, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLUser:
+        db_row = PostgreSQLUser.__get_db_select_row(username = username, db_cur_session = db_cur_session)
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
-                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
+                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_with_id(db_id = db_row[2], db_cur_session = db_cur_session),
                               base64_image = db_row[7], profile_text = db_row[8], orcid = db_row[9], url = db_row[10],
                               allow_login = db_row[11], expires_after = db_row[16])
 
@@ -439,8 +439,8 @@ class PostgreSQLUser(dlib.ABCUser):
         return user
 
     @classmethod
-    def objectify_with_email(cls, email: str) -> PostgreSQLUser:
-        db_row = PostgreSQLUser.__get_db_select_row(email = email)  # Fixme: Check if something is returned, also in other classes
+    def objectify_with_email(cls, email: str, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLUser:
+        db_row = PostgreSQLUser.__get_db_select_row(email = email, db_cur_session = db_cur_session)
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
                               research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),

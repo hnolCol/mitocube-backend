@@ -68,7 +68,7 @@ if not db_users.does_exist_with_username("superuser"):
                          email = "andreas.lindner@ukbonn.de",
                          base64_image = None, profile_text = None, orcid = None, url = None,
                          allow_login = True, expires_after = datetime.now() + timedelta(weeks=52.1775*999))
-    superuser.write()
+    superuser.write_to_db()
     superuser.write_password("bamboozle")
 else:
     superuser = db_users.objectify_with_username("superuser")
@@ -92,7 +92,7 @@ if not db_users.does_exist_with_username("felix.meissner"):
                      email = "felix.meissner@uni-bonn.de",
                      base64_image = None, profile_text = None, orcid = "0000-0003-1000-7989", url = "https://www.iiibonn.de/felix-meissner-lab/felix-meissner-lab-science",
                      allow_login = True, expires_after = datetime.now() + timedelta(weeks=52.1775*999))
-    felix.write()
+    felix.write_to_db()
     felix.write_password("bamboozle")
 else:
     felix = db_users.objectify_with_username("felix.meissner")
@@ -116,7 +116,7 @@ if not db_users.does_exist_with_username("andreas.lindner"):
                        email = "andreas.lindner@uni-bonn.de",
                        base64_image = None, profile_text = None, orcid = "0000-0003-1590-3547", url = None,
                        allow_login = True, expires_after = datetime.now() + timedelta(weeks=52.1775*999))
-    andreas.write()
+    andreas.write_to_db()
     andreas.write_password("bamboozle")
 else:
     andreas = db_users.objectify_with_username("andreas.lindner")
@@ -368,7 +368,7 @@ db_instruments = dlib.ABCInstrument.get_class()
 if not db_instruments.does_exist_with_label(label="obscurus"):
     obscurus = psql.PostgreSQLInstrument(label="obscurus", name="Obscurus", location="Munich, DE",
                                          description = "Obscurus, MS", base64_image = None)
-    obscurus.write()
+    obscurus.write_to_db()
 else:
     obscurus = db_instruments.objectify_with_label(label="obscurus")
 print(".........................................")
@@ -388,7 +388,7 @@ for tag, item in attribute_info.items():
                                        allow_as_filter = True, allow_for_dataset = True,
                                        allow_for_genotype = False, allow_for_performance = False,
                                        allow_for_sample = True, allow_trait_values = True, required_for_dataset_state = dlib.DatasetState.ACTIVE)
-        att.write()
+        att.write_to_db()
 print(".........................................")
 print(" > prepare missing Traits")
 attributes = db_attributes.get_all_attributes()
@@ -406,7 +406,7 @@ for full_tag, item in trait_info.items():
                           keyword = item["keyword"],
                           description = item["description"],
                           db_id = None)
-        trait.write()
+        trait.write_to_db()
 print(".........................................")
 attributes = db_attributes.get_all_attributes()
 attributes_tags = {item.get_tag(): db_id for db_id, item in attributes.items()}
@@ -443,7 +443,7 @@ for dataset_tag, info in meta_info.items():
                                      metatexts=None,
                                      urls=None,
                                      trait_values=None)
-    dataset.write(write_datatable = False)
+    dataset.write_to_db(write_datatable = False)
     print(" > Created dataset '{}' with database id '{}'.".format(dataset_tag, dataset.get_internal_id()))
 
     if info["species"] == "mouse":
@@ -520,7 +520,7 @@ for dataset_tag, info in meta_info.items():
                                               replicates_samples = replicates_samples,
                                               batches_samples = None,
                                               trait_values_samples = trait_values_samples)
-        data_table.write()
+        data_table.write_to_db()
     else:
         print("Dataset '{}' has no samples to import!".format(dataset_tag))
 

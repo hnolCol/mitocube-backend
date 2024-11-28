@@ -1,0 +1,3 @@
+tag,parent_tag,text,priority,group_tag,required_for_state,allow_as_filter,allow_for_dataset,allow_for_sample,allow_for_genotype,allow_for_qc,allow_values,values_are_numeric,values_are_feature_labels,values_are_genotype_labels
+att_ms_setting,,MS-Setting,1000,ms,,TRUE,TRUE,TRUE,FALSE,TRUE,FALSE,FALSE,FALSE,FALSE
+att_protease,,Protease,5000,ms,,TRUE,TRUE,TRUE,FALSE,FALSE,FALSE,FALSE,FALSE,FALSE

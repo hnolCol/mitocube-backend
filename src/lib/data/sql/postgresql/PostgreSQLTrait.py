@@ -114,7 +114,7 @@ class PostgreSQLTrait(dlib.ABCTrait):
                                                      keyword = self._keyword, db_cur_session = db_cur_session)
 
         self._id = db_row[0]
-        self._attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1], catch_parent = True),
+        self._attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1]),
         self._tag = db_row[2]
         self._text = db_row[3]
         self._keyword = db_row[4]
@@ -230,21 +230,21 @@ class PostgreSQLTrait(dlib.ABCTrait):
     def objectify_with_id(cls, db_id: int, db_cur_session: psycopg2.cursor | None = None) -> dlib.ABCTrait:
         db_row = PostgreSQLTrait.__get_db_select_row(db_id = db_id, db_cur_session = db_cur_session)
 
-        return cls(parent_attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1], catch_parent = True),
+        return cls(parent_attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1]),
                    tag = db_row[2], text = db_row[3], keyword = db_row[4], description = db_row[5], db_id = db_row[0])
 
     @classmethod
     def objectify_with_tag(cls, full_tag: str | None, db_cur_session: psycopg2.cursor | None = None) -> dlib.ABCTrait:
         db_row = PostgreSQLTrait.__get_db_select_row(full_tag = full_tag, db_cur_session = db_cur_session)  # ToDo: Check with tag versus full_tag
 
-        return cls(parent_attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1], catch_parent = True),
+        return cls(parent_attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1]),
                    tag=db_row[2], text=db_row[3], keyword=db_row[4], description=db_row[5], db_id=db_row[0])
 
     @classmethod
     def objectify_with_keyword(cls, keyword: str, db_cur_session: psycopg2.cursor | None = None) -> dlib.ABCTrait:
         db_row = PostgreSQLTrait.__get_db_select_row(keyword = keyword, db_cur_session = db_cur_session)  # ToDo: Check with tag versus full_tag
 
-        return cls(parent_attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1], catch_parent = True),
+        return cls(parent_attribute = psql.PostgreSQLAttribute.objectify_with_id(db_id = db_row[1]),
                    tag=db_row[2], text=db_row[3], keyword=db_row[4], description=db_row[5], db_id=db_row[0])
 
     #@classmethod

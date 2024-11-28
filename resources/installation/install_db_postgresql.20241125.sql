@@ -3,9 +3,9 @@
 -- ---------------------------------------------------------------------------------------------------------------------
 -- Setup to populate database with tables and everything else needed
 -- ---------------------------------------------------------------------------------------------------------------------
--- Version: 2024-11-27
+-- Version: 2024-11-28
 -- Author: Andreas U Lindner, andreas.lindner@ukbonn.de
--- Last Change: 2024-11-27, Andreas Lindner
+-- Last Change: 2024-11-28, Andreas Lindner
 -- Target DB: postgreSQL 12.17, Ubuntu
 -- =====================================================================================================================
 
@@ -158,8 +158,9 @@ CREATE TABLE attributes (
     allow_for_sample boolean DEFAULT false NOT NULL,
     allow_trait_values boolean DEFAULT false NOT NULL,
     allow_values boolean DEFAULT false NOT NULL,
-    values_are_numeric boolean DEFAULT false NOT NULL,
     values_are_feature_labels boolean DEFAULT false NOT NULL,
+    values_are_genotype_labels DEFAULT false NOT NULL,
+    values_are_numeric boolean DEFAULT false NOT NULL,
     PRIMARY KEY(id),
     UNIQUE(tag),
     FOREIGN KEY(parent_id) REFERENCES attributes(id) ON UPDATE CASCADE ON DELETE RESTRICT
@@ -444,6 +445,7 @@ CREATE INDEX index_nm_traits_samples_fk_sample ON nm_traits_samples USING btree(
 CREATE TABLE genotypes (
     id serial NOT NULL,
     trait_node_id integer NOT NULL,
+    label character varying NOT NULL,
     name character varying NOT NULL,
     description character varying,
     is_selectable boolean DEFAULT false,
@@ -451,7 +453,9 @@ CREATE TABLE genotypes (
     created_on timestamp without time zone NOT NULL,
     PRIMARY KEY(id),
     FOREIGN KEY(trait_node_id) REFERENCES trait_nodes(id) ON UPDATE CASCADE ON DELETE RESTRICT,
-    UNIQUE(name)
+    UNIQUE(name),
+    UNIQUE(label),
+    UNIQUE(trait_node_id)
 );
 ALTER TABLE genotypes OWNER TO postgres;
 

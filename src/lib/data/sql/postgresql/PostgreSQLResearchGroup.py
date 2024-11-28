@@ -10,6 +10,7 @@ import lib.data.sql.postgresql as psql
 
 class PostgreSQLResearchGroup(dlib.ABCResearchGroup):
 
+    @staticmethod
     def __get_db_select_row(db_id: int | None = None, db_cur_session: psycopg2.cursor | None = None) -> Tuple[Any]:
         if db_id is None:
             raise dlib.ABCResearchGroupError("No id (db_id) set for PostgreSQLResearchGroup. Unable to perform SELECT.")
@@ -136,8 +137,8 @@ class PostgreSQLResearchGroup(dlib.ABCResearchGroup):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @classmethod
-    def objectify_with_id(cls, db_id: int) -> PostgreSQLResearchGroup:
-        db_row = PostgreSQLResearchGroup.__get_db_select_row(self._id)
+    def objectify_with_id(cls, db_id: int, db_cur_session = db_cur_session) -> PostgreSQLResearchGroup:
+        db_row = PostgreSQLResearchGroup.__get_db_select_row(db_id = self._id, db_cur_session = db_cur_session)
 
         return cls(name = db_row[0], name_short = db_row[1], institute = db_row[2], base64_image = db_row[3],
                    profile_text = db_row[4], contact_address = db_row[5], contact_email = db_row[6], url = db_row[7],

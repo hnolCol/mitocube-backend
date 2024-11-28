@@ -16,7 +16,7 @@ class PostgreSQLTimeline(dlib.ABCTimeline):
                                        timestamp: datetime = datetime.now(tz=None),
                                        db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLDatasetTimelineEvent:
         event = PostgreSQLDatasetTimelineEvent(db_id=None, timestamp=timestamp, user=user, state=state, text=text, event_type=event_type, dataset_id=dataset_id)
-        event.write(db_cur_session=db_cur_session)
+        event.write_to_db(db_cur_session=db_cur_session)
         return event
 
     @classmethod

@@ -313,10 +313,7 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
 
         return obj
 
-    def read(self, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_select(db_cur_session = db_cur_session)
-
-    def write(self, db_cur_session: psycopg2.cursor | None = None):
+    def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
         if self.is_stored():
             raise dlib.ABCDatasetError("Unable to update / write already uploaded dataset.")
         else:

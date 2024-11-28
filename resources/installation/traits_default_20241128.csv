@@ -109,17 +109,11 @@ kin,att_engineering,,KIN,Gene knock-in
 deletion,att_engineering,,del,Gene deletion
 inducible_expression,att_engineering,,Inducible Expression,Inducible gene expression
 stable_expression,att_engineering,,Stable Expression,Stable gene expression
-argc,att_protease,,ArgC,ArgC - Cleaves C-term of arginine (R) residues
-aspn,att_protease,,AspN,"AspN N-terminal of Asp, optimal pH = 4-9"
-chymotrypsin,att_protease,,Chymotrypsin,"Chymotrypsin, cleaves C-terminal of Tyr, Phe, Trp"
-elastase,att_protease,,Elastase,"Elastase, C-terminal of Ala, Val, Ser, Gly, Leu and ile, optimal pH = 9.0"
-gluc,att_protease,,GluC,GlucC - Cleaves C-term of glutamine residues
-lysc,att_protease,,LysC,LysC (Wako) - Cleaves C-term of lysine
-raspn,att_protease,,rAsp-N,"rAsp-N, N-terminal of Asp, optimal pH = 6 - 9"
-trypsin,att_protease,,Trypsin,Trypsin (Sigma) - Cleave C-term of arginine (R) and lysine (K)
 elegans,att_organism,elegans,C. Elegans,Caenorhabditis elegans
 gut,att_organism,gut,Gut Microbiom,Gut Microbiomm (Specify in Additional Info)
 human,att_organism,human,Human,Homo sapiens (Human)
 mouse,att_organism,mouse,Mouse,Mus musculus (Mouse)
 rat,att_organism,rat,Rat,Rattus norvegicus (Rat)
 yeast,att_organism,yeast,Yeast,Saccharomyces cerevisiae (Baker's Yeast)
+model,att_genotype,,model,Animal or Cell Model
+elemental,att_genotype,,elemental,Elemental Model that was not modified

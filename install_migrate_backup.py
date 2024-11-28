@@ -49,7 +49,7 @@ print(".........................................")
 if not db_instruments.does_exist_with_label(label="boris"):
     boris = psql.PostgreSQLInstrument(label="boris", name="Boris", location="iii, 2 OG, MS Room",
                                       description = "Orbitrap Exploris 480, Thermo Fisher", base64_image = None)
-    boris.write()
+    boris.write_to_db()
 else:
     boris = db_instruments.objectify_with_label(label="boris")
 
@@ -58,7 +58,7 @@ print(".........................................")
 if not db_instruments.does_exist_with_label(label="doris"):
     doris = psql.PostgreSQLInstrument(label="doris", name="Doris", location="iii, 2 OG, MS Room",
                                       description = "Orbitrap Exploris 480, Thermo Fisher", base64_image = None)
-    doris.write()
+    doris.write_to_db()
 else:
     doris = db_instruments.objectify_with_label(label="doris")
 
@@ -67,7 +67,7 @@ print(".........................................")
 if not db_instruments.does_exist_with_label(label="kristof"):
     kristof = psql.PostgreSQLInstrument(label="kristof", name="KrisTOF", location="iii, 2 OG, MS Room",
                                         description = "timsTOF Pro 2, Bruker", base64_image = None)
-    kristof.write()
+    kristof.write_to_db()
 else:
     kristof = db_instruments.objectify_with_label(label="kristof")
 
@@ -94,7 +94,7 @@ if not db_users.does_exist_with_username("superuser"):
                          email = "andreas.lindner@uni-bonn.de",
                          base64_image = None, profile_text = None, orcid = None, url = None,
                          allow_login = True, expires_after = datetime.now() + timedelta(weeks=52.1775*999))
-    superuser.write()
+    superuser.write_to_db()
     superuser.write_password("bamboozle")
 else:
     superuser = db_users.objectify_with_username("superuser")
@@ -121,7 +121,7 @@ print("{timestamp}.".format(timestamp = datetime.now().strftime("%A the %Y-%m-%d
 print(".........................................")
 json_attributes = JSONAttributes(path_json_file = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources/installation/attributes_examples.json")
 json_attributes.read(ignore_missing_parent_attributes = True)
-json_attributes.write()
+json_attributes.write_to_db()
 print("=========================================")
 
 print("\n\n\n")
@@ -170,8 +170,9 @@ for dataset_id, dataset_path in list_dataset_ids.items():
             print(psql_data)
 
             pgsql_dataset = psql.PostgreSQLDataset.objectify_with_dataset(json_dataset)  # "Casts" the json data set to a postgresql dataset
-            pgsql_dataset.set_data(data = psql_data)  # assigns the data table to the dataset
-            pgsql_dataset.write(write_datatable = True)  # writes everything to the db. Attributes etc. require to be postgresql at this point but JSONDataset takes partly care of it already
+            # ToDo: Replace below with something that works
+            # pgsql_dataset.set_data(data = psql_data)  # assigns the data table to the dataset
+            pgsql_dataset.write_to_db(write_datatable = True)  # writes everything to the db. Attributes etc. require to be postgresql at this point but JSONDataset takes partly care of it already
 
             print("  (i) imported 'params.json' with n = {n} features".format(n=0))
         else:

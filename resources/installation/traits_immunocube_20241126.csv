@@ -176,10 +176,6 @@ invitro,att_model,invitro,In vitro,in the glass
 invivo,att_model,invivo,In vivo,within the living
 insilico,att_model,insilico,In Silico,Virtual
 xenografts,att_model,xenografts,xenografts,Tissue or cells implanted into a model animal
-easy,att_ms_setting,easy,Easy,MS-Setting: Easy
-faims,att_ms_setting,faims,Faims,MS-Setting: Faims
-trap,att_ms_setting,trap,Trap,MS-Setting: Trap
-vanquish,att_ms_setting,vanquish,Vanquish,MS-Setting: Vanquish
 appendix,att_organ,appendix,Appendix,
 arteries,att_organ,arteries,Arteries,
 bladder,att_organ,bladder,Bladder,
