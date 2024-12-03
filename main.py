@@ -7,11 +7,14 @@ from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from lib.data.mem import MemUserTokens
 import lib.data.sql.postgresql as psql
+
+import lib.rest.routes.auth.auth as routes_auth  # Critical for user authentication
 
 # import lib.rest.routes.application as routes_app
 # import lib.rest.routes.attributes.attributes as routes_attributes
-# import lib.rest.routes.auth.auth as routes_auth
+
 # import lib.rest.routes.genotypes.genotypes as routes_genotypes
 # import lib.rest.routes.dataset.dataset as routes_dataset  # ToDo: add to routes
 # import lib.rest.routes.datasets.datasets as routes_datasets  # ToDo: add to routes
@@ -28,6 +31,9 @@ import lib.data.sql.postgresql as psql
 from config import SystemSettings
 
 system_settings = SystemSettings.get_system_settings()
+
+# Fixme: Initialise session, here simple save write to local file... needs to be fixed with shutdown signal maybe... see auth routes
+MemUserTokens(token_persist_restart = True, path_persistent_memory = "/home/andreaslindner/Projects/MitoCube")
 
 db_features = psql.PostgreSQLFeatureDatabase()  # todo: create 'init'/first loading method
 db_features.read()
@@ -68,7 +74,7 @@ app.add_middleware(CORSMiddleware,
 # for item in [routes_auth, routes_app, routes_attributes, routes_features, routes_genotypes, routes_users,
 #              routes_deprecated_instruments, routes_deprecated_submission, routes_deprecated_submissions,
 #              routes_deprecated_users, routes_deprecated_datasets, routes_deprecated_features]:
-for item in []:
+for item in [routes_auth]:
     if hasattr(item, "router"):
         app.include_router(getattr(item, "router"))
 

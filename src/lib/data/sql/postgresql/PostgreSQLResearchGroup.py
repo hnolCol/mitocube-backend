@@ -137,7 +137,7 @@ class PostgreSQLResearchGroup(dlib.ABCResearchGroup):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
     @classmethod
-    def objectify_with_id(cls, db_id: int, db_cur_session = db_cur_session) -> PostgreSQLResearchGroup:
+    def objectify_with_id(cls, db_id: int, db_cur_session: psycopg2.cursor | None = None) -> PostgreSQLResearchGroup:
         db_row = PostgreSQLResearchGroup.__get_db_select_row(db_id = self._id, db_cur_session = db_cur_session)
 
         return cls(name = db_row[0], name_short = db_row[1], institute = db_row[2], base64_image = db_row[3],

@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, timedelta
 import random
 import string
-from typing import Dict
+from typing import Dict, Tuple
 import hashlib
 
 from lib.designpatterns import SingletonABCMeta
@@ -19,10 +19,10 @@ class MemLoginToken:  # ToDo: Create ABCLoginToken class
                  token: str | None = None,
                  md5_token: str | None = None):
 
-        if bool(token) != bool(md5_token):
+        if bool(token) == bool(md5_token):
             raise MemLoginTokenError("On have to provide provide either token or md5_token, but not both simultaneously nor neither.")
         elif token:
-            md5_token = MemLoginTokenError.token_to_md5_token(token)
+            md5_token = MemLoginToken.token_to_md5_token(token)
 
         self._md5_token = md5_token
         self._username = username
@@ -33,8 +33,14 @@ class MemLoginToken:  # ToDo: Create ABCLoginToken class
         self._expires_after = datetime.now() + timedelta(minutes=6)  # ToDo: Create configuration
 
     @staticmethod
-    def create_new_token(range_value: int = 12,
-                         char_lib: str = string.ascii_uppercase + string.ascii_lowercase + string.digits) -> str:
+    def create(username: str, ip: str, agent: str) -> Tuple[str, MemLoginToken]:
+        str_token = MemLoginToken.generate_new_token()
+        token = MemLoginToken(token = str_token, username = username, ip = ip, agent = agent)
+        return str_token, token
+
+    @staticmethod
+    def generate_new_token(range_value: int = 12,
+                           char_lib: str = string.ascii_uppercase + string.ascii_lowercase + string.digits) -> str:
         return ''.join(random.SystemRandom().choice(char_lib) for _ in range(range_value))
 
     def get_agent(self) -> str:
@@ -99,7 +105,8 @@ class MemLoginTokens(metaclass=SingletonABCMeta):
     # ToDo: make it thread safe https://docs.python.org/3/library/asyncio-task.html
     # Fixme: async <coroutine object MemLoginTokens.create_token at 0x7ff46a5f9ad0>
     def create_token(self, username: str, ip: str, agent: str, n_attempts: int = 42) -> str:
-        token: str
+        str_token: str
+        token: MemLoginToken
         it: int = 0
 
         if random.random() > 0.95:  # Check for expired tokens every 20th-ish attempt
@@ -107,17 +114,17 @@ class MemLoginTokens(metaclass=SingletonABCMeta):
 
         # async with MemLoginTokens.__lock:
         while True:
-            token = MemLoginToken.create_new_token()
-            md5_token = MemLoginToken.token_to_md5_token(token = token)
+            str_token, token = MemLoginToken.create(username = username, ip = ip, agent = agent)
+            md5_token = token.get_md5_token()
             it += 1
 
             if md5_token not in self._memory.keys():
-                self._memory[md5_token] = MemLoginToken(md5_token = md5_token, username = username, ip = ip, agent = agent)
+                self._memory[md5_token] = token
                 break
             elif it > n_attempts:
                 raise MemLoginTokenError("Unable to create unique token!")
 
-        return token
+        return str_token
 
     def clear(self):
         # async with MemLoginTokens.__lock:
@@ -128,3 +135,9 @@ class MemLoginTokens(metaclass=SingletonABCMeta):
         for token, obj in self._memory.items():
             if obj.is_expired():
                 self._memory.pop(token)
+
+    def remove_token(self, token: MemLoginToken):
+        try:
+            self._memory.pop(token.get_md5_token())
+        except KeyError:
+            pass

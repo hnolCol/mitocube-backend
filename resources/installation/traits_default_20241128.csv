@@ -115,5 +115,10 @@ human,att_organism,human,Human,Homo sapiens (Human)
 mouse,att_organism,mouse,Mouse,Mus musculus (Mouse)
 rat,att_organism,rat,Rat,Rattus norvegicus (Rat)
 yeast,att_organism,yeast,Yeast,Saccharomyces cerevisiae (Baker's Yeast)
-model,att_genotype,,model,Animal or Cell Model
-elemental,att_genotype,,elemental,Elemental Model that was not modified
+cell,att_genotype,,Cell Model,Cell model or modified cell line
+stable,att_genotype,,Stable Animal Model,Genetical stable animal breeding model
+isogenic,att_genotype,,Isogenic Model,isogenic stable animal model
+non_breeding,att_genotype,,Non-Breeding Model,unable to self-perpetuate
+de_novo,att_genotype,,de novo Model,"must be ""recreated"" each time by crossing two specific genotypes"
+dependent,att_genotype,,Dependent Model,dependence on parental lines for recreation
+f1,att_genotype,,F1-specific Model,first Generation model requiring repeating same parental breeding
