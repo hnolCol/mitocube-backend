@@ -10,8 +10,8 @@ import lib.data.sql.postgresql as psql
 
 
 class PostgreSQLDataset(dlib.ABCDataset):
-    def __db_insert(self, use_id: bool = False, write_datatable: bool = False, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Implement write_datatable
-        if self.does_exist():  # ToDo: Implement does_exist and matching static function
+    def __db_insert(self, db_cur_session: psycopg2.cursor | None = None):
+        if self._internal_id is None:
             raise dlib.ABCDatasetError("Unable to perform database INSERT with PostgreSQLDataset that does already exist in database.")
 
         db_conn = None
@@ -25,34 +25,18 @@ class PostgreSQLDataset(dlib.ABCDataset):
             if self._owner_user is None:
                 raise dlib.ABCDatasetError("No owner of the dataset was set!")
 
-            if use_id :
-                if self._internal_id is None:
-                    raise dlib.ABCDatasetError("No id (db_id) set for PostgreSQLDataset. Unable to perform INSERT with assigned id.")
-
-                db_cur.execute("""INSERT INTO datasets(id, instrument_id, project_id, label, created_on, title, contact_email, user_id, research_group_id, state) 
-                                    VALUES (%(db_id)s, %(instrument_id)s, %(project_id)s, %(label)s, %(created_on)s, %(title)s, %(contact_email)s, %(user_id)s, %(research_group_id)s, %(state)s) RETURNING id;""",
-                               {"db_id": self._internal_id,
-                                "instrument_id": self._instrument.get_id() if self._instrument else None,
-                                "project_id": self._parent_project.get_id() if self._parent_project else None,
-                                "label": self._external_id,
-                                "created_on": self._created_on,
-                                "title": self._title,
-                                "contact_email": self._contact_email,
-                                "user_id": self._owner_user.get_id() if self._owner_user else None,
-                                "research_group_id": self._owner_group.get_id() if self._owner_group else None,
-                                "state": self._state})
-            else:
-                db_cur.execute("""INSERT INTO datasets(instrument_id, project_id, label, created_on, title, user_id, research_group_id, contact_email, state) 
-                                    VALUES (%(instrument_id)s, %(project_id)s, %(label)s, %(created_on)s, %(title)s, %(user_id)s, %(research_group_id)s, %(contact_email)s, %(state)s) RETURNING id;""",
-                               {"instrument_id": self._instrument.get_id() if self._instrument else None,
-                                "project_id": self._parent_project.get_id() if self._parent_project else None,
-                                "label": self._external_id,
-                                "created_on": self._created_on,
-                                "title": self._title,
-                                "user_id": self._owner_user.get_id() if self._owner_user else None,
-                                "research_group_id": self._owner_group.get_id() if self._owner_group else None,
-                                "contact_email": self._contact_email,
-                                "state": self._state})
+            db_cur.execute("""INSERT INTO datasets(instrument_id, project_id, label, created_on, title, user_id, research_group_id, contact_email, state) 
+                                    VALUES (%(instrument_id)s, %(project_id)s, %(label)s, %(created_on)s, %(title)s, %(user_id)s, %(research_group_id)s, %(contact_email)s, %(state)s) 
+                                    RETURNING id;""",
+                           {"instrument_id": self._instrument.get_id() if self._instrument else None,
+                            "project_id": self._parent_project.get_id() if self._parent_project else None,
+                            "label": self._external_id,
+                            "created_on": self._created_on,
+                            "title": self._title,
+                            "user_id": self._owner_user.get_id() if self._owner_user else None,
+                            "research_group_id": self._owner_group.get_id() if self._owner_group else None,
+                            "contact_email": self._contact_email,
+                            "state": self._state})
 
             self._internal_id = db_cur.fetchone()[0]
 
@@ -74,21 +58,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                                                                    dataset_id=self._internal_id,
                                                                    db_cur_session=db_cur)  # ToDo: Another event downstream?
 
-            if write_datatable and self._data:
-                self._data.write_to_db(db_cur_session=db_cur)
-
-                psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=self._created_on,
-                                                                       user=self._owner_user if self._owner_user else None,
-                                                                       state=dlib.TimelineEventState.INFO,
-                                                                       text="Data table import via install & migration script.",  # ToDo: What text should be saved?
-                                                                       event_type=dlib.DatasetTimelineEventType.UPLOADED,
-                                                                       dataset_id=self._internal_id,
-                                                                       db_cur_session=db_cur)  # Question: Second timeline event here for upload at the same time? Or just one?
-            elif write_datatable:
-                raise dlib.ABCDatasetError("No datable attached to PostgreSQLDataset. Unable to add datasets!")
-
             if db_conn:
-                # db_conn.rollback()  # ToDo: swap me at the end!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                 db_conn.commit()
         except Exception as err:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:
@@ -128,36 +98,9 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
         return db_row
 
-    def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
-        db_row = PostgreSQLDataset.__db_select_db_row(db_id = self._internal_id,
-                                                      label = self._external_id,
-                                                      db_cur_session = db_cur_session)
-
-        self._internal_id = db_row[0]
-        self._external_id = db_row[1]
-
-        self._instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None
-        self._parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None
-
-        self._created_on = db_row[4]
-        self._title = db_row[5]
-        self._owner_user = psql.PostgreSQLUser.objectify_with_id(db_row[6]) if db_row[6] else None
-        self._owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_row[7]) if db_row[7] else None  #
-
-        self._contact_email = db_row[8]
-        self._state = db_row[9]
-
-        self._metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(self._internal_id)
-        self._urls = psql.PostgreSQLUrl.objectify_with_dataset_id(self._internal_id)
-
-        self._trait_values = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id=self._internal_id)
-
-        self._data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id=db_row[0])
-
-        raise dlib.ABCDatasetError("Not Finished yet!")
 
     def __db_update(self, update_metatexts: bool = True, update_urls: bool = True, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Implement write_datatable
-        if not self.does_exist():
+        if self._internal_id is None:
             raise dlib.ABCDatasetError("Unable to perform database UPDATE on PostgreSQLDataset that does not exist in database.")
 
         db_conn = None
@@ -221,7 +164,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
             trait_values = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id = db_row[0])
 
         dataset = cls(internal_id = db_row[0], external_id = db_row[1],
-                      data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id = db_id),
                       parent_project = psql.PostgreSQLProject.objectify_with_id(db_row[3], fetch_datasets=False) if db_row[3] else None,
                       instrument = psql.PostgreSQLInstrument.objectify_with_id(db_row[2]) if db_row[2] else None,
                       created_on = db_row[4],
@@ -231,8 +173,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                       owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_row[7]) if db_row[7] else None,
                       contact_email = db_row[8],
                       metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(db_row[0]),
-                      urls = psql.PostgreSQLUrl.objectify_with_dataset_id(dataset_id = db_row[0]),
-                      trait_values = trait_values)
+                      urls = psql.PostgreSQLUrl.objectify_with_dataset_id(dataset_id = db_row[0]))
 
         return dataset
 
@@ -241,12 +182,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
         # Fixme: Add option to only select certain features
         db_row = PostgreSQLDataset.__db_select_db_row(label = label)
 
-        trait_values = {}
-        with suppress(dlib.ABCTraitValueNotFoundError):
-            trait_values = psql.PostgreSQLTraitValue.objectify_with_dataset_id(db_id = db_row[0])
-
         dataset = cls(internal_id = db_row[0], external_id = db_row[1],
-                      data = psql.PostgreSQLDataTable.objectify_with_dataset_id(dataset_id=db_row[0]),
                       parent_project = psql.PostgreSQLProject.objectify_with_id(db_id=db_row[3], fetch_datasets=False) if db_row[3] else None,
                       instrument = psql.PostgreSQLInstrument.objectify_with_id(db_id=db_row[2]) if db_row[2] else None,
                       created_on = db_row[4],
@@ -256,14 +192,12 @@ class PostgreSQLDataset(dlib.ABCDataset):
                       owner_group = psql.PostgreSQLResearchGroup.objectify_with_id(db_id=db_row[7]) if db_row[7] else None,
                       contact_email = db_row[8],
                       metatexts = psql.PostgreSQLMetatext.objectify_with_dataset_id(db_row[0]),
-                      urls = psql.PostgreSQLUrl.objectify_with_dataset_id(dataset_id = db_row[0]),
-                      trait_values = trait_values)
+                      urls = psql.PostgreSQLUrl.objectify_with_dataset_id(dataset_id = db_row[0]))
 
         return dataset
 
     @classmethod
-    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> PostgreSQLDataset:  # Fixme: Add option to only select certain features
-
+    def objectify_with_dataset(cls, dataset: dlib.ABCDataset) -> PostgreSQLDataset:
         # def migrate_obj(obj, id, target_class) -> target_class:
         #     if object is target_class:
         #         return obj
@@ -272,7 +206,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
         # Question, FixMe: hard copy of some objects? e.g. data, and remove links to old dataset?
         new_dataset = cls(internal_id = None, external_id = dataset._external_id,
-                          data = dataset._data,  # ToDo: objectify with sql type if needed? dataset._data.set_parent_dataset(self)
                           parent_project = dataset._parent_project,  # ToDo: objectify with sql type if needed?
                           instrument = dataset._instrument,  # ToDo: objectify with sql type if needed?
                           created_on = dataset._created_on,
@@ -282,8 +215,7 @@ class PostgreSQLDataset(dlib.ABCDataset):
                           owner_group = dataset._owner_group,  # ToDo: objectify with sql type if needed?
                           contact_email = dataset._contact_email,
                           metatexts = dataset._metatexts,  # ToDo: objectify with sql type if needed?
-                          urls = dataset._urls,  # ToDo: objectify with sql type if needed?
-                          trait_values = dataset._trait_values)  # ToDo: objectify with sql type if needed?
+                          urls = dataset._urls)  # ToDo: objectify with sql type if needed?
 
         return new_dataset
 
@@ -311,12 +243,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
         return datasets_ids
-
-    def does_exist(self, db_cur_session: psycopg2.cursor | None = None):  # ToDo: Inherit from parent class?
-        if self._internal_id is None:
-            return False
-        else:
-            return PostgreSQLDataset.does_exist_with_id(self._internal_id, db_cur_session=db_cur_session)
 
     @staticmethod
     def does_exist_with_id(db_id: int, db_cur_session: psycopg2.cursor | None = None) -> bool:
@@ -408,14 +334,6 @@ class PostgreSQLDataset(dlib.ABCDataset):
 
         return return_dict
 
-    def read(self, fetch_datatable: bool = False, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_select(db_cur_session=db_cur_session)
-
-        if fetch_datatable:
-            raise dlib.ABCDatasetError("Fetching the database for a PostgreSQLDataset is not implemented yet.")  # ToDo: implement fetch_datatable for dataset
-        else:
-            self._data = None
-
     def set_metatexts(self, metatexts: List[dlib.ABCMetatext] | None):
         if self._internal_id is None or self._metatexts is None:  # It is most likely not in the database, just treat it as simple set
             super(PostgreSQLDataset, self).set_metatexts(metatexts)
@@ -475,5 +393,5 @@ class PostgreSQLDataset(dlib.ABCDataset):
             if db_conn:
                 psql.PostgreSQLConnection().returnConnection(db_conn)
 
-    def write_to_db(self, write_datatable: bool = True, db_cur_session: psycopg2.cursor | None = None):
-        self.__db_insert(use_id=False, write_datatable=write_datatable, db_cur_session=db_cur_session) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True, db_cur_session=db_cur_session)
+    def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
+        self.__db_insert(use_id=False, db_cur_session=db_cur_session) if self._internal_id is None else self.__db_update(update_metatexts=True, update_urls=True, db_cur_session=db_cur_session)

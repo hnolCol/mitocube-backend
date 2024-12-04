@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import datetime
 from typing import Any, Dict, List, Tuple
-import pandas as pd
 
+import pandas as pd
 import psycopg2
 
 import lib.data as dlib
@@ -101,7 +102,7 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                 # Stores the sample label with the internal database id
                 db_ids_samples: Dict[str, int] = {}  # self._data_columns  # Question: change to dict to save index?
 
-                # Insert samples into database and saves database id into samples
+                # Insert samples into database and saves database id into samples # Fixme: Will be done by the ABCSamples / PostgreSQLSamples class
                 for sample in self._data_columns:
                     db_cur.execute("""INSERT INTO samples(dataset_id, label) VALUES(%(dataset_id)s, %(label)s) RETURNING id, label;""",
                                    {"dataset_id": dataset_id, "label": sample})
@@ -132,17 +133,25 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                         for trait in traits:
                             trait.add_to_sample_id(sample_id=db_ids_samples[sample], db_cur_session = db_cur)  # #FixMe: should trait me more specfic here? Typing issue
 
-                # Write Replicates to DB
+                # Write Replicates to DB # Fixme: Will be done by the ABCSamples / PostgreSQLSamples class
                 if self._replicates:
                     for sample, replicate in self._replicates.items():
                         db_cur.execute("""INSERT INTO sample_replicates (sample_id, replicate_label) VALUES (%(sample_id)s, %(replicate_label)s);""",
                                        {"sample_id": db_ids_samples[sample], "replicate_label": replicate})
 
-                # Write Batches to DB
+                # Write Batches to DB # Fixme: Will be done by the ABCSamples / PostgreSQLSamples class
                 if self._batches:
                     for sample, batch in self._batches.items():
                         db_cur.execute("""INSERT INTO sample_batches (sample_id, batch_label) VALUES (%(sample_id)s, %(batch_label)s);""",
                                        {"sample_id": db_ids_samples[sample], "batch_label": batch})
+
+                psql.PostgreSQLTimeline.add_new_dataset_timeline_event(timestamp=datetime.now(tz = None),
+                                                                       user=self._parent_dataset.get_owner(),  # Question, can someone else attache data? need to forward user
+                                                                       state=dlib.TimelineEventState.INFO,
+                                                                       text="Data table attached.",  # ToDo: What text should be saved?
+                                                                       event_type=dlib.DatasetTimelineEventType.DATASET_ADDED,
+                                                                       dataset_id=self._parent_dataset.get_internal_id(),
+                                                                       db_cur_session=db_cur)
 
                 if db_conn:
                     db_conn.commit()
@@ -155,26 +164,6 @@ class PostgreSQLDataTable(dlib.ABCDataTable):
                     psql.PostgreSQLConnection().returnConnection(db_conn)
         else:
             raise dlib.ABCDataTableError("Writing the PostgreSQLDataTable is not possible without stored parent dataset.")
-
-    def __db_select(self, db_cur_session: psycopg2.cursor | None = None):
-
-        if self.get_parent_dataset():
-            db_rows = PostgreSQLDataTable.__db_select_db_row(dataset_id = self.get_parent_dataset().get_internal_id(),
-                                                             db_cur_session = db_cur_session)
-        else:
-            raise dlib.ABCDataTableError("Unable to perform select without set parent dataset to receive dataset id.")
-
-        # ToDo: Implement
-        print(db_rows)
-
-        tbl = pd.DataFrame(db_rows, columns=["dataset_id",  # db_row[0]  # db_row = db_cur.fetchone()
-                                             "sample_id",  # db_row[1]"sample",  # db_row[2]
-                                             "feature_id",  # db_row[3]
-                                             self._row_index_name,  # "accession",  # db_row[4]
-                                             "is_grouped",  # db_row[5]
-                                             "proteome_id",  # db_row[6]
-                                             "intensity"])  # db_row[7]
-        print(tbl)
 
     def __db_update(self, db_cur_session: psycopg2.cursor | None = None):  # Question: Do we allow updates?
         if self._parent_dataset and self._parent_dataset.get_internal_id():

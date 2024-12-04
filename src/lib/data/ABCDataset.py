@@ -30,6 +30,7 @@ class DatasetState(IntEnum):
 class ABCDatasetError(dlib.ABCDataError):
     pass
 
+
 class ABCDatasetNotFoundError(ABCDatasetError):
     pass
 
@@ -62,10 +63,6 @@ class ABCDataset(ABC, dlib.FlexDataClass):
     def _get_class_rulings(cls) -> Dict[str, Self]:
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLDataset}
-
-    @abstractmethod
-    def does_exist(self):
-        pass
 
     @staticmethod
     @abstractmethod

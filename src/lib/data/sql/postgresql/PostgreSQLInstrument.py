@@ -174,7 +174,6 @@ class PostgreSQLInstrument(dlib.ABCInstrument):
         else:
             return PostgreSQLInstrument.does_exist_with_id(self._id, db_cur_session=db_cur_session)
 
-
     @staticmethod
     def does_exist_with_id(db_id: int, db_cur_session: psycopg2.cursor | None = None) -> bool:
         db_conn = None

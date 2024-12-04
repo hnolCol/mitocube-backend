@@ -8,6 +8,7 @@
 from .PostgreSQLConnection import PostgreSQLConnection
 from .PostgreSQLDatabase import PostgreSQLDatabase
 from .PostgreSQLStatDatabase import PostgreSQLStatDatabase
+from .PostgreSQLSamples import PostgreSQLSamples
 from .PostgreSQLDataset import PostgreSQLDataset
 from .PostgreSQLAttribute import PostgreSQLAttribute
 from .PostgreSQLTrait import PostgreSQLTrait

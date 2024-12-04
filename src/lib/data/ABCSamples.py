@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, List
+from typing import Dict, List, Self
 
 import lib.data as dlib
 
@@ -10,10 +10,10 @@ class DatasetSampleError(dlib.ABCDataError):
     pass
 
 class DatasetSample:
-    def __init__(self, dataset: dlib.ABCDataset, label: str, db_id: int | None = None,
+    def __init__(self, parent_dataset: dlib.ABCDataset, label: str, db_id: int | None = None,
                  batch_labels: List[str] | None = None, replicate_labels: List[str] | None = None):
         self._db_id: int | None = db_id
-        self._dataset: dlib.ABCDataset = dataset
+        self._parent_dataset: dlib.ABCDataset = parent_dataset
         self._label: str = label
         self._batch_labels: List[str] | None = batch_labels
         self._replicate_labels: List[str] | None = replicate_labels
@@ -34,7 +34,7 @@ class DatasetSample:
         return self._db_id
 
     def get_dataset(self) -> dlib.ABCDataset:
-        return self._dataset
+        return self._parent_dataset
 
     def get_label(self) -> str:
         return self._label
@@ -59,6 +59,11 @@ class ABCSamples(ABC, dlib.FlexDataClass):
     def __init__(self, samples: List[DatasetSample] | None = None):
         self._samples = samples
 
+    @classmethod
+    def _get_class_rulings(cls) -> Dict[str, Self]:
+        import lib.data.sql.postgresql as sqllib
+        return {"postgresql": sqllib.PostgreSQLSamples}
+
     def add_sample(self, sample: DatasetSample):
         if self._samples is None:
             self._samples = []
@@ -71,11 +76,11 @@ class ABCSamples(ABC, dlib.FlexDataClass):
 
         self._samples.extend(samples)
 
-    def construct_and_add_samples(self, dataset: dlib.ABCDataset,  labels: List[str],
+    def construct_and_add_samples(self, parent_dataset: dlib.ABCDataset,  labels: List[str],
                                   batches: Dict[str, List[str]],  # Sample name and batch labels / replicate labels
                                   replicates: Dict[str, List[str]]) -> List[DatasetSample]:
 
-        new_samples = [DatasetSample(dataset = dataset, label = label , db_id = None,
+        new_samples = [DatasetSample(parent_dataset = parent_dataset, label = label , db_id = None,
                                      batch_labels = batches[label] if label in batches else None,
                                      replicate_labels = replicates[label] if label in replicates else None) for label in labels]
 
