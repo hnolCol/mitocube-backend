@@ -133,7 +133,7 @@ class PostgreSQLUser(dlib.ABCUser):
 
         self._id = db_row[0]
         self._username = db_row[1]
-        self._research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2])
+        self._research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_with_id(db_id=db_row[2], db_cur_session=db_cur_session)
         self._firstname = db_row[3]
         self._lastname = db_row[4]
         self._email = db_row[5]
@@ -340,7 +340,7 @@ class PostgreSQLUser(dlib.ABCUser):
 
             for db_row in db_rows:
                 user = PostgreSQLUser(db_id = db_row[0], username = db_row[1],
-                                      research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
+                                      research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_with_id(db_id=db_row[2], db_cur_session = db_cur_session),
                                       firstname = db_row[3], lastname = db_row[4], email = db_row[5],
                                       base64_image = db_row[7], profile_text = db_row[8], orcid = db_row[9],
                                       url = db_row[10], allow_login = db_row[11], expires_after = db_row[16])
@@ -407,7 +407,7 @@ class PostgreSQLUser(dlib.ABCUser):
         db_row = PostgreSQLUser.__get_db_select_row(db_id = db_id, db_cur_session = db_cur_session)
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
-                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
+                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_with_id(db_id = db_row[2], db_cur_session = db_cur_session),
                               base64_image = db_row[7], profile_text = db_row[8], orcid = db_row[9], url = db_row[10],
                               allow_login = db_row[11], expires_after = db_row[16])
 
@@ -443,7 +443,7 @@ class PostgreSQLUser(dlib.ABCUser):
         db_row = PostgreSQLUser.__get_db_select_row(email = email, db_cur_session = db_cur_session)
 
         user = PostgreSQLUser(db_id = db_row[0], username = db_row[1], firstname = db_row[3], lastname = db_row[4], email = db_row[5],
-                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_from_id(db_id=db_row[2]),
+                              research_group = None if db_row[2] is None else psql.PostgreSQLResearchGroup.objectify_with_id(db_id=db_row[2], db_cur_session = db_cur_session),
                               base64_image = db_row[7], profile_text = db_row[8], orcid = db_row[9], url = db_row[10],
                               allow_login = db_row[11], expires_after = db_row[16])
 
@@ -480,5 +480,3 @@ class PostgreSQLUser(dlib.ABCUser):
 
     def write_password(self, password: str, db_cur_session: psycopg2.cursor | None = None):
         self.__db_update_password(password = password, db_cur_session = db_cur_session)
-
-

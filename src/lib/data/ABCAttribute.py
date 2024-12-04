@@ -49,7 +49,7 @@ class ABCAttribute(ABC, dlib.FlexDataClass):
         return "{}(id={}, tag={})".format(self.__class__.__name__, self._id, self._tag)
 
     @classmethod
-    def _get_class_rulings(cls) -> Dict[str, Self]:  # ToDo: Update return values!
+    def _get_class_rulings(cls) -> Dict[str, Self]:
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLAttribute}
 

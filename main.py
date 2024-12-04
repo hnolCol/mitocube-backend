@@ -7,7 +7,7 @@ from fastapi.responses import ORJSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from lib.data.mem import MemUserTokens
+from lib.data.mem import MemEmailTokens, MemLoginTokens, MemUserTokens
 import lib.data.sql.postgresql as psql
 
 import lib.rest.routes.auth.auth as routes_auth  # Critical for user authentication
@@ -32,8 +32,10 @@ from config import SystemSettings
 
 system_settings = SystemSettings.get_system_settings()
 
-# Fixme: Initialise session, here simple save write to local file... needs to be fixed with shutdown signal maybe... see auth routes
-MemUserTokens(token_persist_restart = True, path_persistent_memory = "/home/andreaslindner/Projects/MitoCube")
+# Initialise token memory
+MemEmailTokens()  # Fixme: is currently persistent but in a very simple way, fix MemTokens class
+MemLoginTokens()
+MemUserTokens()  # Fixme: is currently persistent but in a very simple way, fix MemTokens class
 
 db_features = psql.PostgreSQLFeatureDatabase()  # todo: create 'init'/first loading method
 db_features.read()

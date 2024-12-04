@@ -62,6 +62,13 @@ class ABCUser(ABC, dlib.FlexDataClass):
     def _test_password(self, password: str) -> bool:
         pass
 
+    def accept_email(self, forceWrite = False):
+        self._refresh_update_date(forceWrite=False)
+        self._is_email_verified = True
+
+        if forceWrite:
+            self.write_to_db()
+
     def allow_login(self, forceWrite = False):
         self._refresh_update_date(forceWrite = False)
         self._db_allow_login = True
@@ -87,7 +94,7 @@ class ABCUser(ABC, dlib.FlexDataClass):
         return self._expires_after <= datetime.now()
 
     def is_login_allowed(self) -> bool:
-        return self._db_allow_login and self._expires_after > datetime.now()
+        return self._db_allow_login and self._expires_after > datetime.now() and self._is_email_verified
 
     @staticmethod
     @abstractmethod
@@ -99,7 +106,12 @@ class ABCUser(ABC, dlib.FlexDataClass):
         self._db_allow_login = False
         # self._expires_after = datetime.now()  # Question: set _expires_after to now on top of it or keep original value?
 
-        # ToDo: invalidate login-token
+        if forceWrite:
+            self.write_to_db()
+
+    def forbid_email(self, forceWrite = False):
+        self._refresh_update_date(forceWrite=False)
+        self._is_email_verified = False
 
         if forceWrite:
             self.write_to_db()
@@ -175,17 +187,22 @@ class ABCUser(ABC, dlib.FlexDataClass):
 
     @classmethod
     @abstractmethod
-    def objectify_with_id(cls, db_id: int) -> dlib.ABCUser:
+    def objectify_with_id(cls, db_id: int) -> ABCUser:
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_username(cls, username: str) -> dlib.ABCUser | None:
+    def objectify_with_username(cls, username: str) -> ABCUser | None:
         pass
 
     @classmethod
     @abstractmethod
-    def objectify_with_object(cls, user: dlib.ABCUser) -> dlib.ABCUser:
+    def objectify_with_email(cls, email: str) -> ABCUser:
+        pass
+
+    @classmethod
+    @abstractmethod
+    def objectify_with_object(cls, user: ABCUser) -> ABCUser:
         pass
 
     def set(self, db_id: int | None, username: str, research_group: dlib.ABCResearchGroup | None, firstname: str,

@@ -37,7 +37,7 @@ class ABCGenotype(ABC, dlib.FlexDataClass):
 
 
     @classmethod
-    def _get_class_rulings(cls) -> Dict[str, Self]:  # ToDo: Update return values!
+    def _get_class_rulings(cls) -> Dict[str, Self]:
         import lib.data.sql.postgresql as sqllib
         return {"postgresql": sqllib.PostgreSQLGenotype}
 

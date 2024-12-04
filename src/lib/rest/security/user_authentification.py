@@ -53,7 +53,7 @@ class RestPermissionSteward:  # Question: outsource RestPermissionSteward? ABCPe
 
         self._requires_users: Tuple[str] | None = requires_users  # ToDo: Implement Database link
         self._requires_superuser: bool = requires_superuser
-        self._require_permission_to_manage_system: bool = require_permission_to_manage_system  # Todo: Implement Database link and Frontend to set below (also todo for lines below)
+        self._require_permission_to_manage_system: bool = require_permission_to_manage_system
         self._require_permission_to_manage_attributes_traits: bool = require_permission_to_manage_attributes_traits
         self._require_permission_to_manage_all_datasets: bool = require_permission_to_manage_all_datasets
         self._require_permission_to_manage_owned_datasets: bool = require_permission_to_manage_owned_datasets
@@ -78,12 +78,14 @@ class RestPermissionSteward:  # Question: outsource RestPermissionSteward? ABCPe
         token: str
         db_session_tokens = MemUserTokens()
 
+        error_message_401 = "Unable to verify token provided for user session."  # Question: Move to config?
+        error_message_403 = "No sufficient rights to proceed."  # Question: Move to config?
+
         if "authorization" in request.headers.keys():
             token = request.headers["authorization"].replace("Bearer ", "")
         else:
             # ToDo / Question: Log ABCLoginTokenError message?
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="Unable to verify token provided for user session.")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
                                 # headers={"WWW-Authenticate": "Bearer"})  # Question, was was that for?
 
         try:
@@ -92,26 +94,24 @@ class RestPermissionSteward:  # Question: outsource RestPermissionSteward? ABCPe
                                                      agent=user_agent if user_agent else "None")
         except MemUserTokenError as err:
             # ToDo / Question: Log ABCLoginTokenError message?
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="Unable to verify token provided for user session.")
-                                # headers={"WWW-Authenticate": "Bearer"})  # Question, was was that for?
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
 
         try:
             user = psql.PostgreSQLUser.objectify_with_username(username=token_obj.get_username())
         except dlib.ABCUserError as err:
             # ToDo / Question: Log ABCLoginTokenError message?
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-                                detail="Unable to verify token provided for user session.")
-                                # headers={"WWW-Authenticate": "Bearer"})  # Question, was was that for?
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
+
+        # Checks if the account is not expired, if user is allowed to log-in and if the email is verified
+        if not user.is_login_allowed():
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
 
         #   if self._requires_superuser and user.get_username() != self.__superuser_name:
         #     raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED,
         #                         detail="You do not have sufficient rights to proceed.",
         #                         headers={"WWW-Authenticate": "Bearer"})
         if self._requires_users and user.get_username() not in self._requires_users:
-            raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED,
-                                detail="You do not have sufficient rights to proceed.")
-                                # headers={"WWW-Authenticate": "Bearer"})  # Question, was was that for?
+            raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail=error_message_403)
 
         required_permissions: List[bool] = [self._requires_superuser,
                                             self._require_permission_to_manage_system,
@@ -150,13 +150,13 @@ class RestPermissionSteward:  # Question: outsource RestPermissionSteward? ABCPe
                                {"db_id": user.get_id()})
 
                 if db_cur.rowcount != 1:
-                    raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail="You do not have sufficient rights to proceed.")
+                    raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail=error_message_403)
 
                 db_row = db_cur.fetchone()
 
                 for ix in range(len(required_permissions)):
                     if required_permissions[ix] and not db_row[ix + 1]:
-                        raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail="You do not have sufficient rights to proceed.")
+                        raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail=error_message_403)
 
             finally:  # fixme: switch to psycopg 3 to be able to use with statements?
                 if db_conn:

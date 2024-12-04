@@ -65,19 +65,17 @@ You will be able to:
     mail_use_credentials: bool = True
     mail_validate_certs: bool = False
     mail_from_name: str = "ImmunoCube Support"
-    mail_cc: List[EmailStr] = ["andreas.lindner@uni-bonn.de"] #"dominique.diehl@age.mpg.de",   # Fixme: change string
-    mail_template_dir: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/templates/email"  # Fixme: change string
-    mail_template_verification: str = "verification_code.html"
-    mail_template_confirmation: str = "email_confirmation.html"
-    mail_template_project_state: str = "state_changed.html"
-    mail_template_submission_complete: str = "submission_complete.html"
-    mail_template_account_generated: str = "account_generated.html"
+    mail_cc: List[EmailStr] = ["andreas.lindner@uni-bonn.de"]  # "dominique.diehl@age.mpg.de",   # Fixme: change string
+    mail_template_dir: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources/templates/emails"  # Fixme: change string
+
+    mail_template_email_confirmation: str = "email_confirmation.html"
+    mail_template_login_code: str = "email_login_code.html"
 
     # DB settings
     db_handler: Literal["panda_files", "postgresql"] = "postgresql"
 
     # DB File Settings
-    path_annotations: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources"  # Fixme: Change string ... "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/features"
+    # path_annotations: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources"  # Fixme: Change string ... "/home/andreaslindner/Projects/MitoCube/GitHub/mitocube-backend/resources/features"
     path_features: DirectoryPath = "/home/andreaslindner/Projects/MitoCube/DB_Interface_2024/resources/features"  # Fixme: Change string
 
     # DB PostgreSQL Settings
@@ -91,6 +89,6 @@ You will be able to:
     db_max_dataset_cached : int = 100
 
 
-@lru_cache(maxsize=129, typed=False)  # Question: saves the last 128 calls, default value, currently no problem but no change of config possible!
+@lru_cache(maxsize = 129, typed = False)  # Question: saves the last 128 calls, default value, currently no problem but no change of config possible!
 def get_system_settings():
     return SystemSettings()

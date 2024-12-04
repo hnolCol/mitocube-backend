@@ -7,11 +7,8 @@ from config import SystemSettings
 system_settings = SystemSettings.get_system_settings()  # Question, is it kept all the time? move to local environment? But how to do the class without?
 
 class EMailHandler:
-    __templates = [system_settings.mail_template_verification,
-                   system_settings.mail_template_confirmation,
-                   system_settings.mail_template_project_state,
-                   system_settings.mail_template_submission_complete,
-                   system_settings.mail_template_account_generated]
+    __templates = [system_settings.mail_template_email_confirmation,
+                   system_settings.mail_template_login_code]
 
     __config = ConnectionConfig(MAIL_USERNAME=system_settings.mail_username.get_secret_value(),
                                 MAIL_PASSWORD=system_settings.mail_password.get_secret_value(),
