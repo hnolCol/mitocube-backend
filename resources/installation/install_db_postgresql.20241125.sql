@@ -161,6 +161,7 @@ CREATE TABLE attributes (
     values_are_feature_labels boolean DEFAULT false NOT NULL,
     values_are_genotype_labels DEFAULT false NOT NULL,
     values_are_numeric boolean DEFAULT false NOT NULL,
+    is_unit boolean DEFAULT false NOT NULL,
     PRIMARY KEY(id),
     UNIQUE(tag),
     FOREIGN KEY(parent_id) REFERENCES attributes(id) ON UPDATE CASCADE ON DELETE RESTRICT

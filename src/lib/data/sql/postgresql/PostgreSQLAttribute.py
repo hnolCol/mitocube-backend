@@ -25,11 +25,13 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                 db_cur = db_conn.cursor()
             db_cur.execute("""INSERT INTO attributes(parent_id, tag, text, priority, allow_as_filter, allow_for_dataset, 
                                         allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state,
-                                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric) 
+                                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric, is_unit) 
                                     VALUES (%(parent_id)s, %(tag)s, %(text)s, %(priority)s, %(allow_as_filter)s, 
                                         %(allow_for_dataset)s, %(allow_for_genotype)s, %(allow_for_performance)s, 
                                         %(allow_for_sample)s, %(allow_trait_values)s, %(required_for_dataset_state)s,
-                                        %(values_are_feature_labels)s, %(values_are_genotype_labels)s, %(values_are_numeric)s) RETURNING id;""",
+                                        %(values_are_feature_labels)s, %(values_are_genotype_labels)s, %(values_are_numeric)s),
+                                        %(is_unit) 
+                                    RETURNING id;""",
                            {"parent_id": self._parent.get_id() if self._parent is not None else None,
                             "tag": self._tag,
                             "text": self._text,
@@ -43,7 +45,8 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                             "required_for_dataset_state": self._required_for_dataset_state,
                             "values_are_feature_labels": self._values_are_feature_labels,
                             "values_are_genotype_labels": self._values_are_genotype_labels,
-                            "values_are_numeric": self._values_are_numeric})
+                            "values_are_numeric": self._values_are_numeric,
+                            "is_unit": self._traits_are_units})
 
             db_row = db_cur.fetchone()
             self._id = db_row[0]
@@ -76,6 +79,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
         self._values_are_feature_labels = db_row[12]
         self._values_are_genotype_labels = db_row[13]
         self._values_are_numeric = db_row[14]
+        self._traits_are_units = db_row[15]
 
     def __db_update(self, db_cur_session: psycopg2.cursor | None = None):
         if not self.does_exist():  # ToDo: Implement
@@ -97,7 +101,8 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                                     allow_for_sample = %(allow_for_sample)s, allow_trait_values = %(allow_trait_values)s, 
                                     values_are_feature_labels = %(values_are_feature_labels)s, 
                                     values_are_genotype_labels = %(values_are_genotype_labels)s, 
-                                    values_are_numeric = %(values_are_numeric)s 
+                                    values_are_numeric = %(values_are_numeric)s, 
+                                    is_unit = %(is_unit)s 
                                 WHERE id = %(db_id)s;""",
                            {"db_id": self._id,
                             "parent_id": self._parent.get_id() if self._parent is not None else None,
@@ -111,7 +116,8 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                             "required_for_dataset_state": self._required_for_dataset_state,
                             "values_are_feature_labels": self._values_are_feature_labels,
                             "values_are_genotype_labels": self._values_are_genotype_labels,
-                            "values_are_numeric": self._values_are_numeric})
+                            "values_are_numeric": self._values_are_numeric,
+                            "is_unit": self._traits_are_units})
 
             if db_conn:
                 db_conn.commit()
@@ -139,12 +145,12 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
             if db_id is None:
                 db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, 
                         allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state,
-                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric 
+                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric, is_unit 
                     FROM attributes WHERE tag = %(tag)s;""", {"tag": tag})
             else:
                 db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, 
                         allow_for_dataset, allow_for_genotype, allow_for_performance, allow_for_sample, allow_trait_values, required_for_dataset_state,
-                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric 
+                        values_are_feature_labels, values_are_genotype_labels, values_are_numeric, is_unit 
                     FROM attributes WHERE id = %(db_id)s;""", {"db_id": db_id})
 
             if db_cur.rowcount != 1:
@@ -173,7 +179,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
             db_cur.execute("""SELECT id, parent_id, tag, text, priority, allow_as_filter, 
                                 allow_for_dataset, allow_for_genotype, allow_for_performance, 
                                 allow_for_sample, allow_trait_values, required_for_dataset_state, 
-                                values_are_feature_labels, values_are_genotype_labels, values_are_numeric 
+                                values_are_feature_labels, values_are_genotype_labels, values_are_numeric, is_unit
                             FROM attributes ORDER by id ASC;""")
 
             db_rows = db_cur.fetchall()
@@ -192,7 +198,8 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                                                             required_for_dataset_state = db_row[11],
                                                             values_are_feature_labels = db_row[12],
                                                             values_are_genotype_labels = db_row[13],
-                                                            values_are_numeric = db_row[14])
+                                                            values_are_numeric = db_row[14],
+                                                            traits_are_units = db_row[15])
 
         finally:  # fixme: switch to psycopg 3 to be able to use with statements?
             if db_conn:
@@ -230,7 +237,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                    allow_as_filter = db_row[5], allow_for_dataset = db_row[6], allow_for_genotype = db_row[7],
                    allow_for_performance = db_row[8], allow_for_sample = db_row[9], allow_trait_values = db_row[10],
                    required_for_dataset_state = db_row[11], values_are_feature_labels=db_row[12],
-                   values_are_genotype_labels=db_row[13], values_are_numeric=db_row[14])
+                   values_are_genotype_labels=db_row[13], values_are_numeric=db_row[14], traits_are_units=db_row[15])
 
     @classmethod
     def objectify_with_tag(cls, tag: str) -> PostgreSQLAttribute:
@@ -241,7 +248,7 @@ class PostgreSQLAttribute(dlib.ABCAttribute):
                    allow_as_filter = db_row[5], allow_for_dataset = db_row[6], allow_for_genotype = db_row[7],
                    allow_for_performance = db_row[8], allow_for_sample = db_row[9], allow_trait_values = db_row[10],
                    required_for_dataset_state = db_row[11], values_are_feature_labels = db_row[12],
-                   values_are_genotype_labels = db_row[13], values_are_numeric = db_row[14])
+                   values_are_genotype_labels = db_row[13], values_are_numeric = db_row[14], traits_are_units=db_row[15])
 
     def write_to_db(self, db_cur_session: psycopg2.cursor | None = None):
         self.__db_insert(db_cur_session=db_cur_session) if self._id is None else self.__db_update(db_cur_session=db_cur_session)
