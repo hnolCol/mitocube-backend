@@ -88,6 +88,22 @@ class SubmissionABC(ABC):
         "Returns the samples of a submission"
     
     @abstractmethod
+    def get_state(self, tag: str) -> SubmissionStatesEnums:
+        """Returns the current state of the submission 
+        given by its tag. 
+
+        Parameters
+        ----------
+        tag : str
+            submission tag.  
+
+        Returns
+        -------
+        SubmissionStatesEnums
+            The state of the submission.
+        """
+    
+    @abstractmethod
     def insert(self, submission : DatasetSubmissionModel) -> bool:
         """Adds a new submission to the database. 
 
@@ -126,7 +142,7 @@ class SubmissionABC(ABC):
 
 
     @abstractmethod
-    def update_state(self, tag : str, new_state : SubmissionStatesEnums) -> bool: #model for meta data.
+    def update_state(self, tag : str, new_state : SubmissionStatesEnums, user_tag : str) -> bool: #model for meta data.
         """Updates the state of a submission.
 
         Parameters
@@ -135,14 +151,13 @@ class SubmissionABC(ABC):
             The submission tag 
         new_state : SubmissionStatesEnums
             The new state the submission is in.
-
+        user_tag : str 
+            The user that changed the state. 
         Returns
         -------
         bool
             _description_
         """
-        
-        
         
 
 class SubmissionFilterABC(ABC):

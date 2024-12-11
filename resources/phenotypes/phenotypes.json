@@ -1,0 +1,268 @@
+[
+    {
+        "group_tag":"mit_import",
+        "group_text":"Import Defect",
+        "text":"Import defect",
+        "description":"Reduced import capacity leading to accumulation of mitochondrial proteins in the cytosol\/at the outer membrane",
+        "tag":"import_defect"
+    },
+    {
+        "group_tag":"mtdna_abnormalties",
+        "group_text":"mtDNA Turonover defect",
+        "text":"mtDNA Instability ",
+        "description":"mtDNA Instability",
+        "tag":"mtdna_instability"
+    },
+    {
+        "group_tag":"mtdna_abnormalties",
+        "group_text":"mtDNA Turonover defect",
+        "text":"mtDNA Release",
+        "description":"Increased mtDNA release to the cytosol causing a cytosolic DNA immune response",
+        "tag":"mtdna_release"
+    },
+    {
+        "group_tag":"mito_morphological",
+        "group_text":"Mitochondrial Morpholohical Phenotype",
+        "text":"Fused Mitochondria",
+        "description":"Long, interconnected networks of mitochondria.",
+        "tag":"fused_mitochondria"
+    },
+    {
+        "group_tag":"mito_morphological",
+        "group_text":"Mitochondrial Morpholohical Phenotype",
+        "text":"Fragmented Mitochondria",
+        "description":"Small, spherical or short rod-shaped mitochondria. Associated with increased fission, stress, apoptosis, or dysfunction. Common in oxidative stress and mitochondrial DNA (mtDNA) mutations.",
+        "tag":"fragmented_mitochondria"
+    },
+    {
+        "group_tag":"mito_morphological",
+        "group_text":"Mitochondrial Morpholohical Phenotype",
+        "text":"Swollen Mitochondria",
+        "description":"Enlarged, bloated mitochondria with compromised cristae structure. Often observed during mitochondrial permeability transition and cell death.",
+        "tag":"swollen_mitochondria"
+    },
+    {
+        "group_tag":"mito_morphological",
+        "group_text":"Mitochondrial Morpholohical Phenotype",
+        "text":"Collapsed\/Hyper-condensed Mitochondria",
+        "description":"Dense, highly compact cristae with reduced overall volume. Seen in high-stress or starvation conditions.",
+        "tag":"collapsed\/hyper-condensed_mitochondria"
+    },
+    {
+        "group_tag":"mito_morphological",
+        "group_text":"Mitochondrial Morpholohical Phenotype",
+        "text":"Elongated Mitochondria",
+        "description":"Unusually long mitochondria, potentially a protective response to stress or inhibition of fission machinery.",
+        "tag":"elongated_mitochondria"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"OXPHOS Defects",
+        "description":"Reduced efficiency in oxidative phosphorylation. ",
+        "tag":"oxphos_defects"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Uncoupling",
+        "description":"Dissociation of ATP synthesis from electron transport. Leads to energy dissipation as heat and decreased ATP production.",
+        "tag":"uncoupling"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Mitochondrial Biogensis Defect",
+        "description":null,
+        "tag":"mitochondrial_biogensis_defect"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Calcium Overload",
+        "description":"Excessive uptake of calcium into the mitochondria. Can trigger mitochondrial permeability transition pore (mPTP) opening and cell death.",
+        "tag":"calcium_overload"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Mitophagy",
+        "description":"Impaired clearance of damaged mitochondria by autophagy.",
+        "tag":"mitophagy"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Increased Reactive Oxygen Species (ROS)",
+        "description":"Elevated production or reduced clearace of ROS by\/in mitochondria.",
+        "tag":"increased_reactive_oxygen_species_(ros)"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Cristae Disruption",
+        "description":"Loss or disorganization of the inner membrane folds (cristae). Associated with respiratory chain defects and apoptosis.",
+        "tag":"cristae_disruption"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Parkin-positive Aggregated",
+        "description":"Clusters of damaged mitochondria tagged with parkin for degradation. Indicative of mitophagy activation.",
+        "tag":"parkin-positive_aggregated"
+    },
+    {
+        "group_tag":"mit_functional",
+        "group_text":"Mitochondrial Functional Phenotypes",
+        "text":"Mitochondrial Outer Membrane Permeabilization (MOMP)",
+        "description":"Loss of outer membrane integrity, releasing cytochrome c and other pro-apoptotic factors.",
+        "tag":"mitochondrial_outer_membrane_permeabilization_(momp)"
+    },
+    {
+        "group_tag":"metabolic",
+        "group_text":"Metabolic",
+        "text":"Reduced Exercise Capacity",
+        "description":"Impaired energy production due to mitochondrial dysfunction; reduced endurance.",
+        "tag":"reduced_exercise_capacity"
+    },
+    {
+        "group_tag":"metabolic",
+        "group_text":"Metabolic",
+        "text":"Glucose Intolerance\/Insulin Resistance",
+        "description":"Mitochondrial dysfunction affects glucose metabolism and insulin signaling.",
+        "tag":"glucose_intolerance\/insulin_resistance"
+    },
+    {
+        "group_tag":"metabolic",
+        "group_text":"Metabolic",
+        "text":"Increased Fat Accumulation",
+        "description":"Reduced mitochondrial fatty acid oxidation leads to lipid accumulation.",
+        "tag":"increased_fat_accumulation"
+    },
+    {
+        "group_tag":"metabolic",
+        "group_text":"Metabolic",
+        "text":"Cold Intolerance",
+        "description":"Impaired thermogenesis due to defective mitochondrial uncoupling.",
+        "tag":"cold_intolerance"
+    },
+    {
+        "group_tag":"neurological",
+        "group_text":"Neurological",
+        "text":"Neurodegeneration",
+        "description":"Mitochondrial defects in neurons lead to motor or cognitive decline.",
+        "tag":"neurodegeneration"
+    },
+    {
+        "group_tag":"neurological",
+        "group_text":"Neurological",
+        "text":"Ataxia",
+        "description":"Coordination issues linked to mitochondrial dysfunction in the cerebellum.",
+        "tag":"ataxia"
+    },
+    {
+        "group_tag":"neurological",
+        "group_text":"Neurological",
+        "text":"Seizures",
+        "description":"Energy deficits in neurons lead to hyperexcitability and seizures.",
+        "tag":"seizures"
+    },
+    {
+        "group_tag":"neurological",
+        "group_text":"Neurological",
+        "text":"Learning and Memory Deficits",
+        "description":"Cognitive impairments due to oxidative stress and mitochondrial energy issues.",
+        "tag":"learning_and_memory_deficits"
+    },
+    {
+        "group_tag":"cardiac\/muscle",
+        "group_text":"Cardiac\/Muscle",
+        "text":"Cardiomyopathy",
+        "description":"Heart dysfunction (dilated or hypertrophic) linked to mitochondrial defects.",
+        "tag":"cardiomyopathy"
+    },
+    {
+        "group_tag":"cardiac\/muscle",
+        "group_text":"Cardiac\/Muscle",
+        "text":"Muscle Weakness and Atrophy",
+        "description":"Energy deficits cause muscle wasting and reduced strength.",
+        "tag":"muscle_weakness_and_atrophy"
+    },
+    {
+        "group_tag":"cardiac\/muscle",
+        "group_text":"Cardiac\/Muscle",
+        "text":"Exercise-Induced Muscle Damage",
+        "description":"Mitochondrial dysfunction makes muscles more prone to damage during exercise.",
+        "tag":"exercise-induced_muscle_damage"
+    },
+    {
+        "group_tag":"developmental",
+        "group_text":"Developmental",
+        "text":"Embryonic Lethality",
+        "description":"Severe mitochondrial dysfunction leads to non-viable embryos.",
+        "tag":"embryonic_lethality"
+    },
+    {
+        "group_tag":"developmental",
+        "group_text":"Developmental",
+        "text":"Growth Retardation",
+        "description":"Postnatal growth defects due to energy deficits.",
+        "tag":"growth_retardation"
+    },
+    {
+        "group_tag":"aging",
+        "group_text":"Aging",
+        "text":"Accelerated Aging",
+        "description":"Premature aging signs like hair loss and frailty from mitochondrial stress.",
+        "tag":"accelerated_aging"
+    },
+    {
+        "group_tag":"aging",
+        "group_text":"Aging",
+        "text":"Reduced Lifespan",
+        "description":"Cumulative mitochondrial dysfunction reduces lifespan.",
+        "tag":"reduced_lifespan"
+    },
+    {
+        "group_tag":"immunological",
+        "group_text":"Immunological",
+        "text":"Immune Dysfunction",
+        "description":"Impaired immune response.",
+        "tag":"immune_dysfunction"
+    },
+    {
+        "group_tag":"immunological",
+        "group_text":"Immunological",
+        "text":"Increased Susceptibility to Infection",
+        "description":"Mitochondrial defects reduce immune defense against pathogens.",
+        "tag":"increased_susceptibility_to_infection"
+    },
+    {
+        "group_tag":"reproductive",
+        "group_text":"Reproductive",
+        "text":"Infertility",
+        "description":"Energy deficits in sperm or oocytes lead to reduced fertility.",
+        "tag":"infertility"
+    },
+    {
+        "group_tag":"reproductive",
+        "group_text":"Reproductive",
+        "text":"Reduced Oocyte Quality",
+        "description":"Impaired mitochondrial function in oocytes reduces their viability.",
+        "tag":"reduced_oocyte_quality"
+    },
+    {
+        "group_tag":"liver\/kidney",
+        "group_text":"Liver\/Kidney",
+        "text":"Hepatic Steatosis (Fatty Liver)",
+        "description":"Reduced fatty acid oxidation in mitochondria leads to fat buildup in the liver.",
+        "tag":"hepatic_steatosis_(fatty_liver)"
+    },
+    {
+        "group_tag":"liver\/kidney",
+        "group_text":"Liver\/Kidney",
+        "text":"Renal Dysfunction",
+        "description":"Mitochondrial stress in kidneys impairs function.",
+        "tag":"renal_dysfunction"
+    }
+]

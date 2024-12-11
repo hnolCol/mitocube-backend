@@ -20,6 +20,10 @@ from lib.data.database.abstract.Genotypes import GenotypeABC
 from lib.data.database.abstract.Peptides import PeptidesABC
 from lib.data.database.abstract.QC import QCABC
 from lib.data.database.abstract.UnitTypes import UnitTypesABC
+from lib.data.database.abstract.Instruments import InstrumentsABC
+from lib.data.database.abstract.Timeline import TimelineABC 
+from lib.data.database.abstract.ResearchGroup import ResearchGroupABC
+from lib.data.database.abstract.Phenotypes import PhenotypeABC
 
 from config.settings.db import get_db_settings
 from config.models.attributes import AttributeModel, AttributeUnitResponseModel
@@ -65,6 +69,10 @@ class DatabaseABC(ABC):
     peptides : PeptidesABC = None 
     submission_summary : SubmissionSummaryABC = None
     unittypes : UnitTypesABC = None
+    instruments : InstrumentsABC = None
+    timeline : TimelineABC = None 
+    research_groups : ResearchGroupABC = None
+    phenotypes: PhenotypeABC = None
    # performance : Per
     
 
@@ -135,22 +143,41 @@ class DatabaseABC(ABC):
             raise TypeError("The datasets class must be an instance of DatasetABC")
         
         if self.genotypes is None:
-            raise not NotImplementedError("A database class must have the genotypes attribute defined")
+            raise NotImplementedError("A database class must have the genotypes attribute defined")
         if not isinstance(self.genotypes,GenotypeABC):
             raise TypeError("The genotypes class must be an instance of GenotypeABC")
 
         if self.qc is None:
-            raise not NotImplementedError("A database class must have the qc attribute defined")
+            raise NotImplementedError("A database class must have the qc attribute defined")
         if not isinstance(self.qc,QCABC):
             raise TypeError("The qc class must be an instance of QCABC")    
         
         if self.peptides is None:
-            raise not NotImplementedError("A database class must have the peptides attribute defined")
+            raise NotImplementedError("A database class must have the peptides attribute defined")
         
         if not isinstance(self.peptides,PeptidesABC):
-            raise TypeError("The peptides class must be an instance of PeptidesABC")    
+            raise TypeError("The peptides class must be an instance of PeptidesABC")   
+         
+        if self.instruments is None:
+            raise  NotImplementedError("A database class must have the instrument attribute defined")
         
+        if not isinstance(self.instruments,InstrumentsABC):
+            raise TypeError("The peptides class must be an instance of InstrumentABC")    
         
+        if self.timeline is None:
+            raise NotImplementedError("A database class must have the timeline attribute defined.")
+        if not isinstance(self.timeline, TimelineABC):
+            raise TypeError("The timeline class must be an instance of the TimelineABC.")
+        
+        if self.research_groups is None:
+            raise NotImplementedError("A database class must have the timeline attribute defined.")
+        if not isinstance(self.research_groups,ResearchGroupABC):
+            raise TypeError("The research_groups class must be an instance of the ResearchGroupABC.")
+        
+        if self.phenotypes is None:
+            raise NotImplementedError("A database class must have the phenotype attribute defined.")
+        if not isinstance(self.phenotypes,PhenotypeABC):
+            raise TypeError("The phenotype class must be an instance of the PhenotypeABC.")
         
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 

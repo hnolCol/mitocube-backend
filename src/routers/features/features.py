@@ -3,16 +3,14 @@ from typing import List
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
-from config.models.annotations.feature import FeatureDataResponseModel, FeatureModel
+from config.models.feature import FeatureSequenceResponseModel
+from config.models.annotations.feature import FeatureDataResponseModel, FeatureNeoModel
 from config.enums.states import SubmissionStatesEnums
-from lib.data.annotations.ABCAnnotations import AnnotationDatabase
 from services.users import get_user_from_token
 from services.submission import map_tags_to_attribute_in_metadata
-from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from config.models.parameter import APIParamString
-from lib.data.database.ABCDatabase import MCDatabase
-from lib.data.transform.FeatureData import FeatureData
-from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+from config.models.calculations.quantile import QuantileModel 
+
 from lib.data.database.Database import Database
 
 from config.exceptions.HTTPExceptions import protein_not_found
@@ -26,7 +24,7 @@ router = APIRouter(
     )
 
 @router.get("")
-def get_features_by_query(query : str, proteome_tags : str = None, limit : int = 30):
+def get_features_by_query(query : str, proteome_tags : str = None, limit : int = 30)->List[FeatureNeoModel]:
     """Finds query by feautre 
 
     Parameters
@@ -35,7 +33,7 @@ def get_features_by_query(query : str, proteome_tags : str = None, limit : int =
         The query string 
     proteome_ids : str, optional
         The list of proteomes to query the feature in. If None, alle available features will be searched for
-        If multiple proteomes should be provided, separate them by a semicolon. 
+        If multiple proteomes should be provided, separate them by a ';'. 
     limit : int, optional
         The maximum number of features to be returned.
     user : UserModel, optional
@@ -50,8 +48,19 @@ def get_features_by_query(query : str, proteome_tags : str = None, limit : int =
     
 
 
+
+@router.get("/{feature_tag}")
+def get_feature_by_tag(feature_tag : str, user : UserModel = Depends(get_user_from_token)) -> FeatureNeoModel:
+    "" 
+    if not DB.features.exists(tag = feature_tag):
+        raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
+    feature = DB.features.get_protein_by_tags(tags=[feature_tag], as_data_frame=False)
+    if len(feature) == 1:
+        return feature[0]
+    
+
 @router.get("/{feature_tag}/i")
-def get_feature_info(feature_tag : str):
+def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
     "" 
     protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False) 
     if len(protein) == 0: raise protein_not_found
@@ -64,7 +73,9 @@ def get_feature_info(feature_tag : str):
             }
     
     
-
+@router.get("/{feature_tag}/abundance") 
+def get_feature_abundance(feature_tag : str) -> QuantileModel:
+    return DB.features.get_abundance_distribution(tag = feature_tag)
 
 
 @router.get("/{feature_tag}/data",
@@ -94,12 +105,10 @@ def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datas
 
     feature_data = DB.features.get_data(tags=[feature_tag], 
                                         submission_tags=APIParamString(param=submission_tags).param)
-    print(feature_data)
     submission_tags = feature_data["submission_tag"].unique().tolist()
     attribute_value_tags = feature_data["attribute_value_tag"].unique().tolist() 
     attribute_tags = feature_data["attribute_tag"].unique().tolist() 
     genotype_tags = feature_data[feature_data["attribute_tag"] == "att_genotype"]["attribute_value_tag"]
-    print(attribute_tags, attribute_value_tags)
     response_data = OrderedDict()#
     sample_attributes_by_submission_tag = {}
     #groupby tag and submission tag. This is too because the get_data function can be used to 
@@ -122,10 +131,10 @@ def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datas
         #
     #get minimal meta information 
     submission_meta = DB.meta.get(tags=submission_tags)
+    print(response_data)
     
     attributes = DB.attributes.get(tags = attribute_tags)
     attribute_values = DB.attributes.get_values(tags = attribute_value_tags)
-    print(attribute_values,"WHATS GOING ON HERE?")
     genotypes = DB.genotypes.get(tags = genotype_tags)
 
     # db = MCDatabase.getDatabase()
@@ -148,49 +157,6 @@ def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datas
     
     print(rsp)
     return rsp 
-    
-    
-    
-    
-    # feature_data_by_dataset_label : Dict[str,pd.DataFrame] = {}
-    # attributes_sample_by_dataset_label : Dict[str,Dict] = {}
-    # attribute_samples_by_sample_collection = {}
-    # attribute_values_by_tag_collection = {}
-    # attributes_collection = {}
-    # genotypes_by_dataset_label = {}
-    # title_by_label = {}
-    # for label in dataset_labels:
-    #     dataset = db.getDataset(label=label)
-    #     metadata = dataset.getMetaJson()
-        
-    #     if dataset.hasData() and metadata.state == SubmissionStatesEnums.ACTIVE:
-    #         feature_data, attributes_samples, annotations = FeatureData(dataset).transform(feature_key, add_annotations=True)
-
-    #         if not feature_data.empty and isinstance(feature_data,pd.DataFrame):
-    #             updated_metadata = map_tags_to_attribute_in_metadata(metadata)
-    #             #TODO this is something we could cash as as well? Mapping the tags from the DB to the actual attributes
-    #             feature_data_by_dataset_label[label] = feature_data
-    #             attributes_sample_by_dataset_label[label] = attributes_samples
-    #             genotypes_by_dataset_label[label] = updated_metadata.genotypes
-    #             ##update the attribute/attribute_value details to get the complete set of attributes required
-    #             attribute_samples_by_sample_collection.update(updated_metadata.samples_attributes_by_sample)
-    #             attribute_values_by_tag_collection.update(updated_metadata.attribute_values_by_tag)
-    #             attributes_collection.update(updated_metadata.attributes)
-    #             title_by_label[label] = metadata.title
-    
-    response_data = {
-        "feature_key": feature_key,
-        "title_by_label" : title_by_label,
-        "dataset_labels" : list(feature_data_by_dataset_label.keys()),
-        "data" : dict([(data_label,data_frame.reset_index(names="index").to_dict(orient="records")) for data_label, data_frame in feature_data_by_dataset_label.items()]),
-        "samples_attributes" : attributes_sample_by_dataset_label,
-        "attribute_values_by_tag" : attribute_values_by_tag_collection,
-        "samples_attributes_by_sample" : attribute_samples_by_sample_collection,
-        "attributes" : attributes_collection,
-        "genotypes_by_label" : genotypes_by_dataset_label
-        }
-    #FeatureDataResponseModel(**response_data)
-    return response_data
 
 
 
@@ -227,9 +193,9 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None):
 
 @router.get("/{feature_tag}/sequence",
             summary="Returns the stored sequence in the annotation database.")
-def get_feature_sequence(feature_tag : str): #user : UserModel = Depends(get_user_from_token)
+def get_feature_sequence(feature_tag : str) -> List[FeatureSequenceResponseModel]: #user : UserModel = Depends(get_user_from_token)
     """
-    Returns the sequence for a specific feature_key (Uniprot ID)
+    Returns the sequence for a specific feature_tag (Uniprot ID)
     
     API Endpoint
     ------------

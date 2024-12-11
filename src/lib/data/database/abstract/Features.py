@@ -28,6 +28,10 @@ class FeaturesABC(ABC):
     # def correlate_features(self):
     #     ""
     
+    @abstractmethod
+    def is_quantified(self, tags : List[str]) -> pd.DataFrame:
+        """Checks if the proteins given by tags are quantified
+        Returns a pandas dataframe with the columns tag (str) and quantified (bool)"""
     
     @abstractmethod
     def count(self, quantified : bool = True) -> int:
@@ -66,6 +70,22 @@ class FeaturesABC(ABC):
                 (e.g. samples that are analysed the same proteome.)
                 - submissions (List[str]) : Submission tags in which the protein has been quantified. 
         """
+        
+        
+    @abstractmethod
+    def exists(self, tag : str) -> bool:
+        """
+        Checks if the given tag is associated with a feature. 
+        Parameters
+        ----------
+        tag : str
+            The feature tag 
+            
+        Returns
+        -------
+        bool 
+        
+        """    
     
     @abstractmethod
     def find(self, search_string : str, proteome_tags : List[str] = None, filter_tags : List[str] = None) -> List[FeatureNeoModel]:

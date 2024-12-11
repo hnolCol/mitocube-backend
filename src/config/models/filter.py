@@ -10,13 +10,11 @@ class FilterProps(BaseModel):
     protein_tags : List[str]
 
     @field_validator("tag", mode="after")
-    def check_tag(cls, v : str) -> str:
-        ""
-        print(v)
-        if v is None:
-            print(cls.text)
+    def check_tag(cls, tag : str) -> str:
+        "If the tag is none, set it"
+        if tag is None:
             return cls.text.replace(" ","_").lower() 
-        return v 
+        return tag 
         
 class FilterModel(BaseModel):
     tag : str 

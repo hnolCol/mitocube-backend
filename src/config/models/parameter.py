@@ -10,6 +10,7 @@ class APIParamString(BaseModel):
         if isinstance(v,str):
             if len(v) == 0: return None
             return v.split(";")
+        if isinstance(v,list): return v 
         return v
 
 class APIParamInt(BaseModel):

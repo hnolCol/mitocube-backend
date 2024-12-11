@@ -1,0 +1,39 @@
+group_tag	group_text	text	description	tag
+mit_import	Import Defect	Import defect	Reduced import capacity leading to accumulation of mitochondrial proteins in the cytosol/at the outer membrane	import_defect
+mtdna_abnormalties	mtDNA Turonover defect	mtDNA Instability 	mtDNA Instability	mtdna_instability
+mtdna_abnormalties	mtDNA Turonover defect	mtDNA Release	Increased mtDNA release to the cytosol causing a cytosolic DNA immune response	mtdna_release
+mito_morphological	Mitochondrial Morpholohical Phenotype	Fused Mitochondria	"Long, interconnected networks of mitochondria."	fused_mitochondria
+mito_morphological	Mitochondrial Morpholohical Phenotype	Fragmented Mitochondria	"Small, spherical or short rod-shaped mitochondria. Associated with increased fission, stress, apoptosis, or dysfunction. Common in oxidative stress and mitochondrial DNA (mtDNA) mutations."	fragmented_mitochondria
+mito_morphological	Mitochondrial Morpholohical Phenotype	Swollen Mitochondria	"Enlarged, bloated mitochondria with compromised cristae structure. Often observed during mitochondrial permeability transition and cell death."	swollen_mitochondria
+mito_morphological	Mitochondrial Morpholohical Phenotype	Collapsed/Hyper-condensed Mitochondria	"Dense, highly compact cristae with reduced overall volume. Seen in high-stress or starvation conditions."	collapsed/hyper-condensed_mitochondria
+mito_morphological	Mitochondrial Morpholohical Phenotype	Elongated Mitochondria	"Unusually long mitochondria, potentially a protective response to stress or inhibition of fission machinery."	elongated_mitochondria
+mit_functional	Mitochondrial Functional Phenotypes	OXPHOS Defects	Reduced efficiency in oxidative phosphorylation. 	oxphos_defects
+mit_functional	Mitochondrial Functional Phenotypes	Uncoupling	Dissociation of ATP synthesis from electron transport. Leads to energy dissipation as heat and decreased ATP production.	uncoupling
+mit_functional	Mitochondrial Functional Phenotypes	Mitochondrial Biogensis Defect		mitochondrial_biogensis_defect
+mit_functional	Mitochondrial Functional Phenotypes	Calcium Overload	Excessive uptake of calcium into the mitochondria. Can trigger mitochondrial permeability transition pore (mPTP) opening and cell death.	calcium_overload
+mit_functional	Mitochondrial Functional Phenotypes	Mitophagy	Impaired clearance of damaged mitochondria by autophagy.	mitophagy
+mit_functional	Mitochondrial Functional Phenotypes	Increased Reactive Oxygen Species (ROS)	Elevated production or reduced clearace of ROS by/in mitochondria.	increased_reactive_oxygen_species_(ros)
+mit_functional	Mitochondrial Functional Phenotypes	Cristae Disruption	Loss or disorganization of the inner membrane folds (cristae). Associated with respiratory chain defects and apoptosis.	cristae_disruption
+mit_functional	Mitochondrial Functional Phenotypes	Parkin-positive Aggregated	Clusters of damaged mitochondria tagged with parkin for degradation. Indicative of mitophagy activation.	parkin-positive_aggregated
+mit_functional	Mitochondrial Functional Phenotypes	Mitochondrial Outer Membrane Permeabilization (MOMP)	"Loss of outer membrane integrity, releasing cytochrome c and other pro-apoptotic factors."	mitochondrial_outer_membrane_permeabilization_(momp)
+metabolic	Metabolic	Reduced Exercise Capacity	Impaired energy production due to mitochondrial dysfunction; reduced endurance.	reduced_exercise_capacity
+metabolic	Metabolic	Glucose Intolerance/Insulin Resistance	Mitochondrial dysfunction affects glucose metabolism and insulin signaling.	glucose_intolerance/insulin_resistance
+metabolic	Metabolic	Increased Fat Accumulation	Reduced mitochondrial fatty acid oxidation leads to lipid accumulation.	increased_fat_accumulation
+metabolic	Metabolic	Cold Intolerance	Impaired thermogenesis due to defective mitochondrial uncoupling.	cold_intolerance
+neurological	Neurological	Neurodegeneration	Mitochondrial defects in neurons lead to motor or cognitive decline.	neurodegeneration
+neurological	Neurological	Ataxia	Coordination issues linked to mitochondrial dysfunction in the cerebellum.	ataxia
+neurological	Neurological	Seizures	Energy deficits in neurons lead to hyperexcitability and seizures.	seizures
+neurological	Neurological	Learning and Memory Deficits	Cognitive impairments due to oxidative stress and mitochondrial energy issues.	learning_and_memory_deficits
+cardiac/muscle	Cardiac/Muscle	Cardiomyopathy	Heart dysfunction (dilated or hypertrophic) linked to mitochondrial defects.	cardiomyopathy
+cardiac/muscle	Cardiac/Muscle	Muscle Weakness and Atrophy	Energy deficits cause muscle wasting and reduced strength.	muscle_weakness_and_atrophy
+cardiac/muscle	Cardiac/Muscle	Exercise-Induced Muscle Damage	Mitochondrial dysfunction makes muscles more prone to damage during exercise.	exercise-induced_muscle_damage
+developmental	Developmental	Embryonic Lethality	Severe mitochondrial dysfunction leads to non-viable embryos.	embryonic_lethality
+developmental	Developmental	Growth Retardation	Postnatal growth defects due to energy deficits.	growth_retardation
+aging	Aging	Accelerated Aging	Premature aging signs like hair loss and frailty from mitochondrial stress.	accelerated_aging
+aging	Aging	Reduced Lifespan	Cumulative mitochondrial dysfunction reduces lifespan.	reduced_lifespan
+immunological	Immunological	Immune Dysfunction	Impaired immune response.	immune_dysfunction
+immunological	Immunological	Increased Susceptibility to Infection	Mitochondrial defects reduce immune defense against pathogens.	increased_susceptibility_to_infection
+reproductive	Reproductive	Infertility	Energy deficits in sperm or oocytes lead to reduced fertility.	infertility
+reproductive	Reproductive	Reduced Oocyte Quality	Impaired mitochondrial function in oocytes reduces their viability.	reduced_oocyte_quality
+liver/kidney	Liver/Kidney	Hepatic Steatosis (Fatty Liver)	Reduced fatty acid oxidation in mitochondria leads to fat buildup in the liver.	hepatic_steatosis_(fatty_liver)
+liver/kidney	Liver/Kidney	Renal Dysfunction	Mitochondrial stress in kidneys impairs function.	renal_dysfunction

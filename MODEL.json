@@ -1,139 +1,51 @@
 {
-    "created_on": 1728559433013.001,
+    "created_on": 1731662363095.4,
     "modified_on": null,
     "state": 0,
     "label": null,
-    "tag": "MHpeDeyaFY",
-    "title": "A unit test , where to save this information?",
+    "tag": "0zyBocjjcW",
+    "title": "testing the new unit function",
     "user_tag": "VpVff4sS",
     "collaborators": [],
     "replicates": [
         1,
-        2,
-        3,
-        1,
-        2
+        1
     ],
     "sample_names": [
-        "20241010_MHpeDeyaFY_01_dmso",
-        "20241010_MHpeDeyaFY_02_dmso",
-        "20241010_MHpeDeyaFY_03_anisomycin",
-        "20241010_MHpeDeyaFY_04_anisomycin",
-        "20241010_MHpeDeyaFY_05_anisomycin"
+        "20241115_0zyBocjjcW_01_dda",
+        "20241115_0zyBocjjcW_02_att_acquisition:dia"
     ],
-    "n_samples": 5,
-    "metatext": {
-        "metatext:research_aim": "asdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadad",
-        "metatext:experimental_procedure": "asdadadadasdadadadasdadadadasdadadadasdadadadasdadadadasdadadad"
-    },
+    "n_samples": 2,
+    "metatext": {},
     "dataset_attributes": {
         "att_experiment": [
-            "expression_proteome"
-        ],
-        "att_omics_type": [
-            "proteomics"
+            "att_experiment:neo_nterm_enrichment"
         ],
         "att_proteome": [
             "UP000005640"
         ],
+        "att_omics_type": [
+            "proteomics"
+        ],
         "att_poi": [
-            "att_poi:None"
+            "A6NNB3"
+        ],
+        "att_gene_expression_alteration": [
+            "att_gene_expression_alteration:knockdown"
         ]
     },
     "samples_attributes": {
-        "att_compound": {
-            "dmso": [
-                0,
-                1
+        "att_acquisition": {
+            "dda": [
+                0
             ],
-            "anisomycin": [
-                2,
-                3,
-                4
+            "att_acquisition:dia": [
+                1
             ]
         }
     },
-    "samples_genotypes": {},
-    "links": [],
-    "timeline": {
-        "created_on": 1728559433.021355,
-        "modified_on": 1728559433.021355,
-        "label": "J9ZBWaMsZqy0MAYVO6E2",
-        "entries": [
-            {
-                "id": 0,
-                "label": "SCLeZ2q7BwoixoiuUhol",
-                "created_on": 1728559433.021332,
-                "user_tag": "VpVff4sS",
-                "user_label": null,
-                "state": 0,
-                "comment": "Project created"
-            }
-        ]
-    },
-    "runlist": null,
-    "samples_attributes_input": {
-        "att_compound": [
-            {
-                "attribute_value_tag": "dmso",
-                "sample_index": 0,
-                "input": [
-                    {
-                        "concentration": 2.0
-                    },
-                    {
-                        "time": 2.0
-                    }
-                ]
-            },
-            {
-                "attribute_value_tag": "dmso",
-                "sample_index": 1,
-                "input": [
-                    {
-                        "concentration": 2.0
-                    },
-                    {
-                        "time": 2.0
-                    }
-                ]
-            },
-            {
-                "attribute_value_tag": "anisomycin",
-                "sample_index": 2,
-                "input": [
-                    {
-                        "concentration": 4.0
-                    },
-                    {
-                        "time": 4.0
-                    }
-                ]
-            },
-            {
-                "attribute_value_tag": "anisomycin",
-                "sample_index": 3,
-                "input": [
-                    {
-                        "concentration": 4.0
-                    },
-                    {
-                        "time": 4.0
-                    }
-                ]
-            },
-            {
-                "attribute_value_tag": "anisomycin",
-                "sample_index": 4,
-                "input": [
-                    {
-                        "concentration": 4.0
-                    },
-                    {
-                        "time": 4.0
-                    }
-                ]
-            }
-        ]
-    }
-}
+    "samples_genotypes": null,
+    "dataset_attribute_input": {
+        "att_gene_expression_alteration": {
+            "att_gene_expression_alteration:knockdown": {
+                

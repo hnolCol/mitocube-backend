@@ -45,7 +45,7 @@ def get_dataset_volcano(dataset_tag : str, attribute_value_tag_left : str, attri
     Returns the result for a volcano plot
     """
     
-    data_exist = DB.dataset_has_data(tag = dataset_tag)
+    data_exist = DB.submission_has_dataset(tag = dataset_tag)
     if not data_exist: return no_data_found_http_exception
 
     
@@ -57,12 +57,13 @@ def get_dataset_volcano(dataset_tag : str, attribute_value_tag_left : str, attri
     within_attribute_tag = APIParamString(param=within_attribute_tag).param 
     within_attribute_value_tag = APIParamString(param=within_attribute_value_tag).param 
     
-    comparison_suffix = "" #get_suffix_from_attributes_and_attribute_tags(sample_attribute_tag,attribute_value_tag_left,attribute_value_tag_right,attributes_db,genotype_db,feature_db,within_attribute_tag=within_attribute_tag,within_attribute_value_tag=within_attribute_value_tag)
-    datatable = DB.get_dataset_table(tag = dataset_tag)
+    comparison_suffix = f"{attribute_value_tag_left} vs. {attribute_value_tag_right} ({within_attribute_value_tag}) ({filter_tag})"
+    datatable = DB.datasets.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
     sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)     
     stats = Ttest(datatable,sample_map).get_stats(sample_attribute_tag=sample_attribute_tag, 
                                      attribute_value_left=attribute_value_tag_left, 
-                                     attribute_value_right=attribute_value_tag_right, suffix = comparison_suffix, 
+                                     attribute_value_right=attribute_value_tag_right, 
+                                     suffix = comparison_suffix, 
                                      impute = impute,
                                      within_attribute_tag=within_attribute_tag,
                                      within_attribute_value_tag=within_attribute_value_tag)
@@ -71,6 +72,7 @@ def get_dataset_volcano(dataset_tag : str, attribute_value_tag_left : str, attri
     features = DB.features.get_protein_by_tags(tags = datatable.index.to_list(), as_data_frame=True)
     #join features to the stat results
     stats_and_feature_data = stats.join(features,how="left").reset_index()
-    stats_and_feature_data.rename(columns={"Key":"key"}, inplace=True)
+    print(stats_and_feature_data)
+    print(stats_and_feature_data.to_dict(orient="records")[0])
     return {"stats" : stats_and_feature_data.to_dict(orient="records"), "suffix" : comparison_suffix}
     

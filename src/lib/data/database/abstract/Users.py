@@ -11,11 +11,20 @@ from config.models.user import UserModel
 
 class UserABC(ABC):
     
+    @abstractmethod
+    def check(self) -> None:
+        "Check if users exists, if not create the lead account."
+    
+    
+    @abstractmethod
+    def get_tags(self, limit : int) -> List[str]:
+        ""
     
     @abstractmethod 
     def add_user(self, user_props):
         ""
 
+    @abstractmethod
     def add_users(self, users : List[UserModel]):
         """Adds users to the database from a list of users
 
@@ -24,7 +33,7 @@ class UserABC(ABC):
         users : List[UserModel]
             The users to be added using the common pydantic UserModel. 
         """
-    
+        
     @abstractmethod
     def block_user_by_tag(self, tag : str) -> bool:
         ""

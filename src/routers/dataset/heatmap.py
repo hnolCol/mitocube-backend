@@ -27,7 +27,7 @@ router = APIRouter(
             tags=["Heatmap"])
 def get_dataset_heatmap(dataset_label : str, 
                         n_clusters : int = 8, 
-                        filter_tag : str = "mitocarta_3.0",
+                        filter_tag : str = None,
                         user : UserModel = Depends(get_user_from_token)):
     """
     Returns data to feed into a heatmap for visualization.
@@ -37,15 +37,14 @@ def get_dataset_heatmap(dataset_label : str,
     """
     dataset_tag = dataset_label
     
-    data_exist = DB.dataset_has_data(tag = dataset_tag)
+    data_exist = DB.submission_has_dataset(tag=dataset_label)
     if not data_exist: return no_data_found_http_exception
     
     if filter_tag is not None:
         if not DB.filters.exists(tag = filter_tag):
             raise filter_tag_does_not_exist_exception
     
-    datatable = DB.get_dataset_table(tag = dataset_tag, filter_tag = filter_tag)
-    print(datatable)
+    datatable = DB.datasets.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
     _, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)  
     
     try:
@@ -73,7 +72,7 @@ def get_dataset_heatmap(dataset_label : str,
     stats_and_zscores = stats_and_zscores.join(features,how="left")
     print(stats_and_zscores)
     return {
-        "dataset_label" : dataset_label,
+        "dataset_tag" : dataset_tag,
         "data" : stats_and_zscores.reset_index(names="Key").to_dict(orient="records"),
         "value_names" : datatable.columns.to_list(),
         "label_names" : ["gene_name"],

@@ -104,13 +104,22 @@ class Neo4JFilter(FilterABC):
         r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value)
         return r [0]
     
-    def get(self, tag : str = None, proteome_tags : List[str] = None, feature_tag : str = None) -> List[FilterModel]:
+    def get(self, tag : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, feature_tag : str = None) -> List[FilterModel]:
         ""
+        print(submission_tags)
         if tag is not None:
             query = (
                 "MATCH (f:Filter) "
                 "WHERE f.tag = $tag "
                 
+            )
+        elif submission_tags is not None and len(submission_tags) > 0:
+            query = (
+                "MATCH (submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue {attribute_tag : 'att_proteome'}) "
+                "WHERE submission.tag in $submission_tags "
+                "WITH collect(av.tag) as proteome_tags "
+                "MATCH (f:Filter) "
+                "WHERE f.proteome_tag in proteome_tags "
             )
         elif proteome_tags is not None:
             query = (
@@ -136,6 +145,7 @@ class Neo4JFilter(FilterABC):
                                     database_="neo4j", 
                                     routing_="r",
                                     feature_tag = feature_tag,
+                                    submission_tags = submission_tags,
                                     tag = tag,
                                     proteome_tags = proteome_tags,
                                     result_transformer_= Result.value)

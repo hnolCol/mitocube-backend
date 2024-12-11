@@ -8,8 +8,6 @@ print(X)
 
 json_data = [] 
 
-
-
 def nan2None(obj):
     if isinstance(obj, dict):
         return {k:nan2None(v) for k,v in obj.items()}
@@ -37,8 +35,10 @@ for UnitType, data in X.groupby("UnitType"):
         "text" : UnitType,
         "tag" : data["UnitType tag"].values[0],
         "priority": int(data["type_priority"].values[0]),	
-        "units" : data[["tag","text","priority"]].to_dict(orient="records")
+        "has_feature_value" : "true" if data["has_feature_value"].values[0] else "false",
+        "units" : data[["tag","text","priority","description"]].to_dict(orient="records")
     })
+print(json_data)
 with open("units.json","w") as f:
     
     json.dump(json_data,f,indent = 4, cls=NanConverter)

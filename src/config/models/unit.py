@@ -1,6 +1,9 @@
 from pydantic import BaseModel, model_serializer
-from typing import Literal, List
+from typing import Optional, List, Union
 
+class UnitTypeInputModel(BaseModel):
+    value : Union[List[str],str]
+    unit_tag : str 
 
 class InputModel(BaseModel):
     value : float|str 
@@ -15,6 +18,7 @@ class InputModel(BaseModel):
 class UnitModel(BaseModel):
     tag : str 
     text : str 
+    description : Optional[str] = None 
     priority : int 
     
     
@@ -22,16 +26,16 @@ class UnitTypeResponseModel(BaseModel):
     tag : str 
     text : str 
     priority : int
+    has_feature_value : bool
     units : List[UnitModel]
     
 
-
-class UserUnitInput(BaseModel):
-    ""
-    time_unit : Literal["s","min","h","w","a"] = "s"
-    value : float 
-    unit  : UnitModel
-    
+class UnitInputResponseModel(BaseModel):
+    unittype_tag : str 
+    has_feature_value : bool = False
+    unit_tag : str 
+    unit_text : str 
+    value : Union[str,float,int] 
     
     
 

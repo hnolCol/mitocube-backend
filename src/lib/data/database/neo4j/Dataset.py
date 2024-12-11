@@ -42,7 +42,7 @@ class Neo4JDataset(DatasetABC):
         grouped_sample_attributes = sample_attributes_map.groupby(by=attribute_tags)
         data_for_test = [data_table.iloc[:,group_data.index].values for group, group_data in grouped_sample_attributes]
         #returns F-value and p-values
-        F,p = f_oneway(*data_for_test,axis=1)
+        F,p = f_oneway(*data_for_test,axis=1,)
         F = pd.Series(F,index=data_table.index)
         return F
     

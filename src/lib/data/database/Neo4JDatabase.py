@@ -44,7 +44,7 @@ users_from_db = UserDB.get_users()
 #print(users_from_db[0])
 
 
-genotypes = []#[GenotypeModel(**x) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
+#genotypes = [GenotypeModel(**x) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
 #print(genotypes)
 
 
@@ -113,11 +113,11 @@ class MergeIndexNode(MatchIndexedNode):
 
 
 
-dataset_tag = "LOGtC9tNC13b" # "BuXOSlIl6G" # #   #"MpHCYf9mShVR" # #
-m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
-meta = DatasetSubmissionModel(**m, tag = m["label"])
-d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/data.txt", sep="\t").set_index("Key") #.sample(n=4000)
-#print(meta)
+# dataset_tag = "LOGtC9tNC13b" # "BuXOSlIl6G" # #   #"MpHCYf9mShVR" # #
+# m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
+# meta = DatasetSubmissionModel(**m, tag = m["label"])
+# d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/data.txt", sep="\t").set_index("Key") #.sample(n=4000)
+# #print(meta)
 #print(d)
 
 def transform_query_result(result):
@@ -166,7 +166,13 @@ constraints = [
     ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag"),
     ConstraintModel(constrain_label  = "qc_tag",node_label = NodeLabelModel(label = "QCRun"),property_name ="tag"),
     ConstraintModel(constrain_label  = "peptide_tag",node_label = NodeLabelModel(label = "Peptide"),property_name ="tag"),
-    ConstraintModel(constrain_label  = "news_tag",node_label = NodeLabelModel(label = "News"),property_name ="tag")
+    ConstraintModel(constrain_label  = "news_tag",node_label = NodeLabelModel(label = "News"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "unittype_tag",node_label = NodeLabelModel(label = "UnitType"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "timeline_tag",node_label = NodeLabelModel(label = "Timeline"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "research_group_tag",node_label = NodeLabelModel(label = "ResearchGroup"),property_name = "tag"),
+    ConstraintModel(constrain_label  = "phenotype_tag",node_label = NodeLabelModel(label = "Phenotype"),property_name = "tag")
+
 ]
 
 
@@ -231,7 +237,7 @@ class Neo4JConstructor:
         self._add_constraints()
         self._add_indices()
         self._add_states()
-        self._add_unit(units=units)
+        #self._add_unit(units=units)
         self._add_user_roles()   
         self._add_full_text_dataset_search()     
     
@@ -240,21 +246,28 @@ class Neo4JConstructor:
         self._add_attributes_from_file()
 
 
+
+    def set_up_phenotypes(self):
+        
+        phenotype_json = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/phenotypes/phenotypes.json")
+        
+        
+
     def set_up_units(self):
         "" 
         json_file = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/units/units.json")
-        
+        #print(json_file)
         query = (
             "UNWIND $units as unit_prop "
             "MERGE (unittype:UnitType {tag : unit_prop.tag}) "
-            "SET unittype.text = unit_prop.text, unittype.priority = unit_prop.priority "
+            "SET unittype.text = unit_prop.text, unittype.priority = unit_prop.priority, unittype.has_feature_value = unit_prop.has_feature_value "
             "WITH unittype, unit_prop "
             "UNWIND unit_prop.units as unit "
             "MERGE (u:Unit {tag:unit.tag}) "
             "ON CREATE "
-            "SET u.created_at = timestamp(), u.text = unit.text, u.priority = unit.priority "
+            "SET u.created_at = timestamp(), u.text = unit.text, u.priority = unit.priority, u.description = unit.description "
             "ON MATCH "
-            "SET u.text = unit.text, u.modified_at = timestamp(), u.priority = unit.priority "
+            "SET u.text = unit.text, u.modified_at = timestamp(), u.priority = unit.priority, u.description = unit.description "
             "MERGE (unittype)-[:HAS_UNIT]-(u) "
             )
         
@@ -268,6 +281,7 @@ class Neo4JConstructor:
         self.factory.create_index("index_protein_proteome_id",NodeLabelModel(label="Protein"),["proteome_id"]) 
         self.factory.create_text_index("protein_s",NodeLabelModel(label = "Protein"),"s")
         self.factory.create_text_index("user_s",NodeLabelModel(label = "User"),"s")
+        self.factory.create_text_index("phenotype_s",NodeLabelModel(label = "Phenotype"),"s")
         self.factory.create_text_index("genotype_s",NodeLabelModel(label = "Genotype"),"s")
         self.factory.create_text_index("protein_gene_search",NodeLabelModel(label = "Protein"),"gene_name")
         self.factory.create_text_index("protein_tag_search",NodeLabelModel(label = "Protein"),"tag")    
@@ -300,6 +314,7 @@ class Neo4JConstructor:
                                         NodeLabelModel(cypher_label="tn",label="AttributeValue"), relationship_label="HAS_VALUE", 
                                         properties=rels)
         
+        hierarchy = attribute_df[["tag","parent_tag"]].dropna(subset="parent_tag").to_dict(orient="records")
         
         ## connect states         
         query = (
@@ -310,6 +325,15 @@ class Neo4JConstructor:
         )
         self._driver.execute_query(query,props = min_state_attributes)
         
+        
+        ## add hierarchy 
+        query = (
+            "UNWIND $hierarchy as h "
+            "MATCH (a:Attribute {tag: h.tag}) "
+            "MATCH (parent:Attribute {tag: h.parent_tag}) "
+            "MERGE (parent)-[:IS_PARENT_OF]->(a) "
+        )
+        self._driver.execute_query(query, hierarchy = hierarchy, routing_="w")
         
         ## add units 
         query = (
@@ -339,70 +363,70 @@ class Neo4JConstructor:
         
         self._driver.execute_query(query)
         
-    # def _add_genotypes(self, genotypes : List[GenotypeModel], user_tag : str = None):
+    def _add_genotypes(self, genotypes : List[GenotypeModel], user_tag : str = None):
         
-    #     def extract_genotype_attributes(genotype_attributes):
-    #         ""
-    #         gen_attrs = []
-    #         n = 0
-    #         for attribute in genotype_attributes:
-    #             #there might be multiple protein mutations
-    #             for idx in range(len(attribute["att_protein_mutation"])):
-    #                 gen_attrs.append({})
-    #                 mutation_tag = attribute["att_protein_mutation"][idx].tag
-    #                 position_of_mutation = attribute["att_protein_position"][mutation_tag]
-    #                 gen_attrs[n]["protein_tag"] = attribute["att_protein_coding_sequence"][0].key
-    #                 gen_attrs[n]["engineering_tag"] = attribute["att_gene_engineering"][0].tag
-    #                 gen_attrs[n]["method_tag"] = attribute["att_gene_editing_method"][0].tag
-    #                 gen_attrs[n]["mutation_tag"] = mutation_tag
-    #                 gen_attrs[n]["position_tag"] = position_of_mutation.attribute_value.tag
-    #                 gen_attrs[n]["aa_position"] = position_of_mutation.aa_position
-    #                 gen_attrs[n]["aa"] = position_of_mutation.aa
-    #                 gen_attrs[n]["substitution"] = position_of_mutation.substitution
-    #                 n += 1
-    #         return gen_attrs
+        def extract_genotype_attributes(genotype_attributes):
+            ""
+            gen_attrs = []
+            n = 0
+            for attribute in genotype_attributes:
+                #there might be multiple protein mutations
+                for idx in range(len(attribute["att_protein_mutation"])):
+                    gen_attrs.append({})
+                    mutation_tag = attribute["att_protein_mutation"][idx].tag
+                    position_of_mutation = attribute["att_protein_position"][mutation_tag]
+                    gen_attrs[n]["protein_tag"] = attribute["att_protein_coding_sequence"][0].key
+                    gen_attrs[n]["engineering_tag"] = attribute["att_gene_engineering"][0].tag
+                    gen_attrs[n]["method_tag"] = attribute["att_gene_editing_method"][0].tag
+                    gen_attrs[n]["mutation_tag"] = mutation_tag
+                    gen_attrs[n]["position_tag"] = position_of_mutation.attribute_value.tag
+                    gen_attrs[n]["aa_position"] = position_of_mutation.aa_position
+                    gen_attrs[n]["aa"] = position_of_mutation.aa
+                    gen_attrs[n]["substitution"] = position_of_mutation.substitution
+                    n += 1
+            return gen_attrs
                 
             
-    #     genotype_props = [{"tag" : genotype.label, 
-    #                        "proteome_id" : genotype.proteome_id, 
-    #                        "text" : genotype.text, 
-    #                        "attributes" : extract_genotype_attributes(genotype.attributes)} for genotype in genotypes if "att_protein_mutation" in genotype.attributes[0] and "att_protein_position" in genotype.attributes[0]]
+        genotype_props = [{"tag" : genotype.label, 
+                           "proteome_tag" : genotype.proteome_id, 
+                           "text" : genotype.text, 
+                           "attributes" : extract_genotype_attributes(genotype.attributes)} for genotype in genotypes if "att_protein_mutation" in genotype.attributes[0] and "att_protein_position" in genotype.attributes[0]]
 
-    #     query = (
-    #         "UNWIND $genotypes as genotype "
-    #         "MERGE (g:Genotype {tag : genotype.tag}) "
-    #         "ON CREATE "
-    #         "SET g.created_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
-    #         "ON MATCH "
-    #         "SET g.modified_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
-    #         "WITH g, genotype "
-    #         "UNWIND genotype.attributes as attribute "
-    #         "MATCH (p:Protein {tag : attribute.protein_tag}) "
-    #         "SET g.s = toLower(genotype.text)+' '+p.s "
-    #         "WITH g,p,genotype, attribute "
-    #         "MERGE (g)-[effect_r:EFFECTS {tag : genotype.tag}]->(p) "
-    #         "SET effect_r.created_at = timestamp() "
-    #         "WITH attribute,p,genotype,g "
-    #         "MATCH (engineer_attribute:AttributeValue {tag : attribute.engineering_tag}) "
-    #         "MATCH (method_attribute:AttributeValue {tag : attribute.method_tag}) "
-    #         "MATCH (prot_mutation_attribute:AttributeValue {tag : attribute.mutation_tag}) "
-    #         "MATCH (position_attribute:AttributeValue {tag : attribute.position_tag}) "
-    #         "MERGE (method_attribute)<-[:MEDIATED_BY {tag : genotype.tag}]-(engineer_attribute) "
-    #         "MERGE (method_attribute)-[:MODIFYING {tag : genotype.tag}]-(p) "
-    #         "MERGE (p)-[:INTRODUCING {tag : genotype.tag}]-(prot_mutation_attribute) "
-    #         "MERGE (prot_mutation_attribute)-[at_r:AT {tag : genotype.tag}]->(position_attribute) "
-    #         "SET at_r.position = attribute.aa_position, at_r.amino_acids = attribute.aa, at_r.substitution = attribute.substitution "
-    #         )
+        query = (
+            "UNWIND $genotypes as genotype "
+            "MERGE (g:Genotype {tag : genotype.tag}) "
+            "ON CREATE "
+            "SET g.created_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
+            "ON MATCH "
+            "SET g.modified_at = timestamp(), g.text = genotype.text, g.proteome_id = genotype.proteome_id "
+            "WITH g, genotype "
+            "UNWIND genotype.attributes as attribute "
+            "MATCH (p:Protein {tag : attribute.protein_tag}) "
+            "SET g.s = toLower(genotype.text)+' '+p.s "
+            "WITH g,p,genotype, attribute "
+            "MERGE (g)-[effect_r:EFFECTS {tag : genotype.tag}]->(p) "
+            "SET effect_r.created_at = timestamp() "
+            "WITH attribute,p,genotype,g "
+            "MATCH (engineer_attribute:AttributeValue {tag : attribute.engineering_tag}) "
+            "MATCH (method_attribute:AttributeValue {tag : attribute.method_tag}) "
+            "MATCH (prot_mutation_attribute:AttributeValue {tag : attribute.mutation_tag}) "
+            "MATCH (position_attribute:AttributeValue {tag : attribute.position_tag}) "
+            "MERGE (method_attribute)<-[:MEDIATED_BY {tag : genotype.tag}]-(engineer_attribute) "
+            "MERGE (method_attribute)-[:MODIFYING {tag : genotype.tag}]-(p) "
+            "MERGE (p)-[:INTRODUCING {tag : genotype.tag}]-(prot_mutation_attribute) "
+            "MERGE (prot_mutation_attribute)-[at_r:AT {tag : genotype.tag}]->(position_attribute) "
+            "SET at_r.position = attribute.aa_position, at_r.amino_acids = attribute.aa, at_r.substitution = attribute.substitution "
+            )
         
-    #     if user_tag is not None:
-    #         query += ("WITH g "
-    #                   "MATCH (u:User {tag : $user_tag}) "
-    #                   "MERGE (u)-[r_defined:DEFINED {tag : g.tag}]->(g) "
-    #                   "ON CREATE "
-    #                   "SET r_defined.created_at = timestamp() "
-    #         )
+        if user_tag is not None:
+            query += ("WITH g "
+                      "MATCH (u:User {tag : $user_tag}) "
+                      "MERGE (u)-[r_defined:DEFINED {tag : g.tag}]->(g) "
+                      "ON CREATE "
+                      "SET r_defined.created_at = timestamp() "
+            )
         
-    #     self._driver.execute_query(query, genotypes = genotype_props, user_tag = user_tag, routing_="w",  database_="neo4j")
+        self._driver.execute_query(query, genotypes = genotype_props, user_tag = user_tag, routing_="w",  database_="neo4j")
         
     def _add_states(self):
         ""
@@ -540,18 +564,18 @@ class MCNeo4JDatabase(DatabaseABC):
         #self.constructor._add_user_roles()
         self.constructor.set_up_attributes()
         
-        print(self.attributes.unit(tags = ["att_compound"]))
+        #print(self.attributes.unit(tags = ["att_compound"]))
        
         self.constructor._screen_pubmed_for_proteins()
         self.constructor._add_genotypes(genotypes=genotypes)
         self.constructor._add_fulltext_dataset_search_nodes()
-        print(self.submission_filter.get_counts())
+        #print(self.submission_filter.get_counts())
        # self.update_state('Q7JgoEYTqy',5,"123asd")
        # self.factory.create_text_index("dataset_searcg",NodeLabelModel(label = "Query"),"s")
         #rr = self.attributes.get_attribute_values_by_attribute_tag()
-        self.user.add_users(users_from_db)
-        self.insert_meta(meta)
-        self.meta.get_metatext(tags=[meta.tag])
+        #self.user.add_users(users_from_db)
+       # self.insert_meta(meta)
+        #self.meta.get_metatext(tags=[meta.tag])
        # self.dataset_values.get_abundance_distribution()
        # self.dataset_values.get_abundance_distribution(filter_tag="MitoCarta 3.0")
         
@@ -610,11 +634,11 @@ class MCNeo4JDatabase(DatabaseABC):
     # return count(p) as count
         
         
-        self.get_protein_data(tag = 'Q86YN6',dataset_tags=[dataset_tag])
+        #self.get_protein_data(tag = 'Q86YN6',dataset_tags=[dataset_tag])
         
-        print("====")
-        print(self.meta.get_users(dataset_tag=meta.label))
-        print("USERS")
+       # print("====")
+       # print(self.meta.get_users(dataset_tag=meta.label))
+       # print("USERS")
         #print(B)
         #self.insert_meta()
         #self.insert_dataset(data_table=d, tag=dataset_tag)

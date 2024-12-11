@@ -36,3 +36,9 @@ class FeatureGeneModel(BaseModel):
     gene_name : str 
     gene_version : int 
     gene_source : Optional[str] = None
+    
+    
+    
+class FeatureSequenceResponseModel(BaseModel):
+    feature_tag : str 
+    sequence : str 

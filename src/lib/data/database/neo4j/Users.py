@@ -27,6 +27,22 @@ class Neo4JUser(UserABC):
         
         self._driver = driver 
         
+        
+    def get_tags(self, limit: int = None) -> List[str]:
+        
+        query = (
+            "MATCH (u:User) "
+            "RETURN u.tag ORDER BY u.created_at "
+        )    
+        if limit is not None:
+            query += "LIMIT $limit"
+            
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, limit = limit)
+        return r 
+    
+    def check(self) -> None:
+        self._check_user()    
+    
     def _check_user(self):
         ""
         if self.count() == 0:
@@ -38,9 +54,11 @@ class Neo4JUser(UserABC):
                 email=GENERAL_SETTINGS.lead_contact,
                 research_group=GENERAL_SETTINGS.lead_contact_group,
                 institute=GENERAL_SETTINGS.lead_contact_institute,
-                role=UserRolesEnum.ADMIN
+                role=UserRolesEnum.ADMIN,
+                is_lead_admin=True
                 )
             self.add_user(lead_contact)
+            print("Lead user created...")
             asyncio.run(async_send_email(
                             subject="Lead Account Generated",
                             email_to=[lead_contact.email],

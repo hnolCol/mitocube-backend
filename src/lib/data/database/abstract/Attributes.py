@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from config.enums.states import SubmissionStatesEnums
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeResponseModel
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeResponseModel, AttributeTreeNode
 from config.models.feature import FeatureNeoModel 
 
 class AttributesABC(ABC):
@@ -112,7 +112,7 @@ class AttributesABC(ABC):
     @abstractmethod
     def get(self, 
             tags : List[str] = None, 
-            param_name : Literal["allow_for_dataset","allow_as_filter",
+            param_name : Literal["allow_for_dataset","allow_as_filter", "allow_for_sample",
                                 "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
             min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[AttributeModel]:
@@ -154,7 +154,27 @@ class AttributesABC(ABC):
         """
         
     @abstractmethod
-    def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
+    def get_attribute_hierarchy(self, tags : List[str], submission_tag : str) -> List[AttributeTreeNode]:
+        """Returns the hierarchy of the attributes, that 
+        match the given tags. 
+
+        Parameters
+        ----------
+        tags : List[str]
+            The attribute tags to get the hierarchy for. 
+            
+        Returns
+        --------
+        List[AttributeTreeNode]
+            The hierarchy as given such as a list of keys
+                - tag 
+                - IS_PARENT_OF 
+            
+            
+        """
+        
+    @abstractmethod
+    def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel]:
         ""
         
         
@@ -238,9 +258,15 @@ class AttributesABC(ABC):
         """
         
     @abstractmethod
-    def get_mandatory_attributes(self)->List[AttributeModel]:
+    def get_mandatory_attributes(self, state : SubmissionStatesEnums = None)->List[AttributeModel]:
         """Mandatory attributes that are required to fill in
         at the submission state. 
+
+        Parameters
+        ----------
+        state 
+            Return mandatory attributes for the given state only. 
+
 
         Returns
         -------

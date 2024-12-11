@@ -17,6 +17,10 @@ from lib.data.database.neo4j.Peptides import Neo4JPeptides
 from lib.data.database.Neo4JDatabase import Neo4JFactory, Neo4JConnection, Neo4JConstructor
 from lib.data.database.neo4j.QC import Neo4JQC
 from lib.data.database.neo4j.UnitTypes import Neo4JUnitTypes
+from lib.data.database.neo4j.Instruments import Neo4JInstruments
+from lib.data.database.neo4j.Timeline import Neo4JTimeline
+from lib.data.database.neo4j.ResearchGroup import Neo4JResearchGroup
+from lib.data.database.neo4j.Phenotypes import Neo4JPhenotypes
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 import pandas as pd 
@@ -39,13 +43,17 @@ class MCNeo4JDatabase(DatabaseABC):
         #self.calcs = Neo4JCalculations(driver=self.connection.driver, feature=self.features)
         self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver)
         self.genotypes = Neo4JGenotype(driver=self.connection.driver)
-        self.proteomes = Neo4JProteomes(driver = self.connection.driver)
+        self.proteomes = Neo4JProteomes(driver = self.connection.driver, features=self.features)
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.qc = Neo4JQC(driver = self.connection.driver)
         self.peptides = Neo4JPeptides(driver = self.connection.driver)
         self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)
         self.unittypes = Neo4JUnitTypes(driver = self.connection.driver)
+        self.instruments = Neo4JInstruments(driver=self.connection.driver)
+        self.timeline = Neo4JTimeline(driver=self.connection.driver)
+        self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
+        self.phenotypes = Neo4JPhenotypes(driver = self.connection.driver)
         #checks if all is correctly defined 
         super(MCNeo4JDatabase, self).__init__()
         
@@ -55,6 +63,7 @@ class MCNeo4JDatabase(DatabaseABC):
         #self.constructor._add_user_roles()
         self.constructor.set_up_units()
         self.constructor.set_up_attributes()
+        #self.constructor._add_
         
         
 

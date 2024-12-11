@@ -10,12 +10,15 @@ from config.models.attributes import AttributeValueModel
 from config.enums.states import SubmissionStatesEnums
 from lib.user.UserHandling import UserDB
 
+from lib.data.database.Database import Database
+
 import numpy as np 
 router = APIRouter(
     prefix="/api/instruments",
     tags=["Remote Control"]
     )
 
+DB = Database.DB()
 
 @router.get("", response_model=List[AttributeValueModel])
 def get_instruments(user : UserModel = Depends(get_user_from_token)):
@@ -33,6 +36,9 @@ def get_instruments(user : UserModel = Depends(get_user_from_token)):
     List[AttributeValueModel]
         The list of instruments.
     """
+    
+    DB.attributes.get_values()
+    
     db_helper = MCDatabaseHelper.getDatabaseHelper()
     db_attributes = MCAttributes.getAttributeDatabase()
     instrument_values = db_attributes.getAttributeValues(tags=list(db_helper.get_instruments()))
@@ -44,6 +50,8 @@ def get_instruments(user : UserModel = Depends(get_user_from_token)):
 @router.get("/{instrument_tag}/stats")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
     ""
+
+    
     measuring_submission = {}
     db_helper = MCDatabaseHelper.getDatabaseHelper()
     instruments = db_helper.get_instruments()

@@ -1,10 +1,11 @@
 from pydantic import BaseModel, field_validator, field_serializer
 
-from typing import Any, Optional, List, Union, Literal
+from typing import Any, Optional, List, Union, Literal, ForwardRef, Dict
 import numpy as np 
 from config.models.feature import FeatureNeoModel
-# from services.random_generators import get_random_string
 
+from config.enums.units import UnitsEnum
+from config.models.unit import UnitInputResponseModel
 class AttributeModel(BaseModel):
     """
     BaseModel for Attributes
@@ -69,8 +70,9 @@ class AttributeModel(BaseModel):
     allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
     allow_for_user : bool = False
     has_unit : bool = False 
-    unit : Optional[List[Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow rate","arbitrary","feature","length","fraction"]]] = None # ToDo: define units like this? 
-
+    unit : Optional[List[UnitsEnum]] = None # ToDo: define units like this? 
+    class Config:  
+        use_enum_values = True
 
     @field_validator('s', mode="before")
     def check_search(cls, v : List[str]|str, field):
@@ -132,6 +134,38 @@ class AttributeModel(BaseModel):
             raise ValueError("Attribute Tags must start 'att_'. Example : 'att_organism")
         return v #remove lower, otherwise proteome maps are inconsistent
 
+AttributeTreeNode = ForwardRef('AttributeTreeNode')
+class AttributeTreeNode(BaseModel):
+    """_summary_
+
+    Parameters
+    ----------
+    BaseModel : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    
+    tag : str 
+    priority : int
+    min_state : int
+    IS_PARENT_OF : Optional[List[AttributeTreeNode]] = []
+
+
+AttributeTreeNode.model_rebuild()
+
+
+print(AttributeTreeNode)
+
+class TraitUnitInput(BaseModel):
+    unit_tag : str 
+    unit_text : str 
+    value : Union[str,float,int]
+
+
 
 class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id (check definitions first)
     """
@@ -152,11 +186,12 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
     attribute_tag : Optional[str] = None 
     text : str
     tag : str 
-    unit_value : Optional[float] = None # The value associated with the attribute value, often None, for some we can define a certain unit value such as concentration 
+    #unit_value : Optional[float] = None # The value associated with the attribute value, often None, for some we can define a certain unit value such as concentration 
     #value : float  # ToDo: str or float or int? or more flexible? :: The excel table says attribute_value, value is not a float then, maybe like
     #value : Optional[Union[float,str,int]] #maybe like this? #changed the excel header attribute_value to value since attribute_id referece to the attribute not the attribute value
     description : Optional[str] = ""
     s : str = None #The search param 
+    user_input :  Optional[Dict[str,TraitUnitInput]] = None # unittype_tag -> TraitUnitInput  Optional[List[UnitInputResponseModel]] = None
     #feature : Optional[str] = None #feature_key 
     
    # feature : str # i dont understand feature here, in my view the attribute_value becomes the feature ID, but I we probably dont need this anymore and we should use the FeatureModel instead. 
@@ -184,6 +219,18 @@ class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id 
             return str(v)
         else:
             return v
+        
+    @field_validator("user_input", mode="before")
+    @classmethod
+    def check_user_input(cls, v: Any):
+        if not isinstance(v,dict): return None 
+        if len(v) == 0: return None 
+        if any(vi["value"] is None for vi in v.values()):
+            return None 
+        return v 
+
+class AttrInput(AttributeValueModel):
+    user_input :  Dict[str,TraitUnitInput]
 
 
 class AttribteValueInsertModel(BaseModel):
@@ -193,7 +240,7 @@ class AttribteValueInsertModel(BaseModel):
 
 
 class AttributeValuesBySubmissionModel(BaseModel):
-    attribute_value : AttributeValueModel|FeatureNeoModel
+    attribute_value : AttributeValueModel
     tags : List[str]
     count : int 
 

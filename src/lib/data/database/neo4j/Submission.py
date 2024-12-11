@@ -1,4 +1,4 @@
-from typing import Literal, List 
+from typing import Literal, List , Dict
 from neo4j import Driver, Result 
 import pandas as pd 
 import datetime
@@ -13,6 +13,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 
+from services.units import extract_user_input
 class Neo4JSubmissions(SubmissionABC):
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC) -> None:
         self._meta = meta 
@@ -58,10 +59,26 @@ class Neo4JSubmissions(SubmissionABC):
         
         return r[0]
     
+    
+    def get_state(self, tag: str) -> SubmissionStatesEnums:
+        
+        query = (
+            "MATCH (submission:Submission)-[:IN_STATE]->(s:State) "
+            "WHERE submission.tag = $tag "
+            "RETURN s.tag "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        print(r)
+        if len(r) == 0: raise ValueError("No state found.")
+        return r[0]
+    
     def insert(self, submission: DatasetSubmissionModel) -> bool:
         ""
+        
         submission_tag = submission.tag
         sample_names = submission.sample_names
+        dataset_attribute_input = submission.dataset_attribute_input
         genotypes_added = 0 
         sample_attributes_added = 0 
         
@@ -81,20 +98,24 @@ class Neo4JSubmissions(SubmissionABC):
             if not self._proteomes.exist(proteome_tag):
                 raise ProteomeNotFoundError(f"The proteome {proteome_tag} was not found in the database. Please add it before inserting the submission.")
         
-        
-    
         samples = [{"tag" : sample_name, "props" : {"index" : idx, "replicate" : submission.replicates[idx], "text" : sample_name}} for idx,sample_name in enumerate(sample_names)]
         dataset_attributes =  [tag for tag in submission.dataset_attributes.keys()]
-        dataset_attribute_values = [{"attribute_value_tag" : tag.split(":")[-1], "attribute_tag" : attribute_tag} 
-                                    for attribute_tag,tags in submission.dataset_attributes.items() for tag in tags]
 
+                
+        dataset_attribute_values = [{"attribute_value_tag" : tag, #remove!! att_ is history 
+                                     "attribute_tag" : attribute_tag, 
+                                     "trait_value" : extract_user_input(dataset_attribute_input[attribute_tag][tag]) if attribute_tag in dataset_attribute_input and dataset_attribute_input[attribute_tag][tag] else []} 
+                                    for attribute_tag,tags in submission.dataset_attributes.items() for tag in tags]
+        
+        dataset_attributes_units = [x for x in dataset_attribute_values if isinstance(x["trait_value"],list) and len(x["trait_value"]) > 0]
+        
         query = (
             "MERGE (submission:Submission {tag : $submission_tag}) "
             "SET submission += $dataset_props "
             "WITH submission "
             "MATCH (state:State {tag : $state_tag}) "
             "MERGE (submission)-[r_in_state:IN_STATE]->(state) "
-            "SET r_in_state.created_at = timestamp() "
+            "SET r_in_state.created_at = timestamp(), r_in_state.user_tag = $user_tag "
             "WITH submission "
             "UNWIND $samples as sample_name "
             "MERGE (s:Sample {tag : sample_name.tag}) "
@@ -110,21 +131,43 @@ class Neo4JSubmissions(SubmissionABC):
             "UNWIND $dataset_attribute_values as attribute_value "
             "MATCH (av:AttributeValue {tag : attribute_value.attribute_value_tag}) "
             "MATCH (a:Attribute {tag : attribute_value.attribute_tag}) "
-            "MERGE (submission)-[:HAS_ATTRIBUTE_VALUE]->(av) "
-            "MERGE (av)-[:HAS_VALUE]-(a) "  
+            "MERGE (submission)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
+            "SET r.created_at = timestamp(), r.attribute_tag = a.tag "
+            "MERGE (av)-[:HAS_VALUE]-(a) "
+
+            ""
         )
     
         self._driver.execute_query(query, routing_="w", 
                                    samples = samples, 
+                                   user_tag = submission.user_tag,
                                    submission_tag = submission_tag, 
                                    dataset_attributes  = dataset_attributes, 
                                    state_tag = submission.state, 
                                    dataset_props = dataset_props, 
                                    dataset_attribute_values = dataset_attribute_values)
+        
+        
+        #add units 
+        if len(dataset_attributes_units) > 0:
+            query = (
+                "MATCH (submission:Submission {tag : $submission_tag}) "
+                "UNWIND $dataset_attribute_values AS attribute_value "
+                "UNWIND attribute_value.trait_value AS trait "
+                "WITH attribute_value, trait "
+                "MATCH (av:AttributeValue {tag: attribute_value.attribute_value_tag}) "
+                "MATCH (unit:Unit {tag: trait.unit_tag}) "
+                "MERGE (av)-[r:HAS_VALUE_OF_UNIT]-(unit) "
+                "SET r.value = trait.value, r.submission_tag = $submission_tag, r.unittype_tag = trait.unittype_tag "
+                "RETURN av, unit, r "
+            )
+            r = self._driver.execute_query(query,routing_="w",submission_tag = submission_tag, dataset_attribute_values = dataset_attributes_units, result_transformer_=Result.value)
+        
         try:
             self._meta.add_samples_attributes(meta_data=submission)
             sample_attributes_added = 1 
-        except:
+        except Exception as e:
+            print(e) 
             print("No sample attributes added ")
         try:
             self._meta.add_samples_genotypes(meta_data=submission)
@@ -136,6 +179,9 @@ class Neo4JSubmissions(SubmissionABC):
         
         self._meta.add_owner(tag=submission_tag, user_tag=submission.user_tag)
         self._meta.add_collaborators(tag=submission_tag, user_tags=submission.collaborators)
+        
+        print(submission.metatext)
+        
         self._meta.add_metatext(tag=submission_tag, user_tag= submission.user_tag, meta_texts=submission.metatext)
         
         
@@ -143,9 +189,84 @@ class Neo4JSubmissions(SubmissionABC):
         return super().get(tag)
 
     
-    def update_state(self, tag: str, new_state: SubmissionStatesEnums) -> bool:
-        return super().update_state(tag, new_state)
+    def update_state(self, tag: str, new_state: SubmissionStatesEnums, user_tag : str) -> bool:
+        "Updates the state of a submission."
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[r_prev:IN_SATE]->(prevState:State) "
+            "MATCH (newState:State {tag : $new_state}) "
+            "CREATE (submission)-[r:IN_STATE]->(newState) "
+            "SET r.created_at = timestamp(), r.user_tag = $user_tag "
+            "WITH r_prev "
+            "DELETE r_prev "
+        )
+        
+        try: 
+            self._driver.execute_query(query, tag = tag, new_state = new_state, user_tag = user_tag)
+        except Exception as e:
+            print(e)
+            return False 
+        return True 
+    
+    
+    def get_correlated_features(self, tags : List[str], 
+                                feature_tag : str = None, 
+                                filter_tag : str = None,  
+                                direction : Literal["positive","negative","both"] = "both", 
+                                limit : int = 20, 
+                                min_data_points : int = 20):
+        """Correlates a feature to all other features 
+        by its tag. 
 
+        Parameters
+        ----------
+        tag : str
+            the feature tag. 
+
+        Returns
+        -------
+        pd.DataFrame
+            Correlation analysis with the following columns
+                - tag (str) - feature_tag that the given tag was correlated to 
+                - pearson (float) - the pearson correlation coefficient 
+                - N (int) - The number of data points used to calculate the statistics 
+                - t (float) - The t-value
+        """
+        ## extend to multiple submission tags ? MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags 
+        query = (
+            "MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags "
+            "MATCH (p_target:Protein {tag : $feature_tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:Protein) "
+        )
+        if filter_tag is not None:
+            query += "WHERE EXISTS {(p)-[:PART_OF]->(f:Filter {tag : $filter_tag})} "
+        query += (
+            "WITH collect(rp2.value) as x, collect(rp1.value) as y, p "
+            "WITH apoc.coll.zip(x, y) AS pairs, apoc.coll.avg(x) AS meanX, apoc.coll.avg(y) AS meanY, x ,y, p "
+            "WHERE size(x) > $min_data_points AND size(y) > $min_data_points "
+            "WITH "
+            "   [p IN pairs | (p[0] - meanX) * (p[1] - meanY)] AS products, "
+            "   [v IN x | (v - meanX)^2] AS xSquaredDiffs, "
+            "   [v IN y | (v - meanY)^2] AS ySquaredDiffs, p, size(pairs) as N "
+            "WITH "
+            "    apoc.coll.sum(products) / "
+            "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
+            "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
+        )
+        if direction == "both": 
+            query += "ORDER BY abs(pearson) DESC LIMIT $limit "
+        elif direction == "negative":
+            query += "ORDER BY pearson ASC LIMIT $limit "
+        elif direction == "positive":
+            query += "ORDER BY pearson DESC LIMIT $limit "    
+                
+        r = self._driver.execute_query(query, 
+                                       routing_="r", 
+                                       result_transformer_=Result.to_df, 
+                                       min_data_points = min_data_points, 
+                                       filter_tag = filter_tag, 
+                                       limit = limit, 
+                                       feature_tag = feature_tag, 
+                                       submission_tags = tags)
+        return r 
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver) -> None:
@@ -283,8 +404,10 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN DISTINCT submission.tag "
         )
         query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, state = state, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
+        r = self._driver.execute_query(query, state = state, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
+        print(state)
+        print("FILTER BY STATE", r)
+        return [ri for ri in r] 
     
     def get(self, 
             state : List[int] = None, 
@@ -299,7 +422,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         tags = None 
         
         if state is not None:
-            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag, genotype_tag]) else None
+            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag,genotype_tag]) else None #add limit only if all others are
             tags = self.filter_by_state(state=state, submission_tags=tags, limit=limit_)
         
         if genotype_tag is not None:

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+#depracted 
 class PrefixModel(BaseModel):
     "" 
     T : float = 10**12

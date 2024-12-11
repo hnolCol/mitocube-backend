@@ -7,9 +7,11 @@ from lib.data.database.abstract.Features import FeaturesABC
 from config.settings.proteomes.annotations import UniprotAnnotationSettings
 
 from config.models.annotations.feature import FeatureModel
+from config.models.calculations.quantile import QuantileModel 
 
 from services.annotations.uniprot import download_proteome_annotations
-from config.models.feature import FeatureNeoModel
+from config.models.feature import FeatureNeoModel, FeatureSequenceResponseModel
+
 
 
 class Neo4JFeatures(FeaturesABC):
@@ -18,10 +20,11 @@ class Neo4JFeatures(FeaturesABC):
         self._driver = driver 
         
     def count(self, quantified: bool = True) -> int:
+        "Returns the number of quantified proteins in the database"
         if quantified:
             query = (
                 "MATCH (p:Protein) "
-                "WHERE EXISTS {(p:Protein)-[:QUANTIFIED_IN]-(:Submission)}"
+                "WHERE EXISTS {(p:Protein)-[:QUANTIFIED_IN]->(:Submission)}"
                 "RETURN count(p) " 
             )
             
@@ -34,6 +37,47 @@ class Neo4JFeatures(FeaturesABC):
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value)
         return r[0]
     
+    def is_quantified(self, tags : List[str]) -> pd.DataFrame:
+        ""
+        query = (
+            "MATCH (p:Protein) "
+            "WHERE p.tag in $tags "
+            "MATCH (p)-[r:QUANTIFIED_IN]->(:Submission) "
+            "WITH count(r) as N, p "
+            "MATCH (p)-[rsample:QUANTIFIED]-(:Sample) "
+            "WITH count(rsample) as nsample, p, N "
+            "RETURN p.tag as tag,  N > 0 as quantified, N as quant_dataset, nsample as quant_samples "
+        )
+            
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.to_df, tags = tags)
+        return r 
+    
+    def exists(self, tag: str) -> bool:
+        
+        query = (
+            "WITH EXISTS {(p:Protein {tag : $tag})} as exists "
+            "RETURN exists"
+        )
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
+        return r[0]
+    
+    def get_unique_quantification(self) -> pd.DataFrame:
+        "Get proteins that are exclusively quantified in a single genotype." 
+        
+        query = (
+            "MATCH (p:Protein)<-[:QUANTIFIED]-(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
+            "WHERE NOT EXISTS { "
+            "    MATCH (p)<-[:QUANTIFIED]-(s2:Sample)-[:HAS_GENOTYPE]->(g2:Genotype) "
+            "        WHERE g2.tag <> g.tag "
+            "       } "
+            "RETURN p, g, COLLECT(s) AS samples "
+            )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data)
+        
+        print(r)
 
     def count_quantifications(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame: 
         """Counts the total number of quantifications
@@ -75,7 +119,7 @@ class Neo4JFeatures(FeaturesABC):
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tags = tags, submission_tags = submission_tags)
         return r 
         
-    def get_protein_sequence(self, tags : str) -> List[str]:
+    def get_protein_sequence(self, tags : str) -> List[FeatureSequenceResponseModel]:
         """
         Returns the protein sequence.
         """
@@ -131,7 +175,8 @@ class Neo4JFeatures(FeaturesABC):
             return pd.DataFrame([ri for ri in r]).set_index("tag")
         
         return [FeatureNeoModel(**ri) for ri in r]
-        
+
+
         
     def get_data(self, tags : List[str], submission_tags : List[str] = None, limit : int = 1) -> List[Dict]:
         ""
@@ -196,6 +241,20 @@ class Neo4JFeatures(FeaturesABC):
                                        submission_tags = submission_tags)
         return r 
         
+    def get_abundance_distribution(self, tag : str):
+        "" 
+        query = (
+            "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample) "
+            "WHERE p.tag = $tag "
+            "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tag = tag)
+        print(r)
+        qs = r[0]["quantiles"]
+        N = r[0]["N"]
+        
+        return QuantileModel(min = qs[0], q25 = qs[1], m = qs[2], q75 = qs[3], max = qs[4], N = N )
         
     def get_avg_abundance(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
         "Neo4J implementation to retrieve the average abundance"
@@ -273,7 +332,7 @@ class Neo4JFeatures(FeaturesABC):
         if is_quantified:
             cypher_query = (
                 "MATCH (p:Protein) "
-                "WHERE p.proteome_id in $proteome_tags AND EXISTS {(p)-[:QUANTIFIED_IN]->(:Dataset)}"
+                "WHERE p.proteome_id in $proteome_tags AND EXISTS {(p)-[:QUANTIFIED_IN]->(:Submission)}"
                 "RETURN collect(p.tag)" 
             )
         else:
@@ -350,10 +409,10 @@ class Neo4JFeatures(FeaturesABC):
                                        limit=limit, 
                                        routing_="r",
                                        result_transformer_=Result.value)
-        
+
         return [FeatureNeoModel(**f) for f in r]
         
-    def find(self, query : str, proteome_tags : str|List[str] = None, limit : int = 10) -> List[FeatureModel]:
+    def find(self, query : str, proteome_tags : str|List[str] = None, limit : int = 10) -> List[FeatureNeoModel]:
         """Returns a list of features that are found by a query string. 
 
         Parameters

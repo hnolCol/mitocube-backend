@@ -28,6 +28,18 @@ class Neo4JUnitTypes( UnitTypesABC):
     def get_unit_types(self) -> List:
         return super().get_unit_types()
     
+    # def get_unit_type(self,tags : List[str]):
+        
+    #     query = (
+    #         "MATCH (unittype:UnitType) "
+    #         "WHERE unittype.tag in $tags "
+    #         "RETURN propiertes(unittype) "
+    #     )
+        
+    #     r = self._driver.execute_query(query, tags = tags, result_transformer_= Result.value)
+    #     print(r)
+    #     return 
+    
     def get_units(self, tags: List[str]) -> List[UnitTypeResponseModel]:
         
         query = (
@@ -38,7 +50,8 @@ class Neo4JUnitTypes( UnitTypesABC):
             "RETURN unittype.tag AS unit_type_tag, "
             "       unittype.text AS unit_type_text, "
             "       unittype.priority AS unit_type_priority, "
-            "       COLLECT({tag: u.tag, text: u.text, priority : u.priority}) AS units "
+            "       unittype.has_feature_value as has_feature_value, "
+            "       COLLECT({tag: u.tag, text: u.text, priority : u.priority, description : u.description}) AS units "
         )
         
         
@@ -47,4 +60,5 @@ class Neo4JUnitTypes( UnitTypesABC):
         return [UnitTypeResponseModel(tag = x["unit_type_tag"],
                                text=x["unit_type_text"],
                                priority = x["unit_type_priority"],
-                               units=x["units"]) for x in r]
+                               has_feature_value = x["has_feature_value"],
+                               units=sorted(x["units"], key= lambda x: -x["priority"])) for x in r]

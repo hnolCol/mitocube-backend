@@ -2,6 +2,26 @@
 
 from enum import Enum 
 
+
+class UnitsEnum(Enum):
+    
+    mass = "mass"
+    concentration = "concentration"
+    time = "time"
+    temperature = "temperature"
+    volume = "volume"
+    masstocharge = "masstocharge"
+    voltage = "voltage"
+    flow_rate = "flow_rate"
+    arbitrary = "arbitrary"
+    feature = "feature"
+    length = "length"
+    fraction = "fraction"
+    version = "version"
+    duration = "duration"
+    age = "age"
+
+
 class TimeUnitToSecondsEnum(Enum):
     s = 1
     min = 1 / 60 

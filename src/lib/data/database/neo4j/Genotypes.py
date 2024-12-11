@@ -40,7 +40,7 @@ class Neo4JGenotype(GenotypeABC):
                 
             
         genotype_props = [{"tag" : genotype.label, 
-                           "proteome_id" : genotype.proteome_tag, 
+                           "proteome_tag" : genotype.proteome_tag, 
                            "text" : genotype.text, 
                            "attributes" : extract_genotype_attributes(genotype.attributes)} for genotype in genotypes if "att_protein_mutation" in genotype.attributes[0] and "att_protein_position" in genotype.attributes[0]]
 
@@ -153,13 +153,13 @@ class Neo4JGenotype(GenotypeABC):
             query = ("MATCH (g:Genotype) ")
         
         query += "RETURN g.tag as tag, g.text as text, g.proteome_tag as proteome_tag "
+
         r, _, _ = self._driver.execute_query(query, 
                                              tags = tags,
                                              proteome_tags = proteome_tags, 
                                              protein_tags = protein_tags, 
                                              routing_="r", 
                                              database_="neo4j")
-        
         return [MinimalGenotypeModel(**ri.data()) for ri in r]
     
         

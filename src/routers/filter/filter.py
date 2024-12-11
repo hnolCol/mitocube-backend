@@ -25,8 +25,10 @@ router = APIRouter(
 @router.get("/filters",
             tags=["Filter"])
 def get_available_filters(proteome_tags : str = None, 
-                          user : UserModel = Depends(get_user_from_token),
                           feature_tag : str = None, 
+                          submission_tag : str = None,
+                          user : UserModel = Depends(get_user_from_token),
+                          
                           ) -> List[FilterModel]:
     """Returns the filter set that are available in the database.
 
@@ -34,6 +36,8 @@ def get_available_filters(proteome_tags : str = None,
     ----------
     proteome_tags : str, optional
         The Uniprot proteome tag. For multiple proteoms - separate by ';', by default None
+    submission_tag : str, optional
+        The submission tag for which an available filter is returned. 
     feature_tag : str, optional, 
         If a feature_tag is given, the filters for the specific featurer are returned. 
         Cannot handle multiple feature_tags (e.g. divided b ";" as in the proteome)
@@ -46,8 +50,9 @@ def get_available_filters(proteome_tags : str = None,
         Filters available in the database.
     """
     
-    filters = DB.filters.get(proteome_tags=APIParamString(param=proteome_tags).param,
-                            feature_tag=feature_tag)
+    filters = DB.filters.get(proteome_tags = APIParamString(param=proteome_tags).param,
+                             submission_tags = APIParamString(param=submission_tag).param,
+                            feature_tag = feature_tag)
     return filters
 
 

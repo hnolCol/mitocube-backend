@@ -24,6 +24,11 @@ router = APIRouter(
 
 
 
+@router.get("/users",summary="Returns the user tags in the database")
+def get_user_tags(limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    return DB.users.get_tags(limit=limit)
+
+
 @router.post("/users", summary="Add a new user to the database.")
 def add_user_to_the_database(background_task : BackgroundTasks, user_props : AddUserPropsModel, user : UserModel = Depends(is_user_admin)):
     """
@@ -158,8 +163,8 @@ def get_user(user_tag : str, user : UserModel = Depends(get_user_from_token)):
 
 @router.delete("/users/{user_tag}", summary="Deletes a user. Requires admin rights.")
 def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
-    """Deletes specific user. Returns an error if token does not belong to admin"""
-    UserDB.delete_user_by_label(user_tag)
+    """Deletes specific user. Returns an error if token does not belong to admin"""    
+    
 
 ## inconsistent!  - change to have user_label in url 
 

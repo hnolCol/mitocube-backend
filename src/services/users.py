@@ -11,9 +11,9 @@ from lib.data.database.Database import Database
 DB = Database.DB()
 
 
-def are_public_users_allowed(users : List[PublicUser]) -> List[bool]:
+def are_public_users_allowed(user_tags  : List[str]) -> List[bool]:
     """Checks if a list of Users are allowed to login."""
-    user_tags = [u.tag for u in users]
+    #user_tags = [u.tag for u in users]
     users_from_db = DB.users.get_users_by_tags(tags = user_tags)
     return [u.allow_login for u in users_from_db if u is not None]
 

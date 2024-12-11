@@ -4,6 +4,8 @@ from abc import abstractmethod, ABC
 from typing import List, Dict, Optional, Tuple
 from deprecated import deprecated
 
+import pandas as pd
+
 from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
 from config.models.filter import FilterModel
@@ -138,4 +140,26 @@ class ProteomesABC(ABC):
         ------
         Exception
             If the database insertion throws an Exception. 
+        """
+        
+    @abstractmethod
+    def insert_proteome_from_dataframe(self, data : pd.DataFrame, proteome_tag : str = "UP000005640", user_tag : str = None): 
+        """Insert data from a Uniprot reference proteome to the database. 
+
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The protein data with the following headers
+            
+                - Length (int) : The number of amino acids
+                - Gene names (str) : All gene names associated with the protein
+                - Gene Names (primary) (str)
+                - Protein Names (str) - The associated protein name 
+                - Entry (str) : The Uniprot ID 
+                - Sequence (str) : The protein sequence.
+                
+        proteome_tag : str, optional
+            The Uniprot reference proteome ID, by default "UP000005640" (Human)
+        user_tag : str, optional
+            The tag associated with a user, by default None
         """

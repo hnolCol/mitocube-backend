@@ -54,19 +54,11 @@ def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[s
         The feature key can be used to access genotypes that affect a certain feature_key, by default Optional[str]=None
     """
     r = DB.genotypes.get(
-        
         proteome_tags=APIParamString(param = proteome_tags).param, 
         protein_tags=APIParamString(param = feature_tag).param
         )
     return r 
-    db_genotype = MCGenotypes.getGenotypeDatabase()
-    try:
-        if proteome_ids is not None:
-            proteome_ids = proteome_ids.split(";")
-        genotypes = db_genotype.get(proteome_ids=proteome_ids,feature_key=feature_tag)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    return genotypes
+
 
 
 @router.post("/genotypes")

@@ -10,6 +10,7 @@ from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString
+from config.models.calculations.quantile import QuantileModel
 
 from config.settings.general import get_general_settings
 from config.settings.email import get_email_settings
@@ -62,5 +63,16 @@ def add_protein_by_proteome_tag(background_task : BackgroundTasks, proteome_tag:
                                  
                              },
                              template_mame=EMAIL_SETTINGS.mail_proteome_added_template)
+    
+    
+@router.get("/{proteome_tag}/abundance")
+def get_proteome_abundance(proteome_tag : str) -> QuantileModel:
+    if not DB.proteomes.exist(tags = proteome_tag): raise HTTPException(status_code=404, detail="Proteome not found.")
+    
+    qs = DB.proteomes.get_feature_abundance_dist(tag = proteome_tag)
+    return qs 
+    
+    
+    
     
     

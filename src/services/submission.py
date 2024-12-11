@@ -197,16 +197,16 @@ def check_for_missing_mandatory_attribute(submission : NewSubmissionModel, attri
             The list of attributes that are misssing in the submission. 
             If the list is empty, all attributes were found. 
     """
-    datasetAttributeTags = [attribute.tag for attribute in submission.datasetAttributes]
+    datasetAttributeTags = submission.datasetAttributes
     # check dataset attributes first, then sample attributes. 
     attrsNotInDatasetAttributes = [attribute for attribute in attributes if attribute.tag not in datasetAttributeTags]
 
-    if len(attrsNotInDatasetAttributes) > 0:
-        #missing mandatory attributes
-        #they could still be in the sample attributes
-        sampleAttributesTags = [sampleAttr.tag for sampleAttr in  submission.samplesAttributes]
-        attrNotInSamplteAttr = [attribute for attribute in attrsNotInDatasetAttributes if attribute.tag not in sampleAttributesTags]
-        return attrNotInSamplteAttr 
+    # if len(attrsNotInDatasetAttributes) > 0:
+    #     #missing mandatory attributes
+    #     #they could still be in the sample attributes
+    #     sampleAttributesTags = list(submission.samplesAttributes[0].keys()) #extract sample attributes from first item, all samples have the same 
+    #     attrNotInSamplteAttr = [attribute for attribute in attrsNotInDatasetAttributes if attribute.tag not in sampleAttributesTags]
+    #     return attrNotInSamplteAttr 
     
     return attrsNotInDatasetAttributes
 
@@ -287,33 +287,33 @@ def submission_to_json(submission : NewSubmissionModel, user : UserModel) -> dic
     json["samples_attributes"] = samplesAttributesJson
     ## sample attribute input 
     user_input = {}
-    if submission.samplesAttributesInput is not None:
+    # if submission.samplesAttributesInput is not None:
         
-        for attribute_tag, sample_attr_input in submission.samplesAttributesInput.items():
-            if attribute_tag not in samplesAttributesJson: continue
-            user_input[attribute_tag] = []
-            for sample_index,i in enumerate(sample_attr_input):
-                for attribute_value_tag, sample_attr_value_input in i.items():
-                    #check if the unit matches a given sample attribute, otherwise simply continue and ignore
-                    if attribute_value_tag not in samplesAttributesJson[attribute_tag] or sample_index not in samplesAttributesJson[attribute_tag][attribute_value_tag]: continue
-                    props = [{
-                        "unit_tag" : unit_tag, 
-                        "value" : input_value_to_standard_unit(value = float(input["value"]), 
-                                                               prefix = input["prefix"] if "prefix" in input else "NA", 
-                                                               is_time=unit_tag == "time", 
-                                                               time_unit = input["time_unit"]),
-                       } for unit_tag, input in sample_attr_value_input.items()] 
+    #     for attribute_tag, sample_attr_input in submission.samplesAttributesInput.items():
+    #         if attribute_tag not in samplesAttributesJson: continue
+    #         user_input[attribute_tag] = []
+    #         for sample_index,i in enumerate(sample_attr_input):
+    #             for attribute_value_tag, sample_attr_value_input in i.items():
+    #                 #check if the unit matches a given sample attribute, otherwise simply continue and ignore
+    #                 if attribute_value_tag not in samplesAttributesJson[attribute_tag] or sample_index not in samplesAttributesJson[attribute_tag][attribute_value_tag]: continue
+    #                 props = [{
+    #                     "unit_tag" : unit_tag, 
+    #                     "value" : input_value_to_standard_unit(value = float(input["value"]), 
+    #                                                            prefix = input["prefix"] if "prefix" in input else "NA", 
+    #                                                            is_time=unit_tag == "time", 
+    #                                                            time_unit = input["time_unit"]),
+    #                    } for unit_tag, input in sample_attr_value_input.items()] 
                     
-                    user_input[attribute_tag].append(
-                        {
-                        "attribute_value_tag" : attribute_value_tag,
-                        "sample_index" : sample_index,
-                        "input" : props
-                    })  
+    #                 user_input[attribute_tag].append(
+    #                     {
+    #                     "attribute_value_tag" : attribute_value_tag,
+    #                     "sample_index" : sample_index,
+    #                     "input" : props
+    #                 })  
     
-    print(submission.samplesAttributesInput)
-    print(user_input)
-    json["samples_attributes_input"] = user_input
+    # print(submission.samplesAttributesInput)
+    # print(user_input)
+    # json["samples_attributes_input"] = user_input
 
     
     

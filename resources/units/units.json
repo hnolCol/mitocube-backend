@@ -1,28 +1,65 @@
 [
     {
+        "text": "Age",
+        "tag": "age",
+        "priority": 500,
+        "has_feature_value": "false",
+        "units": [
+            {
+                "tag": "age:d",
+                "text": "d",
+                "priority": 500,
+                "description": "day"
+            },
+            {
+                "tag": "age:h",
+                "text": "h",
+                "priority": 200,
+                "description": "hour"
+            },
+            {
+                "tag": "age:w",
+                "text": "w",
+                "priority": 750,
+                "description": "week"
+            },
+            {
+                "tag": "age:a",
+                "text": "a",
+                "priority": 600,
+                "description": "year "
+            }
+        ]
+    },
+    {
         "text": "Arbitrary",
         "tag": "arbitrary",
         "priority": 500,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "uid",
-                "text": "Unique identifier",
-                "priority": 550
+                "tag": "arbitrary:uid",
+                "text": "uid",
+                "priority": 550,
+                "description": "Unique identifier"
             },
             {
-                "tag": "intensity",
-                "text": "Intensity",
-                "priority": 500
+                "tag": "arbitrary:intensity",
+                "text": "intensity",
+                "priority": 500,
+                "description": "Intensity"
             },
             {
-                "tag": "r_200",
-                "text": "Resolution (at 200 m/z)",
-                "priority": 520
+                "tag": "arbitrary:R(200m/z)",
+                "text": "R(200m/z)",
+                "priority": 520,
+                "description": "Resolution (at 200 m/z)"
             },
             {
-                "tag": "r_400",
-                "text": "Resolution (at 400 m/z)",
-                "priority": 500
+                "tag": "arbitrary:R(400m/z)",
+                "text": "R(400m/z)",
+                "priority": 500,
+                "description": "Resolution (at 400 m/z)"
             }
         ]
     },
@@ -30,31 +67,87 @@
         "text": "Concentration",
         "tag": "concentration",
         "priority": 600,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "mg/mL",
-                "text": "milligramm per milliliter",
-                "priority": 500
+                "tag": "concentration:mg/mL",
+                "text": "mg/mL",
+                "priority": 500,
+                "description": "milligramm per milliliter"
             },
             {
-                "tag": "mol/L",
-                "text": "mol per litre",
-                "priority": 500
+                "tag": "concentration:mol/L",
+                "text": "mol/L",
+                "priority": 500,
+                "description": "mol per litre"
             },
             {
-                "tag": "\u00b5g/mL",
-                "text": "microgramm per millilitre",
-                "priority": 500
+                "tag": "concentration:\u00b5g/mL",
+                "text": "\u00b5g/mL",
+                "priority": 500,
+                "description": "microgramm per millilitre"
             },
             {
-                "tag": "M",
-                "text": "molar",
-                "priority": 500
+                "tag": "concentration:M",
+                "text": "M",
+                "priority": 500,
+                "description": "molar"
             },
             {
-                "tag": "\u00b5M",
-                "text": "micromolar",
-                "priority": 500
+                "tag": "concentration:\u00b5M",
+                "text": "\u00b5M",
+                "priority": 600,
+                "description": "micromolar"
+            },
+            {
+                "tag": "concentration:%",
+                "text": "%",
+                "priority": 450,
+                "description": "Percentage"
+            }
+        ]
+    },
+    {
+        "text": "Duration",
+        "tag": "duration",
+        "priority": 500,
+        "has_feature_value": "false",
+        "units": [
+            {
+                "tag": "duration:s",
+                "text": "s",
+                "priority": 550,
+                "description": "second"
+            },
+            {
+                "tag": "duration:d",
+                "text": "d",
+                "priority": 500,
+                "description": "day"
+            },
+            {
+                "tag": "duration:h",
+                "text": "h",
+                "priority": 650,
+                "description": "hour"
+            },
+            {
+                "tag": "duration:min",
+                "text": "min",
+                "priority": 600,
+                "description": "minute"
+            },
+            {
+                "tag": "duration:w",
+                "text": "w",
+                "priority": 580,
+                "description": "week"
+            },
+            {
+                "tag": "duration:a",
+                "text": "a",
+                "priority": 500,
+                "description": "year "
             }
         ]
     },
@@ -62,38 +155,39 @@
         "text": "Feature",
         "tag": "feature",
         "priority": 800,
+        "has_feature_value": "true",
         "units": [
             {
-                "tag": "UP000005640",
-                "text": "Homo sapiens",
-                "priority": 550
-            },
-            {
-                "tag": "UP000000589",
-                "text": "Mus musculus",
-                "priority": 500
+                "tag": "feature:ctrl",
+                "text": "ctrl",
+                "priority": 550,
+                "description": "Control proteins (GFP, LUC, ..)"
             }
         ]
     },
     {
         "text": "Flow rate",
-        "tag": "flow rate",
+        "tag": "flow_rate",
         "priority": 500,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "mL/min",
-                "text": "milli litle per minute",
-                "priority": 500
+                "tag": "flow_rate:mL/min",
+                "text": "mL/min",
+                "priority": 500,
+                "description": "milli litle per minute"
             },
             {
-                "tag": "nL/min",
-                "text": "nano litre per minute",
-                "priority": 550
+                "tag": "flow_rate:nL/min",
+                "text": "nL/min",
+                "priority": 550,
+                "description": "nano litre per minute"
             },
             {
-                "tag": "L/min",
-                "text": "litre per minute",
-                "priority": 500
+                "tag": "flow_rate:L/min",
+                "text": "L/min",
+                "priority": 500,
+                "description": "litre per minute"
             }
         ]
     },
@@ -101,21 +195,25 @@
         "text": "Fraction",
         "tag": "fraction",
         "priority": 600,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "%",
-                "text": "Percentage",
-                "priority": 600
+                "tag": "fraction:%",
+                "text": "%",
+                "priority": 600,
+                "description": "Percentage"
             },
             {
-                "tag": "\u2030",
-                "text": "Per mille",
-                "priority": 500
+                "tag": "fraction:\u2030",
+                "text": "\u2030",
+                "priority": 500,
+                "description": "Per mille"
             },
             {
-                "tag": ":",
-                "text": "Ratio",
-                "priority": 550
+                "tag": "fraction::",
+                "text": ":",
+                "priority": 550,
+                "description": "Ratio"
             }
         ]
     },
@@ -123,53 +221,69 @@
         "text": "Length",
         "tag": "length",
         "priority": 500,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "m",
-                "text": "metre",
-                "priority": 500
+                "tag": "length:m",
+                "text": "m",
+                "priority": 500,
+                "description": "metre"
             },
             {
-                "tag": "\u00b5m",
-                "text": "mico-metre",
-                "priority": 700
+                "tag": "length:\u00b5m",
+                "text": "\u00b5m",
+                "priority": 700,
+                "description": "mico-metre"
             },
             {
-                "tag": "cm",
-                "text": "centimetre",
-                "priority": 800
+                "tag": "length:cm",
+                "text": "cm",
+                "priority": 800,
+                "description": "centimetre"
             },
             {
-                "tag": "dm",
-                "text": "decimetre",
-                "priority": 500
+                "tag": "length:dm",
+                "text": "dm",
+                "priority": 500,
+                "description": "decimetre"
+            },
+            {
+                "tag": "length:aa",
+                "text": "aa",
+                "priority": 500,
+                "description": "amino acids"
             }
         ]
     },
     {
         "text": "Mass",
         "tag": "mass",
-        "priority": 550,
+        "priority": 650,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "kg",
-                "text": "kilogram",
-                "priority": 500
+                "tag": "mass:kg",
+                "text": "kg",
+                "priority": 500,
+                "description": "kilogram"
             },
             {
-                "tag": "g",
-                "text": "gramm",
-                "priority": 500
+                "tag": "mass:g",
+                "text": "g",
+                "priority": 500,
+                "description": "gramm"
             },
             {
-                "tag": "\u00b5g",
-                "text": "microgramm",
-                "priority": 550
+                "tag": "mass:\u00b5g",
+                "text": "\u00b5g",
+                "priority": 550,
+                "description": "microgramm"
             },
             {
-                "tag": "ng",
-                "text": "nanogramm",
-                "priority": 500
+                "tag": "mass:ng",
+                "text": "ng",
+                "priority": 500,
+                "description": "nanogramm"
             }
         ]
     },
@@ -177,11 +291,13 @@
         "text": "Mass To Charge",
         "tag": "masstocharge",
         "priority": 550,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "m/z",
-                "text": "mass to chrage (Thomson)",
-                "priority": 500
+                "tag": "masstocharge:m/z",
+                "text": "m/z",
+                "priority": 500,
+                "description": "mass to chrage (Thomson)"
             }
         ]
     },
@@ -189,53 +305,33 @@
         "text": "Temperature",
         "tag": "temperature",
         "priority": 600,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "K",
-                "text": "Kelvin",
-                "priority": 500
+                "tag": "temperature:K",
+                "text": "K",
+                "priority": 500,
+                "description": "Kelvin"
             },
             {
-                "tag": "\u00b0C",
-                "text": "Celsius",
-                "priority": 700
+                "tag": "temperature:\u00b0C",
+                "text": "\u00b0C",
+                "priority": 700,
+                "description": "Celsius"
             }
         ]
     },
     {
-        "text": "Time/Age/Duration",
-        "tag": "time",
-        "priority": 500,
+        "text": "Version",
+        "tag": "version",
+        "priority": 400,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "s",
-                "text": "second",
-                "priority": 550
-            },
-            {
-                "tag": "d",
-                "text": "day",
-                "priority": 500
-            },
-            {
-                "tag": "h ",
-                "text": "hour",
-                "priority": 650
-            },
-            {
-                "tag": "min",
-                "text": "minute",
-                "priority": 600
-            },
-            {
-                "tag": "w",
-                "text": "week",
-                "priority": 580
-            },
-            {
-                "tag": "a",
-                "text": "year ",
-                "priority": 500
+                "tag": "version:v.",
+                "text": "v.",
+                "priority": 500,
+                "description": "Version (v. X.Y.Z)"
             }
         ]
     },
@@ -243,16 +339,19 @@
         "text": "Voltage",
         "tag": "voltage",
         "priority": 500,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "V",
-                "text": "volt",
-                "priority": 500
+                "tag": "voltage:V",
+                "text": "V",
+                "priority": 500,
+                "description": "volt"
             },
             {
-                "tag": "kV",
-                "text": "kilovolt",
-                "priority": 550
+                "tag": "voltage:kV",
+                "text": "kV",
+                "priority": 550,
+                "description": "kilovolt"
             }
         ]
     },
@@ -260,21 +359,25 @@
         "text": "Volume",
         "tag": "volume",
         "priority": 500,
+        "has_feature_value": "false",
         "units": [
             {
-                "tag": "dl",
-                "text": "decilitre",
-                "priority": 500
+                "tag": "volume:dl",
+                "text": "dl",
+                "priority": 500,
+                "description": "decilitre"
             },
             {
-                "tag": "\u00b5L",
-                "text": "microlitre",
-                "priority": 500
+                "tag": "volume:\u00b5L",
+                "text": "\u00b5L",
+                "priority": 600,
+                "description": "microlitre"
             },
             {
-                "tag": "nL",
-                "text": "nanolitre",
-                "priority": 500
+                "tag": "volume:nL",
+                "text": "nL",
+                "priority": 550,
+                "description": "nanolitre"
             }
         ]
     }

@@ -48,6 +48,7 @@ class UserModel(BasicUserWithEmail):
     password : SecretStr = None
     allow_login : bool = True 
     role : UserRolesEnum = UserRolesEnum.STANDARD
+    is_lead_admin : bool = False
     #salt : str = None
 
 

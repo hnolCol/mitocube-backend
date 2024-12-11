@@ -150,9 +150,10 @@ def get_dataset_sample_info(dataset_tag : str):
     sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)
     has_genotype = "att_genotype" in sample_map.columns
     attribute_tags = [attribute_tag for attribute_tag in sample_map.columns if attribute_tag not in ["sample_text"]]
-    attribute_value_tags = pd.Series(sample_map.values.flatten()).unique().tolist()
+    attribute_value_tags = pd.Series(sample_map[[colName for colName in sample_map.columns if colName != "sample_text"]].values.flatten()).unique().tolist()
     attributes = DB.attributes.get(tags = attribute_tags)
-    attribute_values = DB.attributes.get_values_by_submission_tag(submission_tag = dataset_tag, tags = attribute_value_tags)
+    attribute_values = DB.attributes.get_values(tags = attribute_value_tags) #CUATION DOESNT RESPECT ENTERED UNIT VALUES! TODO IMPLEMENT! 
+    
     if has_genotype:
         genotypes = DB.genotypes.get(tags = sample_map.loc[:,"att_genotype"].to_list())
         attribute_values.extend(genotypes)

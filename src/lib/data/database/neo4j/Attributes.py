@@ -6,10 +6,10 @@ from lib.data.database.abstract.Attributes import AttributesABC
 
 from config.enums.states import SubmissionStatesEnums
 
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitModel, AttributeUnitResponseModel, AttributeResponseModel
+from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitModel, AttributeUnitResponseModel, AttributeResponseModel, AttrInput
 from config.models.annotations.feature import FeatureModel 
 from config.models.feature import FeatureNeoModel
-
+from config.models.attributes import AttributeTreeNode
 
 class Neo4JAttributes(AttributesABC):
 
@@ -87,7 +87,7 @@ class Neo4JAttributes(AttributesABC):
     
         if tag is not None and value is None:
             query = (
-                "WITH EXISTS {(a:Attribute {tag : $tag})} as attribute_exists "
+                "WITH EXISTS {(a:Attribute {tag : $tag})} as exists "
             )
         if tag is not None and value is not None:
             query = (
@@ -131,6 +131,8 @@ class Neo4JAttributes(AttributesABC):
                 query += "AND a.min_state <= $min_state "
             
         query += "RETURN properties(a) ORDER BY a.priority"
+
+        print(query)
 
         attributes = self._driver.execute_query(query_=query, 
                                                 routing_="r",
@@ -193,23 +195,30 @@ class Neo4JAttributes(AttributesABC):
         return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av)  for av in attribute_values]
         
     
-    def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel|FeatureNeoModel]:
-        "Returns the props of the attributes its values. Note that it will return features and sample attribute values"
+    def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None, include_input : bool = False) -> List[AttributeValueModel]:
+        "Returns the props of the attributes and its values."
         
         if tags is not None:
-            query = (
-                "MATCH (av:AttributeValue) "
-                "WHERE NOT 'Protein' in labels(av) AND av.tag in $tags "
-                "RETURN properties(av) as props "
-                "UNION "
-                "MATCH (av:AttributeValue:Protein) "
-                "WHERE av.tag in $tags "
-                "MATCH (submission:Submission)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
-                "WHERE submission.tag = $submission_tag "
-                "WITH {attribute_tag : r.attribute_tag} as attr_tag, av "
-                "WITH apoc.map.merge(properties(av), attr_tag) as props "
-                "RETURN props"
-            )
+            
+            if include_input:
+                
+                query = (
+                    "MATCH (submission:Submission)-[r:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue)"
+                    "WHERE submission.tag = $submission_tag AND  av.tag in $tags "
+                    "OPTIONAL MATCH (av)-[r_input:HAS_VALUE_OF_UNIT]->(u:Unit)<-[:HAS_UNIT]-(unittype:UnitType) "
+                    "WHERE r_input.submission_tag = $submission_tag "
+                    "RETURN av.tag as trait_tag, properties(av) as trait, collect({unittype_tag: r_input.unittype_tag, unit_tag : u.tag, value : r_input.value, unit_text: u.text, priority : unittype.priority}) as user_input"
+                )
+            
+            else:
+            
+                query = (
+                    "MATCH (submission:Submission)-[r:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
+                    "WHERE submission.tag = $submission_tag AND  av.tag in $tags "
+                    "RETURN properties(av) "
+                )
+            
+        
         
         else:
             query = (
@@ -217,12 +226,19 @@ class Neo4JAttributes(AttributesABC):
                 "WHERE submission.tag = $submission_tag "
                 "WITH {attribute_tag : a.tag} as attr_tag, av " #add the attribute tag 
                 "RETURN apoc.map.merge(properties(av), attr_tag)"
-                ""
             )
+        
+        if include_input:
+            r = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.data, submission_tag = submission_tag)
+            if not isinstance(r,list): raise TypeError("Trait tags did not match any node. Checks the tags or submission_tag")
+            return [AttributeValueModel(**ri["trait"], 
+                                        user_input=OrderedDict([(user_input["unittype_tag"], {"value" : user_input["value"], "unit_tag" : user_input["unit_tag"], "unit_text" : user_input["unit_text"]}) 
+                                                                for user_input in sorted(ri["user_input"], key = lambda x : 0 if x["priority"] is None else -x["priority"])]))
+                    for ri in r if "trait" in ri]
         
         attribute_values  = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.value, submission_tag = submission_tag)
        # attribute_values_props = [av.value() for av in attribute_values]
-        return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av) for av in attribute_values]
+        return [AttributeValueModel(**av) for av in attribute_values]
     
     def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
         
@@ -311,13 +327,25 @@ class Neo4JAttributes(AttributesABC):
                                                   attribute_tags = attribute_tags,
                                                   database_="neo4j", 
                                             routing_="r")
-        print(r)
         return [AttributeValuesBySubmissionModel(**ri.data()) for ri in r]
         
         
-    def get_mandatory_attributes(self) -> List[AttributeModel]:
+    def get_mandatory_attributes(self, state : SubmissionStatesEnums = None) -> List[AttributeModel]:
         
-        return self._get_attributes_by_boolean_param()
+        
+        query = (
+            "MATCH (a:Attribute) "
+            "WHERE a[$mandatory_name] "
+        )
+        
+        if state is not None:
+            
+            query += "AND EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag = $state} "
+        
+        query += "RETURN properties(a) ORDER BY a.priority DESC "
+            
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, state=state, mandatory_name="mandatory_for_active")
+        return [AttributeModel(**ri) for ri in r]
     
     def get_dataset_attributes(self, min_state : SubmissionStatesEnums = None):
         """Returns attribute that can be used to define a dataset.
@@ -430,7 +458,7 @@ class Neo4JAttributes(AttributesABC):
         return self._driver.execute_query(query)
         
         
-    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel|FeatureNeoModel]]]:
+    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
         """Finds the attirbute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
 
@@ -461,7 +489,7 @@ class Neo4JAttributes(AttributesABC):
             "MATCH (a)-[:HAS_VALUE]->(av:AttributeValue) "
             "WHERE a.s CONTAINS $search_string OR av.s CONTAINS $search_string "
             "WITH a, av ORDER BY a.priority DESC "
-            "RETURN properties(a), collect(DISTINCT properties(av))"
+            "RETURN properties(a) as attribute, collect(DISTINCT properties(av)) as traits"
         )
         
         r  = self._driver.execute_query(
@@ -469,7 +497,7 @@ class Neo4JAttributes(AttributesABC):
             search_string=search_string.lower(),
             min_state = min_state, 
             param_name = param_name, 
-            result_transformer_= Result.values,
+            result_transformer_= Result.data,
             routing_="r", 
             database_="neo4j")
     
@@ -526,7 +554,7 @@ class Neo4JAttributes(AttributesABC):
             "ORDER BY a.priority, ut.priority DESC "
             "RETURN a.tag AS attribute_tag, "
             "       ut.tag AS unit_type_tag, "
-            "       ut.text AS unit_type_text"
+            "       ut.text AS unit_type_text "
         )
 
         
@@ -608,3 +636,76 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.values, tags = tags)
         return OrderedDict([(attribute_tag, unit_type_tags) for attribute_tag, unit_type_tags in r])
+    
+    
+    def get_attribute_hierarchy(self, tags : List[str], submission_tag : str) -> List[AttributeTreeNode]:
+        """_summary_
+
+        Parameters
+        ----------
+        tags : List[str]
+            _description_
+        
+        submission_tag: str 
+            The submission tag- 
+
+        Returns
+        -------
+        List[AttributeTreeNode]
+            _description_
+
+        Yields
+        ------
+        Iterator[List[AttributeTreeNode]]
+            AttributeTreeNode that has the following keys:
+                - tag : The attribute tag at that level.
+                - IS_PARENT_OF: List of tags that are children of the 
+                    attribue given by tag.  
+
+        Raises
+        ------
+        TypeError
+            _description_
+        """
+        
+        query = (
+            
+            #get the attributes that have no hierarchy 
+            "UNWIND $tags AS tag "
+            "MATCH path = (root:Attribute)-[:IS_PARENT_OF*]->(leaf:Attribute) "
+            "WHERE ANY(node IN nodes(path) WHERE node.tag = tag) "
+            "  AND EXISTS {(submission:Submission {tag : $submission_tag})-[:HAS_VALUES_FOR_ATTRIBUTE]->(leaf)} "
+            "  AND EXISTS {(submission:Submission {tag : $submission_tag})-[:HAS_VALUES_FOR_ATTRIBUTE]->(root)} "
+            "WITH collect(path) AS all_paths " #, root_attr, root_tags
+            
+            "MATCH (root:Attribute) "
+            "WHERE root.tag IN $tags AND NOT ANY(path in all_paths WHERE apoc.coll.contains(nodes(path), root)) " #filter out any node that is already in the all_path
+            "  AND EXISTS {(submission:Submission {tag : $submission_tag})-[:HAS_VALUES_FOR_ATTRIBUTE]->(root)} "
+            "  AND EXISTS {(root)-[:IS_PARENT_OF]->(:Attribute)} "
+            "  AND NOT EXISTS {(root)<-[:IS_PARENT_OF]-(:Attribute)} "
+            "WITH collect({tag: root.tag, priority: root.priority, min_state: root.min_state, root : true}) AS root_attr, collect(root.tag) as root_tags, all_paths "
+            
+            #match attributes that are parents but no child is in the tag list. 
+            "UNWIND $tags AS tag "
+            "MATCH (standalone:Attribute {tag: tag}) "
+            "WHERE NOT EXISTS {(standalone)-[:IS_PARENT_OF]-(:Attribute)} "
+            "  AND EXISTS {(submission:Submission {tag : $submission_tag})-[:HAS_VALUES_FOR_ATTRIBUTE]->(standalone)} "
+            "WITH all_paths, {tag: standalone.tag, priority: standalone.priority, min_state: standalone.min_state, standalone:true} AS no_parent_attr, root_attr, root_tags "
+            
+
+            "CALL apoc.convert.toTree(all_paths, false, { "
+            "    nodes: {Attribute: ['tag', 'priority', 'min_state']}, "
+            "    sortPaths: false "
+            "}) YIELD value AS tree "
+            "RETURN tree, collect(no_parent_attr) as standalones , root_attr"
+        )
+
+        r = self._driver.execute_query(query, routing_="r", tags=tags, submission_tag = submission_tag, result_transformer_=Result.data)
+        
+        if len(r) == 0: raise TypeError("The response did match a list of length > 0")
+        attributes_tree = [ri["tree"] for ri in r if len(ri["tree"]) > 0] + r[0]["standalones"] + r[0]["root_attr"]#standlones are always the same in each item of the array, just take the first one. 
+        #maybe bettter to separate the DB queries? 
+        attribute_tres_sorted = sorted(attributes_tree, key = lambda x : (-x["min_state"], x["priority"]), reverse=True)
+    
+        return [AttributeTreeNode(**attributes_tree) for attributes_tree in attribute_tres_sorted]
+        

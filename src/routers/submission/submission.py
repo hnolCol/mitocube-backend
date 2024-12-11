@@ -1,6 +1,6 @@
 import time 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
-from typing import List, Annotated, Literal, Dict
+from typing import List, Annotated, Literal, Dict, Optional
 from collections import OrderedDict
 from neo4j.exceptions import ConstraintError
 import pandas as pd 
@@ -23,14 +23,17 @@ from config.models.news.news import NewsModel
 
 from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
-from config.models.attributes import AttributeModel
-from config.models.submissions.submissions import NewSubmissionModel, UpdateDatasetAttributesInSubmission, SubmissionQueryResponse, DatasetAttributesResponse
+from config.models.submissions.submissions import NewSubmissionModel, SubmissionQueryResponse, DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
 from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel, SubmissionCountResponse
 from config.models.submissions.states import StateResponse, StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
+from config.models.timeline import TimelineInputModel
 from config.models.submissions.runs import RunListRequestPropsModel, RunListResponseModel
+from config.models.unit import UnitTypeInputModel
+from config.enums.units import UnitsEnum
+
 
 from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator, is_user_admin
 from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata, get_dataset_from_database, add_timeline_entry_to_metadata
@@ -53,7 +56,7 @@ router = APIRouter(
     )
 
 
-@router.get("/submission/tag",
+@router.get("/submissions/tag",
     summary = "Returns a unique tag for a new submission.",
     response_model = SubmissionIDResponse)
 def get_submission_id(user : UserModel = Depends(get_user_from_token)):
@@ -64,22 +67,22 @@ def get_submission_id(user : UserModel = Depends(get_user_from_token)):
     return SubmissionIDResponse()
 
 
-@router.patch("/submissions/{submission_label}/metatext", summary="Update the metatext of a submission.")
-def post_meta_text(submission_label : str, metatext : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
+# @router.patch("/submissions/{submission_label}/metatext", summary="Update the metatext of a submission.")
+# def post_meta_text(submission_label : str, metatext : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
         
-    db = MCDatabase.getDatabase()
-    dataset = get_dataset_from_database(db,submission_label)
-    metadata = dataset.getMetaJson()
-    if user.role < UserRolesEnum.CURATOR and metadata.user_label != user.label:
-        raise HTTPException(status_code=403,detail="Metatext can only be modified by the owner or a user that is at least curator.")
-    #TO DO should be in the DEPENDS model 
-    metadata = metadata.model_dump()
-    metadata["modified_on"] = time.time()
-    metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Metatext updated.", state = metadata["state"]))
-    metadata["metatext"] = metatext
-    update_submission = DatasetSubmissionModel(**metadata)
-    dataset.write_json(update_submission, update = True)
-    return True 
+#     db = MCDatabase.getDatabase()
+#     dataset = get_dataset_from_database(db,submission_label)
+#     metadata = dataset.getMetaJson()
+#     if user.role < UserRolesEnum.CURATOR and metadata.user_label != user.label:
+#         raise HTTPException(status_code=403,detail="Metatext can only be modified by the owner or a user that is at least curator.")
+#     #TO DO should be in the DEPENDS model 
+#     metadata = metadata.model_dump()
+#     metadata["modified_on"] = time.time()
+#     metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Metatext updated.", state = metadata["state"]))
+#     metadata["metatext"] = metatext
+#     update_submission = DatasetSubmissionModel(**metadata)
+#     dataset.write_json(update_submission, update = True)
+#     return True 
     
 
 @router.get("/submissions/{submission_tag}/metatext")
@@ -87,8 +90,16 @@ def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_use
     ""
     meta_text = DB.meta.get_metatext(tags = APIParamString(param=submission_tag).param)
     
-    print(meta_text)
     return meta_text.to_dict(orient="records")
+
+@router.get("/submissions/{submission_tag}/metatext/{metatext_tag}")
+def get_metatext_by_tag(submission_tag : str, metatext_tag : str, user : UserModel = Depends(get_user_from_token)):
+    ""
+    print(submission_tag,metatext_tag)
+    meta_text = DB.meta.get_metatext(tags = APIParamString(param=submission_tag).param, metatext_tag = metatext_tag)
+    if len(meta_text) == 0: raise HTTPException(status_code=404, detail="No meta text found.")
+    return meta_text.to_dict(orient="records")[0]
+
 
 @router.get("/submissions/metatext",
             summary="Returns the metatext information that can be used to describe a submission.",
@@ -335,11 +346,14 @@ def get_submission_by_query(state : str|int = None,
             genotype_tag = APIParamString(param=genotype_tag).param,
             limit = max_submissions
             )
+    
+    print(tags)
     if len(tags) == 0: 
         #empty response
         return SubmissionQueryResponse(submissions=[],query_count=0,total_count=N,tags=[])
     
     meta_data = DB.meta.get(tags = tags)
+    print(meta_data)
     
     d = {
         "submissions" : meta_data,
@@ -347,39 +361,56 @@ def get_submission_by_query(state : str|int = None,
         "query_count"  : len(tags),
         "total_count" : N
     }
+    print(SubmissionQueryResponse(**d))
     return SubmissionQueryResponse(**d)
     
     
     
 @router.post("/submissions", summary="Add submission to the database")
-def add_submission(background_task : BackgroundTasks ,submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
+def add_submission(background_task : BackgroundTasks , submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
     """
     Adds a submission to the database
-    """
-    
+    """    
     if DB.submission_exists(tag = submission.tag):
         raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update the submission tag.")
 
     mandatory_attributes = DB.attributes.get_mandatory_attributes()
     missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
+    
     if len(missing_mand_attributes) > 0:
         exception = mandatory_dataset_attrs_not_found_exception
         raise exception
-    
-    json_data = submission_to_json(submission,user)
 
-    if submission.includes_data:   
-        json_data["state"] = SubmissionStatesEnums.DONE
-    metadata = DatasetSubmissionModel(**json_data)
-    save_json(metadata.model_dump(),"MODEL.json")
+    
+    metadata = DatasetSubmissionModel(
+        created_on=submission.created_on,
+        title=submission.title,
+        tag= submission.tag,
+        replicates=submission.replicates,
+        n_samples=len(submission.sampleNames),
+        user_tag=user.tag, 
+        collaborators=submission.collaborators,
+        state = SubmissionStatesEnums.DONE if submission.includes_data else SubmissionStatesEnums.SUBMITTED,
+        sample_names=submission.sampleNames,
+        dataset_attributes=submission.datasetAttributes,
+        samples_attributes=submission.samplesAttributes,
+        samples_genotypes=submission.genotypes,
+        dataset_attribute_input=submission.datasetAttributeInput,
+        metatext=submission.metatext
+    )
+
+    
+    #save_json(metadata.model_dump(),"MODEL.json")
     try:
         DB.insert_meta(meta_data=metadata)
     except ConstraintError:
         #should not happen, since it is controlled before, delete?
         raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update a submission.")
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail="An unknown error occured.")
-    check_collaborators = are_public_users_allowed(submission.collaborators)
+    check_collaborators = are_public_users_allowed(user_tags=metadata.collaborators)
+    
     if not submission.includes_data:
         DB.news.insert(NewsModel(user_tag=user.tag,
                              title="New Submission!",
@@ -405,37 +436,6 @@ def add_submission(background_task : BackgroundTasks ,submission : NewSubmission
                         template_mame=EMAIL_SETTINGS.mail_submission_complete_template)    
 
     return 
-
-    
-    
-    
-    datasetObj = db.getDatasetObject()(label = metadata.label) #initiate dataset 
-    datasetObj._read_meta(meta = metadata)
-    #save metadata first. TODO : Implement in insert? Or insert_metadata? 
-    db.insert_meta(obj=datasetObj,meta=metadata)
-    
-    if submission.includes_data:    
-        #TODO Check -> features (index to be in the annotation database with the selected database.?)
-        sample_names = metadata.sample_names 
-        datatable = pd.DataFrame(data = submission.data_array, columns=sample_names, index=submission.data_index)
-        datatable = datatable.dropna(how="all")
-        #no nan in index
-        non_nan_index = datatable.index.dropna()
-        datatable = datatable.loc[non_nan_index,:]
-        #no duplicates in index 
-        non_duplicates = datatable.index.duplicated(keep="first")
-        datatable = datatable.loc[~non_duplicates,:]
-        #check for only nan columns 
-        if datatable.dropna(axis=1, how='all').columns.size != datatable.columns.size:
-            raise HTTPException(status_code=500,detail="A selected column contained only NaN. Please remove the column and submit the data again.")
-        # datatable.to_csv(dataset_path, sep="\t")
-        #TODO add filtering for features that are in the database? 
-        #Lets discuss Andreas, as uniprot such as XADSD2-2 are somehow lost. 
-        datasetObj._read_from_dataframe(datatable)
-        db.insert(datasetObj)
-        
-    check_collaborators = are_public_users_allowed(submission.collaborators)
-        
     
     
 @router.get("/submissions/{submission_tag}/datasetattributes",summary="Returns the dataset attributes of a submission.")
@@ -443,21 +443,20 @@ def get_submission_attributes(submission_tag : str,
                               user : UserModel = Depends(get_user_from_token)) -> DatasetAttributesResponse:
     
     dataset_attribute_tags = DB.meta.get_dataset_attributes(tag = submission_tag)
-    dataset_attribute_value_tags = [av_tag for av_tags in dataset_attribute_tags.values() for av_tag in av_tags]
-    attributes = DB.attributes.get(tags = list(dataset_attribute_tags))
-    values = DB.attributes.get_values_by_submission_tag(submission_tag=submission_tag, tags = dataset_attribute_value_tags)
 
-    DatasetAttributesResponse(tag = submission_tag, attribute_values= values, attributes= attributes, tags = dataset_attribute_tags)
     return {'tags' : dataset_attribute_tags, 
-            'attributes' : attributes, 
-            'attribute_values' : values, 
-            'tag' : submission_tag}
+            'tag' : submission_tag,
+            }
+
+@router.patch("/submissions/{submission_tag}/state")
 
 @router.patch("/submissions/{submission_tag}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 
                       submission_tag : str,
+                      state : SubmissionStatesEnums, 
                       state_change : StateChangeModel,  
-                      datasetAttributes : UpdateDatasetAttributesInSubmission, 
+                      dataset_attributes : Dict[str,List[str]], # attribute_tag, List[trait_tag] 
+                      #dataset_attribute_input : Optional[Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]]] = None,
                       user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Update datasetattribute along with the state if user is at least curator.
@@ -466,17 +465,26 @@ def update_submission(background_task : BackgroundTasks,
     TO DO: Add exception handling 
     """
     
-    dataset_attributes = dict([(attribute_tag, [attribute_value.tag for attribute_value in attribute_values]) 
-                          for attribute_tag, attribute_values in datasetAttributes.datasetAttributeValues.items() ])
-    
-    print(submission_tag)
-    submission = {}
-    
-    ok = DB.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes)
-    
-    print(ok)
-    
-    return ok 
+    # dataset_attributes = dict([(attribute_tag, [attribute_value.tag for attribute_value in attribute_values]) 
+    #                       for attribute_tag, attribute_values in datasetAttributes.datasetAttributeValues.items() ])  
+    try:  
+        if not DB.submissions.exists(tag = submission_tag): return tag_not_found
+        
+        ok = DB.submissions.update_state(tag = submission_tag, new_state = state_change.state, user_tag = user.tag)
+        if ok:
+            dataset_update_stats = DB.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes, dataset_attribute_input = dataset_attribute_input)
+            print(dataset_update_stats)
+        
+       
+        
+        
+            DB.timeline.insert(TimelineInputModel(content=f"Dataset attributes have been updated by {user.firstname}. {dataset_update_stats['number_deleted_traits']} traits were removed. ({', '.join(dataset_update_stats['deleted_trait_tags'])}). {dataset_update_stats['number_added_traits']} traits were added. ({', '.join(dataset_update_stats['added_trait_tags'])}).", 
+                                            submission_tag=submission_tag, 
+                                            submission_state=state_change.state,
+                                            user_tag=user.tag))
+    except Exception as e :
+        raise HTTPException(status_code=400, detail=str(e))
+    return True
 
     #notify the user if the state updated. For regular updates, no email is sent. 
     if state_change.prev_state != state_change.state:
@@ -540,27 +548,28 @@ def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curato
 @router.get("/submissions/{submission_tag}/sampleattributes")
 def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
     
+    sample_attrs, sample_map = DB.meta.get_sample_attributes_and_genotypes(tag = submission_tag) #: Dict[str,Dict[str,List[int]]], pd.DatafRmae
+    
+    return {"sample_attributes" : sample_attrs, "sample_map" : sample_map }
+    
     r = DB.meta.get_sample_attributes(tag = submission_tag)
     
     print(r)
+    return r 
 
 @router.get("/submissions/{submission_tag}/summary")
-def get_submission_summary_string(submission_tag : str) -> str:
+def get_submission_summary_string(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
     "Returns a string with dataset and sample attributes"
     summary_strings = DB.submission_summary.get(submission_tag)
-    print(summary_strings)
     
     return "\n".join(summary_strings)
 
 @router.get("/submissions/{submission_tag}/samples")
-def get_submission_summary_string(submission_tag : str) -> str:
+def get_submission_summary_string(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
     "Returns a string with dataset and sample attributes"
     samples = DB.submissions.get_samples(tag=submission_tag)
     samples_string = pd.DataFrame.from_dict(samples).sort_values(by="index")
-    print(samples_string)
     return samples_string.to_csv(sep="\t", index = None)
-
-
 
 
 @router.get("/submissions", response_model=List[DatasetSubmissionResponseModel])
@@ -584,8 +593,8 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
 
 
 
-@router.post("/submissions/{submission_label}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
-def get_dataset_runlist(submission_label : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(is_user_at_least_curator)): #
+@router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
+def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(is_user_at_least_curator)): #
     """
     Creates a runlist for a specific dataset. 
     A run is defined as the actual run and the number can be different from the number samples since
