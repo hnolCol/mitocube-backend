@@ -26,6 +26,9 @@ class ABCTraitNode(ABC, dlib.FlexDataClass):
         self._name: str | None = name
         self._value: str | None = value
 
+    def __str__(self):
+        return self.get_full_tag()
+
     @classmethod
     def _get_class_rulings(cls) -> Dict[str, Self]:
         import lib.data.sql.postgresql as sqllib

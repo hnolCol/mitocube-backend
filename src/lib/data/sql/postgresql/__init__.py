@@ -8,6 +8,9 @@
 from .PostgreSQLConnection import PostgreSQLConnection
 from .PostgreSQLDatabase import PostgreSQLDatabase
 from .PostgreSQLStatDatabase import PostgreSQLStatDatabase
+from .PostgreSQLOrganism import PostgreSQLOrganism
+from .PostgreSQLProteome import PostgreSQLProteome
+from .PostgreSQLFeature import PostgreSQLFeature
 from .PostgreSQLSamples import PostgreSQLSamples
 from .PostgreSQLDataset import PostgreSQLDataset
 from .PostgreSQLAttribute import PostgreSQLAttribute
@@ -21,6 +24,7 @@ from .PostgreSQLInstrument import PostgreSQLInstrument
 from .PostgreSQLProject import PostgreSQLProject
 from .PostgreSQLResearchGroup import PostgreSQLResearchGroup
 from .PostgreSQLTimeline import PostgreSQLTimeline, PostgreSQLDatasetTimelineEvent
+from .PostgreSQLToken import PostgreSQLToken
 from .PostgreSQLUser import PostgreSQLUser
 from .PostgreSQLUrl import PostgreSQLUrl
 from .PostgreSQLMetatext import PostgreSQLMetatext

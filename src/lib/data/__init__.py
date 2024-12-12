@@ -11,6 +11,10 @@ from .ABCTrait import ABCTraitNotFoundError, ABCTrait
 from .ABCTraitNode import ABCTraitNodeError, ABCTraitNodeNotFoundError, ABCTraitNode
 from .ABCTraitTree import ABCTraitTreeError, ABCTraitTreeNotFoundError, ABCTraitTree
 
+from .ABCOrganism import ABCOrganism, ABCOrganismError
+from .ABCProteome import ABCProteome, ABCProteomeError
+from .ABCFeature import ABCFeature, ABCFeatureError
+from .ABCToken import ABCToken, ABCTokenType, ABCTokenError, TokenNotFoundError, ExpiredTokenError, EmailTokenError, UserTokenError, LoginTokenError, RegistrationTokenError
 from .ABCSamples import DatasetSample, DatasetSampleError, ABCSamples
 from .ABCDatabase import ABCDatabase, ABCDatabaseError
 from .ABCStatDatabase import ABCStatDatabase, ABCStatDatabaseError

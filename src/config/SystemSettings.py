@@ -82,7 +82,7 @@ You will be able to:
     db_ip: Optional[IPvAnyAddress] = "127.0.0.1"  # ToDo: create validation conditions if db_handler is postgresql? Good idea. I would use the @field_validator function which is also availabe in  pydantic Settings
     db_port: Optional[int] = 5432
     db_user: Optional[SecretStr] = "immunocube"  # None
-    db_name: Optional[SecretStr] = "ImmunoCubeV4"  # None
+    db_name: Optional[SecretStr] = "ImmunoCubeV5"  # None
     db_pw: Optional[SecretStr] = "jflw$4Uv%9j8X4?jpeXuXYZgjpr!de2"  # None
     db_pool_connections_n_min: int = 4
     db_pool_connections_n_max: int = 16

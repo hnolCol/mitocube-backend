@@ -11,11 +11,17 @@ entity "attributes" as attributes {
     * tag: varchar
     text: varchar
     priority: smallint
+    allow_as_fiter: bool
     allow_for_dataset: bool
-    allow_for_sample: bool
     allow_for_genotype: bool
-    allow_for_trait_values: bool
+    allow_for_performance: bool
+    allow_for_sample: bool
+    allow_values: bool
+    values_are_numeric: bool
+    values_are_feature_labels: bool
+    values_are_genotype_labels: bool
     required_for_dataset_state: smallint
+    is_unit: bool
 }
 
 entity "traits" as traits {
@@ -40,25 +46,32 @@ entity "nm_traits_samples" as nm_traits_samples {
 
 entity "genotype" as genotype {
     **id**: int
+    trait_node_id: int
     --
     * label: varchar
+    name: varchar
     description: varchar
+    is_selectable: varchar
+    created_by: int
+    created_on: timestamp
 }
 
-entity "trait_node" as trait_node {
+entity "trait_nodes" as trait_nodes {
     **id**: bigint
+    trait_id: bigint
     parent_node: bigint <<FK>>
-    * label: varchar <<?>>
+    --
+    * name: varchar
     trait_value: varchar
 }
 
 
-trait_node }|--|| nm_traits_datasets
-trait_node }|--|| nm_traits_samples
-trait_node }|--|| genotype
+trait_nodes }|--|| nm_traits_datasets
+trait_nodes }|--|| nm_traits_samples
+trait_nodes }|--|| genotype
 
-traits }o--|| trait_node
-trait_node }o--|| trait_node
+traits }o--|| trait_nodes
+trait_nodes }o--|| trait_nodes
 
 traits }|--|| attributes
 attributes }o--|| attributes

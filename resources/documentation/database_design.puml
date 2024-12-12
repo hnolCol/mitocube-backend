@@ -12,11 +12,17 @@ entity "attributes" as attributes {
     * tag: varchar
     text: varchar
     priority: smallint
+    allow_as_fiter: bool
     allow_for_dataset: bool
-    allow_for_sample: bool
     allow_for_genotype: bool
-    allow_for_trait_values: bool
+    allow_for_performance: bool
+    allow_for_sample: bool
+    allow_values: bool
+    values_are_numeric: bool
+    values_are_feature_labels: bool
+    values_are_genotype_labels: bool
     required_for_dataset_state: smallint
+    is_unit: bool
 }
 
 entity "traits" as traits {
@@ -32,17 +38,33 @@ entity "traits" as traits {
 entity "nm_traits_datasets" as nm_traits_datasets {
     **trait_id**: int <<FK>>
     **dataset_id**: int <<FK>>
-    --
-    trait_value: varchar
 }
 
 entity "nm_traits_samples" as nm_traits_samples {
     **trait_id**: int <<FK>>
     **sample_id**: bigint <<FK>>
+}
+
+entity "trait_nodes" as trait_nodes {
+    **id**: bigint
+    trait_id: bigint <<FK>>
+    parent_node: bigint <<FK>>
     --
+    * name: varchar
     trait_value: varchar
 }
 
+entity "genotype" as genotype {
+    **id**: int
+    trait_node_id int <<FK>>
+    --
+    * label: varchar
+    name: varchar
+    description: varchar
+    is_selectable: varchar
+    created_by: int
+    created_on: timestamp
+}
 
 entity "projects" as projects {
     **id**: int
@@ -181,8 +203,15 @@ entity "sec_permission_groups" as permission_groups {
     * label: varchar
     is_super_admin: bool
     permission_to_manage_system: bool
-    permission_to_manage_all_datasets: bool
-    ...
+    permission_to_manage_attributes_traits: bool
+    permission_to_manage_all_datasets boolean: bool
+    permission_to_manage_owned_datasets: bool
+    permission_to_manage_instruments: bool
+    permission_to_manage_genoytpes: bool
+    permission_to_manage_features boolean: bool
+    permission_to_manage_research_groups boolean: bool
+    permission_to_manage_users boolean: bool
+    permission_to_submit_datasets boolean: bool
 }
 
 entity "sec_nm_permissions_users" as nm_permissions_users {
@@ -211,8 +240,10 @@ samples  ||-[bold]-|{  feature_values
 feature_values }|-[bold]-||  features
 features  }o--o{  feature_nm
 
-traits ||-[bold]-o{ nm_traits_datasets
-traits ||-[bold]-o{ nm_traits_samples
+trait_nodes ||-[bold]-o{ nm_traits_datasets
+trait_nodes ||-[bold]-o{ nm_traits_samples
+trait_nodes }|--|| genotype
+traits }o--|| trait_nodes
 traits }|-[bold]-|| attributes
 attributes }o--|| attributes
 

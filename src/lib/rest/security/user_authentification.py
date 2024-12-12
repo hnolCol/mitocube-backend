@@ -1,16 +1,15 @@
-from typing import Annotated, Tuple, List
+from typing import Annotated, Type, Tuple, List
 
 import lib.data as dlib
-from lib.data.mem import MemUserToken, MemUserTokens, MemUserTokenError
 import lib.data.sql.postgresql as psql
 
 from fastapi import Header, status, Request
 from fastapi.exceptions import HTTPException
 
 class RestSessionInformation:
-    def __init__(self, user: dlib.ABCUser | None, token: MemUserToken, ip: str, agent: str):
+    def __init__(self, user: dlib.ABCUser | None, token: dlib.ABCToken, ip: str, agent: str):
         self._user: dlib.ABCUser | None = user
-        self._token: MemUserToken = token
+        self._token: dlib.ABCToken = token
         self._ip: str = ip
         self._agent: str = agent
 
@@ -23,7 +22,7 @@ class RestSessionInformation:
     def get_user(self) -> dlib.ABCUser | None:
         return self._user
 
-    def get_token(self) -> MemUserToken:
+    def get_token(self) -> dlib.ABCToken:
         return self._token
 
 # Either test the following with (argument in FastAPI route definitions):
@@ -65,53 +64,54 @@ class RestPermissionSteward:  # Question: outsource RestPermissionSteward? ABCPe
         self._require_permission_to_submit_datasets: bool = require_permission_to_submit_datasets
 
     def __call__(self, request: Request, user_agent: Annotated[str | None, Header()] = None) -> RestSessionInformation:
-        user, token, token_obj = self.__verify_session(request=request, user_agent=user_agent)
+        user, _, token_obj = self.__verify_session(request = request, user_agent = user_agent)
 
-        return RestSessionInformation(user=user,  # dlib.ABCUser
-                                      token=token_obj,  # MemUserToken
-                                      ip=request.client.host,  # str
-                                      agent=user_agent if user_agent else "None")
+        return RestSessionInformation(user = user,  # dlib.ABCUser
+                                      token = token_obj,  # MemUserToken
+                                      ip = request.client.host,  # str
+                                      agent = user_agent if user_agent else "None")
 
     # Fixme, so far it is just mostly copied from the function 'verify_user_token', Implement it properly (extend database)
-    def __verify_session(self, request: Request, user_agent: str | None = None) -> Tuple[dlib.ABCUser, str, MemUserToken]:
+    def __verify_session(self, request: Request, user_agent: str | None = None) -> Tuple[dlib.ABCUser, str, dlib.ABCToken]:
         user: dlib.ABCUser
         token: str
-        db_session_tokens = MemUserTokens()
+        db_tokens: Type[dlib.ABCToken] = dlib.ABCToken.get_class()
+        token_obj: dlib.ABCToken
 
         error_message_401 = "Unable to verify token provided for user session."  # Question: Move to config?
         error_message_403 = "No sufficient rights to proceed."  # Question: Move to config?
 
         if "authorization" in request.headers.keys():
-            token = request.headers["authorization"].replace("Bearer ", "")
+            str_token = request.headers["authorization"].replace("Bearer ", "")
         else:
             # ToDo / Question: Log ABCLoginTokenError message?
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
                                 # headers={"WWW-Authenticate": "Bearer"})  # Question, was was that for?
 
         try:
-            token_obj = db_session_tokens.test_token(token=token,
-                                                     ip=request.client.host,
-                                                     agent=user_agent if user_agent else "None")
-        except MemUserTokenError as err:
+            token_obj = db_tokens.objectify_token(token = str_token)
+            db_tokens.test_token(token_type = dlib.ABCTokenType.USER,
+                                 ip = request.client.host, agent = user_agent if user_agent else "None")
+        except dlib.ABCTokenError as err:
             # ToDo / Question: Log ABCLoginTokenError message?
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
+            raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = error_message_401)
 
         try:
-            user = psql.PostgreSQLUser.objectify_with_username(username=token_obj.get_username())
+            user = psql.PostgreSQLUser.objectify_with_username(username = token_obj.get_username())
         except dlib.ABCUserError as err:
             # ToDo / Question: Log ABCLoginTokenError message?
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
+            raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = error_message_401)
 
         # Checks if the account is not expired, if user is allowed to log-in and if the email is verified
         if not user.is_login_allowed():
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
+            raise HTTPException(status_code = status.HTTP_401_UNAUTHORIZED, detail = error_message_401)
 
         #   if self._requires_superuser and user.get_username() != self.__superuser_name:
         #     raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED,
         #                         detail="You do not have sufficient rights to proceed.",
         #                         headers={"WWW-Authenticate": "Bearer"})
         if self._requires_users and user.get_username() not in self._requires_users:
-            raise HTTPException(status_code=status.HTTP_403_UNAUTHORIZED, detail=error_message_403)
+            raise HTTPException(status_code = status.HTTP_403_UNAUTHORIZED, detail = error_message_403)
 
         required_permissions: List[bool] = [self._requires_superuser,
                                             self._require_permission_to_manage_system,
@@ -162,4 +162,4 @@ class RestPermissionSteward:  # Question: outsource RestPermissionSteward? ABCPe
                 if db_conn:
                     psql.PostgreSQLConnection().returnConnection(db_conn)
 
-        return user, token, token_obj
+        return user, str_token, token_obj

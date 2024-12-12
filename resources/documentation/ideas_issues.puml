@@ -1,0 +1,17 @@
+
+@startmindmap
+* Ideas
+
+* Issues
+** Phenotypes
+*** Linking a genotype with a genotype subtree with new traits
+
+* Requirements
+** "Filter" - Grouping of Features
+*** Used to highlight Features in Plots
+** Permissions
+*** required_group (e.g. download only by PIs)
+*** required_own_group (e.g. only user of research group can view research group item)
+*** nm_permissions_users_datasets (e.g. add individual user to dataset)
+
+@endmindmap

@@ -1,5 +1,4 @@
-from typing import Any, Annotated, Dict, Type
-import os
+from typing import Annotated, Type
 import re
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Header, status, Request
@@ -11,7 +10,6 @@ from config import SystemSettings
 from lib.rest.security import RestPermissionSteward, RestSessionInformation
 
 import lib.data as dlib
-from lib.data.mem import MemToken, MemEmailTokens, MemLoginTokens, MemUserTokens, MemTokenError
 from lib.io.com import EMailHandler
 
 
@@ -40,12 +38,16 @@ def rest_post_request_email_login_token(background_task: BackgroundTasks,
     except dlib.ABCUserError as err:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=error_message_401)
 
-    db_login_tokens = MemLoginTokens()
-    token: str = db_login_tokens.create_token(username=user.get_username(),
-                                              ip=request.client.host,
-                                              agent=user_agent if user_agent else "None")
+    db_token: Type[dlib.ABCToken] = dlib.ABCToken.get_class()
+    str_token: str
+    token: dlib.ABCToken
 
-    print("> Send the code '{token}' to '{email}'.".format(email=user.get_email(), token=token, ))  # Fixme: Remove this line after debugging!!!
+    str_token, token = db_token.create(token_type = dlib.ABCTokenType.LOGIN,
+                                       username = user.get_username(),
+                                       ip = request.client.host,
+                                       agent = user_agent if user_agent else "None")
+
+    print("> Send the code '{token}' to '{email}'.".format(email = user.get_email(), token = str_token))  # Fixme: Remove this line after debugging!!!
 
     system_settings = SystemSettings.get_system_settings()
     EMailHandler.send_email_in_background(background_tasks = background_task,
@@ -61,25 +63,23 @@ def rest_post_request_email_login_token(background_task: BackgroundTasks,
 def rest_post_validate_login_token(request: Request,
                                    token_to_verify: str = Form(),
                                    user_agent: Annotated[str | None, Header()] = None):
-    login_token: MemToken
 
-    db_login_tokens = MemLoginTokens()
+    db_token: Type[dlib.ABCToken] = dlib.ABCToken.get_class()
+    login_token: dlib.ABCToken
 
     try:
-        login_token = db_login_tokens.test_token(token = token_to_verify,
-                                                 ip = request.client.host,
-                                                 agent = user_agent if user_agent else "None")
-    except MemTokenError as err:
+        login_token = db_token.objectify_token(token = token_to_verify, token_type = dlib.ABCTokenType.LOGIN)
+        login_token.test_token(token_type = dlib.ABCTokenType.LOGIN, agent = user_agent if user_agent else "None", ip = request.client.host)
+    except dlib.ABCTokenError as err:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unable to verify token provided for user login.")  # Question: Message to config?
                             # headers={"WWW-Authenticate": "Bearer"})  # Question, what was that for?
 
-    db_login_tokens.remove_token(login_token)
+    db_token.remove_token(login_token)
 
-    db_session_tokens = MemUserTokens()
-    token_session: str = db_session_tokens.create_token(username = login_token.get_username(),
-                                                        ip = request.client.host,
-                                                        agent = user_agent if user_agent else "None")
-    db_session_tokens._write()  # Fixme, remove or find a solution to do it with shut down signal (close needs then also to remove everything in memory!)
+    token_session, _ = db_token.create(token_type = dlib.ABCTokenType.LOGIN,
+                                       username = login_token.get_username(),
+                                       ip = request.client.host,
+                                       agent = user_agent if user_agent else "None")
 
     return {"token": token_session, "username": login_token.get_username()}
 
@@ -89,10 +89,7 @@ def rest_get_username(session: RestSessionInformation = Depends(RestPermissionSt
 
 @router.get("/logout/", tags = ["Logout"])
 def rest_get_logout(session: RestSessionInformation = Depends(RestPermissionSteward())):
-    db_user_tokens = MemUserTokens()
-    token: MemToken = session.get_token()
-
-    db_user_tokens.remove_token(token = token)
+    dlib.ABCToken.get_class().remove_token(token = session.get_token())
 
 @router.get("/request_email_verification/{username}", tags=["Logout"])
 def rest_get_request_verify_email(background_task: BackgroundTasks,
@@ -108,12 +105,14 @@ def rest_get_request_verify_email(background_task: BackgroundTasks,
         pass
 
     if user:
-        db_email_tokens = MemEmailTokens()
-        token: str = db_email_tokens.create_token(username=user.get_username(),
-                                                  ip=request.client.host,
-                                                  agent=user_agent if user_agent else "None")
+        db_token: Type[dlib.ABCToken] = dlib.ABCToken.get_class()
+        token: str
+        token, _ = db_token.create(token_type = dlib.ABCTokenType.EMAIL,
+                                   username=user.get_username(),
+                                   ip=request.client.host,
+                                   agent=user_agent if user_agent else "None")
 
-        print("> Send the code '{token}' to '{email}'.".format(email=user.get_email(), token=token, ))  # Fixme: Remove this line after debugging!!!
+        print("> Send the code '{token}' to '{email}'.".format(email=user.get_email(), token=token))  # Fixme: Remove this line after debugging!!!
 
         system_settings = SystemSettings.get_system_settings()
         EMailHandler.send_email_in_background(background_tasks=background_task,
@@ -126,16 +125,19 @@ def rest_get_request_verify_email(background_task: BackgroundTasks,
                                               template_name = system_settings.mail_template_email_confirmation)
 
 
-@router.get("/verify_email/{token}", tags = ["Logout"])
+@router.get("/verify_email/{token}", tags = ["Lgout"])
 def rest_get_verify_email(token: str):
-    db_email_tokens: MemEmailTokens = MemEmailTokens()
-    email_token: MemToken
+    db_token: Type[dlib.ABCToken] = dlib.ABCToken.get_class()
+    email_token: dlib.ABCToken
 
     try:
-        email_token = db_email_tokens.test_token(token=token, ip="", agent="")
-    except MemTokenError as err:
+        email_token = db_token.objectify_token(token = token, token_type = dlib.ABCTokenType.EMAIL)
+        email_token.test_token(token_type=dlib.ABCTokenType.EMAIL)
+    except dlib.ABCTokenError as err:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unable to verify token provided for user login.")  # Question: Message to config?
                             # headers={"WWW-Authenticate": "Bearer"})  # Question, what was that for?
+
+    db_token.remove_token(email_token)
 
     user_db: Type[dlib.ABCUser] = dlib.ABCUser.get_class()
     user: dlib.ABCUser

@@ -32,6 +32,21 @@ ALTER TYPE proteome_ids OWNER TO postgres;
 -- Setup Security
 -- ---------------------------------------------------------------------------------------------------------------------
 
+CREATE TABLE IF NOT EXISTS sec_tokens (
+    md5_token character(32) NOT NULL,
+    token_type character varying NOT NULL,
+    expires_after timestamp without time zone NOT NULL,
+    username character varying,
+    agent character varying,
+    ip character varying,
+    value character varying,
+    PRIMARY KEY(md5_token, token_type),
+    UNIQUE (md5_token, token_type)
+)
+ALTER TABLE sec_tokens OWNER TO postgres;
+
+CREATE INDEX index_sec_tokens ON sec_tokens USING btree(token_type, md5_token);
+
 CREATE TABLE sec_permission_groups (
     id serial NOT NULL,
     label character varying NOT NULL,
@@ -50,6 +65,7 @@ CREATE TABLE sec_permission_groups (
     UNIQUE(label)
 );
 ALTER TABLE sec_permission_groups OWNER TO postgres;
+GRANT DELETE ON TABLE sec_tokens TO immunocube;
 
 CREATE INDEX index_sec_permission_groups_pk ON sec_permission_groups USING btree(id);
 
