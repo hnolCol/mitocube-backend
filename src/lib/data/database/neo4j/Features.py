@@ -37,6 +37,29 @@ class Neo4JFeatures(FeaturesABC):
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value)
         return r[0]
     
+    def get(self, tag : str) -> FeatureNeoModel:
+        ""
+        query = (
+            "MATCH (p:Protein) "
+            "WHERE p.tag in $tags "
+            "RETURN properties(p) as props " 
+        )
+        r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+        if len(r): raise ValueError("Tag does not exist in the database.")
+        return FeatureNeoModel(**r[0])
+    
+    
+    def count_samples_quantifying_protein(self, tags : List[str]) -> pd.DataFrame:
+        
+        query = (
+            "MATCH (p:Protein)<-[:QUANTIFIED]-(s:Sample) "
+            "WHERE p.tag in $tags "
+            "RETURN p.tag as tag, count(s) as n_samples "
+        )
+        
+        df = self._driver.execute_query(query, tags = tags, result_transformer_=Result.to_df)
+        return df.set_index("tag")
+    
     def is_quantified(self, tags : List[str]) -> pd.DataFrame:
         ""
         query = (
@@ -44,12 +67,11 @@ class Neo4JFeatures(FeaturesABC):
             "WHERE p.tag in $tags "
             "MATCH (p)-[r:QUANTIFIED_IN]->(:Submission) "
             "WITH count(r) as N, p "
-            "MATCH (p)-[rsample:QUANTIFIED]-(:Sample) "
+            "MATCH (p)<-[rsample:QUANTIFIED]-(:Sample) "
             "WITH count(rsample) as nsample, p, N "
             "RETURN p.tag as tag,  N > 0 as quantified, N as quant_dataset, nsample as quant_samples "
         )
             
-        
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.to_df, tags = tags)
         return r 
     
@@ -63,7 +85,7 @@ class Neo4JFeatures(FeaturesABC):
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
         return r[0]
     
-    def get_unique_quantification(self) -> pd.DataFrame:
+    def get_unique_quantification_in_genotype(self) -> pd.DataFrame:
         "Get proteins that are exclusively quantified in a single genotype." 
         
         query = (
@@ -72,14 +94,15 @@ class Neo4JFeatures(FeaturesABC):
             "    MATCH (p)<-[:QUANTIFIED]-(s2:Sample)-[:HAS_GENOTYPE]->(g2:Genotype) "
             "        WHERE g2.tag <> g.tag "
             "       } "
-            "RETURN p, g, COLLECT(s) AS samples "
+            "RETURN p.tag as tag, g.tag as genotype_tag, COLLECT(s.tag) AS samples, count(s) as n_samples "
             )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df)
         
         print(r)
+        return r 
 
-    def count_quantifications(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame: 
+    def get_quantification_stats(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame: 
         """Counts the total number of quantifications
         as well as the number of samples in which the protein 
         could also have been detected (e.g. same proteome).
@@ -176,7 +199,15 @@ class Neo4JFeatures(FeaturesABC):
         
         return [FeatureNeoModel(**ri) for ri in r]
 
-
+    def get_proteome(self, tags : List[str]) -> pd.DataFrame:
+        ""
+        query = (
+            "MATCH (p:Protein)-[:IN_PROTEOME]->(trait:AttributeValue) "
+            "WHERE p.tag in $tags "
+            "RETURN p.tag as tag, trait.tag as proteome_tag "
+        ) 
+        df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df,  tags = tags)
+        return df.set_index("tag")
         
     def get_data(self, tags : List[str], submission_tags : List[str] = None, limit : int = 1) -> List[Dict]:
         ""
@@ -241,20 +272,48 @@ class Neo4JFeatures(FeaturesABC):
                                        submission_tags = submission_tags)
         return r 
         
-    def get_abundance_distribution(self, tag : str):
+    def get_abundance_distribution(self, tag : str, attribute_tag : str = None) -> List[QuantileModel]:
         "" 
-        query = (
-            "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample) "
-            "WHERE p.tag = $tag "
-            "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N "
-        )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tag = tag)
-        print(r)
-        qs = r[0]["quantiles"]
-        N = r[0]["N"]
+        if attribute_tag is not None:
+            #  query = (
+            #     "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)-[:HAS_VALUE]-(a:Attribute) "
+            #     "WHERE p.tag = $tag AND a.tag = $attribute_tag "
+            #     "RETURN av.tag as trait_tag,apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N, collect(r.value) as values "
+            # )
+             
+             query = (
+                #match first the sample attributes and then the dataset attributes.
+            "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
+            "MATCH (a:Attribute) WHERE a.tag = $attribute_tag "
+            "OPTIONAL MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a) "
+            "OPTIONAL MATCH (sample)<-[:HAS_SAMPLE]-(:Submission)-[:HAS_ATTRIBUTE_VALUE]->(avDataset:AttributeValue)<-[:HAS_VALUE]-(a) "
+            "WHERE (av IS NOT NULL AND avDataset IS NULL) OR (av IS NULL AND avDataset IS NOT NULL) "
+            "WITH r, COALESCE(av, avDataset) AS avFinal "
+            "WHERE avFinal IS NOT NULL "
+            "RETURN avFinal.text as text, apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N "
+             
+             )
+             
+        else:
+            query = (
+                "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample)"
+                "WHERE p.tag = $tag "
+                "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N, p.gene_name as text"
+            )
         
-        return QuantileModel(min = qs[0], q25 = qs[1], m = qs[2], q75 = qs[3], max = qs[4], N = N )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tag = tag, attribute_tag = attribute_tag)
+        if not isinstance(r,list): return []
+        
+        return [QuantileModel(
+            text = ri["text"],
+            min = ri["quantiles"][0], 
+            q25 = ri["quantiles"][1], 
+            m = ri["quantiles"][2],
+            q75 = ri["quantiles"][3],
+            max = ri["quantiles"][4], 
+            N = ri["N"] ) for ri in r]
         
     def get_avg_abundance(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
         "Neo4J implementation to retrieve the average abundance"
@@ -307,7 +366,25 @@ class Neo4JFeatures(FeaturesABC):
         r = self._driver.execute_query(query,tags=tags,submission_tags=submission_tags,routing_="r",result_transformer_=Result.to_df)
 
         return r 
-            
+    
+    
+    def get_pairwise_feature_quant(self, feature_tag_x : str, feature_tag_y : str) -> pd.DataFrame:
+        "Returns the the quantitifacation of two features from the same sample. Intended to be used for showing correlations. "
+
+        query = (
+            "MATCH (p_x:Protein {tag : $feature_tag_x}), (p_y:Protein {tag : $feature_tag_y}) "
+            "MATCH (p_x)<-[r_x:QUANTIFIED]-(s:Sample)-[r_y:QUANTIFIED]->(p_y) "
+            "RETURN r_x.value as x, r_y.value as y, s.tag as sample_tag "
+        )
+        
+        r = self._driver.execute_query(query,
+                                       result_transformer_=Result.to_df,
+                                       routing_="r",
+                                       feature_tag_x = feature_tag_x, 
+                                       feature_tag_y = feature_tag_y
+                                       )
+        print(r)
+        return r 
    
     def get_protein_tags(self, proteome_tags : str|List[str] = "UP000005640", is_quantified : bool = True) -> List[str]:
         """Returns the proteins in the database using the proteome_tags. This 
@@ -353,6 +430,27 @@ class Neo4JFeatures(FeaturesABC):
             return []
 
         return r
+    
+    def get_quantification_count(self, tags : List[str]):
+        """Returns the number of samples that quantified a specific 
+        feature. 
+        Parameters
+        ----------
+        tag : str
+            The feature tag. (Uniprot ID)
+        """
+        
+        query = (
+            "MATCH (p:Protein) "
+            "WHERE p.tag in $tags "
+            "MATCH (p)<-[:QUANTIFIED]-(s:Sample) "
+            "RETURN p.tag as tag, count(s) as N "
+        )
+        
+        r = self._driver.execute_query(query,tags=tags,routing_="r",result_transformer_=Result.data)
+        print(r)
+        return r 
+    
     
     def get_quant_stats(self, tags : List[str]) -> pd.DataFrame:
         """Returns the general stats of a list of features by their tag. 

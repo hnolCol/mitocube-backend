@@ -260,7 +260,8 @@ class Neo4JConstructor:
         query = (
             "UNWIND $units as unit_prop "
             "MERGE (unittype:UnitType {tag : unit_prop.tag}) "
-            "SET unittype.text = unit_prop.text, unittype.priority = unit_prop.priority, unittype.has_feature_value = unit_prop.has_feature_value "
+            "SET unittype.text = unit_prop.text, unittype.priority = unit_prop.priority, unittype.has_feature_value = unit_prop.has_feature_value, "
+            "unittype.is_feature_position = unit_prop.is_feature_position "
             "WITH unittype, unit_prop "
             "UNWIND unit_prop.units as unit "
             "MERGE (u:Unit {tag:unit.tag}) "

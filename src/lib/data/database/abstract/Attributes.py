@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from config.enums.states import SubmissionStatesEnums
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeResponseModel, AttributeTreeNode
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeResponseModel, AttributeTreeNode, AttributeTraitResponseModel
 from config.models.feature import FeatureNeoModel 
 
 class AttributesABC(ABC):
@@ -196,9 +196,10 @@ class AttributesABC(ABC):
         """
         
     @abstractmethod    
-    def get_attributes_and_values_by_search_string(self, 
+    def get_attributes_by_search_string(self, 
                                                    search_string : str, 
-                                                   min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED, 
+                                                   min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
+                                                   limit : int = None,
                                                    param_name : Literal["allow_for_dataset",
                                                                         "mandatory_for_submission",
                                                                         "allow_as_filter",
@@ -206,6 +207,20 @@ class AttributesABC(ABC):
                                                                         "allow_for_measurement",
                                                                         "allow_for_qc",
                                                                         "mandatory_for_active"] = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
+        ""
+    
+    @abstractmethod    
+    def get_attributes_and_values_by_search_string(self, 
+                                                   search_string : str, 
+                                                   min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
+                                                   limit : int = None,
+                                                   param_name : Literal["allow_for_dataset",
+                                                                        "mandatory_for_submission",
+                                                                        "allow_as_filter",
+                                                                        "allow_for_genotype",
+                                                                        "allow_for_measurement",
+                                                                        "allow_for_qc",
+                                                                        "mandatory_for_active"] = None) -> List[AttributeTraitResponseModel]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
         TODO: Rename to find? 
@@ -218,6 +233,8 @@ class AttributesABC(ABC):
             The minimal state of a submission/dataset that is required. Certain attribute can only be 
             selected if the submission is in specific state. For example, you can only set the 
             mass spectrometer if the samples are being measured, by default SubmissionStatesEnums.SUBMITTED
+        limit : int, optional
+            The maximum of attributes to return
         param_name : str, optional
             A boolean attribute param, if None it is ignored, by default None
 

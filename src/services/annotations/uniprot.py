@@ -40,7 +40,7 @@ def download_proteome_annotations(annotationUrl : str,
             raise ValueError("The proteome was not found in the Uniprot database. ")
         elif add_proteome_callback is not None:
             add_proteome_callback(proteome_tag, uniprot_proteome_info[0])
-        uniprot_query = f"((proteome:{proteome_tag}) AND (reviewed:{reviewed}))" if reviewed else f"(proteome:{proteome_tag})"
+        uniprot_query = f"((proteome:{proteome_tag}) AND (reviewed:{'true' if reviewed else 'false'}))" if reviewed else f"(proteome:{proteome_tag})"
         apiParams = apiParamModel(query=uniprot_query)
         rr = requests.get(annotationUrl,params=apiParams.model_dump())
         rr.raise_for_status()

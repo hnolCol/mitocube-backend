@@ -51,6 +51,7 @@ class Neo4JUnitTypes( UnitTypesABC):
             "       unittype.text AS unit_type_text, "
             "       unittype.priority AS unit_type_priority, "
             "       unittype.has_feature_value as has_feature_value, "
+            "       unittype.is_feature_position as is_feature_position, "
             "       COLLECT({tag: u.tag, text: u.text, priority : u.priority, description : u.description}) AS units "
         )
         
@@ -61,4 +62,5 @@ class Neo4JUnitTypes( UnitTypesABC):
                                text=x["unit_type_text"],
                                priority = x["unit_type_priority"],
                                has_feature_value = x["has_feature_value"],
+                               is_feature_position = x["is_feature_position"],
                                units=sorted(x["units"], key= lambda x: -x["priority"])) for x in r]

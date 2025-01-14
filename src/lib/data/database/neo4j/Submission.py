@@ -209,17 +209,18 @@ class Neo4JSubmissions(SubmissionABC):
     
     
     def get_correlated_features(self, tags : List[str], 
-                                feature_tag : str = None, 
+                                feature_tag : str, 
                                 filter_tag : str = None,  
                                 direction : Literal["positive","negative","both"] = "both", 
                                 limit : int = 20, 
                                 min_data_points : int = 20):
         """Correlates a feature to all other features 
-        by its tag. 
+        by its feature_tag in the submissions given by 'tags' . 
 
         Parameters
         ----------
-        tag : str
+        tags : List[stt] - List of submissions 
+        feature_tag : str
             the feature tag. 
 
         Returns
@@ -326,18 +327,19 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
     
-    def filter_by_attribute_value_tags(self, attribute_value_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:
+    def filter_by_attribute_value_tags(self, attribute_value_tags : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
         ""
         query = (
             "MATCH (submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
             f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
             "WITH submission, COLLECT(DISTINCT av.tag) AS value_tags "
-            "WHERE ALL(value_tag in $attribute_value_tags WHERE value_tag in value_tags) "
+            "WHERE ALL(value_tag IN $attribute_value_tags WHERE value_tag in value_tags) "
             "RETURN DISTINCT submission.tag "
         )
         query = self._add_limit(query,limit)
-        r,_,_ = self._driver.execute_query(query, attribute_value_tags=attribute_value_tag, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
+        r = self._driver.execute_query(query, attribute_value_tags = attribute_value_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
+        print(r)
+        return r
     
             
     def filter_by_attribute_tags(self, attribute_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:

@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 
-from config.models.user import UserModel 
+from config.models.user import UserModel, UserModelForRegistration
 
 
 class UserABC(ABC):
@@ -21,7 +21,7 @@ class UserABC(ABC):
         ""
     
     @abstractmethod 
-    def add_user(self, user_props):
+    def add_user(self, user_props : UserModelForRegistration):
         ""
 
     @abstractmethod

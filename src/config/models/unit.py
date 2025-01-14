@@ -27,12 +27,14 @@ class UnitTypeResponseModel(BaseModel):
     text : str 
     priority : int
     has_feature_value : bool
+    is_feature_position : bool = False
     units : List[UnitModel]
     
 
 class UnitInputResponseModel(BaseModel):
     unittype_tag : str 
     has_feature_value : bool = False
+    is_feature_position : bool = False
     unit_tag : str 
     unit_text : str 
     value : Union[str,float,int] 

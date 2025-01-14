@@ -51,16 +51,19 @@ class Neo4JDataset(DatasetABC):
         ""
         F = self._get_variance_in_groups(tag, data_table)
         
-        with self._driver.session() as session:
-            session.execute_write(self._add_dt, data_table, tag, F)
+        # with self._driver.session() as session:
+        #     session.execute_write(self._add_dt, data_table, tag, F)
             
             
         #set sample index 
         data_table.columns = np.arange(data_table.columns.size)
         #print(data_table.reset_index(names="p_tag").melt(id_vars="p_tag", var_name="sample_index"))
-        X = data_table.reset_index(names="p_tag").melt(id_vars="p_tag", var_name="sample_index").dropna(subset=["value"]).groupby("sample_index")
+        X = data_table.reset_index(names="p_tag").melt(id_vars="p_tag", var_name="sample_index").dropna(subset=["value"])
        # print(X)
-        for sample_index, sample_data in X:
+        print(X.index.size)
+        
+        for sample_index, sample_data in X.groupby("sample_index"):
+            print(sample_data.index)
             query = (
                 "MATCH (submission:Submission {tag : $tag}) "
                 "MATCH (sample:Sample {index : $sample_index}) "

@@ -12,7 +12,7 @@ import pandas as pd
 from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
 from config.models.filter import FilterModel
-   
+from config.models.calculations.quantile import QuantileModel
    
    
 class FeaturesABC(ABC):
@@ -49,7 +49,7 @@ class FeaturesABC(ABC):
         """
         
     @abstractmethod
-    def count_quantifications(self, tags : List[str]) -> pd.DataFrame: 
+    def get_quantification_stats(self, tags : List[str]) -> pd.DataFrame: 
         """Counts the total number of quantifications
         as well as the number of samples in which the protein 
         could also have been detected (e.g. same genotype).
@@ -150,6 +150,10 @@ class FeaturesABC(ABC):
         """
         
     @abstractmethod
+    def get_abundance_distribution(self, tag : str, attribute_tag : str = None) -> List[QuantileModel]:
+        ""
+        
+    @abstractmethod
     def get_avg_abundance(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:
         """Returns the average abundance in every submission the feature has been quantified. 
 
@@ -169,6 +173,11 @@ class FeaturesABC(ABC):
                 - value (float) : Average abundance 
                 - submission_tag (str) : The submission tag the abundance was taken from.
         """
+    
+    
+    @abstractmethod
+    def get_pairwise_feature_quant(self, feature_tag_x : str, feature_tag_y : str) -> pd.DataFrame:
+        ""
     
     @abstractmethod
     def get_f_value(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:

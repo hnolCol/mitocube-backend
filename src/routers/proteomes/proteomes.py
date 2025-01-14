@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from typing import List
+from typing import List, Literal
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
@@ -63,6 +63,27 @@ def add_protein_by_proteome_tag(background_task : BackgroundTasks, proteome_tag:
                                  
                              },
                              template_mame=EMAIL_SETTINGS.mail_proteome_added_template)
+    
+    
+    
+@router.get("/{proteome_tag}/correlation/{feature_tag}")
+def get_feature_correlation_across_proteome(proteome_tag : str, feature_tag : str , filter_tag : str = None, direction : Literal["positive","negative","both"] = "positive", min_data_points : int = 5, limit : int = 20) -> List:
+    "" 
+    if not DB.features.exists(tag=feature_tag):
+        raise HTTPException(status_code=404,detail=f"The feature was not found {feature_tag}")
+    
+    submission_tags = DB.submission_filter.filter_by_attribute_value_tags(attribute_value_tags = [proteome_tag])
+    submission_tags = [tag for tag in submission_tags if DB.submission_has_dataset(tag = tag)]
+    
+    
+    if len(submission_tags) == 0: raise HTTPException(status_code=404,detail=f"No submission tag with datatables found of the proteome_tag {proteome_tag}.")
+    correlated_features = DB.submissions.get_correlated_features(tags = submission_tags,
+                                           feature_tag = feature_tag,
+                                           filter_tag = filter_tag,
+                                           direction = direction,
+                                           limit = limit,
+                                           min_data_points = min_data_points)
+    return correlated_features.to_dict(orient="records")
     
     
 @router.get("/{proteome_tag}/abundance")

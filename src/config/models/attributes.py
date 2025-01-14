@@ -245,6 +245,11 @@ class AttributeValuesBySubmissionModel(BaseModel):
     count : int 
 
 
+class AttributeTraitResponseModel(BaseModel):
+    attribute: AttributeModel 
+    traits: List[AttributeValueModel]
+
+
 class AttributeResponseModel(BaseModel):
     """
     Response model for receiving attributes.

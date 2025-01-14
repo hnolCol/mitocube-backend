@@ -11,7 +11,7 @@ from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import map_tags_to_attribute_in_metadata
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.database.ABCDatabase import MCAttributes
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel, AttributeTreeNode
+from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel, AttributeTreeNode, AttributeTraitResponseModel
 from config.models.parameter import APIParamString
 from lib.data.database.ABCDatabase import MCDatabase
 from lib.data.transform.FeatureData import FeatureData
@@ -34,22 +34,20 @@ router = APIRouter(
 def get_attributes(search_string : Optional[str] = None, 
                    min_state : SubmissionStatesEnums = None, 
                    param_name : Literal["allow_for_dataset","mandatory_for_submission","allow_as_filter","allow_for_genotype","allow_for_measurement","allow_for_qc","mandatory_for_active",] = None, 
-                   user : UserModel = Depends(get_user_from_token)) -> List[Dict]:
+                   include_traits : bool = True,
+                   limit : int = None,
+                   user : UserModel = Depends(get_user_from_token)) -> List[AttributeTraitResponseModel]:
     """
     Returns the stored attribute and attribute values.
     """
     if search_string is not None:
-        return DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name )
-        r = DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name )
-        attributes = [ri["attribute"] for ri in r]
-        traits = [t for ri in r for t in ri["traits"]]
-        print(attributes)
-        print(traits)
-        return AttributeResponseModel(attribute_values=traits,attributes=attributes)
-        return DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name )
+        if include_traits:
+            return DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name, limit = limit )
+        else:
+            return DB.attributes.get_attributes_by_search_string(search_string=search_string, min_state=min_state, param_name = param_name, limit = limit)
 
     else: 
-        attributes = DB.attributes.get(param_name=param_name,min_state=min_state)
+        attributes = DB.attributes.get(param_name=param_name,min_state=min_state, limit=limit)
         attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
     return [{"attribute" : attribute, "traits" : DB.attributes.values(tags = [attribute.tag])} for attribute in attributes]
     return AttributeResponseModel(attributes=attributes,

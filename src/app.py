@@ -21,6 +21,8 @@ from lib.data.database.Database import Database
 ### import services
 from services.paths.utils import get_absolute_path_to_dir
 
+from migration.load_data import MigrateScripts 
+
 ### import routers
 from routers.dataset import dataset, heatmap, volcano, correlation
 from routers.submission import submission
@@ -88,23 +90,27 @@ d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data
 phenotype_json = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/phenotypes/phenotypes.json")
 
 
+# ms = MigrateScripts(submissions=DB.submissions, datasets=DB.datasets, users=DB.users)
+# ms.add_users()
+# ms.run()
+
 #DB.proteomes.correlate_features(tag = "UP000005640")
 from lib.user.UserHandling import UserDB
 from config.models.genotype import GenotypeModel
 from config.models.performance import QCRunModel, QCPeptidesModel, QCPeptideModel
 from config.models.timeline import TimelineInputModel
 from config.models.phenotype import PhenotypeGenotypeInput, PhenotypeInputModel
-
+from config.models.news.news import NewsModel
 DB.submissions.get_correlated_features(tags=["BuXOSlIl6G"],feature_tag = "Q9Y5T4", direction = "both", filter_tag = "mc", limit=30)
 DB.submissions.get_correlated_features(tags=["BuXOSlIl6G"],feature_tag = "Q9Y5T4", direction = "positive", filter_tag = "mc", limit=30)
 
 # for p in phenotype_json:
 #     DB.phenotypes.insert(PhenotypeInputModel(**p))
-
-DB.features.get_abundance_distribution(tag = "Q9Y5T4")
+print("feautre")
+DB.features.get_abundance_distribution(tag = "Q9Y5T4", attribute_tag = "att_acquisition")
 print("==")
-DB.proteomes.get_feature_abundance_dist(tag = "UP000005640")
-print("Proteome abundance")
+#DB.proteomes.get_feature_abundance_dist(tag = "UP000005640")
+#print("Proteome abundance")
 #users_from_db = UserDB.get_users()
 #DB.users.add_users(users_from_db)
 DB.insert_meta(meta)
@@ -152,13 +158,10 @@ genotypes_from_file = [GenotypeModel(**x, proteome_tag=x["proteome_id"]) for x  
 
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="asda")
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="UP000005640")
+r = DB.features.get_quantification_count(tags=['P41587','A0JNW5',"ABS","Q8NHH1"])
 
-print("======")
-DB.features.get_unique_quantification()
-print("12!!!")
-##print(DB.attributes.unit(tags=["att_compound","att_digestion_time"]))
-print("REALLY COOL")
 #DB.unittypes.get_units(tags=["concentration","time"])
+DB.samples.get_sample(tag = "20240308_LOGtC9tNC13b_05_dmso")
 
 #check for users
 DB.users.check()
@@ -173,20 +176,20 @@ if CTRL_PROTEOME_SETTINGS.add_control_proteome:
 # print("WUHU")
 # df = DB.features.get_data(tags=['A0JNW5','P41587'])
 # print(df["tag"].unique())
-# #print(DB.features.count_quantifications(tag = ))
-# print(DB.features.count_quantifications(tags = ['P41587','A0JNW5',"ABS","Q8NHH1"]))
+# #print(DB.features.get_quantification_stats(tag = ))
+# print(DB.features.get_quantification_stats(tags = ['P41587','A0JNW5',"ABS","Q8NHH1"]))
 # overview = DB.features.get_regulation_summary(tags=['P41587','A0JNW5',"ABS","Q8NHH1"])
 # print(DB.filters.get_feature_quant(tag="mitocarta_3.0", ascending = True, limit = None))
 # print(DB.filters.get_abundance_distribution(tag="mitocarta_3.0"))
 # print(DB.filters.get_overlap_with_dataset_quant(tags=["mitocarta_3.0","hendriks_list_of_substrates"], submission_tags = ['BuXOSlIl6G',"LOGtC9tNC13b"]))
 # print("abundance dist, above")
 # print(overview)D
-
-#DB.news.insert(News(user_tag="nqVQzDvn", content="This is a the latest beatuiful news", submission_tags=["LOGtC9tNC13b"], feature_tags=["A4GXA9","A0A0C5B5G6"]))
+#DB.news.insert(NewsModel(user_tag="lxMGhZSn", content="New dataset published.", submission_tags=["LOGtC9tNC13b"], feature_tags=["A4GXA9","A0A0C5B5G6"]))
 #print(DB.news.get())
 #DB.genotypes.add_genotypes(genotypes_from_file)
 
-
+r = DB.attributes.get_attributes_by_search_string(search_string = "comp")
+print("SEARCH", r)
 #DB.proteomes.insert_uniprot_proteome()
 #r = DB.datasets.get_datatable(tag = dataset_tag)
 

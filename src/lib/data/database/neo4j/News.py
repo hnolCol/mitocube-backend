@@ -56,7 +56,7 @@ class Neo4JNews(NewsABC):
         
         if self.exists(tag = news.tag):
             raise ValueError("Tag is already in the database.")
-        
+        print(news)
         query = (
             "CREATE (n:News {tag : $news.tag})-[r:HAS_CONTENT]->(c:Content)"
             "SET n.created_at = timestamp(), c.content = $news.content, r.news_tag = $news.tag "

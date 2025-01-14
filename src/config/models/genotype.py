@@ -19,6 +19,15 @@ class GenotypeModel(BaseModel):
     features : Optional[List[FeatureModel|FeatureNeoModel]]
     user_tag : Optional[str] = None
     attributes : List[Dict[str, Union[List[Union[FeatureModel|FeatureNeoModel,AttributeValueModel]],Dict[str,MutationPositionModel]]]]#Union[List[Union[FeatureModel,AttributeValueModel]],MutationPositionModel]]]
+    tag : str = None
+    
+    @field_validator("tag", mode="after")
+    def check_tag(cls,v : str):
+        
+        if v is None and cls.label is not None:
+            return cls.label 
+        
+        return v 
     
     
     

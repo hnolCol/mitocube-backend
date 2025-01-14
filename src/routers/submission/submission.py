@@ -456,10 +456,10 @@ def update_submission(background_task : BackgroundTasks,
                       state : SubmissionStatesEnums, 
                       state_change : StateChangeModel,  
                       dataset_attributes : Dict[str,List[str]], # attribute_tag, List[trait_tag] 
-                      #dataset_attribute_input : Optional[Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]]] = None,
+                      dataset_attribute_input : Optional[Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]]] = None,
                       user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
-    Update datasetattribute along with the state if user is at least curator.
+    Update datas etattribute along with the state if user is at least curator.
     Returns the updated version of the complete submission.
 
     TO DO: Add exception handling 
@@ -472,11 +472,7 @@ def update_submission(background_task : BackgroundTasks,
         
         ok = DB.submissions.update_state(tag = submission_tag, new_state = state_change.state, user_tag = user.tag)
         if ok:
-            dataset_update_stats = DB.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes, dataset_attribute_input = dataset_attribute_input)
-            print(dataset_update_stats)
-        
-       
-        
+            dataset_update_stats = DB.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes, dataset_attribute_input = dataset_attribute_input)       
         
             DB.timeline.insert(TimelineInputModel(content=f"Dataset attributes have been updated by {user.firstname}. {dataset_update_stats['number_deleted_traits']} traits were removed. ({', '.join(dataset_update_stats['deleted_trait_tags'])}). {dataset_update_stats['number_added_traits']} traits were added. ({', '.join(dataset_update_stats['added_trait_tags'])}).", 
                                             submission_tag=submission_tag, 

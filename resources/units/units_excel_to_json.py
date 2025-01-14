@@ -35,6 +35,7 @@ for UnitType, data in X.groupby("UnitType"):
         "text" : UnitType,
         "tag" : data["UnitType tag"].values[0],
         "priority": int(data["type_priority"].values[0]),	
+        "is_feature_position" : "true" if data["is_feature_position"].values[0] else "false",
         "has_feature_value" : "true" if data["has_feature_value"].values[0] else "false",
         "units" : data[["tag","text","priority","description"]].to_dict(orient="records")
     })

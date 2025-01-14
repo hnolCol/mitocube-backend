@@ -3,6 +3,7 @@
         "text": "Age",
         "tag": "age",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -32,9 +33,139 @@
         ]
     },
     {
+        "text": "Amino Acid",
+        "tag": "aminoacid",
+        "priority": 500,
+        "is_feature_position": "false",
+        "has_feature_value": "false",
+        "units": [
+            {
+                "tag": "aminoacid:A",
+                "text": "Alanine",
+                "priority": 600,
+                "description": "Non-polar, involved in glucose metabolism and energy production."
+            },
+            {
+                "tag": "aminoacid:R",
+                "text": "Arginine",
+                "priority": 600,
+                "description": "Polar, semi-essential, important in protein synthesis and urea cycle."
+            },
+            {
+                "tag": "aminoacid:N",
+                "text": "Asparagine",
+                "priority": 600,
+                "description": "Polar, plays a role in nitrogen metabolism and neural signaling."
+            },
+            {
+                "tag": "aminoacid:D",
+                "text": "Aspartic Acid",
+                "priority": 600,
+                "description": "Acidic, involved in neurotransmission and urea cycle."
+            },
+            {
+                "tag": "aminoacid:C",
+                "text": "Cysteine",
+                "priority": 600,
+                "description": "Sulfur-containing, forms disulfide bonds for protein structure."
+            },
+            {
+                "tag": "aminoacid:Q",
+                "text": "Glutamine",
+                "priority": 600,
+                "description": "Polar, involved in nitrogen transport and immune function."
+            },
+            {
+                "tag": "aminoacid:E",
+                "text": "Glutamic Acid",
+                "priority": 600,
+                "description": "Acidic, plays a role in neurotransmission and metabolism."
+            },
+            {
+                "tag": "aminoacid:G",
+                "text": "Glycine",
+                "priority": 600,
+                "description": "Non-polar, important for protein structure and collagen."
+            },
+            {
+                "tag": "aminoacid:H",
+                "text": "Histidine",
+                "priority": 600,
+                "description": "Essential, polar, important in enzyme active sites and pH regulation."
+            },
+            {
+                "tag": "aminoacid:I",
+                "text": "Isoleucine",
+                "priority": 600,
+                "description": "Essential, non-polar, involved in muscle metabolism and energy."
+            },
+            {
+                "tag": "aminoacid:L",
+                "text": "Leucine",
+                "priority": 600,
+                "description": "Essential, non-polar, critical for muscle repair and protein synthesis."
+            },
+            {
+                "tag": "aminoacid:K",
+                "text": "Lysine",
+                "priority": 600,
+                "description": "Essential, basic, involved in calcium absorption and collagen formation."
+            },
+            {
+                "tag": "aminoacid:M",
+                "text": "Methionine",
+                "priority": 600,
+                "description": "Essential, sulfur-containing, starts protein synthesis and aids metabolism."
+            },
+            {
+                "tag": "aminoacid:F",
+                "text": "Phenylalanine",
+                "priority": 600,
+                "description": "Essential, non-polar, precursor for neurotransmitters."
+            },
+            {
+                "tag": "aminoacid:P",
+                "text": "Proline",
+                "priority": 600,
+                "description": "Non-polar, important for collagen structure."
+            },
+            {
+                "tag": "aminoacid:S",
+                "text": "Serine",
+                "priority": 600,
+                "description": "Polar, involved in metabolism and enzyme catalysis."
+            },
+            {
+                "tag": "aminoacid:T",
+                "text": "Threonine",
+                "priority": 600,
+                "description": "Essential, polar, involved in immune function and protein synthesis."
+            },
+            {
+                "tag": "aminoacid:W",
+                "text": "Tryptophan",
+                "priority": 600,
+                "description": "Essential, non-polar, precursor for serotonin and melatonin."
+            },
+            {
+                "tag": "aminoacid:Y",
+                "text": "Tyrosine",
+                "priority": 600,
+                "description": "Non-polar, precursor for thyroid hormones and neurotransmitters."
+            },
+            {
+                "tag": "aminoacid:V",
+                "text": "Valine",
+                "priority": 600,
+                "description": "Essential, non-polar, involved in muscle growth and energy."
+            }
+        ]
+    },
+    {
         "text": "Arbitrary",
         "tag": "arbitrary",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -67,6 +198,7 @@
         "text": "Concentration",
         "tag": "concentration",
         "priority": 600,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -111,6 +243,7 @@
         "text": "Duration",
         "tag": "duration",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -155,6 +288,7 @@
         "text": "Feature",
         "tag": "feature",
         "priority": 800,
+        "is_feature_position": "false",
         "has_feature_value": "true",
         "units": [
             {
@@ -169,6 +303,7 @@
         "text": "Flow rate",
         "tag": "flow_rate",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -195,6 +330,7 @@
         "text": "Fraction",
         "tag": "fraction",
         "priority": 600,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -221,6 +357,7 @@
         "text": "Length",
         "tag": "length",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -259,6 +396,7 @@
         "text": "Mass",
         "tag": "mass",
         "priority": 650,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -291,6 +429,7 @@
         "text": "Mass To Charge",
         "tag": "masstocharge",
         "priority": 550,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -302,9 +441,31 @@
         ]
     },
     {
+        "text": "Position",
+        "tag": "position",
+        "priority": 500,
+        "is_feature_position": "true",
+        "has_feature_value": "false",
+        "units": [
+            {
+                "tag": "position:aa",
+                "text": "aa",
+                "priority": 500,
+                "description": "Amino acid position"
+            },
+            {
+                "tag": "position:aa_range",
+                "text": "aa_range",
+                "priority": 600,
+                "description": "Amino acid Range"
+            }
+        ]
+    },
+    {
         "text": "Temperature",
         "tag": "temperature",
         "priority": 600,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -325,6 +486,7 @@
         "text": "Version",
         "tag": "version",
         "priority": 400,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -339,6 +501,7 @@
         "text": "Voltage",
         "tag": "voltage",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {
@@ -359,6 +522,7 @@
         "text": "Volume",
         "tag": "volume",
         "priority": 500,
+        "is_feature_position": "false",
         "has_feature_value": "false",
         "units": [
             {

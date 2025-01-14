@@ -6,7 +6,7 @@ from lib.data.database.abstract.Attributes import AttributesABC
 
 from config.enums.states import SubmissionStatesEnums
 
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitModel, AttributeUnitResponseModel, AttributeResponseModel, AttrInput
+from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitModel, AttributeUnitResponseModel, AttributeResponseModel, AttrInput, AttributeTraitResponseModel
 from config.models.annotations.feature import FeatureModel 
 from config.models.feature import FeatureNeoModel
 from config.models.attributes import AttributeTreeNode
@@ -106,7 +106,7 @@ class Neo4JAttributes(AttributesABC):
             param_name : Literal["allow_for_dataset","allow_as_filter",
                                 "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
-            min_state : SubmissionStatesEnums = None) -> List[AttributeModel]:
+            min_state : SubmissionStatesEnums = None, limit : int = None) -> List[AttributeModel]:
         ""
         
         query = (
@@ -130,16 +130,19 @@ class Neo4JAttributes(AttributesABC):
             else:
                 query += "AND a.min_state <= $min_state "
             
-        query += "RETURN properties(a) ORDER BY a.priority"
+        query += "RETURN properties(a) ORDER BY a.priority DESC "
 
         print(query)
+        if limit is not None:
+            query += "LIMIT $limit"
 
         attributes = self._driver.execute_query(query_=query, 
                                                 routing_="r",
                                                 result_transformer_ = Result.value, 
                                                 tags = tags, 
                                                 param_name = param_name, 
-                                                min_state = min_state)
+                                                min_state = min_state,
+                                                limit = limit)
         return [AttributeModel(**k) for k in attributes]
 
 
@@ -457,8 +460,55 @@ class Neo4JAttributes(AttributesABC):
         
         return self._driver.execute_query(query)
         
+    def get_attributes_by_search_string(self, 
+                                        search_string : str, 
+                                        min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
+                                        param_name : str = None, 
+                                        limit : int = None):
+        """Returns attributes by search query.
+
+        Parameters
+        ----------
+        search_string : str
+            _description_
+        min_state : SubmissionStatesEnums, optional
+            _description_, by default SubmissionStatesEnums.SUBMITTED
+        param_name : str, optional
+            _description_, by default None
+        """
+        query = "MATCH (a:Attribute) "
         
-    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None) -> List[Tuple[AttributeModel,List[AttributeValueModel]]]:
+        if min_state is not None:
+            query += "WHERE a.min_state <= $min_state "
+        
+        if param_name is not None:
+            if min_state is None:
+                query += "WHERE a[$param_name] "
+            else:
+                query += "AND a[$param_name] "
+        if param_name is None and min_state is None:
+            query += "WHERE a.s CONTAINS $search_string "
+        else:
+            query += "AND a.s CONTAINS $search_string "
+        query += (
+            "RETURN properties(a) as attribute, [] as traits ORDER BY a.priority DESC "
+        )
+        
+        if limit is not None:
+            query += "LIMIT $limit"
+        
+        r  = self._driver.execute_query(
+            query,
+            search_string=search_string.lower(),
+            min_state = min_state, 
+            param_name = param_name, 
+            result_transformer_= Result.data,
+            limit = limit,
+            routing_="r", 
+            )
+        return r
+        
+    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None, limit : int = None) -> List[AttributeTraitResponseModel]:
         """Finds the attirbute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
 
@@ -468,7 +518,8 @@ class Neo4JAttributes(AttributesABC):
             _description_
         min_state : SubmissionStatesEnums, optional
             _description_, by default SubmissionStatesEnums.SUBMITTED
-
+        limit : int, optional
+            Maximum number of attributes to be returned. Does not account for the traits. 
         Returns
         -------
         List[Tuple[AttributeModel,List[AttributeValueModel]]]
@@ -491,6 +542,8 @@ class Neo4JAttributes(AttributesABC):
             "WITH a, av ORDER BY a.priority DESC "
             "RETURN properties(a) as attribute, collect(DISTINCT properties(av)) as traits"
         )
+        if limit is not None:
+            query += "LIMIT $limit"
         
         r  = self._driver.execute_query(
             query,

@@ -12,17 +12,15 @@ from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 from config.exceptions.HTTPExceptions import no_data_found_http_exception, filter_tag_does_not_exist_exception
 from config.models.user import UserModel
 
-from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attribute_in_metadata
+from services.users import get_user_from_token
 DB = Database.DB()
-
-
 
 router = APIRouter(
     prefix="/api",
     tags=["Heatmap"]
 )
-#heatmap endpoints 
+
+
 @router.get("/datasets/{dataset_label}/heatmap",
             tags=["Heatmap"])
 def get_dataset_heatmap(dataset_label : str, 
@@ -55,7 +53,6 @@ def get_dataset_heatmap(dataset_label : str,
     if stats.empty or stats.index.size < 3: raise HTTPException(status_code=400, detail="No or less than 3 significant hits found using ANOVA. Please use a volcano plot.")
     #merge data and sort them after clusters.
     
-    print(stats,"stats")
     clusters, zscores = HierarchicalClustering(datatable).get_clusters(idcs=stats.index, n_clusters= n_clusters)
     stats_and_zscores = zscores.join([stats,clusters], how="left")
     clusters_for_group = clusters.loc[stats_and_zscores.index,:].reset_index() #index is now number, before keys
@@ -65,12 +62,10 @@ def get_dataset_heatmap(dataset_label : str,
     ##annotate features 
     #print(features)
     features = DB.features.get_protein_by_tags(stats_and_zscores.index.values.tolist())
-    print(features,"NEO4J")
     #join features to the stat results
     #consider adding the features as an extra -> may be used to select features from the heatmap to view the detailed proteomics
     #data in a feature-centric way. 
     stats_and_zscores = stats_and_zscores.join(features,how="left")
-    print(stats_and_zscores)
     return {
         "dataset_tag" : dataset_tag,
         "data" : stats_and_zscores.reset_index(names="Key").to_dict(orient="records"),

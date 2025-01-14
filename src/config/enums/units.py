@@ -20,6 +20,8 @@ class UnitsEnum(Enum):
     version = "version"
     duration = "duration"
     age = "age"
+    position = "position"
+    aminoacid = "aminoacid"
 
 
 class TimeUnitToSecondsEnum(Enum):
