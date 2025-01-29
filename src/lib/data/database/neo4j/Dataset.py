@@ -28,7 +28,7 @@ class Neo4JDataset(DatasetABC):
     def exists(self, tag : str) -> bool:
         "Checks if the submission has data (e.g. quantified proteins). This is not meant to check if a submission exists."
         query = (
-            "WITH EXISTS {(submission:Submission {tag : $tag})<-[:QUANTIFIED_IN]-(p:Protein)} as submission_exists "
+            "WITH EXISTS {(submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(p:Protein)} as submission_exists "
             "RETURN submission_exists "
         )    
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
@@ -49,7 +49,7 @@ class Neo4JDataset(DatasetABC):
         
     def insert(self, data_table : pd.DataFrame, tag : str):
         ""
-        F = self._get_variance_in_groups(tag, data_table)
+        #F = self._get_variance_in_groups(tag, data_table)
         
         # with self._driver.session() as session:
         #     session.execute_write(self._add_dt, data_table, tag, F)
@@ -76,6 +76,8 @@ class Neo4JDataset(DatasetABC):
             r = self._driver.execute_query(query, tag = tag, 
                                            sample_index = sample_index,
                                            quant_values = sample_data[["p_tag","value"]].to_dict(orient="records"))
+            print(r)
+            print(sample_data.index)
             
     @staticmethod
     def _add_dt(tx, data_table: pd.DataFrame, tag  : str, F : pd.Series):
@@ -187,33 +189,41 @@ class Neo4JDataset(DatasetABC):
     
     def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
         ""
-        query = (
-            "MATCH (submission:Submission {tag : $tag}) "
-        )
-        if filter_tag is not None:
-            query += (
-                "MATCH (f:Filter) "
-                "WHERE f.tag = $filter_tag "
-                "MATCH (submission)<-[r:QUANTIFIED_IN]-(p:Protein)-[:PART_OF]->(f)"
+        # query = (
+        #     "MATCH (submission:Submission {tag : $tag}) "
+        # )
+        # if filter_tag is not None:
+        #     query += (
+        #         "MATCH (f:Filter) "
+        #         "WHERE f.tag = $filter_tag "
+        #         "MATCH (submission)<-[r:QUANTIFIED_IN]-(p:Protein)-[:PART_OF]->(f)"
+        #         )
+        # else:
+        #     query += (
+        #         "MATCH (submission)<-[r:QUANTIFIED_IN]-(p:Protein) "
+        #         )
+        # query += "RETURN r.qs AS qs, r.sample_index AS idx, p.tag AS tag"
+   
+        # datatable_long = self._driver.execute_query(query, routing_="r",tag = tag, filter_tag = filter_tag, result_transformer_=Result.to_df)
+        
+        # datatable = datatable_long.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
+        
+        # return datatable
+        if filter_tag is None:
+            query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:Protein) "
                 )
         else:
-            query += (
-                "MATCH (submission)<-[r:QUANTIFIED_IN]-(p:Protein) "
-                )
-        query += "RETURN r.qs AS qs, r.sample_index AS idx, p.tag AS tag"
-   
-        datatable_long = self._driver.execute_query(query, routing_="r",tag = tag, filter_tag = filter_tag, result_transformer_=Result.to_df)
+            query = (
+                "MATCH (f:Filter) "
+                "WHERE f.tag = $filter_tag "
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:Protein)-[:PART_OF]->(f) "
+            )
+            
         
-        datatable = datatable_long.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
+        query += "RETURN p.tag as tag, collect(r.value) as qs, collect(sample.index) as idx"
         
-        return datatable
-        
-        query2 = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:Protein) "
-            "RETURN p.tag as tag, collect(r.value) as qs, collect(sample.index) as idx"
-        )
-        
-        r = self._driver.execute_query(query2, routing_="r", tag = tag, result_transformer_=Result.to_df)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df)
         datatable = r.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
         return datatable
         
@@ -224,7 +234,7 @@ class Neo4JDataset(DatasetABC):
             "MATCH (submission:Submission {tag : $tag}) "
             "UNWIND $protein_tags AS protein_tag "
             "MATCH (p:Protein {tag : protein_tag}) "
-            "RETURN protein_tag as tag, EXISTS {(submission)<-[:QUANTIFIED_IN]-(p)} as quantified "
+            "RETURN protein_tag as tag, EXISTS {(submission)-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(p)} as quantified "
         )
         
         r = self._driver.execute_query( 
@@ -237,29 +247,4 @@ class Neo4JDataset(DatasetABC):
         r = r.reset_index("tag")
         return r["quantified"]
         
-        
-    #     index_dataset_node = MatchIndexedNode(cypher_label="d",label="Dataset",index_value=tag,index_prop="tag")
-    #     with self._driver.session() as session:
-    #         return session.execute_read(self._is_q,index_dataset_node, feature_node_label, keys)
-    
-    # @staticmethod
-    # def _is_q(tx, dataset_node : MatchIndexedNode, feature_node_label : NodeLabelModel, keys : List[str]):
-        
-    #     query = (
-    #         "UNWIND $keys AS tag "
-    #         f"{dataset_node.model_dump()} "
-    #         "RETURN tag, EXISTS {"
-    #         f"    ({dataset_node.cypher_label})<-[:QUANTIFIED_IN]->({feature_node_label.model_dump()} {{tag : tag}}) "
-    #         "} AS is_quantified"
-    #         )
-    #     r = tx.run(query, keys=keys)
-    #     return r.to_df()
-
-    # def is_quantified_in(self, feature_node_label : NodeLabelModel, keys : List[str] = ['P15924']):
-    #     ""
-    #     with self._driver.session() as session:
-    #         return session.execute_read(self._is_q, feature_node_label, keys)
-    
-    # @staticmethod
-    # def _is_q_in(tx, dataset_node : MatchIndexedNode, feature_node_label : NodeLabelModel, keys : List[str]):
-    #     ""
+      

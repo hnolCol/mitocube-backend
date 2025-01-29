@@ -23,7 +23,7 @@ class Neo4JSamples(SamplesABC):
         return r[0]
     
     def count(self, trait_tag : str) -> int:
-        "Counts the number of samples"
+        "Counts the number of samples that have a specific trait"
         
         if trait_tag is not None:
             query = (
@@ -39,6 +39,12 @@ class Neo4JSamples(SamplesABC):
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, trait_tag = trait_tag)
         return r[0]["count"] 
+        
+        
+    def insert(self, tag : str, submission_tag : str, sample_name : str, sample_index : int, trait_tags : List[str]):
+        "Insert a new sample to a given submission" 
+        if self.exists(tag = tag): raise ValueError("Sample tag exists already. ")
+        
         
         
     def get_samples_by_genotype(self, genotype_tag : str):

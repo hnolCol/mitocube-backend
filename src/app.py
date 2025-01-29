@@ -81,7 +81,7 @@ DB = Database.DB()
 print(DB)
 
 import pandas as pd 
-dataset_tag = "LOGtC9tNC13b" # "BuXOSlIl6G" #"BuXOSlIl6G"#"0Ks1mc18NL" #"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
+dataset_tag = "BkrjUoOjGN"#"LOGtC9tNC13b" # "BuXOSlIl6G" #"BuXOSlIl6G"#"0Ks1mc18NL" #"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
 m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
 print(m)
 meta = DatasetSubmissionModel(**m, tag = m["label"])
@@ -90,9 +90,9 @@ d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data
 phenotype_json = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/phenotypes/phenotypes.json")
 
 
-# ms = MigrateScripts(submissions=DB.submissions, datasets=DB.datasets, users=DB.users)
-# ms.add_users()
-# ms.run()
+ms = MigrateScripts(submissions=DB.submissions, datasets=DB.datasets, users=DB.users, genotypes=DB.genotypes)
+#ms.add_users()
+#ms.run()
 
 #DB.proteomes.correlate_features(tag = "UP000005640")
 from lib.user.UserHandling import UserDB
@@ -101,20 +101,19 @@ from config.models.performance import QCRunModel, QCPeptidesModel, QCPeptideMode
 from config.models.timeline import TimelineInputModel
 from config.models.phenotype import PhenotypeGenotypeInput, PhenotypeInputModel
 from config.models.news.news import NewsModel
-DB.submissions.get_correlated_features(tags=["BuXOSlIl6G"],feature_tag = "Q9Y5T4", direction = "both", filter_tag = "mc", limit=30)
-DB.submissions.get_correlated_features(tags=["BuXOSlIl6G"],feature_tag = "Q9Y5T4", direction = "positive", filter_tag = "mc", limit=30)
+#DB.submissions.get_correlated_features(tags=["BuXOSlIl6G"],feature_tag = "Q9Y5T4", direction = "both", filter_tag = "mc", limit=30)
+#DB.submissions.get_correlated_features(tags=["BuXOSlIl6G"],feature_tag = "Q9Y5T4", direction = "positive", filter_tag = "mc", limit=30)
 
 # for p in phenotype_json:
 #     DB.phenotypes.insert(PhenotypeInputModel(**p))
-print("feautre")
-DB.features.get_abundance_distribution(tag = "Q9Y5T4", attribute_tag = "att_acquisition")
-print("==")
+
 #DB.proteomes.get_feature_abundance_dist(tag = "UP000005640")
 #print("Proteome abundance")
 #users_from_db = UserDB.get_users()
 #DB.users.add_users(users_from_db)
-DB.insert_meta(meta)
-#DB.insert_dataset(d,dataset_tag)
+# DB.insert_meta(meta)
+# print("dataset shape", d.shape)
+DB.insert_dataset(d,dataset_tag)
 # DB.attributes.get_mandatory_attributes()
 # print("NO STATE")
 # DB.attributes.get_mandatory_attributes(state=3)
@@ -154,14 +153,14 @@ DB.insert_meta(meta)
 # DB.submission_summary.get(tag=dataset_tag)
 # print("========")
 
-genotypes_from_file = [GenotypeModel(**x, proteome_tag=x["proteome_id"]) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
+#genotypes_from_file = [GenotypeModel(**x, proteome_tag=x["proteome_id"]) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
 
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="asda")
 # DB.proteomes.find_features(query="Fbxo",proteome_tags="UP000005640")
-r = DB.features.get_quantification_count(tags=['P41587','A0JNW5',"ABS","Q8NHH1"])
+#r = DB.features.get_quantification_count(tags=['P41587','A0JNW5',"ABS","Q8NHH1"])
 
 #DB.unittypes.get_units(tags=["concentration","time"])
-DB.samples.get_sample(tag = "20240308_LOGtC9tNC13b_05_dmso")
+#DB.samples.get_sample(tag = "20240308_LOGtC9tNC13b_05_dmso")
 
 #check for users
 DB.users.check()
@@ -188,8 +187,8 @@ if CTRL_PROTEOME_SETTINGS.add_control_proteome:
 #print(DB.news.get())
 #DB.genotypes.add_genotypes(genotypes_from_file)
 
-r = DB.attributes.get_attributes_by_search_string(search_string = "comp")
-print("SEARCH", r)
+#r = DB.attributes.get_attributes_by_search_string(search_string = "comp")
+#print("SEARCH", r)
 #DB.proteomes.insert_uniprot_proteome()
 #r = DB.datasets.get_datatable(tag = dataset_tag)
 

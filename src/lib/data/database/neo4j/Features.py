@@ -24,7 +24,7 @@ class Neo4JFeatures(FeaturesABC):
         if quantified:
             query = (
                 "MATCH (p:Protein) "
-                "WHERE EXISTS {(p:Protein)-[:QUANTIFIED_IN]->(:Submission)}"
+                "WHERE EXISTS {(p:Protein)<-[:QUANTIFIED]->(:Sample)}"
                 "RETURN count(p) " 
             )
             
@@ -65,10 +65,8 @@ class Neo4JFeatures(FeaturesABC):
         query = (
             "MATCH (p:Protein) "
             "WHERE p.tag in $tags "
-            "MATCH (p)-[r:QUANTIFIED_IN]->(:Submission) "
-            "WITH count(r) as N, p "
-            "MATCH (p)<-[rsample:QUANTIFIED]-(:Sample) "
-            "WITH count(rsample) as nsample, p, N "
+            "MATCH (p)<-[r:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]->(submission:Submission) "
+            "WITH count(submission) as N, p, count(rsample) as nsample "
             "RETURN p.tag as tag,  N > 0 as quantified, N as quant_dataset, nsample as quant_samples "
         )
             
@@ -213,7 +211,7 @@ class Neo4JFeatures(FeaturesABC):
         ""
         if submission_tags is None and limit is None:
             base_submission_query = (
-                "MATCH (submission:Submission)<-[:QUANTIFIED_IN]-(p:Protein) "
+                "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED_IN]->(p:Protein) "
                 "WHERE p.tag in $tags "
                 "WITH collect(DISTINCT submission.tag) as filteredSubmissions "
             )
@@ -231,7 +229,7 @@ class Neo4JFeatures(FeaturesABC):
             )
         else:
             base_submission_query = (
-                "MATCH (submission:Submission)<-[:QUANTIFIED_IN]-(p:Protein) "
+                "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED_IN]->(p:Protein)  "
                 "WHERE p.tag in $tags "
                 "WITH collect(DISTINCT submission.tag)[0..$limit] as filteredSubmissions "
             )
@@ -284,7 +282,7 @@ class Neo4JFeatures(FeaturesABC):
              
              query = (
                 #match first the sample attributes and then the dataset attributes.
-            "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
+            "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
             "MATCH (a:Attribute) WHERE a.tag = $attribute_tag "
             "OPTIONAL MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a) "
             "OPTIONAL MATCH (sample)<-[:HAS_SAMPLE]-(:Submission)-[:HAS_ATTRIBUTE_VALUE]->(avDataset:AttributeValue)<-[:HAS_VALUE]-(a) "

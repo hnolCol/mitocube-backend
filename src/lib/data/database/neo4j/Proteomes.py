@@ -209,7 +209,7 @@ class Neo4JProteomes(ProteomesABC):
         "" 
         query = (
             "MATCH (av:AttributeValue {tag : $tag}) "
-            "MATCH (av)<-[:IN_PROTEOME]-(p:Protein)-[r:QUANTIFIED]-(s:Sample) "
+            "MATCH (av)<-[:IN_PROTEOME]-(p:Protein)<-[r:QUANTIFIED]-(s:Sample) "
             "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N "
         )
         

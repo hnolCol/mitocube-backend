@@ -267,9 +267,9 @@ class Neo4JFilter(FilterABC):
         
         query = ("MATCH (submission:Submission) "
                  "WHERE submission.tag in $submission_tags "
-                 "MATCH (f:Filter)<-[:PART_OF]-(p:Protein)-[:QUANTIFIED_IN]-(submission) "
-                 "WHERE f.tag in $tags "
-                 "WITH count(p) as N, submission.tag as submission_tag, f.N as total, f.tag as tag "
+                 "MATCH (f:Filter)<-[:PART_OF]-(p:Protein) "
+                 "WHERE f.tag in $tags AND EXISTS {(p)<-[:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]-(submission)} "
+                 "WITH count(DISTINCT p) as N, submission.tag as submission_tag, f.N as total, f.tag as tag "
                  "RETURN tag, submission_tag, N, total "
                  )
 
