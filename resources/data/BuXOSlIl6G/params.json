@@ -1,5 +1,6 @@
 {
     "created_on": 1700669191.460135,
+    "modified_on": 1707321617.0335555,
     "state": 5,
     "label": "BuXOSlIl6G",
     "title": "Knockdown of JC15 JC19 TImm17a in HeLa and treatments",
@@ -191,6 +192,15 @@
         ],
         "att_ms_name": [
             "att_ms_name:expl480"
+        ],
+        "att_software": [
+            "att_software:diann"
+        ],
+        "att_acquisition": [
+            "att_acquisition:dia"
+        ],
+        "att_quantification": [
+            "att_quantification:isobaric"
         ]
     },
     "samples_attributes": {
@@ -409,6 +419,14 @@
                 "label": "9WstJ9uf5nuuAqPtCDmU",
                 "created_on": 1706201692.877012,
                 "user_label": "VpVff4sS",
+                "state": 5,
+                "comment": "Updated dataset attributes."
+            },
+            {
+                "id": 1,
+                "label": "iXJEn17EFwz2OivtMJPg",
+                "created_on": 1707321617.0348883,
+                "user_label": "fOtsqZCP",
                 "state": 5,
                 "comment": "Updated dataset attributes."
             }

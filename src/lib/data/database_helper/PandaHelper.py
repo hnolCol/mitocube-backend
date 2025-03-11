@@ -235,13 +235,14 @@ class PandaDatabaseHelper(MCDatabaseHelper):
                     continue
                 sample_names = metadata.sample_names
                 try:
+
                     self._mean_abundance_by_feature[fileProps["label"]] = d.loc[:,sample_names].mean(axis=1).to_dict()
                 except:
                     print(metadata)
                     print(d)
                     print(sample_names)
                     print(d.columns)
-                    raise ValueError()
+                    raise ValueError("There was an error calculating the mean average abundance. Likely because the data are not all floats.")
                 # load meta to calculate variances 
                     
                 total_variance = d.loc[:,sample_names].var(axis=1)

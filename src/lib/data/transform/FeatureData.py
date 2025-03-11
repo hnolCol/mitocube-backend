@@ -35,7 +35,9 @@ class FeatureData(DatasetTransform):
 
         sample_names = metadata.sample_names
         feature_data : pd.DataFrame = pd.DataFrame(data.loc[feature_key,sample_names].values, index = sample_names, columns=["value"])  # name is for the values in the pandas seeries return by loc
-
+        feature_data = feature_data.dropna(subset="value")
+        if feature_data.index.size < 1:
+            return pd.DataFrame(), {}, {}
         if add_sample_attributes:
             sample_names_annotated, attributes_samples = self._dataset.getSamplesAttributes()
             #sample_names_annotated, attributes_samples = SampleAttributeAnnotation(self._dataset).annotate()  # ToDo: What is it supposed to do here?
