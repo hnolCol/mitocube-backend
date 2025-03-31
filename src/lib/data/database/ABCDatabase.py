@@ -23,6 +23,7 @@ from lib.data.database.abstract.Features import FeaturesABC
 from lib.data.database.abstract.Filter import FilterABC
 from lib.data.database.abstract.News import NewsABC
 from lib.data.database.abstract.Proteomes import ProteomesABC
+from lib.data.database.abstract.Submission import SubmissionsABC
 
 DB_SETTINGS = get_db_settings()
 
@@ -35,6 +36,8 @@ class DatabaseABC(ABC):
     features : FeaturesABC = None 
     news : NewsABC = None 
     proteomes : ProteomesABC = None 
+    submissions : SubmissionsABC = None 
+    submissions_filters : SubmissionFilterABC = None 
     
     def __init__(self):
         """The abstract database class that defines
@@ -99,6 +102,13 @@ class DatabaseABC(ABC):
         if not isinstance(self.proteomes, ProteomesABC):
             raise TypeError("The attribute proteomes must be an instance of ProteomesABC")
         
+        if self.submissions is None:
+            raise NotImplementedError("A database class must have the 'submissions' attribute defined. ")
+        
+        if not isinstance(self.proteomes, SubmissionsABC):
+            raise TypeError("The attribute proteomes must be an instance of SubmissionsABC")  
+        
+              
     @abstractmethod
     def dataset_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 

@@ -4,9 +4,7 @@
 
 from config.settings.db import get_db_settings
 from lib.data.database.ABCDatabase import DatabaseABC
-
 DB_SETTINGS = get_db_settings()
-print(DB_SETTINGS.db_handler)
 class Database:
     
     @staticmethod

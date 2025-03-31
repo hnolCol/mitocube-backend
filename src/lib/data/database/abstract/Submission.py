@@ -9,13 +9,13 @@ from deprecated import deprecated
 import pandas as pd
 
 from config.settings.db import get_db_settings
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel
 from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.submissions.comments import SubmissionCommentModel
 from config.enums.states import SubmissionStatesEnums
 
 
 class SubmissionSummaryABC(ABC):
-
+    
     @abstractmethod
     def get(self, tag : str) -> List[str]:
         """Creates a summary as a string. 
@@ -33,15 +33,27 @@ class SubmissionSummaryABC(ABC):
             _Submission summary strings. 
         """
 
-class SubmissionABC(ABC):
+class SubmissionsABC(ABC):
     """Handles Submissions in the backend. 
     Notably, filtering submissions have an extra abstract class (see below)
     
     """
     
     @abstractmethod
-    def count(self) -> int:
-        "Counts the total number of submissions in the database"
+    def count(self, state : SubmissionStatesEnums = None) -> int:
+        """Counts the total number of submissions in the database
+
+        Parameters
+        ----------
+        state : SubmissionStatesEnums, optional
+            Submission state. If provided, the number of submissions in the 
+            given state is returned, by default None
+
+        Returns
+        -------
+        int
+            The number of submission. 
+        """
         
     
     def contains(self, tag : str) -> bool:
@@ -124,6 +136,11 @@ class SubmissionABC(ABC):
             If the proteome is not yet in the database. 
         
         """
+    
+    
+    @abstractmethod
+    def insert_comment(self, tag : str, comment : SubmissionCommentModel):
+        "Inserts a comment for a submission." 
     
     @abstractmethod
     def delete(self, tag : str) -> bool:

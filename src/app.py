@@ -11,7 +11,7 @@ from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 
 from config.settings.proteomes.control_proteomes import get_control_proteome_settings
-
+from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.submissions import DatasetSubmissionModel
 # from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase, AnnotationDatabase
 # from lib.data.database.ABCDatabase import MCAttributes
@@ -21,11 +21,11 @@ from lib.data.database.Database import Database
 ### import services
 from services.paths.utils import get_absolute_path_to_dir
 
-from migration.load_data import MigrateScripts 
+#from migration.load_data import MigrateScripts 
 
 ### import routers
 from routers.dataset import dataset, heatmap, volcano, correlation
-from routers.submission import submission
+from routers.submission import submission, comments, count
 from routers.authentication import token, user
 from routers.info import info
 from routers.annotations import annotations
@@ -43,12 +43,15 @@ from routers.unittypes import unittypes
 from routers.timelines import timelines
 from routers.researchgroups import researchgroup
 from routers.phenotypes import phenotypes
+from routers.states import states
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
 
 router_sources = [dataset, 
                   submission, 
+                  comments,
+                  count,
                   token, user, 
                   features, 
                   info, 
@@ -68,7 +71,8 @@ router_sources = [dataset,
                   timelines,
                   correlation,
                   researchgroup,
-                  phenotypes]
+                  phenotypes,
+                  states]
 
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
@@ -79,18 +83,21 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
 print(DB)
-
+print(DB.submissions.count(state=4))
+print(DB.submissions.count(state=3))
 import pandas as pd 
 dataset_tag = "BkrjUoOjGN"#"LOGtC9tNC13b" # "BuXOSlIl6G" #"BuXOSlIl6G"#"0Ks1mc18NL" #"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
 m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
 print(m)
-meta = DatasetSubmissionModel(**m, tag = m["label"])
+#meta = DatasetSubmissionModel(**m, tag = m["label"])
 d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/data.txt", sep="\t").set_index("Key") #.sample(n=4000)
 
 phenotype_json = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/phenotypes/phenotypes.json")
 
 
-ms = MigrateScripts(submissions=DB.submissions, datasets=DB.datasets, users=DB.users, genotypes=DB.genotypes)
+#DB.submissions.insert_comment(tag = dataset_tag, comment = SubmissionCommentModel(user_tag = "wEPVYYBt", content = "This is a first comment", tags = ["Sample Processing"]))
+#DB.submissions.get_comments(tag = dataset_tag)
+#ms = MigrateScripts(submissions=DB.submissions, datasets=DB.datasets, users=DB.users, genotypes=DB.genotypes)
 #ms.add_users()
 #ms.run()
 
@@ -113,7 +120,7 @@ from config.models.news.news import NewsModel
 #DB.users.add_users(users_from_db)
 # DB.insert_meta(meta)
 # print("dataset shape", d.shape)
-DB.insert_dataset(d,dataset_tag)
+#DB.insert_dataset(d,dataset_tag)
 # DB.attributes.get_mandatory_attributes()
 # print("NO STATE")
 # DB.attributes.get_mandatory_attributes(state=3)

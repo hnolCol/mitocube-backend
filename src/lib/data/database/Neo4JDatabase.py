@@ -1,8 +1,8 @@
 
 from neo4j import GraphDatabase, Driver, Result
-from neo4j.exceptions import ConstraintError
-from lib.data.database.ABCDatabase import DatabaseABC, MetaABC, MCDatabase, MCAttributes
-from typing import List, Tuple, Any, Dict, Literal, Optional
+
+from lib.data.database.ABCDatabase import DatabaseABC
+from typing import List, Tuple, Any, Dict, Literal
 from collections import OrderedDict
 from lib.data.database.neo4j.Users import Neo4JUser
 from lib.data.database.neo4j.Meta import Neo4JMetaHandler
@@ -171,7 +171,8 @@ constraints = [
     ConstraintModel(constrain_label  = "unittype_tag",node_label = NodeLabelModel(label = "UnitType"),property_name ="tag"),
     ConstraintModel(constrain_label  = "timeline_tag",node_label = NodeLabelModel(label = "Timeline"),property_name ="tag"),
     ConstraintModel(constrain_label  = "research_group_tag",node_label = NodeLabelModel(label = "ResearchGroup"),property_name = "tag"),
-    ConstraintModel(constrain_label  = "phenotype_tag",node_label = NodeLabelModel(label = "Phenotype"),property_name = "tag")
+    ConstraintModel(constrain_label  = "phenotype_tag",node_label = NodeLabelModel(label = "Phenotype"),property_name = "tag"),
+    ConstraintModel(constrain_label  = "comment_tag",node_label = NodeLabelModel(label = "Comment"),property_name = "tag")
 
 ]
 

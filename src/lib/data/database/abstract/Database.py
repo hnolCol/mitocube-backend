@@ -13,7 +13,7 @@ from lib.data.database.abstract.Attributes import AttributesABC
 from lib.data.database.abstract.Filter import FilterABC
 from lib.data.database.abstract.Users import UserABC 
 from lib.data.database.abstract.Meta import MetaABC 
-from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC, SubmissionSummaryABC
+from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionsABC, SubmissionSummaryABC
 from lib.data.database.abstract.Features import FeaturesABC
 from lib.data.database.abstract.Dataset import DatasetABC
 from lib.data.database.abstract.Genotypes import GenotypeABC
@@ -61,7 +61,7 @@ class DatabaseABC(ABC):
     features : FeaturesABC = None
     attributes : AttributesABC = None
     filters : FilterABC = None
-    submissions : SubmissionABC = None
+    submissions : SubmissionsABC = None
     submission_filter : SubmissionFilterABC = None
     datasets : DatasetABC = None 
     genotypes : GenotypeABC = None
@@ -133,7 +133,7 @@ class DatabaseABC(ABC):
         if self.submissions is None:
             raise NotImplementedError("A database class must have the submissions attribute defined.")
         
-        if not isinstance(self.submissions, SubmissionABC):
+        if not isinstance(self.submissions, SubmissionsABC):
             raise TypeError("The submissions class must be an instance of SubmissionABC")
         
         if self.datasets is None:

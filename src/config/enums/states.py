@@ -23,3 +23,4 @@ class SubmissionStateColors(Enum):
     ANALYSIS = "#dbae57" 
     DONE = "#eb6a47" 
     ACTIVE = "#ac3e30"
+    

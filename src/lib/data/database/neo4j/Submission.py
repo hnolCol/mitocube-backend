@@ -3,8 +3,8 @@ from neo4j import Driver, Result
 import pandas as pd 
 import datetime
 from config.models.searches import FulltextSearchResult
-
-from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionABC, SubmissionSummaryABC
+from config.models.submissions.comments import SubmissionCommentModel
+from lib.data.database.abstract.Submission import SubmissionFilterABC, SubmissionsABC, SubmissionSummaryABC
 from lib.data.database.abstract.Meta import MetaABC
 from lib.data.database.abstract.Attributes import AttributesABC
 from lib.data.database.abstract.Proteomes import ProteomesABC
@@ -14,21 +14,39 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 
 from services.units import extract_user_input
-class Neo4JSubmissions(SubmissionABC):
+
+class Neo4JSubmissions(SubmissionsABC):
+    
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC) -> None:
         self._meta = meta 
         self._driver = driver
         self._proteomes = proteomes
         
-    def count(self) -> int:
-        "Counts the total number of submissions in the database"
-        
+    def count(self, state : SubmissionStatesEnums = None) -> int:
+        """Counts the total number of submissions in the database
+
+        Parameters
+        ----------
+        state : SubmissionStatesEnums, optional
+            Submission state. If provided, the number of submissions in the 
+            given state is returned, by default None
+
+        Returns
+        -------
+        int
+            The number of submission. 
+        """
         query = (
             "MATCH (submission:Submission) "
-            "RETURN count(submission)"
         )
         
-        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value)
+        if state is not None:
+            query += " WHERE EXISTS {(submission)-[:IN_STATE]->(state:State {tag : $state})} "
+        
+        query += "RETURN count(submission)"
+         
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, state = state)
+        
         if isinstance(r,list) and len(r) > 0:
             return r[0]
         return 0 
@@ -69,7 +87,6 @@ class Neo4JSubmissions(SubmissionABC):
         )
         
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
-        print(r)
         if len(r) == 0: raise ValueError("No state found.")
         return r[0]
     
@@ -186,7 +203,36 @@ class Neo4JSubmissions(SubmissionABC):
         
         
 
+
+    def insert_comment(self, tag : str, comment : SubmissionCommentModel):
+        ""         
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "MATCH (user:User) "
+            "WHERE user.tag = $comment.user_tag "
+            "MERGE (comment: Comment {tag : $comment.tag}) "
+            "SET comment.content = $comment.content, comment.created_at = timestamp(), comment.user_tag = comment.user_tag "
+            "MERGE (submission)-[:HAS]->(comment) "
+            "MERGE (user)-[r:CREATED]->(comment) "
+            "SET r.created_at = timestamp() "
+        )
+        try: 
+            self._driver.execute_query(query, tag = tag, comment = comment.model_dump(exclude_none=True))
+        except Exception as e:
+            print(e)
+            return False 
         
+    
+    def get_comments(self, tag : str) -> List[SubmissionCommentModel]:
+        "Returns the available comments for a given submission tag."
+        
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS]-(comment:Comment)-[r:CREATED]-(u:User) "
+            "RETURN {user_tag : u.tag, created_at : r.created_at, content : comment.content, tag : comment.tag} "
+            
+        )
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return [SubmissionCommentModel(**c) for c in r ]
         
     def get(self, tag: str) -> DatasetSubmissionModel:
         return super().get(tag)

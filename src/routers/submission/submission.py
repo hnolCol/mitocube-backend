@@ -1,4 +1,4 @@
-import time 
+
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from typing import List, Annotated, Literal, Dict, Optional
 from collections import OrderedDict
@@ -245,6 +245,34 @@ def change_submission_owner(submission_tag : str,
     if not ok:
         raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
     return True
+
+
+
+
+
+@router.get("/submissions/{submission_tag}/state", response_model=SubmissionStatesEnums)
+def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    """Returns the state of a submission. 
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission the owner should be returned. 
+
+    Returns
+    -------
+    SubmissionStatesEnums
+        The state of the submission
+
+    Raises
+    ------
+    tag_not_found
+       The submission_tag was not found.
+    """
+    
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
+    return DB.submissions.get_state(tag = submission_tag)
+
 
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
