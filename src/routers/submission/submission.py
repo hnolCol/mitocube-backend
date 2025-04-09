@@ -420,13 +420,13 @@ def update_submission(background_task : BackgroundTasks,
     # update state using the State enumerater 
     metadata["state"] =  submission_state
     metadata["modified_on"] = datasetAttributes.modified_on 
-    
+    print(metadata,"h")
     ## TODO : - move to service function
     time_line = metadata["timeline"].copy()
     updated_entries = time_line["entries"] + [TimeLineEntryModel(id=1,user_label=user.label,comment=state_change.comment,state=state_change.state).model_dump()]
     time_line["entries"] = updated_entries
     metadata["timeline"] = TimeLineModel(**time_line)
-
+    print(metadata,"h")
     # save dataset attributes 
     updated_dataset_attributes = OrderedDict([(attr.tag,[attrValue.tag for attrValue in datasetAttributes.datasetAttributeValues[attr.tag]]) 
                                       for attr in datasetAttributes.datasetAttributes if attr.tag in datasetAttributes.datasetAttributeValues])
@@ -434,9 +434,9 @@ def update_submission(background_task : BackgroundTasks,
     metadata["dataset_attributes"] = {**metadata["dataset_attributes"], **updated_dataset_attributes}
     updated_submission = DatasetSubmissionModel(**metadata)
     #update meta data in dataset and write json file.
-    
+    print(updated_submission)
     dataset.write_json(updated_submission, update = True)
-    
+    print("H?")
     if state_change.prev_state != state_change.state:
         send_email_in_background(background_tasks=background_task,
                              subject=f"Project {updated_submission.title} ({updated_submission.label}) state updated.",
