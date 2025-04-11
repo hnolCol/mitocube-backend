@@ -72,6 +72,7 @@ def map_tags(
     elif attribute.has_features_value:
             #if it is a feature, then add feature model 
             feature_keys = [attribute_value_tag.split(":")[1].upper() for attribute_value_tag in attr_value_tags]
+            print(feature_keys,attribute,attr_value_tags)
             return [FeatureModel(**f, tag = f"{attribute.tag}:{f['key']}") for f in db_features.get(keys=feature_keys, proteome_ids=proteome_ids).reset_index().to_dict(orient="records")]
             
     elif attribute.has_numeric_input:

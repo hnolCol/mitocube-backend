@@ -42,7 +42,6 @@ class Ttest(DatasetStatistic):
         pd.DataFrame
             _description_
         """
-        print(impute)
         
         if impute:
             datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
@@ -58,9 +57,11 @@ class Ttest(DatasetStatistic):
             for within_attr_tag, within_attr_value_tag in zip(within_attribute_tag,within_attribute_value_tag):
                 bool_within = mapped_sample_names.loc[:,within_attr_tag] == within_attr_value_tag
                 mapped_sample_names = mapped_sample_names.loc[bool_within]
-                
+
         boolIdx = mapped_sample_names.loc[:,sample_attribute_tag].isin([attribute_value_left,attribute_value_right])
         subset_mapped_sample_names = mapped_sample_names.loc[boolIdx]
+        if subset_mapped_sample_names.index.size == 0: 
+            raise ValueError("The filtered dataset had length 0. Check if the attributes match the sample names.")
         #get the sample names (e.g. column names in the datatable)
         samples_left = subset_mapped_sample_names.loc[subset_mapped_sample_names[sample_attribute_tag] == attribute_value_left].index.values
         samples_right = subset_mapped_sample_names.loc[subset_mapped_sample_names[sample_attribute_tag] == attribute_value_right].index.values

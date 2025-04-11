@@ -51,11 +51,12 @@ def get_dataset_volcano(dataset_label : str, attribute_value_tag_left : str, att
         raise HTTPException(status_code=400,detail="Data not found for given label.")
     if not dataset.hasData(): raise HTTPException(status_code=404,detail=f"No datatable found for the dataset {dataset_label}.")
     metadata = dataset.getMetaJson()
+    print(dataset.getDataTable())
     #adjust proteome_id extraction
     proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     
     comparison_suffix = get_suffix_from_attributes_and_attribute_tags(sample_attribute_tag,attribute_value_tag_left,attribute_value_tag_right,attributes_db,genotype_db,feature_db,within_attribute_tag=within_attribute_tag,within_attribute_value_tag=within_attribute_value_tag)
-            
+    print(dataset)
     stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
                                      attribute_value_left=attribute_value_tag_left, 
                                      attribute_value_right=attribute_value_tag_right, suffix = comparison_suffix, 
@@ -63,7 +64,7 @@ def get_dataset_volcano(dataset_label : str, attribute_value_tag_left : str, att
                                      within_attribute_tag=within_attribute_tag,
                                      within_attribute_value_tag=within_attribute_value_tag)
 
-    
+    print(stats)
     features = feature_db.get(stats.index,proteome_ids,ignoreMissing=True)
     #join features to the stat results
     stats_and_feature_data = stats.join(features,how="left").reset_index()
