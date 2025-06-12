@@ -14,17 +14,17 @@ class Email(BaseSettings):
     also to the maintainers using the cc_email.
     see class CarbonCopyEmailList
     """
-    mail_server : str = "mail.privateemail.com"
-    mail_port : int = 465
-    mail_username: str = "support@mitocube.com"
-    mail_use_tls_ssl: bool = True
-    mail_start_tls : bool = False
-    mail_default_sender : EmailStr =  "support@mitocube.com"
+    mail_server : str = "mail.ox.gwdg.de"#"mail.privateemail.com"
+    mail_port : int = 587
+    mail_username: str
+    mail_use_tls_ssl: bool = False
+    mail_start_tls : bool = True
+    mail_default_sender : EmailStr =  "mitocube@age.mpg.de"
     mail_password : SecretStr 
     mail_use_crendentials : bool = True
     mail_validate_certs : bool = False
     mail_from_name : str = "MitoCube Support"
-    mail_cc : List[EmailStr] = ["h.nolte@age.mpg.de","support@mitocube.com"] #"dominique.diehl@age.mpg.de", 
+    mail_cc : List[EmailStr] = ["h.nolte@age.mpg.de","mitocube@age.mpg.de"] #"dominique.diehl@age.mpg.de", 
     mail_template_dir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/templates/email"
     mail_verification_template : str = "verification_code.html"
     mail_confirmation_template : str = "email_confirmation.html"
