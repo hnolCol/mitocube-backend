@@ -7,7 +7,7 @@ from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentia
 from config.models.user import UserModel, UserRolesEnum, PublicUser
 
 from lib.user.UserHandling import UserDB
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 DB = Database.DB()
 
 

@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from typing import List 
 
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 from config.models.user import UserModel
 from config.models.submissions.comments import SubmissionCommentModel 
 from config.exceptions.HTTPExceptions import tag_not_found

@@ -3,7 +3,7 @@ from typing import List
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 
 from config.models.user import UserModel

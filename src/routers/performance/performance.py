@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 from config.models.performance import QCRunModel
 from config.models.user import UserModel

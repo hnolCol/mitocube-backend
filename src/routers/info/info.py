@@ -11,7 +11,7 @@ from config.models.info.info import InfoResponse
 from config.settings.general import get_general_settings
 from config.settings.keyfigures import get_key_figure_settings
 
-from lib.data.database.Database import Database 
+from lib.database.Database import Database 
 
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 from lib.user.UserHandling import UserDB

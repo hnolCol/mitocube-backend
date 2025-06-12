@@ -13,9 +13,10 @@ from config.settings.db import get_db_settings
 from config.settings.proteomes.control_proteomes import get_control_proteome_settings
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.maintenance import MaintenanceEventInsertModel
 # from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase, AnnotationDatabase
-# from lib.data.database.ABCDatabase import MCAttributes
-from lib.data.database.Database import Database
+# from lib.database.ABCDatabase import MCAttributes
+from lib.database.Database import Database
 # from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 # from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 ### import services
@@ -44,6 +45,7 @@ from routers.timelines import timelines
 from routers.researchgroups import researchgroup
 from routers.phenotypes import phenotypes
 from routers.states import states
+from routers.maintenance import symptoms
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
@@ -72,7 +74,8 @@ router_sources = [dataset,
                   correlation,
                   researchgroup,
                   phenotypes,
-                  states]
+                  states,
+                  symptoms]
 
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
@@ -94,7 +97,33 @@ d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data
 
 phenotype_json = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/phenotypes/phenotypes.json")
 
+# print(DB.attributes.get_children(tag = "att_compound"))
+# print(DB.attributes.get_children(tag = "att_concentration"),"conc children")
 
+# print(DB.attributes.get_trait_tags(tag = "att_compound"))
+# print(DB.attributes.get_trait_tags(limit=10))
+
+#DB.symptoms._utils_insert_from_file(file_path = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/symptoms/symptoms.txt", sep="\t")
+#DB.symptoms.find(search_string="Unst")
+#DB.symptoms.find()
+DB.attributes._utils_insert_from_file()
+DB.spareparts._utils_insert_from_file(file_path = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/maintenance/spareparts.txt", sep="\t")
+DB.instruments.get(instrument_type = None)
+print(DB.attributes.trait(trait_tag = "att_cellline:du145"))
+print(DB.attributes.get_attributes_and_values_by_search_string("lc",min_state=5),"HELLA")
+DB.meta.add_condition_procedure(sample_tag = "2025_12sf4224")
+print("added sample")
+# DB.maintenance._utils_insert_from_file(sep="\t")
+
+#DB.maintenance.connect_instrument(tag = "oilexchange", instrument_tag = "att_ms:e1", user_tag = "wEPVYYBt", costs  = 750, description = "Replacing the oil on the Leybold machine (forevacuum pump).")
+# DB.maintenance_event.insert(maintenance_event = MaintenanceEventInsertModel(
+#     maintenance_tags=["oilexchange"], 
+#     costs  = 750, 
+#     description = "Replacing the oil on the Leybold machine (forevacuum pump).",
+#     instrument_tag = "att_ms:e1", 
+#     user_tag = "wEPVYYBt"))
+
+# DB.maintenance_event.get()
 #DB.submissions.insert_comment(tag = dataset_tag, comment = SubmissionCommentModel(user_tag = "wEPVYYBt", content = "This is a first comment", tags = ["Sample Processing"]))
 #DB.submissions.get_comments(tag = dataset_tag)
 #ms = MigrateScripts(submissions=DB.submissions, datasets=DB.datasets, users=DB.users, genotypes=DB.genotypes)
@@ -171,6 +200,8 @@ from config.models.news.news import NewsModel
 
 #check for users
 DB.users.check()
+
+
 
 if CTRL_PROTEOME_SETTINGS.add_control_proteome:
     control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)

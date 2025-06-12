@@ -4,7 +4,7 @@ import numpy as np
 from typing import List, Dict, Literal
 from config.models.user import UserModel
 
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 
 from config.exceptions.HTTPExceptions import no_data_found_http_exception

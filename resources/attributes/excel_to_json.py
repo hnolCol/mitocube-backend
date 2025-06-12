@@ -59,14 +59,14 @@ parent_ids = attrs["parent_tag"].map(tag_mapper)
 
 
 
-attrs.loc[:,"parent_id"] = parent_ids  # ToDo: issue, saved as float, parent_ids.astype(int, errors="ignore") does not work
+#attrs.loc[:,"parent_id"] = parent_ids  # ToDo: issue, saved as float, parent_ids.astype(int, errors="ignore") does not work
 attr_values.loc[:,"attribute_id"] = attr_values["attribute_tag"].map(tag_mapper)
 attr_values = attr_values.dropna(how="all")
 attr_values.dropna(subset=["attribute_id"], inplace=True)
 attr_values["id"] = np.arange(attr_values.index.size)
 
 
-JSON = {"attributes" : attrs.to_dict(orient="records"), "attribute_values" : attr_values.to_dict(orient="records")}
+JSON = {"attributes" : attrs.to_dict(orient="records"), "traits" : attr_values.to_dict(orient="records")}
 
 with open(FILE_OUT,"w+") as f:
     dump(JSON,f,indent=4, cls=NanConverter)

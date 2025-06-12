@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List, Literal
-from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.database.ABCDatabase import MCDatabase, MCAttributes
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from services.users import is_user_admin, get_user_from_token

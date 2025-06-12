@@ -15,6 +15,8 @@ class AttributeModel(BaseModel):
         Attribute tag, is validated to be of style ``att_<text>``
     text : str
         Attribute text to be displayed to a user in a ui. 
+    type : str, default None
+        
     priority : int, default 500 
         Priority of the attribute 
     parent_id : int, optional, default None
@@ -50,14 +52,18 @@ class AttributeModel(BaseModel):
     unit : Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow rate","arbitrary","fraction"], default None
         The unit type
     """
-    id : int
+    
+    id : int = None
     tag : str 
     text : str 
     priority : int = 500  # attributes will be sorted by priority in descending order
-    parent_id : Optional[int] = None  # parent attribute should be Attribute type
+    #parent_id : Optional[int] = None  # parent attribute should be Attribute type
     parent_tag : Optional[str] = None  # parent tag
     group_tag : str  # attribute grouping
-    s : Optional[str] = None
+    s : Optional[str] = None # search string (no caps)
+    children : Optional[List[str]] = None# list of strings that are children of this attribute (for example if an attribute has values to be entered by the user, the attribute must have UnitAttributes as children.)
+    type : Optional[Literal["Investigation","Study","Assay","Measurement","Instrument","InstrumentType","User","Unit"]] = None 
+    allow_input : bool #if the attribute allows for data input by the user. For example, a concentration.
     mandatory_for_submission : bool = False  # must be defined by an attribute value for a submission
     mandatory_for_active : bool = False  # must be defined by an attribute value for an active (published) state
     has_features_value : Optional[bool] = False  # if true, features (e.g. proteins) can be selected for this attribute
@@ -69,8 +75,9 @@ class AttributeModel(BaseModel):
     allow_for_genotype : bool = False  # attributes that are allowed for specifying a genotype.
     allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
     allow_for_user : bool = False
-    has_unit : bool = False 
-    unit : Optional[List[UnitsEnum]] = None # ToDo: define units like this? 
+    #has_unit : bool = False 
+    #unit : Optional[List[UnitsEnum]] = None # ToDo: define units like this? 
+    
     class Config:  
         use_enum_values = True
 
@@ -80,51 +87,59 @@ class AttributeModel(BaseModel):
         if v is None: return ""
         if isinstance(v,str): return v 
         return " ".join([str(s).lower() for s in v if s is not None])
-        
-    @field_validator('unit', mode="before")
-    def check_unit(cls, v : str|List[str], field):
-        if isinstance(v,str): return v.split(";")
+    
+    @field_validator('children', mode="before")
+    def check_children(cls, v : List[str]|str, field):
+        ""
         if isinstance(v,list): return v 
-        return None 
-
-    @field_validator('parent_id', mode="before")
-    def change_nan_to_none(cls, v, field):  # ToDo: cls or self? @classmethod
-        """
-        Check input for parent_id as pandas dataframe will transform
-        it to a float if there is null/None (e.g. NaN)
-        """
-        if v is None:
-            return None
+        if isinstance(v,str): return v.split("|")
         
-        if np.isnan(v):
-            return None
+        return v  # should give an error, if it reaches here
+    
+    # @field_validator('unit', mode="before")
+    # def check_unit(cls, v : str|List[str], field):
+    #     if isinstance(v,str): return v.split(";")
+    #     if isinstance(v,list): return v 
+    #     return None 
 
-        return int(v)
-
-    @field_validator('parent_id', mode="before")
-    @classmethod
-    def change_nan_to_none(cls, v, field): 
-        """
-        Check input for parent_id as pandas dataframe will transform
-        it to a float if there is null/None (e.g. NaN)
-        """
-        if v is None:
-            return None
+    # @field_validator('parent_id', mode="before")
+    # def change_nan_to_none(cls, v, field):  # ToDo: cls or self? @classmethod
+    #     """
+    #     Check input for parent_id as pandas dataframe will transform
+    #     it to a float if there is null/None (e.g. NaN)
+    #     """
+    #     if v is None:
+    #         return None
         
-        if np.isnan(v):
-            return None
+    #     if np.isnan(v):
+    #         return None
 
-        return int(v)
+    #     return int(v)
 
-    @field_serializer("parent_id", mode="plain")
-    def check_parent_id(self, v : int):  # ToDo: Missing self? :: I think, pydantic docs uses cls for validator, self for serilizer
-        if v is None:
-            return v
+    # @field_validator('parent_id', mode="before")
+    # @classmethod
+    # def change_nan_to_none(cls, v, field): 
+    #     """
+    #     Check input for parent_id as pandas dataframe will transform
+    #     it to a float if there is null/None (e.g. NaN)
+    #     """
+    #     if v is None:
+    #         return None
+        
+    #     if np.isnan(v):
+    #         return None
 
-        if np.isnan(v):
-            return None
+    #     return int(v)
 
-        return v 
+    # @field_serializer("parent_id", mode="plain")
+    # def check_parent_id(self, v : int):  # ToDo: Missing self? :: I think, pydantic docs uses cls for validator, self for serilizer
+    #     if v is None:
+    #         return v
+
+    #     if np.isnan(v):
+    #         return None
+
+    #     return v 
 
     @field_validator("tag")  # ToDo, issue with return type?
     @classmethod
@@ -132,7 +147,7 @@ class AttributeModel(BaseModel):
         """Checks the tag of an attribute and """
         if not v.startswith("att_"):
             raise ValueError("Attribute Tags must start 'att_'. Example : 'att_organism")
-        return v #remove lower, otherwise proteome maps are inconsistent
+        return str(v)
 
 AttributeTreeNode = ForwardRef('AttributeTreeNode')
 class AttributeTreeNode(BaseModel):
@@ -165,8 +180,51 @@ class TraitUnitInput(BaseModel):
     unit_text : str 
     value : Union[str,float,int]
 
+class TraitBaseModel(BaseModel):
+    """
+    BaseModel for an attribute value
+    
+    Parameters
+    ----------
 
-
+    text : str 
+        String representative of the value
+    value : str,float,int 
+        The actual value 
+    description : str, optional, default ""
+        Description of the attribute value. 
+    """
+    attribute_tag : Optional[str] = None 
+    text : str
+    tag : str 
+    description : Optional[str] = ""
+class TraitModel(TraitBaseModel):
+    """
+    BaseModel for a trait
+    """
+    s : str = None #The search param 
+    
+    @field_validator('s', mode="before")
+    def check_search(cls, v : List[str]|str, field):
+        ""
+        if v is None: return ""
+        if isinstance(v,str): return v 
+        return " ".join([str(s).lower() for s in v if s is not None])
+    
+    @field_validator("text", mode="before")  
+    @classmethod
+    def check_text(cls, v : Any) -> str:
+        """Checks text to be string"""
+        if not isinstance(v,str):
+            return str(v)
+        else:
+            return v
+        
+class TraitResponseModel(TraitBaseModel):
+    ""
+    
+    
+    
 class AttributeValueModel(BaseModel):  # ToDo: Update, add value and feature_id (check definitions first)
     """
     BaseModel for an attribute value
@@ -246,9 +304,13 @@ class AttributeValuesBySubmissionModel(BaseModel):
 
 
 class AttributeTraitResponseModel(BaseModel):
-    attribute: AttributeModel 
-    traits: List[AttributeValueModel]
+    attribute: AttributeModel
+    traits: List[TraitModel]
 
+class AttributeTraitTagResponseModel(BaseModel):
+    "Returns an attribute (tag) and the corresponding trait tags."
+    attribute_tag: str 
+    trait_tags: List[str]
 
 class AttributeResponseModel(BaseModel):
     """

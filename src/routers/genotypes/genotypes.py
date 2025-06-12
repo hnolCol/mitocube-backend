@@ -10,7 +10,7 @@ from services.users import is_user_admin, get_user_from_token
 
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 DB = Database.DB()
 
 

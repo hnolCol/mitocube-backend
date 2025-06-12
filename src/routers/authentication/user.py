@@ -12,7 +12,7 @@ from services.mail import send_email_in_background
 from services.enums import get_enum_as_dict
 from lib.user.UserHandling import UserDB
 from config.settings.general import get_general_settings
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 DB = Database.DB()
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()

@@ -15,7 +15,7 @@ from services.encryption import create_access_token, check_for_verification_code
 from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked
 
 from lib.user.UserHandling import UserDB
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()

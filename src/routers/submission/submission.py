@@ -5,11 +5,11 @@ from collections import OrderedDict
 from neo4j.exceptions import ConstraintError
 import pandas as pd 
 
-from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.database.ABCDatabase import MCDatabase, MCAttributes
 from lib.data.runs.runs import RunListCreator
 from lib.user.UserHandling import UserDB
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
@@ -604,15 +604,15 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
     while standard users can only see their own submissions
     """
 
-    db = MCDatabase.getDatabase()
-    metadata = db.getJSONDatasets()
-    subset =  labels.split(";") if labels is not None else None
-    #map_tags_to_attribute_in_metadata(list(metadata.values())[0])
-    if user.role < UserRolesEnum.CURATOR:
-        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label and (subset is None or dataset_label in subset)] #check if in a list of collaborators ? 
-    else:
-        #return all if user at least curator
-        return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if subset is None or dataset_label in subset]
+    # db = MCDatabase.getDatabase()
+    # metadata = db.getJSONDatasets()
+    # subset =  labels.split(";") if labels is not None else None
+    # #map_tags_to_attribute_in_metadata(list(metadata.values())[0])
+    # if user.role < UserRolesEnum.CURATOR:
+    #     return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if dataset_meta.user_label == user.label and (subset is None or dataset_label in subset)] #check if in a list of collaborators ? 
+    # else:
+    #     #return all if user at least curator
+    #     return [map_tags_to_attribute_in_metadata(dataset_meta) for dataset_label, dataset_meta in metadata.items() if subset is None or dataset_label in subset]
     
 
 

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from collections import OrderedDict
 from typing import List 
 
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 

@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
-from lib.data.database.ABCDatabase import MCAttributes
+from lib.database.ABCDatabase import MCAttributes
 from services.users import is_user_admin, get_user_from_token
 
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 
 from config.models.user import UserModel
-from config.models.attributes import AttributeValueModel
+from config.models.attributes import AttributeValueModel, TraitModel
 from config.enums.states import SubmissionStatesEnums
 from lib.user.UserHandling import UserDB
 
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 import numpy as np 
 router = APIRouter(
@@ -20,32 +20,37 @@ router = APIRouter(
 
 DB = Database.DB()
 
-@router.get("", response_model=List[AttributeValueModel])
-def get_instruments(user : UserModel = Depends(get_user_from_token)):
-    """Returns all the instruments as an attribute value model that 
-    were used in the database and are annotated in one or more submissions. 
-    Hence it is different from get all attribute values for the attribute tag
-    that defines the instruments. 
+@router.get("")
+def get_instruments(type : str = None, user : UserModel = Depends(get_user_from_token)):
+    ""
+    return DB.instruments.get(instrument_type = type)
+    
 
-    API Endpoint
-    ------------
-    GET /api/instruments/
+@router.get("/types")
+def get_instrument_type_tags(user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Instruments are grouped by type."
+    return DB.instruments.get_types()
 
-    Returns
-    -------
-    List[AttributeValueModel]
-        The list of instruments.
-    """
-    
-    DB.attributes.get_values()
-    
-    db_helper = MCDatabaseHelper.getDatabaseHelper()
-    db_attributes = MCAttributes.getAttributeDatabase()
-    instrument_values = db_attributes.getAttributeValues(tags=list(db_helper.get_instruments()))
-    return instrument_values.to_dict(orient="records")
-    
-    
-    
+
+@router.get("/{instrument_tag}")
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)) -> TraitModel:
+    "Since instruments are also traits in the database, we can use the attributes route."
+    if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
+    instrument = DB.attributes.trait(trait_tag = instrument_tag)
+    return instrument
+
+@router.get("/{instrument_tag}/projects/count")
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
+    "Return the number of projects the instrument was used in."
+    return 9 
+
+@router.get("/{instrument_tag}/samples/count")
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
+    "Return the number of samples the instrument measured."
+    return 12 
+
+
+
     
 @router.get("/{instrument_tag}/stats")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):

@@ -12,7 +12,7 @@ except:
     pass 
 import typing
 
-from lib.data.database.ProstgreSQLDatabase import PostgreSQLConnection
+from lib.database.ProstgreSQLDatabase import PostgreSQLConnection
 
 
 

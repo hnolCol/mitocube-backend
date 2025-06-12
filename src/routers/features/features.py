@@ -11,7 +11,7 @@ from services.submission import map_tags_to_attribute_in_metadata
 from config.models.parameter import APIParamString
 from config.models.calculations.quantile import QuantileModel 
 
-from lib.data.database.Database import Database
+from lib.database.Database import Database
 
 from config.exceptions.HTTPExceptions import protein_not_found
 from collections import OrderedDict

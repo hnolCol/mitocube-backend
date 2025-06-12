@@ -1,6 +1,6 @@
 from datetime import datetime
 from collections import OrderedDict
-from lib.data.database.ABCDatabase import MCAttributes, MCDatabase
+from lib.database.ABCDatabase import MCAttributes, MCDatabase
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.genotype.PandaGenotype import PandaFileGenotype
 

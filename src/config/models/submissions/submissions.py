@@ -1,7 +1,7 @@
 import time
 
 from datetime import datetime 
-from typing import List, Dict, Optional, Union, Literal, Any
+from typing import List, Dict, Optional, Union, Literal, Any, ForwardRef
 from pydantic import AnyUrl
 from pydantic import BaseModel 
 from pydantic import Field
@@ -69,6 +69,13 @@ class MinimalMetadataResponseModel(MinimalMetadataModel):
     "" 
     
 
+SampleAttributeTree = ForwardRef('SampleAttributeTree')
+    
+class SampleAttributeTree(BaseModel):
+    tag : str # Attribute or Trait String 
+    type :  Literal["Attribute","Trait"]
+    value : float|int
+    children : Optional[List[SampleAttributeTree]]
 
 
 class NewSubmissionModel(BaseModel):
@@ -98,6 +105,9 @@ class NewSubmissionModel(BaseModel):
     data_sample_names : List[str] = None
     data_index : List[str|None] = None 
     datasetAttributeInput : Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None # Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None
+    
+    sample_attributes : List[List[SampleAttributeTree]]
+    
     
     @field_validator("datasetAttributeInput", mode="after")
     def validate_dataset_attribute_input(cls, v : Dict|None, config):

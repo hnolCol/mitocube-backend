@@ -4,14 +4,14 @@ from typing import List
 
 from config.models.user import UserModel
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel
-from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.database.ABCDatabase import MCDatabase, MCAttributes
 from config.enums.users.roles import UserRolesEnum
 from services.users import get_user_from_token
 from services.enums import get_enum_as_dict
 import pandas as pd
 
 
-from lib.data.database.Database import Database 
+from lib.database.Database import Database 
 
 DB = Database.DB() 
 

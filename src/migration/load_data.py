@@ -2,10 +2,10 @@
 import os 
 from pydantic import BaseModel 
 
-from lib.data.database.neo4j.Submission import SubmissionABC
-from lib.data.database.neo4j.Dataset import DatasetABC
-from lib.data.database.neo4j.Users import UserABC
-from lib.data.database.neo4j.Genotypes import GenotypeABC
+from lib.database.neo4j.Submission import SubmissionABC
+from lib.database.neo4j.Dataset import DatasetABC
+from lib.database.neo4j.Users import UserABC
+from lib.database.neo4j.Genotypes import GenotypeABC
 from config.models.submissions.submissions import DatasetSubmissionModel
 from config.models.user import UserModelForRegistration, UserModel
 from config.models.genotype import GenotypeModel

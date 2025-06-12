@@ -2,8 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from collections import OrderedDict
 
-from lib.data.database.Database import Database
-from lib.data.database.ABCDatabase import MCDatabase
+from lib.database.Database import Database
+from lib.database.ABCDatabase import MCDatabase
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 
 from lib.data.statistic.ANOVA import OneWayANOVA

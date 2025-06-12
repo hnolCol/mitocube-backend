@@ -10,8 +10,8 @@ from config.models.submissions.submissions import DatasetSubmissionModel, Datase
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
 from config.models.annotations.feature import FeatureModel
 
-from lib.data.database.ABCDatabase import MCDatabase, MCAttributes
-from lib.data.database.Database import Database
+from lib.database.ABCDatabase import MCDatabase, MCAttributes
+from lib.database.Database import Database
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.transform.PCA import PCATransform
 from lib.data.transform.FeatureData import FeatureData

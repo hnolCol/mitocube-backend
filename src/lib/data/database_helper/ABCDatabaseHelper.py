@@ -22,7 +22,7 @@ class MCDatabaseHelper(metaclass=SingletonABCMeta):
     @staticmethod
     def getDatabaseHelper():
         if DB_SETTTINGS.db_handler == "pandafiles":
-            from lib.data.database_helper.PandaHelper import PandaDatabaseHelper
+            from lib.database_helper.PandaHelper import PandaDatabaseHelper
             return PandaDatabaseHelper()
         raise ValueError("db-handler is unknown.")
     
