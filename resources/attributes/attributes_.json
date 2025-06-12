@@ -7577,42 +7577,8 @@
             "keyword": null,
             "text": "C57BL/6J",
             "description": "C57BL/6J (Black 6), inbred, low susceptibility to tumors, high susceptibility to diet-induced\nobesity, moderate hyperglycemia and\nhyperinsulinemia",
-            "Priority": 500.0,
-            "attribute_id": 27.0,
-            "id": 412
-        },
-        {
-            "value": "c57bl6n",
-            "attribute_tag": "att_mouse_strain",
-            "tag": "att_mouse_strain:c57bl6n",
-            "keyword": null,
-            "text": "C57BL/6N",
-            "description": "C57BL/6N, mutation in Nnt gene",
-            "Priority": 500.0,
-            "attribute_id": 27.0,
-            "id": 413
-        },
-        {
-            "value": "c57bl6nj",
-            "attribute_tag": "att_mouse_strain",
-            "tag": "att_mouse_strain:c57bl6nj",
-            "keyword": null,
-            "text": "C57BL/6NJ",
-            "description": "This is an NIH subline of C57BL/6. It was separated from C57BL/6J in 1951. Five SNP differences have been identified that distinguish C57BL/6J from C57BL/6ByJ and C57BL/6NJ. This strain does not have the deletion in the\u00a0Nnt\u00a0gene that has been found in the C57BL/6J strain.",
-            "Priority": 500.0,
-            "attribute_id": 27.0,
-            "id": 414
-        },
-        {
-            "value": "c57bl6nrj",
-            "attribute_tag": "att_mouse_strain",
-            "tag": "att_mouse_strain:c57bl6nrj",
-            "keyword": null,
-            "text": "C57BL6/NRj",
-            "description": "C57BL/6JRj mice exhibit age-related hearing loss, resistance to audiogenic seizures, and sensitivity to diet-induced Type II diabetes and atherosclerosis. They are prone to hereditary hydrocephalus, alopecia (potentially linked to behavioral causes), low bone density, malocclusion, microphtalmia, ocular malformations, and addiction to morphine and alcohol. Additionally, they carry a deletion in the\u00a0Nnt\u00a0gene and are active, relatively aggressive, but easy to handle with a life expectancy of about two years",
-            "Priority": null,
-            "attribute_id": 27.0,
-            "id": 415
+            "attribute_id": 70.0,
+            "id": 462
         },
         {
             "value": "arg0",
