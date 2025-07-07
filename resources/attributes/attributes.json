@@ -12642,7 +12642,7 @@
             "text": "Fumarte 1mM",
             "description": "Fumarate used at a concentration of 1 mM",
             "attribute_id": 114.0,
-            "id": 823
+            "id": 963
         },
         {
             "value": "fumarate-10",
@@ -12652,7 +12652,7 @@
             "text": "Fumarate 10 mM",
             "description": "Fumarate used at a concentration of 10 mM (similiar to FH KO accumulation in the cell)",
             "attribute_id": 114.0,
-            "id": 824
+            "id": 964
         },
         {
             "value": "dmf",
@@ -12662,7 +12662,7 @@
             "text": "Dimethylfumarate",
             "description": "Dimethylfumarate is a very active compound and leads to succination of cystein residues.",
             "attribute_id": 114.0,
-            "id": 825
+            "id": 965
         },
         {
             "value": "fumarate-25",
@@ -12672,7 +12672,7 @@
             "text": "Fumarate 25 mM",
             "description": "Fumarate used at a concentration of 25 mM.",
             "attribute_id": 114.0,
-            "id": 826
+            "id": 966
         }
     ]
 }
