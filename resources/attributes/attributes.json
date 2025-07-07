@@ -2947,6 +2947,26 @@
             "unit": null,
             "id": 133,
             "parent_id": null
+        },
+        {
+            "tag": "att_pisa_cond",
+            "parent_tag": null,
+            "text": "Proteome Integral Solubility Alteration Chemicals",
+            "priority": 600,
+            "has_features_value": false,
+            "has_numeric_input": false,
+            "group_tag": "treatment",
+            "min_state": 0,
+            "mandatory_for_submission": false,
+            "mandatory_for_active": false,
+            "allow_as_filter": true,
+            "allow_for_user": false,
+            "allow_for_genotype": false,
+            "allow_for_qc": false,
+            "allow_for_dataset": true,
+            "allow_for_sample": true,
+            "id": 134,
+            "parent_id": null
         }
     ],
     "attribute_values": [
@@ -12613,6 +12633,46 @@
             "description": null,
             "attribute_id": 133.0,
             "id": 962
+        },
+        {
+            "value": "fumarate-1",
+            "attribute_tag": "att_pisa_cond",
+            "tag": "att_pisa_cond:fumarate-1",
+            "keyword": null,
+            "text": "Fumarte 1mM",
+            "description": "Fumarate used at a concentration of 1 mM",
+            "attribute_id": 114.0,
+            "id": 823
+        },
+        {
+            "value": "fumarate-10",
+            "attribute_tag": "att_pisa_cond",
+            "tag": "att_pisa_cond:fumarate-10",
+            "keyword": null,
+            "text": "Fumarate 10 mM",
+            "description": "Fumarate used at a concentration of 10 mM (similiar to FH KO accumulation in the cell)",
+            "attribute_id": 114.0,
+            "id": 824
+        },
+        {
+            "value": "dmf",
+            "attribute_tag": "att_pisa_cond",
+            "tag": "att_pisa_cond:dmf",
+            "keyword": null,
+            "text": "Dimethylfumarate",
+            "description": "Dimethylfumarate is a very active compound and leads to succination of cystein residues.",
+            "attribute_id": 114.0,
+            "id": 825
+        },
+        {
+            "value": "fumarate-25",
+            "attribute_tag": "att_pisa_cond",
+            "tag": "att_pisa_cond:fumarate-25",
+            "keyword": null,
+            "text": "Fumarate 25 mM",
+            "description": "Fumarate used at a concentration of 25 mM.",
+            "attribute_id": 114.0,
+            "id": 826
         }
     ]
 }
