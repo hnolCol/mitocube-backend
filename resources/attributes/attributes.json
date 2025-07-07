@@ -12669,7 +12669,7 @@
             "attribute_tag": "att_pisa_cond",
             "tag": "att_pisa_cond:dmf",
             "keyword": null,
-            "text": "Dimethylfumarate",
+            "text": "Dimethylfumarate 5 mM",
             "description": "Dimethylfumarate is a very active compound and leads to succination of cystein residues.",
             "attribute_id": 134,
             "id": 965
