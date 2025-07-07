@@ -12635,6 +12635,16 @@
             "id": 962
         },
         {
+            "value": "vehicle",
+            "attribute_tag": "att_pisa_cond",
+            "tag": "att_pisa_cond:vehicle",
+            "keyword": null,
+            "text": "Vehicle",
+            "description": "Control vehicle in a PISA study",
+            "attribute_id": 134,
+            "id": 967
+        },
+        {
             "value": "fumarate-1",
             "attribute_tag": "att_pisa_cond",
             "tag": "att_pisa_cond:fumarate-1",
