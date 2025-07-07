@@ -21,7 +21,6 @@ router = APIRouter(
 def find_spare_parts(search_string : str = "") -> List[str]:
     "Finds spare parts by a search_string and returns the tags. " 
     
-    
     return DB.spareparts.find(search_string = search_string)
     
 @router.get("/{tag}")

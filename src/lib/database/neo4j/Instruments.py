@@ -1,9 +1,119 @@
 from neo4j import Driver, Result 
 from typing import List, Dict
 import pandas as pd 
+from services.random_generators import get_random_string
+from config.models.instruments import InstrumentStateModel, InstrumentsStateResponseModel, InstrumentStateHistoryModel
 
 from lib.database.abstract.Instruments import InstrumentsABC
+from lib.database.abstract.Instruments import InstrumentStatesABC
 
+
+
+class Neo4JInstrumentStates(InstrumentStatesABC):
+    
+    def __init__(self, driver : Driver) -> None:
+        self._driver = driver 
+    
+    def _utils_insert_from_file(self, file_path : str =  "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", *args, **kwargs):
+        
+        instrument_states = pd.read_csv(file_path, *args, **kwargs)
+        if not all(column_name in instrument_states.columns for column_name in ["tag","text","description","color"]):
+            raise ValueError("The dataframe does not have all required columns. 'tag','text','description','color'")
+        
+        instrument_state_models = [InstrumentStateModel(**i) for i in instrument_states.to_dict(orient="records")]
+        query = (
+            "UNWIND $states as is_props "
+            "MERGE (is:InstrumentState {tag : is_props.tag}) "
+            "ON CREATE "
+            "SET is.description = is_props.description, is.text = is_props.text, is.color = is_props.color, is.created_at = timestamp() "
+            "ON MATCH "
+            "SET is.description = is_props.description, is.text = is_props.text, is.color = is_props.color, is.modified = timestamp() "
+            "RETURN count(is) "
+        )
+        
+        r = self._driver.execute_query(query,routing_="w", states = [i_state.model_dump() for i_state in instrument_state_models])
+        print(r,"Instrument States created.")
+        
+    def get(self, tag = None) -> InstrumentStateModel:
+        ""
+        
+        query = (
+            "MATCH (is:InstrumentState {tag : $tag}) "
+            "RETURN {tag : is.tag, text : is.text, description : is.description, color : is.color} "
+        )
+        r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+        return InstrumentStateModel(**r[0])
+        
+    def get_instrument_state(self, instrument_tag : str, limit : int = 1) -> List[InstrumentsStateResponseModel]:
+        "Returns the state "
+            
+        query = (
+            "MATCH (instrument:Trait {tag : $instrument_tag})<-[:HAS_TRAIT]-(a:Attribute) WHERE EXISTS {(a)-[:PART_OF]->(ag:AttributeGroup {tag : 'instrument'})} "
+            "MATCH (instrument)-[r:IN_STATE]-(is:InstrumentState) "
+            "RETURN {tag : is.tag, comment : r.comment, created_at : r.created_at} ORDER BY r.created_at DESC "
+        )
+        
+        if limit is not None:
+            query += " LIMIT $limit"
+            
+        r = self._driver.execute_query(query,instrument_tag = instrument_tag, result_transformer_=Result.value, limit = limit)
+
+        return [InstrumentsStateResponseModel(**ri) for ri in r]
+    
+    
+    def get_history(self, instrument_tag : str = None, limit : int = None) -> List[InstrumentStateHistoryModel]:
+        ""
+        query = "MATCH (t:Trait)-[r:IN_STATE]->(state:InstrumentState) "
+        if instrument_tag is not None:
+            query += "WHERE t.tag = $instrument_tag "
+            
+        query += "WITH t, state, r.tag as tag, r.created_at AS created ORDER BY created ASC " 
+        
+        if limit is not None:
+            query += " LIMIT $limit "
+        
+        query += (
+            "WITH COLLECT({tag : tag, instrument_tag : t.tag, state : state.tag, created_at : created}) as l  "
+            "WITH [idx IN range(0, size(l)-1) |  "
+            "       { "
+            "           tag : l[idx].tag, "
+            "           started_at : l[idx].created_at, "
+            "           ended_at : l[idx+1].created_at, "
+            "           instrument_tag : l[idx].instrument_tag, "
+            "           state_tag : l[idx].state, "
+            "           duration : (l[idx+1].created_at-l[idx].created_at) "
+            "       }] AS durations "
+            "RETURN durations "
+        )
+        
+        
+        r = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.value)
+        
+        return [InstrumentStateHistoryModel(**ri) for ri in r[0]]
+    
+    
+    def find(self, search_string = None):
+        return super().find(search_string)
+
+
+    def insert(self, state):
+        return super().insert(state)
+    
+    
+    def set(self, tag : str, instrument_tag : str, comment : str = None):
+        ""
+        
+        unique_tag = get_random_string(N = 10)
+        
+        query = (
+            "MATCH (is:InstrumentState {tag : $tag}) "
+            "MATCH (instrument:Trait {tag : $instrument_tag})<-[:HAS_TRAIT]-(a:Attribute) WHERE EXISTS {(a)-[:PART_OF]->(ag:AttributeGroup {tag : 'instrument'})} "
+            "CREATE (is)<-[r:IN_STATE]-(instrument) "
+            "SET r.created_at = timestamp(), r.comment = $comment, r.tag = $r_tag "
+        )
+        
+        self._driver.execute_query(query, routing_="w", tag = tag, instrument_tag = instrument_tag, comment = comment, r_tag = unique_tag)
+        
 
 
 class Neo4JInstruments(InstrumentsABC):
@@ -14,7 +124,7 @@ class Neo4JInstruments(InstrumentsABC):
     def get_types(self, limit : int = 50) -> List[str]:
         "Returns all the instrument type tags"
         query = (
-            "MATCH (it:InstrumentType) RETURN it.tag LIMIT 50"
+            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) WHERE ag.tag = 'instrumenttype' RETURN a.tag LIMIT $limit"
         )
         
         instrument_types = self._driver.execute_query(query, routing_="r",result_transformer_=Result.value, limit = limit)
@@ -23,8 +133,8 @@ class Neo4JInstruments(InstrumentsABC):
         
         
     def get(self, instrument_type : str = None, tags: List[str] = None) -> List:
-        """An instrument is a trait, but the attribute has a label that is 
-        Instrument. In addition there are instrument types (e.g. mass spec type, lc type)
+        """An instrument is a trait of an attribute The attribute is in an AttributeGroup 'instrument'
+        In addition there are instrument types (e.g. mass spec type, lc type)
         that group the instruments. 
         Hence you can provide a type go get the list of instrument tags (Traits). 
         If no instrument_type is provided, all instrument tags will be returned. 
@@ -41,13 +151,13 @@ class Neo4JInstruments(InstrumentsABC):
         """
         
         query = (
-            "MATCH (i:Instrument) "
+            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) WHERE ag.tag = 'instrument' "
         )
         
         if instrument_type is not None:
-            query += "WHERE EXISTS {(it:InstrumentType {tag : $instrument_type})-[:IS_CHILD]->(i)} "
+            query += "AND EXISTS {(:AttributeGroup {tag : 'instrumenttype'})<-[:PART_OF]-(a_type:Attribute)-[:IS_CHILD]->(a) WHERE a_type.tag = $instrument_type} "
         
-        query += "MATCH (i)-[:HAS_TRAIT]->(t:Trait) RETURN t.tag "
+        query += "MATCH (a)-[:HAS_TRAIT]->(t:Trait) RETURN t.tag "
 
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, instrument_type = instrument_type)

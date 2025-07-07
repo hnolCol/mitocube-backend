@@ -20,7 +20,7 @@ from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.Peptides import PeptidesABC
 from lib.database.abstract.QC import QCABC
 from lib.database.abstract.UnitTypes import UnitTypesABC
-from lib.database.abstract.Instruments import InstrumentsABC
+from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesABC
 from lib.database.abstract.Timeline import TimelineABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from lib.database.abstract.Phenotypes import PhenotypeABC
@@ -71,6 +71,7 @@ class DatabaseABC(ABC):
     submission_summary : SubmissionSummaryABC = None
     unittypes : UnitTypesABC = None
     instruments : InstrumentsABC = None
+    instrument_states : InstrumentStatesABC = None
     timeline : TimelineABC = None 
     research_groups : ResearchGroupABC = None
     phenotypes: PhenotypeABC = None
@@ -166,10 +167,17 @@ class DatabaseABC(ABC):
             raise  NotImplementedError("A database class must have the instrument attribute defined")
         
         if not isinstance(self.instruments,InstrumentsABC):
-            raise TypeError("The peptides class must be an instance of InstrumentABC")    
+            raise TypeError("The instruments class must be an instance of InstrumentABC")    
+        
+        if self.instrument_states is None:
+            raise  NotImplementedError("A database class must have the instrument_states attribute defined")
+        
+        if not isinstance(self.instrument_states,InstrumentStatesABC):
+            raise TypeError("The instrument_states class must be an instance of InstrumentStatesABC")    
         
         if self.timeline is None:
             raise NotImplementedError("A database class must have the timeline attribute defined.")
+        
         if not isinstance(self.timeline, TimelineABC):
             raise TypeError("The timeline class must be an instance of the TimelineABC.")
         

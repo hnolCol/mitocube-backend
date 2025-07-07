@@ -56,7 +56,6 @@ class Neo4JAttributes(AttributesABC):
             #since it is just the tag, there should not be a case where the tag is modified since
             #the tag is unique index
         )
-        
         self._driver.execute_query(query, attr_group_tags = unique_attribute_groups, routing_="w")
         
         #add multilabel attributes 
@@ -219,16 +218,29 @@ class Neo4JAttributes(AttributesABC):
         return AttributeModel(**r[0])
     
     
-    def find_attribute(self, search_string : str, 
-                       attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None, 
+    def find_attribute(self, search_string : str = None, 
+                       attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None,
+                       min_state : SubmissionStatesEnums = None, 
                        limit : int = 20) -> List[str]:
         
-        query = (
-            "MATCH (a:Attribute) "
-            "WHERE a.s CONTAINS $search_string " )
+        if all(a is None for a in [search_string,attribute_group]): raise ValueError("Either 'search_string', 'attribute_group' or 'min_state' must be provided.")
+        
+        query = "MATCH (a:Attribute) WHERE "
+            
+        if search_string is not None:
+            query += "a.s CONTAINS $search_string "
         
         if attribute_group is not None:
-            query += "AND EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)} "
+            if search_string is not None:
+                query += "AND "
+
+            query += "EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)} "
+            
+            
+        if min_state is not None:
+            if search_string is not None or attribute_group is not None:
+                query += "AND "
+            query += " EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             
             
         query += "RETURN a.tag ORDER BY a.priority "
@@ -237,16 +249,16 @@ class Neo4JAttributes(AttributesABC):
         if limit is not None:
             query += "LIMIT $limit"
         
-        trait_tags = self._driver.execute_query(query_=query,
-                                       routing_="r",
-                                       attribute_group = attribute_group,
-                                       result_transformer_=Result.value,
-                                       search_string = search_string.lower(),
-                                       limit = limit)
+        trait_tags = self._driver.execute_query(
+                        query_=query,
+                        routing_="r",
+                        attribute_group = attribute_group,
+                        result_transformer_=Result.value,
+                        min_state = min_state,
+                        search_string = search_string.lower() if isinstance(search_string,str) else "",
+                        limit = limit)
         
         return trait_tags
-        
-        
         
         
     def count(self) -> int:
@@ -361,12 +373,14 @@ class Neo4JAttributes(AttributesABC):
         
         
     
-    def get(self, tags : List[str] = None,
+    def get(self, 
+            tags : List[str] = None,
             attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None, 
-            param_name : Literal["allow_for_dataset","allow_as_filter",
-                                "allow_for_genotype","allow_for_measurement","allow_for_qc",
-                                "mandatory_for_submission","mandatory_for_active"] = None,
-            min_state : SubmissionStatesEnums = None, limit : int = None) -> List[str]:
+            # param_name : Literal["allow_for_dataset","allow_as_filter",
+            #                     "allow_for_genotype","allow_for_measurement","allow_for_qc",
+            #                     "mandatory_for_submission","mandatory_for_active"] = None,
+            min_state : SubmissionStatesEnums = None, 
+            limit : int = None) -> List[str]:
         ""
         
         query = (
@@ -386,7 +400,7 @@ class Neo4JAttributes(AttributesABC):
             
         if min_state is not None:
             if tags is None and attribute_group is None:
-                query += "WHERE a.min_state = $min_state "
+                query += "WHERE EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             else:
                 query += "AND EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             
@@ -814,8 +828,12 @@ class Neo4JAttributes(AttributesABC):
             )
         return r
         
-    def get_attributes_and_values_by_search_string(self, search_string : str, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, param_name : str = None, limit : int = None) -> List[AttributeTraitTagResponseModel]:
-        """Finds the attirbute and the corresponding attribute values. 
+    def find_attributes_and_traits(self, 
+                                                   search_string : str, 
+                                                   min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
+                                                   limit : int = None, 
+                                                   attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None) -> List[AttributeTraitTagResponseModel]:
+        """Finds the attribute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
 
         Parameters
@@ -828,19 +846,19 @@ class Neo4JAttributes(AttributesABC):
             Maximum number of attributes to be returned. Does not account for the traits. 
         Returns
         -------
-        List[Tuple[AttributeModel,List[AttributeValueModel]]]
-            _description_
+        List[AttributeTraitTagResponseModel]
+            List of attribute_tag and corresponding trait_tags
         """
         query = "MATCH (a:Attribute) "
         
         if min_state is not None:
             query += "WHERE EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag <= $min_state} "
         
-        if param_name is not None:
-            if min_state is None:
-                query += "WHERE a[$param_name] "
-            else:
-                query += "AND a[$param_name] "
+       
+        if attribute_group is not None:
+            if min_state is None: query += "WHERE "
+            
+            query += "EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)} "
             
         query += (
             "MATCH (a)-[:HAS_TRAIT]->(t:Trait) "
@@ -857,8 +875,9 @@ class Neo4JAttributes(AttributesABC):
         r  = self._driver.execute_query(
             query,
             search_string=search_string.lower(),
+            limit = limit,
             min_state = min_state, 
-            param_name = param_name, 
+            attribute_group = attribute_group,
             result_transformer_= Result.data,
             routing_="r", 
             database_="neo4j")

@@ -369,12 +369,10 @@ class Neo4JConstructor:
         
         r,_,_ = self._driver.execute_query(query)
         
-        
-        
+
     def _add_full_text_dataset_search(self):
-        
         query = (
-            f"CREATE FULLTEXT INDEX datasetSearch IF NOT EXISTS FOR (q:Query) ON EACH [q.s, q.tag] "
+            f"CREATE FULLTEXT INDEX submissionTitleSearch IF NOT EXISTS FOR (s:Submission) ON EACH [s.title] "
             "OPTIONS {"
             "indexConfig: {"
             "    `fulltext.analyzer`: 'english'"
@@ -604,7 +602,7 @@ class MCNeo4JDatabase(DatabaseABC):
         # self.submission_filter.get_submissions(protein_tag=APIParamString(param="Q86X40"))
         
         
-       # self.attributes.get_attributes_and_values_by_search_string("DIA")
+       # self.attributes.find_attributes_and_traits("DIA")
        
         #self.attributes.get_attribute_values_by_dataset_tags(["LOGtC9tNC13b", "MpHCYf9mShVR", "BuXOSlIl6G"])
         

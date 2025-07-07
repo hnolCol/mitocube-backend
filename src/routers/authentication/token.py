@@ -96,7 +96,7 @@ def check_token(user : UserModel = Depends(get_user_from_token)):
     Returns
     -------
     TokenValidResponse 
-        If the token is valid a response is made, otherwise a HTTP Exception is raise in the Depends(get_user_from_token)
+        If the token is valid a response is made, otherwise a HTTP Exception is raised in the Depends(get_user_from_token)
     """
     return TokenValidResponse(
         success=True,

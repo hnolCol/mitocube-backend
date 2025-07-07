@@ -63,14 +63,14 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Add
 
 
 @router.get("/users/q")
-def query_user_db(query : str = None, max_users : int = 40, user : UserModel = Depends(get_user_from_token)):
-    """Query user in the database. 
+def query_user_db(query : str = None, limit : int = 40, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    """Query user in the database and returns the tags 
 
     Parameters
     ----------
     query : str, optional
         _description_, by default None
-    max_users : int, optional
+    limit : int, optional
         _description_, by default 40
 
     Returns
@@ -79,14 +79,8 @@ def query_user_db(query : str = None, max_users : int = 40, user : UserModel = D
         _description_
     """
     
-    filtered_users = DB.users.find_user(query, limit=max_users)
-    total_count = DB.users.count()
-    query_count = len(filtered_users)
-   
-    return {"users" : filtered_users, 
-            "user_tags" : [u.tag for u in filtered_users], 
-            "query_count" : query_count, 
-            "total_count" : total_count} 
+    return DB.users.find_user(query, limit=limit)
+    
 
 @router.post("/users/pw",summary="Allows users to change the password for themselves.")
 def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):

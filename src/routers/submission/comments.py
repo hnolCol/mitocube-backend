@@ -36,7 +36,7 @@ def post_comment_to_submission(submission_tag : str, content : str, tags : List[
         _description_
     """
 
-    DB.submissions.add_comment(tag = submission_tag,comment = SubmissionCommentModel(user_tag = user.tag, content = content, tags = tags))
+    DB.submissions.add_comment(tag = submission_tag, comment = SubmissionCommentModel(user_tag = user.tag, content = content, tags = tags))
 
 @router.get('/{submission_tag}/comments')
 def get_comments_for_submission(submission_tag : str) -> List[SubmissionCommentModel]:

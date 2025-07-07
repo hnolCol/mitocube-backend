@@ -85,6 +85,14 @@ def get_submission_id(user : UserModel = Depends(get_user_from_token)):
 #     return True 
     
 
+@router.get("/submissions/{submission_tag}/title")
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    "Returns the submission title by its tag."
+    if not DB.submissions.exists(tag = submission_tag):
+        return tag_not_found
+    return DB.submissions.get_title(tag = submission_tag)
+
+
 @router.get("/submissions/{submission_tag}/metatext")
 def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
     ""
@@ -319,17 +327,17 @@ def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)
 
 
 
-@router.get("/submissions/q", response_model=SubmissionQueryResponse)
+@router.get("/submissions/q")
 def get_submission_by_query(state : str|int = None,
-                            query : Annotated[str | None, Query(min_length=1)] = None,
+                            search_string : str = None,
                             feature_key : str = None, 
-                            attribute_value_tag : str = None, 
+                            trait_tags : str = None, 
                             attribute_tag : str = None, 
                             genotype_tag : str = None, 
                             user_tag : str = None,
                             max_submissions : int = 50, 
                             user : UserModel = Depends(get_user_from_token)
-                            ): 
+                            ) -> List[str]: 
     """Counting the submissions based on various filter criteria. 
 
     Parameters
@@ -340,7 +348,7 @@ def get_submission_by_query(state : str|int = None,
         _description_, by default 1)]=None
     feature_key : str, optional
         _description_, by default None
-    attribute_value_tag : str, optional
+    trait_tags : str, optional
         _description_, by default None
     attribute_tag : str, optional
         _description_, by default None
@@ -355,26 +363,33 @@ def get_submission_by_query(state : str|int = None,
 
     Returns
     -------
-    SubmissionQueryResponse
-        Summarizes the result with the following keys:
-            - 'submission' (List[Dict]) : Minimal information about a submission.
-            - 'tags' (List[str]) : List of submission tags 
-            - 'query_count' : The number of submissions that match the filtering ignoring
-            the provided limit.
-            - 'total_count' (int) : The number of all submissions in the dataset. 
+    List of submission tags that match the filtering. 
+    
+    # SubmissionQueryResponse
+    #     Summarizes the result with the following keys:
+    #         - 'submission' (List[Dict]) : Minimal information about a submission.
+    #         - 'tags' (List[str]) : List of submission tags 
+    #         - 'query_count' : The number of submissions that match the filtering ignoring
+    #         the provided limit.
+    #         - 'total_count' (int) : The number of all submissions in the dataset. 
     """
+
+
+
 
     N = DB.submissions.count()
     tags = DB.submission_filter.get(
+            search_string = search_string,
             state = APIParamInt(param = state).param, 
             attribute_tag=APIParamString(param=attribute_tag).param,
-            attribute_value_tag=APIParamString(param=attribute_value_tag).param,
+            trait_tags=APIParamString(param=trait_tags).param,
             protein_tag=APIParamString(param=feature_key).param,
             user_tag=APIParamString(param=user_tag).param,
             genotype_tag = APIParamString(param=genotype_tag).param,
             limit = max_submissions
             )
-    
+    print(tags)
+    return tags 
     print(tags)
     if len(tags) == 0: 
         #empty response

@@ -117,7 +117,7 @@ class AttributesABC(ABC):
             param_name : Literal["allow_for_dataset","allow_as_filter", "allow_for_sample",
                                 "allow_for_genotype","allow_for_measurement","allow_for_qc",
                                 "mandatory_for_submission","mandatory_for_active"] = None,
-            min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[AttributeModel]:
+            min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[str]:
         """Returns attributes by their tags. If the tag is not in the 
         database it is simply ignored. 
 
@@ -125,10 +125,11 @@ class AttributesABC(ABC):
         ----------
         tags : List[str], optional
             The attribute tags, by default None (all attributes returned)
-
+        attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] 
+            Attribute group. If given, only attributes of the specified group is returned.
         Returns
         -------
-        List[AttributeModel]
+        List[str]
             The list of attributes associated with the provided tags. Please note
             that if the tag is not found, the attribute is simply ignored.
             If tags is None, all attributes are returned. 
@@ -212,17 +213,11 @@ class AttributesABC(ABC):
         ""
     
     @abstractmethod    
-    def get_attributes_and_values_by_search_string(self, 
+    def find_attributes_and_traits(self, 
                                                    search_string : str, 
                                                    min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                                    limit : int = None,
-                                                   param_name : Literal["allow_for_dataset",
-                                                                        "mandatory_for_submission",
-                                                                        "allow_as_filter",
-                                                                        "allow_for_genotype",
-                                                                        "allow_for_measurement",
-                                                                        "allow_for_qc",
-                                                                        "mandatory_for_active"] = None) -> List[AttributeTraitResponseModel]:
+                                                    ) -> List[AttributeTraitResponseModel]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
         TODO: Rename to find? 
@@ -237,8 +232,6 @@ class AttributesABC(ABC):
             mass spectrometer if the samples are being measured, by default SubmissionStatesEnums.SUBMITTED
         limit : int, optional
             The maximum of attributes to return
-        param_name : str, optional
-            A boolean attribute param, if None it is ignored, by default None
 
         Returns
         -------
@@ -305,6 +298,7 @@ class AttributesABC(ABC):
     @abstractmethod
     def find_attribute(self, search_string : str, 
                        attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None, 
+                       min_state : SubmissionStatesEnums = None,
                        limit : int = 20) -> List[str]:    
         "Finds attribute tags"
     

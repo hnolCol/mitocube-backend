@@ -1,0 +1,6 @@
+tag	text	description	color
+state.instrument.calibration	Calibration	Instrument is calibrated. 	#2a76a9
+state.instrument.running	Running	Instrument is running.	#b2d990
+state.instrument.maintenance	Maintenance	"Routine maintenance including (e.g. Leak test, FAIMS cleaning, etc)"	#f2be7a
+state.instrument.under.service	Service	Under service (turned off)	#d4292b
+state.instrument.out.of.service	Out of service	The instrument is not used anymore. 	#efefef

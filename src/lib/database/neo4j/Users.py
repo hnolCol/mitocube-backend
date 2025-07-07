@@ -191,7 +191,7 @@ class Neo4JUser(UserABC):
         ""
         cypher_query = (
             "MATCH (u:User) "
-            "WHERE u.email = $email "
+            "WHERE toLower(u.email) = toLower($email) " #case insensitive comparison.
             "RETURN properties(u) "
         )
         try:
@@ -255,7 +255,7 @@ class Neo4JUser(UserABC):
         
     
     
-    def find_user(self, query : str, limit : int = 10) -> List[UserModel]:
+    def find_user(self, query : str, limit : int = 10) -> List[str]:
         """Finds user by 'query' string. The result is limited to a number of
         users given by 'limit'.
 
@@ -275,19 +275,20 @@ class Neo4JUser(UserABC):
         cypher_query = (
             "MATCH (u:User) "
             "WHERE u.s CONTAINS $query_string "
-            "RETURN collect(u)[0..$limit] as query_result " 
+            "RETURN u.tag LIMIT $limit " 
         )
         try:
             users = self._driver.execute_query(cypher_query , 
                                         database_="neo4j", 
                                         routing_="r", 
-                                        result_transformer_= transform_query_result,
+                                        result_transformer_= Result.value,
                                         query_string = query.lower(),
                                         limit = limit)
+            print(users)
         except Exception as e:
             print("Query finding resulted in an error " + str(e))
             return []
-        return [UserModel(**u, label = u["tag"]) for u in users]
+        return users
 
     def update(self, tag: str, user_props: Dict) -> bool:
         return super().update(tag, user_props)

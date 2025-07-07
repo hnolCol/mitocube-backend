@@ -17,7 +17,7 @@ from lib.database.neo4j.Peptides import Neo4JPeptides
 from lib.database.Neo4JDatabase import Neo4JFactory, Neo4JConnection, Neo4JConstructor
 from lib.database.neo4j.QC import Neo4JQC
 from lib.database.neo4j.UnitTypes import Neo4JUnitTypes
-from lib.database.neo4j.Instruments import Neo4JInstruments
+from lib.database.neo4j.Instruments import Neo4JInstruments, Neo4JInstrumentStates
 from lib.database.neo4j.Timeline import Neo4JTimeline
 from lib.database.neo4j.ResearchGroup import Neo4JResearchGroup
 from lib.database.neo4j.Phenotypes import Neo4JPhenotypes
@@ -54,6 +54,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)
         self.unittypes = Neo4JUnitTypes(driver = self.connection.driver)
         self.instruments = Neo4JInstruments(driver=self.connection.driver)
+        self.instrument_states = Neo4JInstrumentStates(driver = self.connection.driver)
         self.timeline = Neo4JTimeline(driver=self.connection.driver)
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.phenotypes = Neo4JPhenotypes(driver = self.connection.driver)

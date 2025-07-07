@@ -77,6 +77,10 @@ class SubmissionsABC(ABC):
         """
     
     @abstractmethod
+    def get_title(self, tag : str) -> str:
+        "Return the title of a given submission."
+    
+    @abstractmethod
     def get(self, tag : str) -> DatasetSubmissionModel:
         """Returns the submission
 
@@ -95,6 +99,11 @@ class SubmissionsABC(ABC):
         ValueError 
             If the tag does not exists 
         """
+        
+    @abstractmethod
+    def get_comments(self, tag : str) -> list:
+        "Returns the comments associated with a submission."
+        
     @abstractmethod
     def get_samples(self, tag : str)-> List:
         "Returns the samples of a submission"
@@ -232,11 +241,11 @@ class SubmissionFilterABC(ABC):
             If the database query throws an exception. 
         """
         
-        
+    
     @abstractmethod
     def get(self,
             state : List[int] = None, 
-            attribute_value_tag : List[str] = None, 
+            trait_tags : List[str] = None, 
             attribute_tag : List[str]= None, 
             user_tag : List[str] = None, 
             protein_tag : List[str] = None, 
@@ -249,7 +258,7 @@ class SubmissionFilterABC(ABC):
         ----------
         state : List[int], optional
             _description_, by default None
-        attribute_value_tag : List[str], optional
+        trait_tags : List[str], optional
             _description_, by default None
         attribute_tag : List[str], optional
             _description_, by default None

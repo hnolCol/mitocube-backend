@@ -37,7 +37,6 @@ router = APIRouter(
 @router.get("/q") #AttributeResponseModel
 def get_attributes(search_string : Optional[str] = None, 
                    min_state : SubmissionStatesEnums = None, 
-                   #param_name : Literal["allow_for_dataset","mandatory_for_submission","allow_as_filter","allow_for_genotype","allow_for_measurement","allow_for_qc","mandatory_for_active",] = None, 
                    attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None,
                    include_traits : bool = True,
                    limit : int = 20,
@@ -47,10 +46,11 @@ def get_attributes(search_string : Optional[str] = None,
     """
     if search_string is not None and isinstance(search_string,str) and len(search_string) > 0:
         if include_traits:
-            return DB.attributes.get_attributes_and_values_by_search_string(search_string=search_string, min_state=min_state, limit = limit)
+            return DB.attributes.find_attributes_and_traits(search_string=search_string, min_state=min_state, limit = limit)
         else:
-            return DB.attributes.find_attribute(search_string, attribute_group= attribute_group, limit = limit)
-    return DB.attributes.get(limit = limit, attribute_group=attribute_group)
+            return DB.attributes.find_attribute(search_string, attribute_group = attribute_group, limit = limit, min_state=min_state)
+    #return all attributes
+    return DB.attributes.get(limit = limit, attribute_group=attribute_group, min_state=min_state)
 
 
 @router.get("/hierarchy")
@@ -124,6 +124,12 @@ def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel]:
     "Returns the attribute values"
     r = DB.attributes.values(tags = [tag])
     return r 
+
+
+@router.get("/groups/{group_tag}")
+def get_attribute_tags_by_group(group_tag : Literal["mandatory","dataset","qc"], min_state : SubmissionStatesEnums = None, limit : int = None) -> List[str]:
+    ""
+    return DB.attributes.find_attribute(attribute_group=group_tag, min_state = min_state, limit=limit)
 
 
 @router.get("/{attribute_tag}")

@@ -87,7 +87,18 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
-        if len(r) == 0: raise ValueError("No state found.")
+        if len(r) == 0: raise ValueError("No state found or submission does not exist.")
+        return r[0]
+    
+    def get_title(self, tag : str) -> str:
+        ""
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "RETURN submission.title "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag)
+        if len(r) == 0: raise ValueError("No submission found for this tag or no title given..")
         return r[0]
     
     def insert(self, submission: DatasetSubmissionModel) -> bool:
@@ -366,8 +377,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             query = ("MATCH (n:Attribute) "
                      "MATCH (n)<-[:HAS_VALUES_FOR_ATTRIBUTE]-(submission:Submission) ")
         elif by == "attribute_value":
-            query = ("MATCH (n:AttributeValue) "
-                     "MATCH (n)<-[:HAS_ATTRIBUTE_VALUE]-(submission:Submission) ")
+            query = ("MATCH (n:Trait) "
+                     "MATCH (n)<-[:HAS_TRAIT]-(submission:Submission) ")
         if tags is not None:
             query += "WHERE submission.tag in $tags "
             
@@ -376,18 +387,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
     
-    def filter_by_attribute_value_tags(self, attribute_value_tags : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+    def filter_by_trait_tags(self, trait_tags : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
         ""
         query = (
-            "MATCH (submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
+            "MATCH (submission:Submission)-[:HAS_TRAIT]->(t:Trait) "
             f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "WITH submission, COLLECT(DISTINCT av.tag) AS value_tags "
-            "WHERE ALL(value_tag IN $attribute_value_tags WHERE value_tag in value_tags) "
+            "WITH submission, COLLECT(DISTINCT t.tag) AS trait_tags "
+            "WHERE ALL(trait_tag IN $trait_tags WHERE trait_tag in trait_tags) "
             "RETURN DISTINCT submission.tag "
         )
         query = self._add_limit(query,limit)
-        r = self._driver.execute_query(query, attribute_value_tags = attribute_value_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-        print(r)
+        r = self._driver.execute_query(query, trait_tags = trait_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
+
         return r
     
             
@@ -458,11 +469,24 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         r = self._driver.execute_query(query, state = state, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
         print(state)
         print("FILTER BY STATE", r)
-        return [ri for ri in r] 
+        return r
+    
+    def filter_by_search_string(self, search_string : str, limit : int) -> List[str]:
+        ""        
+        query = (
+            "MATCH (submission:Submission) "
+            "WHERE toLower(submission.title) CONTAINS $search_string "
+            "RETURN submission.tag "
+        )
+        query = self._add_limit(query,limit)
+        tags = self._driver.execute_query(query, routing_="r", result_transformer_= Result.value, search_string = search_string.lower(), limit = limit)
+ 
+        return tags 
     
     def get(self, 
+            search_string : str = None,
             state : List[int] = None, 
-            attribute_value_tag : List[str] = None, 
+            trait_tags : List[str] = None, 
             attribute_tag : List[str]= None, 
             user_tag : List[str] = None, 
             protein_tag : List[str] = None, 
@@ -471,18 +495,24 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         ""
         
         tags = None 
+        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tag, protein_tag, genotype_tag])
+        
+        if search_string is not None:
+            
+            limit_ = limit if all(attr is None for attr in [state,trait_tags,attribute_tag,user_tag,protein_tag,genotype_tag]) else None #add limit only if all others are
+            tags = self.filter_by_search_string(search_string=search_string, limit=limit)
         
         if state is not None:
-            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag,genotype_tag]) else None #add limit only if all others are
+            limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tag,protein_tag,genotype_tag]) else None #add limit only if all others are
             tags = self.filter_by_state(state=state, submission_tags=tags, limit=limit_)
         
         if genotype_tag is not None:
-            limit_ = limit if all(attr is None for attr in [attribute_value_tag,attribute_tag,user_tag,protein_tag]) else None
+            limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tag,protein_tag]) else None
             tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_)
         
-        if attribute_value_tag is not None:
+        if trait_tags is not None:
             limit_ = limit if all(attr is None for attr in [attribute_tag,user_tag,protein_tag]) else None
-            tags = self.filter_by_attribute_value_tags(attribute_value_tag,submission_tags=tags,limit=limit_)
+            tags = self.filter_by_attribute_value_tags(trait_tags,submission_tags=tags,limit=limit_)
 
         if attribute_tag is not None:
             limit_ = limit if all(attr is None for attr in [user_tag,protein_tag]) else None
@@ -495,9 +525,11 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         if protein_tag is not None:
             tags = self.filter_by_quantified_protein(protein_tag,submission_tags=tags,limit=limit)
             
-        if tags is None: #none defined, then just return all. 
+        if not filter_defined: #none defined, then just return all. 
             
             return self.get_all_tags(limit=limit)
+        
+        if tags is None: return []
         
         return tags 
         

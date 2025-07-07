@@ -8,6 +8,8 @@ from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
 from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel, TraitModel
 from config.enums.states import SubmissionStatesEnums
+
+from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel
 from lib.user.UserHandling import UserDB
 
 from lib.database.Database import Database
@@ -31,6 +33,16 @@ def get_instrument_type_tags(user : UserModel = Depends(get_user_from_token)) ->
     "Instruments are grouped by type."
     return DB.instruments.get_types()
 
+@router.get("/states/q")
+def get_instrument_state_by_search_string(search_string : str, limit : int = None):
+    return DB.instrument_states.find(search_string)
+
+
+@router.get("/states/{state_tag}")
+def get_instrument_state_by_tag(state_tag : str) -> InstrumentStateModel:
+    print(DB.instrument_states.get(tag = state_tag),"STATE")
+    return DB.instrument_states.get(tag = state_tag)
+
 
 @router.get("/{instrument_tag}")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)) -> TraitModel:
@@ -38,6 +50,11 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
     if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
     instrument = DB.attributes.trait(trait_tag = instrument_tag)
     return instrument
+
+@router.get("/{instrument_tag}/states/history") 
+def get_instrument_state_history(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
+    "" 
+    return DB.instrument_states.get_history(instrument_tag = instrument_tag, limit = limit)
 
 @router.get("/{instrument_tag}/projects/count")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):

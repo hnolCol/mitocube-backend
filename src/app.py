@@ -103,16 +103,22 @@ phenotype_json = read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/reso
 # print(DB.attributes.get_trait_tags(tag = "att_compound"))
 # print(DB.attributes.get_trait_tags(limit=10))
 
-#DB.symptoms._utils_insert_from_file(file_path = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/symptoms/symptoms.txt", sep="\t")
+DB.symptoms._utils_insert_from_file(file_path = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/symptoms/symptoms.txt", sep="\t")
 #DB.symptoms.find(search_string="Unst")
 #DB.symptoms.find()
 DB.attributes._utils_insert_from_file()
 DB.spareparts._utils_insert_from_file(file_path = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/maintenance/spareparts.txt", sep="\t")
 DB.instruments.get(instrument_type = None)
-print(DB.attributes.trait(trait_tag = "att_cellline:du145"))
-print(DB.attributes.get_attributes_and_values_by_search_string("lc",min_state=5),"HELLA")
-DB.meta.add_condition_procedure(sample_tag = "2025_12sf4224")
-print("added sample")
+DB.instrument_states._utils_insert_from_file(sep = "\t")
+DB.instrument_states.set(tag = "state.instrument.running" , instrument_tag = "att_ms:timstof", comment = "The column was replaced..")
+print(DB.instrument_states.get_instrument_state(instrument_tag = "att_ms:timstof", limit = 100),"states!!")
+
+DB.instrument_states.get_history(instrument_tag = "att_ms:timstof")
+print("state histroy!")
+# print(DB.attributes.trait(trait_tag = "att_cellline:du145"))
+# print(DB.attributes.find_attributes_and_traits("lc",min_state=5),"HELLA")
+# DB.meta.add_condition_procedure(sample_tag = "2025_12sf4224") ADD TIS TO SAMPLE INSTEAD OF META! 
+# print("added sample")
 # DB.maintenance._utils_insert_from_file(sep="\t")
 
 #DB.maintenance.connect_instrument(tag = "oilexchange", instrument_tag = "att_ms:e1", user_tag = "wEPVYYBt", costs  = 750, description = "Replacing the oil on the Leybold machine (forevacuum pump).")

@@ -7,7 +7,7 @@ sym.reducedsensitivity	Reduced sensitivity	"Reduced sensitivity or signal intens
 sym.backgroundcontamination	Background contamination	"Unexpected background ions (e.g., +44 Da series); often from polymer contamination in solvents or LC components."	500
 sym.reducedpeptideorproteinidentifications	Reduced peptide or protein identifications	"Decline in peptide/protein identifications; may be due to poor ionization efficiency, suboptimal collision energy, or detector aging. Also the sample source might be a problem (re run with a standardized sample). Also a problem of the sample loader (needle) might be the source of the problem."	500
 sym.inconsistentmsmsquality	Inconsistent MS MS quality	"Inconsistent MS/MS spectral quality and mass range offsets or mass range cutoffs; may result from misaligned ion optics or contamination in the mass analyzer. Quadrupole dirt, checks if all rods are tightly secured."	500
-sym.column/emitterspitting	Column/Emitter Spitting	Formation of a drop at the end of the column or emitter	500
+sym.columnemitterspitting	Column Tip or Emitter Spitting	Formation of a drop at the end of the column or emitter	500
 sym.increasedinjectiontime	Increased injection time	Increased injection time might be due to dirt. Requires usually cleaning	500
 sym.entrancetoionopticksdirty	Entrance to Ion opticks dirty	"Dirt at the atmospheric pressure site of the instrument (FAIMS, transfer capillars, etc)"	500
 sym.blockedcolumn	Blocked Column	Blocked column	500
