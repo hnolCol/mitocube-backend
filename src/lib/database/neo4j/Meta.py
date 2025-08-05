@@ -231,42 +231,42 @@ class Neo4JMetaHandler(MetaABC):
         self._driver.execute_query(query, value = value, trait_tag = trait_tag, cv_tag = cv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
         return cv_tag 
     
-    def add_condition_procedure(self, sample_tag : str, sample_data : List = None):
+    def add_condition_procedure(self, sample_tag : str, sample_data : List):
         "" 
         
-        sample_data = [
-                {
-                    "type": "Attribute",
-                    "tag": "compound",
-                    "children": [
-                        {
-                            "type": "Trait",
-                            "tag": "DMSO",
-                            "children": [
-                                {
-                                    "type": "Attribute",
-                                    "tag": "Concentration",
-                                    "children": [
-                                        {"type": "Trait", "tag": "mM", "value": 2, 
-                                         "children": [
-                                             {"type" : "Attribute", "tag" : "temperature", "children" : [
-                                                 {"type" : "Trait", "tag" : "high"}
-                                             ]}
-                                         ]}
-                                    ]
-                                },
-                                {
-                                    "type": "Attribute",
-                                    "tag": "Time",
-                                    "children": [
-                                        {"type": "Trait", "tag": "h", "value": 5, "children": []}
-                                    ]
-                                }
-                            ]
-                        }
-                    ]
-                }
-                ]
+        # sample_data = [
+        #         {
+        #             "type": "Attribute",
+        #             "tag": "compound",
+        #             "children": [
+        #                 {
+        #                     "type": "Trait",
+        #                     "tag": "DMSO",
+        #                     "children": [
+        #                         {
+        #                             "type": "Attribute",
+        #                             "tag": "Concentration",
+        #                             "children": [
+        #                                 {"type": "Trait", "tag": "mM", "value": 2, 
+        #                                  "children": [
+        #                                      {"type" : "Attribute", "tag" : "temperature", "children" : [
+        #                                          {"type" : "Trait", "tag" : "high"}
+        #                                      ]}
+        #                                  ]}
+        #                             ]
+        #                         },
+        #                         {
+        #                             "type": "Attribute",
+        #                             "tag": "Time",
+        #                             "children": [
+        #                                 {"type": "Trait", "tag": "h", "value": 5, "children": []}
+        #                             ]
+        #                         }
+        #                     ]
+        #                 }
+        #             ]
+        #         }
+        #         ]
         
         
         for condition_application in sample_data:

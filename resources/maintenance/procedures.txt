@@ -1,0 +1,9 @@
+tag	text	description	priority
+procedure.clean.quadrupole	Quadrupole Cleaning	Quadrupole was cleaned using water and isopropanl. Dried and placed back into the instrument. 	500
+procedure.clean.transfer.capillary	Transfer capillary cleaning	The transfer capillary was washed (Ultrasonic batch with some detergents)	500
+procedure.clean.front.ion.optics 	Clean front ion optics	Clean ion optics (Thermo Fisher Instruments) containing S-lens and isolation quadrupole	500
+procedure.exchange.column 	LC Column Exchange	Excahnge the column	500
+procedure.exchange.pump.piston.seal	Piston Seal Replaced	Exchange the piston seals of a HPLC pump	500
+procedure.electronics.restart	Electronic Restart	Restart the electronics.	500
+procedure.ms.calibration	Mass spectromter Calibration	Calibration of a specific procedure (please define)	500
+procdure.lc.calibration	LC Calibration	Calibration regarding the liquid chromatography (for example flow sensors) or autosampler sample pickup (e.g. plate)	500

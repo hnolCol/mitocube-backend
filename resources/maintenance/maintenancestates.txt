@@ -1,0 +1,3 @@
+tag	text	description	color
+state.maintenance.open	Open	The maintenance is open and not resolved yet. 	#2a76a9
+state.maintenance.resolved	Resolved	The maintenance event is resolved.	#b2d990

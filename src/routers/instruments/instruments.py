@@ -34,7 +34,7 @@ def get_instrument_type_tags(user : UserModel = Depends(get_user_from_token)) ->
     return DB.instruments.get_types()
 
 @router.get("/states/q")
-def get_instrument_state_by_search_string(search_string : str, limit : int = None):
+def get_instrument_state_by_search_string(search_string : str, limit : int = 20):
     return DB.instrument_states.find(search_string)
 
 

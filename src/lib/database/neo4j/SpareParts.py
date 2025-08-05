@@ -22,11 +22,11 @@ class Neo4jSpareParts(SparePartsABC):
             "UNWIND $parts as sp_props "
             "MERGE (s:SparePart {tag : sp_props.tag}) "
             "ON CREATE "
-            "SET s.created_at = timestamp(), s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.vendor = sp_props.vendor, "
-            "s.price = sp_props.price "
+            "SET s.created_at = timestamp(), s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.company = sp_props.company, "
+            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link "
             "ON MATCH "
-            "SET s.modified_at = timestamp(), s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.vendor = sp_props.vendor, "
-            "s.price = sp_props.price "
+            "SET s.modified_at = timestamp(), s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.company = sp_props.company, "
+            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link "
             "RETURN count(s) as count"
         )
     
@@ -40,7 +40,7 @@ class Neo4jSpareParts(SparePartsABC):
         exists = self._driver.execute_query(query, tag = tag, routing_ = "r")    
         return exists[0]
         
-    def find(self, search_string : str = "", limit : int = 20) -> List[str]:
+    def find(self, search_string : str = None, limit : int = None) -> List[str]:
         """Find spare part by a search string and returns the tags that match. 
 
         Parameters
@@ -56,9 +56,12 @@ class Neo4jSpareParts(SparePartsABC):
             The spare part tags. 
         """
         query = "MATCH (s:SparePart) "
-        if len(search_string) > 0:
+        if search_string is not None and len(search_string) > 0:
             query += "WHERE s.s CONTAINS $search_string "
-        query += "RETURN s.tag ORDER BY s.priority LIMIT $limit "
+        query += "RETURN s.tag ORDER BY s.priority "
+        
+        if limit is not None:
+            query += "LIMIT $limit"
                
         sp_tags = self._driver.execute_query(query, 
                                               search_string = search_string.lower(), 

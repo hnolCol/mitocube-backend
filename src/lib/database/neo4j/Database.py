@@ -22,7 +22,7 @@ from lib.database.neo4j.Timeline import Neo4JTimeline
 from lib.database.neo4j.ResearchGroup import Neo4JResearchGroup
 from lib.database.neo4j.Phenotypes import Neo4JPhenotypes
 from lib.database.neo4j.Samples import Neo4JSamples
-from lib.database.neo4j.Maintenance import Neo4JMaintenance, Neo4JMaintenanceEvent
+from lib.database.neo4j.Maintenance import Neo4JMaintenanceProcedure, Neo4JMaintenanceEvent
 from lib.database.neo4j.Symptoms import Neo4jSymptoms
 from lib.database.neo4j.SpareParts import Neo4jSpareParts
 from config.models.submissions.submissions import DatasetSubmissionModel
@@ -59,7 +59,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.phenotypes = Neo4JPhenotypes(driver = self.connection.driver)
         self.samples = Neo4JSamples(driver=self.connection.driver)
-        self.maintenance = Neo4JMaintenance(driver=self.connection.driver)
+        self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
         self.maintenance_event = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)

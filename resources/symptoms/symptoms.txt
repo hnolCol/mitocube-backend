@@ -1,5 +1,6 @@
 tag	text	description	priority
 sym.unstableelectrospray	Unstable Electrospray	"Unstable electrospray or signal fluctuations; may indicate clogged or misaligned spray needle / column, contaminated ion source, or suboptimal voltage settings."	500
+sym.vacuum.broke	Vacuum/ Pump error	A vacuum error. Might be due to pump error/shutdown. A gas supply error may also cause a vaccuum error.	500
 sym.chemicalnoise	Chemical noise	Increased chemical noise in spectra; often caused by contaminants in the mobile phase or ion source.	500
 sym.pressureorflowrateabnormalties	Pressure or Flow rate abnormalties	"Pressure abnormalities (spikes or drops) in the LC system; can be due to blockages, leaks, or pump seal issues."	500
 sym.retentiontimeshifts	Retention time shifts	"Retention time shifts or peak broadening; may result from column degradation, contaminated frits, or mobile phase inconsistencies."	500

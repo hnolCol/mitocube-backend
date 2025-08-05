@@ -92,8 +92,21 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         return [InstrumentStateHistoryModel(**ri) for ri in r[0]]
     
     
-    def find(self, search_string = None):
-        return super().find(search_string)
+    def find(self, search_string = None, limit : int = None) -> List[str]:
+        
+        query = "MATCH (is:InstrumentState)  " 
+        
+        if search_string is not None:
+            query += "WHERE toLower(is.text) CONTAINS toLower($search_string) OR toLower(is.description) CONTAINS toLower($search_string) "
+            
+        query += "RETURN is.tag "
+        
+        if limit is not None:
+            query += "LIMIT $limit "
+            
+        r = self._driver.execute_query(query, search_string = search_string, limit = limit, routing_="r", result_transformer_=Result.value) 
+        return r 
+        
 
 
     def insert(self, state):

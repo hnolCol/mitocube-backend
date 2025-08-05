@@ -28,7 +28,7 @@ class SparepartResponseModel(BaseModel):
     text : str 
     description : str 
     company : str 
-    product_it : str 
+    product_id : str 
     price: Optional[int|float] = 0 
     link : Optional[HttpUrl] = ""
     

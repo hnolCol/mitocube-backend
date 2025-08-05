@@ -173,10 +173,12 @@ constraints = [
     ConstraintModel(constrain_label  = "research_group_tag",node_label = NodeLabelModel(label = "ResearchGroup"),property_name = "tag"),
     ConstraintModel(constrain_label  = "phenotype_tag",node_label = NodeLabelModel(label = "Phenotype"),property_name = "tag"),
     ConstraintModel(constrain_label  = "comment_tag",node_label = NodeLabelModel(label = "Comment"),property_name = "tag"),
-    ConstraintModel(constrain_label  = "maintenance_tag",node_label = NodeLabelModel(label = "Maintenance"),property_name = "tag"),
+    ConstraintModel(constrain_label  = "maintenance_procedure_tag",node_label = NodeLabelModel(label = "MaintenanceProcedure"),property_name = "tag"),
     ConstraintModel(constrain_label  = "symptom_tag",node_label = NodeLabelModel(label = "Symptom"),property_name = "tag"),
-    ConstraintModel(constrain_label  = "spare_part_tag",node_label = NodeLabelModel(label = "SparePart"),property_name = "tag")
-
+    ConstraintModel(constrain_label  = "spare_part_tag",node_label = NodeLabelModel(label = "SparePart"),property_name = "tag"),
+    ConstraintModel(constrain_label  = "maintenance_state_tag",node_label = NodeLabelModel(label = "MaintenanceState"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "maintenance_event_tag",node_label = NodeLabelModel(label = "MaintenanceEvent"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "condition_application_tag",node_label = NodeLabelModel(label = "ConditionApplication"), property_name = "tag")
 ]
 
 

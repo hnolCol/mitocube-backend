@@ -24,7 +24,7 @@ from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesAB
 from lib.database.abstract.Timeline import TimelineABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from lib.database.abstract.Phenotypes import PhenotypeABC
-from lib.database.abstract.Maintenance import MaintenanceABC 
+from lib.database.abstract.Maintenance import MaintenanceProcedureABC 
 from lib.database.abstract.SpareParts import SparePartsABC
 from lib.database.abstract.Symptoms import SymptomABC
 
@@ -75,7 +75,7 @@ class DatabaseABC(ABC):
     timeline : TimelineABC = None 
     research_groups : ResearchGroupABC = None
     phenotypes: PhenotypeABC = None
-    maintenance : MaintenanceABC  = None 
+    maintenance_procedures : MaintenanceProcedureABC  = None 
     spareparts : SparePartsABC = None
     symptoms : SymptomABC = None
    # performance : Per
@@ -191,10 +191,10 @@ class DatabaseABC(ABC):
         if not isinstance(self.phenotypes,PhenotypeABC):
             raise TypeError("The phenotype class must be an instance of the PhenotypeABC.")
         
-        if self.maintenance is None:
+        if self.maintenance_procedures is None:
             raise NotImplementedError("A database class must have the maintenance attribute defined.")
-        if not isinstance(self.maintenance, MaintenanceABC):
-            raise TypeError("The phenotype class must be an instance of the MaintenanceABC.")
+        if not isinstance(self.maintenance_procedures, MaintenanceProcedureABC):
+            raise TypeError("The phenotype class must be an instance of the MaintenanceProcedureABC.")
                 
         
         

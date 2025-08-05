@@ -1,5 +1,6 @@
 from typing import Literal, List , Dict
 from neo4j import Driver, Result 
+import uuid
 import pandas as pd 
 import datetime
 from config.models.searches import FulltextSearchResult
@@ -14,7 +15,7 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 
 from services.units import extract_user_input
-
+from services.encryption import create_hierarchical_hash
 class Neo4JSubmissions(SubmissionsABC):
     
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC) -> None:
@@ -212,7 +213,157 @@ class Neo4JSubmissions(SubmissionsABC):
         
         self._meta.add_metatext(tag=submission_tag, user_tag= submission.user_tag, meta_texts=submission.metatext)
         
+    
+         
         
+     
+    def handle_children(self, submission_tag, trait_node, parent_tag):
+        
+        for attribute_node in trait_node["children"]:
+            if attribute_node.get("type") != "Attribute":
+                raise ValueError("The child node is not an Attribute node. Attribute and Trait nodes must always be used as children of a ConditionApplication node in alternating order.")
+            attribute_tag = attribute_node["tag"]
+            trait_nodes = attribute_node["children"]
+            if len(trait_nodes) > 0:
+                for trait_node in trait_nodes:
+                    if trait_node.get("type") != "Trait":
+                        raise ValueError("The child node is not a Trait node.")
+                    parent_tag_2 = self.add_condition_value(submission_tag, 
+                                                            attribute_tag=attribute_tag, 
+                                                            value = trait_node.get("value"),
+                                                            trait_tag= trait_node["tag"], 
+                                                            parent_tag=parent_tag)
+                    
+                    if len(trait_node.get("children",[])) > 0:
+                        for child in trait_node["children"]:
+                            self.handle_children(submission_tag, trait_node=trait_node, parent_tag=parent_tag_2)
+    
+    
+    
+    def add_condition_value(self, submission_tag : str, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
+        """Adds a condition value to a submission. This is used to add conditions to the submission that are not specific to a sample but to the whole submission.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag to which the condition value should be added.
+        parent_tag : str
+            The parent tag of the condition value.
+        attribute_tag : str
+            The attribute tag of the condition value.
+        trait_tag : str
+            The trait tag of the condition value.
+        value : str | float | int, optional
+            The value of the condition. This is usually a concentration or a temperature (very likely to be numeric). , by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        cv_tag = uuid.uuid4().hex
+        query = (
+            "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
+            "MERGE (cv:ConditionValue {tag : $cv_tag, text : $cv_tag}) "
+        )
+        if value is not None:
+            query += "SET cv.value = $value "
+            
+        query += (
+                "WITH ca,cv "
+                "MATCH (a:Attribute {tag : $attribute_tag})-[:PART_OF]->(ag:AttributeGroup {tag : 'dataset'}) " #only dataset attributes are allowed here
+                "MATCH (t:Trait {tag : $trait_tag}) "
+                "WITH ca,cv,a,t "
+                "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
+                "MERGE (cv)-[:HAS_TRAIT]-(t) "
+                "MERGE (ca)-[:HAS_VALUE]->(cv) "
+            )
+        
+        self._driver.execute_query(query, value = value, trait_tag = trait_tag, cv_tag = cv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
+        return cv_tag 
+    
+    def insert_condition_procedure(self, tag : str, attribute_tag : str = None,  trait_tag : str = None, trait_data : List[dict] = None):
+        """ Inserts a condition procedure into the database connect to a submission This indicates that all samples
+        of the submission are affected by this condition. There are also ConditionApplication nodes that are connected to the samples via the 
+        HAS_PROCEDURE relationship and are manage by the Samples DB class. These are then specific for a given sample"""
+
+        submission_tag = tag
+        
+        if trait_tag is not None and trait_data is None or len(trait_data) == 0:
+
+            trait_data = [
+                {"type" : "Attribute", "tag" : "att_compound", 
+                 "children" : [
+                     {"type": "Trait", "tag": trait_tag, "children": []}
+                 ]}
+           ]    
+
+        node_hash_tag = create_hierarchical_hash(trait_data)
+        print(node_hash_tag)
+        # else:
+
+            #     submission_tag = tag 
+        #     sample_data = [
+        #             {
+        #                 "type": "Attribute",
+        #                 "tag": "att_compound",
+        #                 "children": [
+        #                     {
+        #                         "type": "Trait",
+        #                         "tag": "att_compound:dmso",
+        #                         "children": [
+        #                             {
+        #                                 "type": "Attribute",
+        #                                 "tag": "att_concentration",
+        #                                 "children": [
+        #                                     {"type": "Trait", "tag": "mM", "value": 2, 
+        #                                     "children": [
+        #                                         {"type" : "Attribute", "tag" : "temperature", "children" : [
+        #                                             {"type" : "Trait", "tag" : "high"}
+        #                                         ]}
+        #                                     ]}
+        #                                 ]
+        #                             },
+        #                             {
+        #                                 "type": "Attribute",
+        #                                 "tag": "Time",
+        #                                 "children": [
+        #                                     {"type": "Trait", "tag": "h", "value": 5, "children": []}
+        #                                 ]
+        #                             }
+        #                         ]
+        #                     }
+        #                 ]
+        #             }
+        #             ]
+            
+            
+        for condition_application in trait_data:
+            attribute_tag = condition_application["tag"]
+            for trait_node in condition_application["children"]:
+                trait_tag = trait_node["tag"]
+                ca_tag = node_hash_tag 
+                query = (
+                    "MERGE (s:Submission {tag : $submission_tag}) "
+                    "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
+                    "WITH ca, s "
+                    "MERGE (a:Attribute {tag : $attribute_tag}) "
+                    "MERGE (t:Trait {tag : $trait_tag}) "
+                    #connect to sample 
+                    "MERGE (s)-[:HAS_PROCEDURE]->(ca) "
+                    "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
+                    "MERGE (ca)-[:INSTANCE_OF]-(t) "
+                )
+                
+                self._driver.execute_query(query, routing_= "w", ca_tag = ca_tag, submission_tag = submission_tag, trait_tag = trait_tag, attribute_tag = attribute_tag)        
+                
+                if len(trait_node.get("children",[])) > 0:
+                    for child in trait_node["children"]:
+                        self.handle_children(submission_tag, trait_node=trait_node, parent_tag=ca_tag)
+                
+    
+    
+    
 
 
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):

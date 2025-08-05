@@ -209,7 +209,11 @@ class Neo4JAttributes(AttributesABC):
             return (attribute,values)
         
     def attribute(self, tag : str) -> AttributeModel:
+        """Returns an attribute by tag."""
         
+        if not self.exists(tag=tag):
+            raise ValueError(f"Attribute with tag {tag} does not exist.")
+           
         
         query = ("MATCH (a:Attribute) WHERE a.tag = $tag RETURN properties(a) ")
         

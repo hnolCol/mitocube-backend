@@ -5,7 +5,8 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt, ExpiredSignatureError
 
 from passlib.context import CryptContext
-
+import hashlib
+import json 
 from typing import List
 from datetime import datetime 
 
@@ -27,6 +28,33 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="", auto_error=False)
 #scheme to create share token
 oauth2_scheme_share = OAuth2PasswordBearer(tokenUrl="api/auth/token/share", auto_error=False)
 #oauth2_scheme_user = OAuth2PasswordBearer(tokenUrl="api/user", auto_error=False)
+
+
+def serialize(obj):
+    """Recursively serialize with sorted output for consistent hashing."""
+    return json.dumps(obj, sort_keys=True, separators=(",",":"))
+
+def create_hierarchical_hash(data):
+    """Creates a hash for the given data structure.
+    This function serializes the data structure and computes a hash using SHA256.   
+    It is designed to handle nested structures and ensure that the hash is consistent
+    across different representations of the same data.
+    Hence it is used to check for available nodes in the database that are hierarchically structured.
+
+    Parameters
+    ----------
+    data : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    serialized = serialize(data)
+    # Use SHA256 for very low collision risk
+    return hashlib.sha256(serialized.encode()).hexdigest()
+
 
 
 def create_password_hash(password : str) -> str:
