@@ -67,7 +67,7 @@ class Neo4JUser(UserABC):
                                 "first_name" : GENERAL_SETTINGS.lead_contact_first_name,
                                 "password" : auto_pw
                             },
-                            template_mame=EMAIL_SETTINGS.mail_account_generated_template,
+                            template_name=EMAIL_SETTINGS.mail_account_generated_template,
                             include_setting_cc=True))                    
             
         

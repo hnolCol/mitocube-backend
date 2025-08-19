@@ -12,7 +12,29 @@ class PeptidesABC(ABC):
     For peptides and proteins, instead of a random string as a tag, 
     we simply use the amino acid sequence. 
     """
-    
+    @abstractmethod
+    def correlate_to(self, tag : str, min_size : int = 4, limit : int = None, filter_tag : str = None, exclude_within_protein_correlation : bool = True) -> pd.DataFrame:
+        """Correlates a peptide to all other peptides based on their quantification data.
+        
+        Parameters
+        ----------
+        tag : str
+            The tag of the peptide to correlate with others.
+        min_size : int, optional
+            Minimum size of the peptide quantification data to consider for correlation, by default 4.
+        limit : int, optional
+            Maximum number of results to return, by default None (no limit).
+        filter_tag : str, optional
+            If provided, only peptides of proteins that are part of the filter_tag will be considered for correlation.
+        exclude_within_protein_correlation : bool, optional
+            If True, excludes correlations between peptides of the same protein, by default True.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame containing the correlation results.
+        """
+        
     @abstractmethod
     def exists(self, tag : str) -> bool:
         """Checks if a given tag is associates with a peptide (e.g. sequence) 
@@ -59,6 +81,24 @@ class PeptidesABC(ABC):
         PeptideResponseModel
             The peptide model.
         """
+        
+        
+    @abstractmethod
+    def get_abundance(self, tag : str, submission_tags : Optional[List[str]] = None) -> pd.DataFrame:
+        """Retrieves the abundance of a peptide by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the peptide to retrieve.
+        submission_tags : Optional[List[str]], optional
+            A list of submission tags to filter the abundance data, by default None (all submissions).
+
+        Returns
+        -------
+        pd.DataFrame
+            The abundance data of the peptide.
+        """     
     
     @abstractmethod
     def insert(self, protein_tags : List[str], peptide_sequence : str) -> bool:
@@ -95,7 +135,7 @@ class PeptidesABC(ABC):
         """
 
     @abstractmethod
-    def insert_quantification_data_from_df(self, submission_tag : str, quantification_data : pd.DataFrame) -> int:
+    def insert_quantification_data_from_df(self, submission_tag : str, sample_tag : str, quantification_data : pd.DataFrame) -> int:
         """Inserts quantification data for a multiple peptides.
         This method is used to insert quantification data for multiple peptides at once.
         The peptide tags are used as the index of the DataFrame. The peptide must be already present in the database and will 
@@ -104,7 +144,9 @@ class PeptidesABC(ABC):
         Parameters
         ----------
         submission_tag : str
-            The tag of the submission to which the quantification data belongs. If the submission does not exist, it will be skipped. 
+            The tag of the submission to which the quantification data belongs. If the submission does not exist, it will be skipped.
+        sample_tag : str
+            The tag of the sample to which the quantification data belongs. If the sample does not exist no data will be inserted.
         quantification_data : pd.DataFrame
             The quantification data to insert.
 

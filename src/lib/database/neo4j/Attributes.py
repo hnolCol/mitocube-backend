@@ -833,13 +833,15 @@ class Neo4JAttributes(AttributesABC):
         return r
         
     def find_attributes_and_traits(self, 
-                                                   search_string : str, 
-                                                   min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
-                                                   limit : int = None, 
-                                                   attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None) -> List[AttributeTraitTagResponseModel]:
+                                    search_string : str = None, 
+                                    min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
+                                    limit : int = None, 
+                                    attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None) -> List[AttributeTraitTagResponseModel]:
         """Finds the attribute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
-
+        The result is ordered by the attribute priority and trait priority.
+        If the search string is None, then all attributes are returned.
+        
         Parameters
         ----------
         search_string : str
@@ -853,32 +855,43 @@ class Neo4JAttributes(AttributesABC):
         List[AttributeTraitTagResponseModel]
             List of attribute_tag and corresponding trait_tags
         """
-        query = "MATCH (a:Attribute) "
+        query = "MATCH (a:Attribute)-[:HAS_TRAIT]->(t:Trait) "
         
+        where_clauses = []
+        params = {}
+
+        if search_string is not None:
+            params["search_string"] = search_string.lower()
         if min_state is not None:
-            query += "WHERE EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag <= $min_state} "
-        
-       
+            params["min_state"] = min_state
         if attribute_group is not None:
-            if min_state is None: query += "WHERE "
+            params["attribute_group"] = attribute_group
+
+
+        if min_state is not None:
+            where_clauses.append("EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag <= $min_state}")
+        if attribute_group is not None:
+            where_clauses.append("EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)}")
+
+        if where_clauses:
+            query += "WHERE " + " AND ".join(where_clauses) + " "
             
-            query += "EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)} "
+            
+        if search_string is not None:
+            query += " AND (a.s CONTAINS $search_string OR t.s CONTAINS $search_string) "
+
             
         query += (
-            "MATCH (a)-[:HAS_TRAIT]->(t:Trait) "
-            "WHERE a.s CONTAINS $search_string OR t.s CONTAINS $search_string "
-            "WITH a, t ORDER BY a.priority DESC "
+            "WITH a, t ORDER BY a.priority DESC, t.priority DESC "
             "RETURN a.tag as attribute_tag, collect(DISTINCT t.tag) as trait_tags "
         )
 
-        
-        
         if limit is not None:
-            query += "LIMIT $limit"
+            query += "LIMIT $limit "
         
         r  = self._driver.execute_query(
             query,
-            search_string=search_string.lower(),
+            search_string=search_string.lower() if search_string is not None else "",
             limit = limit,
             min_state = min_state, 
             attribute_group = attribute_group,

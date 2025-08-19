@@ -281,7 +281,7 @@ class Neo4JMetaHandler(MetaABC):
                     "MERGE (a:Attribute {tag : $attribute_tag}) "
                     "MERGE (t:Trait {tag : $trait_tag}) "
                     #connect to sample 
-                    "MERGE (s)-[:HAS_PROCEDURE]->(ca) "
+                    "MERGE (s)-[:HAS_APPLICATION]->(ca) "
                     "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
                     "MERGE (ca)-[:INSTANCE_OF]-(t) "
                 )

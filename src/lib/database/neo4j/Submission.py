@@ -11,11 +11,12 @@ from lib.database.abstract.Attributes import AttributesABC
 from lib.database.abstract.Proteomes import ProteomesABC
 from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
-from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.submissions.submissions import AttributeTree, DatasetSubmissionModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 
-from services.units import extract_user_input
 from services.encryption import create_hierarchical_hash
+from services.random_generators import get_random_string
+
 class Neo4JSubmissions(SubmissionsABC):
     
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC) -> None:
@@ -50,8 +51,19 @@ class Neo4JSubmissions(SubmissionsABC):
         
         if isinstance(r,list) and len(r) > 0:
             return r[0]
-        return 0 
-        
+        return 0
+
+    def condition_application_exists(self, tag : str) -> bool:
+        "Check if a condition application exists for the given tag."
+
+        query = (
+            "WITH EXISTS {(ca:ConditionApplication {tag : $tag})} as exists "
+            "RETURN exists"
+        )
+
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
+        return r[0]
+    
     def delete(self, tag: str) -> bool:
         return super().delete(tag)
     
@@ -78,6 +90,15 @@ class Neo4JSubmissions(SubmissionsABC):
         
         return r[0]
     
+    def get_states(self) -> List[int]:
+        "Returns the available submission states in the database."
+        
+        query = (
+            "MATCH (state:State) "
+            "RETURN state.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        return r 
     
     def get_state(self, tag: str) -> SubmissionStatesEnums:
         
@@ -102,121 +123,203 @@ class Neo4JSubmissions(SubmissionsABC):
         if len(r) == 0: raise ValueError("No submission found for this tag or no title given..")
         return r[0]
     
-    def insert(self, submission: DatasetSubmissionModel) -> bool:
-        ""
+    def get_created_at(self, tag : str ) -> float:
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "RETURN submission.created_at "
+        )
         
-        submission_tag = submission.tag
-        sample_names = submission.sample_names
-        dataset_attribute_input = submission.dataset_attribute_input
-        genotypes_added = 0 
-        sample_attributes_added = 0 
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag)
+        if len(r) == 0: raise ValueError("No submission found for this tag or no created_at given..")
+        return r[0]
+    
+    def get_creator(self, tag : str) -> str| None:
+        """
+        Returns the user tag of the creator of the submission.
+        Parameters
+        ----------
+        tag : str 
+            The tag of the submission.  
+            
+        Returns     
+        ------- 
+        str   the user tag of the creator of the submission.
+        """
         
-        dataset_props = {
-            "title" : submission.title, 
-            "n_samples" : submission.n_samples, 
-            "created_at" : submission.created_on,
-            "state" : submission.state, 
-            "n_replicates" : len(set(submission.replicates))
-            }
-        #get the state tag 
-        #state_tag =  SubmissionStatesEnums(submission.state).name
-        if "att_proteome" not in submission.dataset_attributes:
-            raise ProteomeNotFoundError("The proteome dataset attribute was not found.")
+        query = "MATCH (submission:Submission {tag : $tag})-[:CREATED]-(user:User) RETURN user.tag" 
         
-        for proteome_tag in submission.dataset_attributes["att_proteome"]:
-            if not self._proteomes.exist(proteome_tag):
-                raise ProteomeNotFoundError(f"The proteome {proteome_tag} was not found in the database. Please add it before inserting the submission.")
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
         
-        samples = [{"tag" : sample_name, "props" : {"index" : idx, "replicate" : submission.replicates[idx], "text" : sample_name}} for idx,sample_name in enumerate(sample_names)]
-        dataset_attributes =  [tag for tag in submission.dataset_attributes.keys()]
-
-                
-        dataset_attribute_values = [{"attribute_value_tag" : tag, #remove!! att_ is history 
-                                     "attribute_tag" : attribute_tag, 
-                                     "trait_value" : extract_user_input(dataset_attribute_input[attribute_tag][tag]) if attribute_tag in dataset_attribute_input and dataset_attribute_input[attribute_tag][tag] else []} 
-                                    for attribute_tag,tags in submission.dataset_attributes.items() for tag in tags]
         
-        dataset_attributes_units = [x for x in dataset_attribute_values if isinstance(x["trait_value"],list) and len(x["trait_value"]) > 0]
+    def get_users(self, tag : str) -> List[str]: 
+        """Returns the users that are associated with the submission.
+        Parameters 
+        ----------
+        tag : str
+            The tag of the submission.  
+        Returns     
+        -------     
+        List[str]   A list of user tags that are associated with the submission.
+        """
         
         query = (
-            "MERGE (submission:Submission {tag : $submission_tag}) "
-            "SET submission += $dataset_props "
-            "WITH submission "
-            "MATCH (state:State {tag : $state_tag}) "
-            "MERGE (submission)-[r_in_state:IN_STATE]->(state) "
-            "SET r_in_state.created_at = timestamp(), r_in_state.user_tag = $user_tag "
-            "WITH submission "
-            "UNWIND $samples as sample_name "
-            "MERGE (s:Sample {tag : sample_name.tag}) "
-            "SET s += sample_name.props "
-            "SET s.created_at = timestamp() "
-            "WITH s, submission "
-            "MERGE (s)<-[:HAS_SAMPLE]-(submission) "   
-            "WITH submission "
-            "UNWIND $dataset_attributes as attribute_tag "
-            "MATCH (a:Attribute {tag : attribute_tag}) "
-            "MERGE (submission)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a) "
-            "WITH submission "
-            "UNWIND $dataset_attribute_values as attribute_value "
-            "MATCH (av:AttributeValue {tag : attribute_value.attribute_value_tag}) "
-            "MATCH (a:Attribute {tag : attribute_value.attribute_tag}) "
-            "MERGE (submission)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
-            "SET r.created_at = timestamp(), r.attribute_tag = a.tag "
-            "MERGE (av)-[:HAS_VALUE]-(a) "
+            "MATCH (submission:Submission {tag : $tag})-[:COLLABORATES|CREATED]-(user:User) "
+            "RETURN collect(user.tag) " ) 
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)    
+        return r[0] if len(r) > 0 else []
+    
+    def get_unique_tag(self) -> str:
+        """Generates a unique tag for a submission.""" 
+        tag = get_random_string(N=10)
+        while self.exists(tag):
+            tag = get_random_string(N=10)
+        return tag
 
-            ""
+    def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None, submission: DatasetSubmissionModel = None) -> bool:
+        ""
+        if self.exists(tag):
+            raise ValueError("Submission with this tag already exists. Use the update function to update the submission.")
+        query = (
+            "MERGE (submission:Submission {tag : $tag}) "
+            "SET submission.title = $title, submission.created_at = timestamp(), submission.user_tag = $user_tag "
+            "WITH submission "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MERGE (u)-[:CREATED]->(submission) "
+            "WITH submission "
+            "UNWIND $collaborators as collaborator_tag "
+            "MATCH (c:User {tag : collaborator_tag}) "
+            "MERGE (submission)-[:COLLABORATES]->(c) "
         )
+        
+        self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators)
+        
+        
+        
+        
     
-        self._driver.execute_query(query, routing_="w", 
-                                   samples = samples, 
-                                   user_tag = submission.user_tag,
-                                   submission_tag = submission_tag, 
-                                   dataset_attributes  = dataset_attributes, 
-                                   state_tag = submission.state, 
-                                   dataset_props = dataset_props, 
-                                   dataset_attribute_values = dataset_attribute_values)
         
         
-        #add units 
-        if len(dataset_attributes_units) > 0:
-            query = (
-                "MATCH (submission:Submission {tag : $submission_tag}) "
-                "UNWIND $dataset_attribute_values AS attribute_value "
-                "UNWIND attribute_value.trait_value AS trait "
-                "WITH attribute_value, trait "
-                "MATCH (av:AttributeValue {tag: attribute_value.attribute_value_tag}) "
-                "MATCH (unit:Unit {tag: trait.unit_tag}) "
-                "MERGE (av)-[r:HAS_VALUE_OF_UNIT]-(unit) "
-                "SET r.value = trait.value, r.submission_tag = $submission_tag, r.unittype_tag = trait.unittype_tag "
-                "RETURN av, unit, r "
-            )
-            r = self._driver.execute_query(query,routing_="w",submission_tag = submission_tag, dataset_attribute_values = dataset_attributes_units, result_transformer_=Result.value)
+        # submission_tag = submission.tag
+        # sample_names = submission.sample_names
+        # dataset_attribute_input = submission.dataset_attribute_input
+        # genotypes_added = 0 
+        # sample_attributes_added = 0 
         
-        try:
-            self._meta.add_samples_attributes(meta_data=submission)
-            sample_attributes_added = 1 
-        except Exception as e:
-            print(e) 
-            print("No sample attributes added ")
-        try:
-            self._meta.add_samples_genotypes(meta_data=submission)
-            genotypes_added = 1 
-        except:
-            print("No genotypes found")
+        # dataset_props = {
+        #     "title" : submission.title, 
+        #     "n_samples" : submission.n_samples, 
+        #     "created_at" : submission.created_on,
+        #     "state" : submission.state, 
+        #     "n_replicates" : len(set(submission.replicates))
+        #     }
+        # #get the state tag 
+        # #state_tag =  SubmissionStatesEnums(submission.state).name
+        # if "att_proteome" not in submission.dataset_attributes:
+        #     raise ProteomeNotFoundError("The proteome dataset attribute was not found.")
+        
+        # for proteome_tag in submission.dataset_attributes["att_proteome"]:
+        #     if not self._proteomes.exist(proteome_tag):
+        #         raise ProteomeNotFoundError(f"The proteome {proteome_tag} was not found in the database. Please add it before inserting the submission.")
+        
+        # samples = [{"tag" : sample_name, "props" : {"index" : idx, "replicate" : submission.replicates[idx], "text" : sample_name}} for idx,sample_name in enumerate(sample_names)]
+        # dataset_attributes =  [tag for tag in submission.dataset_attributes.keys()]
+
+                
+        # dataset_attribute_values = [{"attribute_value_tag" : tag, #remove!! att_ is history 
+        #                              "attribute_tag" : attribute_tag, 
+        #                              "trait_value" : extract_user_input(dataset_attribute_input[attribute_tag][tag]) if attribute_tag in dataset_attribute_input and dataset_attribute_input[attribute_tag][tag] else []} 
+        #                             for attribute_tag,tags in submission.dataset_attributes.items() for tag in tags]
+        
+        # dataset_attributes_units = [x for x in dataset_attribute_values if isinstance(x["trait_value"],list) and len(x["trait_value"]) > 0]
+        
+        # query = (
+        #     "MERGE (submission:Submission {tag : $submission_tag}) "
+        #     "SET submission += $dataset_props "
+        #     "WITH submission "
+        #     "MATCH (state:State {tag : $state_tag}) "
+        #     "MERGE (submission)-[r_in_state:IN_STATE]->(state) "
+        #     "SET r_in_state.created_at = timestamp(), r_in_state.user_tag = $user_tag "
+        #     "WITH submission "
+        #     "UNWIND $samples as sample_name "
+        #     "MERGE (s:Sample {tag : sample_name.tag}) "
+        #     "SET s += sample_name.props "
+        #     "SET s.created_at = timestamp() "
+        #     "WITH s, submission "
+        #     "MERGE (s)<-[:HAS_SAMPLE]-(submission) "   
+        #     "WITH submission "
+        #     "UNWIND $dataset_attributes as attribute_tag "
+        #     "MATCH (a:Attribute {tag : attribute_tag}) "
+        #     "MERGE (submission)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a) "
+        #     "WITH submission "
+        #     "UNWIND $dataset_attribute_values as attribute_value "
+        #     "MATCH (av:AttributeValue {tag : attribute_value.attribute_value_tag}) "
+        #     "MATCH (a:Attribute {tag : attribute_value.attribute_tag}) "
+        #     "MERGE (submission)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
+        #     "SET r.created_at = timestamp(), r.attribute_tag = a.tag "
+        #     "MERGE (av)-[:HAS_VALUE]-(a) "
+
+        #     ""
+        # )
+    
+        # self._driver.execute_query(query, routing_="w", 
+        #                            samples = samples, 
+        #                            user_tag = submission.user_tag,
+        #                            submission_tag = submission_tag, 
+        #                            dataset_attributes  = dataset_attributes, 
+        #                            state_tag = submission.state, 
+        #                            dataset_props = dataset_props, 
+        #                            dataset_attribute_values = dataset_attribute_values)
+        
+        
+        # #add units 
+        # if len(dataset_attributes_units) > 0:
+        #     query = (
+        #         "MATCH (submission:Submission {tag : $submission_tag}) "
+        #         "UNWIND $dataset_attribute_values AS attribute_value "
+        #         "UNWIND attribute_value.trait_value AS trait "
+        #         "WITH attribute_value, trait "
+        #         "MATCH (av:AttributeValue {tag: attribute_value.attribute_value_tag}) "
+        #         "MATCH (unit:Unit {tag: trait.unit_tag}) "
+        #         "MERGE (av)-[r:HAS_VALUE_OF_UNIT]-(unit) "
+        #         "SET r.value = trait.value, r.submission_tag = $submission_tag, r.unittype_tag = trait.unittype_tag "
+        #         "RETURN av, unit, r "
+        #     )
+        #     r = self._driver.execute_query(query,routing_="w",submission_tag = submission_tag, dataset_attribute_values = dataset_attributes_units, result_transformer_=Result.value)
+        
+        # try:
+        #     self._meta.add_samples_attributes(meta_data=submission)
+        #     sample_attributes_added = 1 
+        # except Exception as e:
+        #     print(e) 
+        #     print("No sample attributes added ")
+        # try:
+        #     self._meta.add_samples_genotypes(meta_data=submission)
+        #     genotypes_added = 1 
+        # except:
+        #     print("No genotypes found")
             
-        if genotypes_added == 0 and sample_attributes_added == 0: raise ValueError("Neither genotypes nor sample attributes could be defined for this project. ")
+        # if genotypes_added == 0 and sample_attributes_added == 0: raise ValueError("Neither genotypes nor sample attributes could be defined for this project. ")
         
-        self._meta.add_owner(tag=submission_tag, user_tag=submission.user_tag)
-        self._meta.add_collaborators(tag=submission_tag, user_tags=submission.collaborators)
+        # self._meta.add_owner(tag=submission_tag, user_tag=submission.user_tag)
+        # self._meta.add_collaborators(tag=submission_tag, user_tags=submission.collaborators)
         
-        print(submission.metatext)
+        # print(submission.metatext)
         
-        self._meta.add_metatext(tag=submission_tag, user_tag= submission.user_tag, meta_texts=submission.metatext)
+        # self._meta.add_metatext(tag=submission_tag, user_tag= submission.user_tag, meta_texts=submission.metatext)
         
     
+    def insert_attributes(self, tag, traits : List[AttributeTree]) -> bool:
+        """Inserts the dataset attributes for a submission. 
+        """
          
+         
+        if not self.exists(tag):  
+            raise ValueError("Submission with this tag does not exist. Please create the submission first.")
+        for attribute_tree in traits:
+            self.insert_condition_application(tag = tag,
+                                        trait_data = [attribute_tree.model_dump()]) 
         
-     
     def handle_children(self, submission_tag, trait_node, parent_tag):
         
         for attribute_node in trait_node["children"]:
@@ -228,7 +331,7 @@ class Neo4JSubmissions(SubmissionsABC):
                 for trait_node in trait_nodes:
                     if trait_node.get("type") != "Trait":
                         raise ValueError("The child node is not a Trait node.")
-                    parent_tag_2 = self.add_condition_value(submission_tag, 
+                    parent_tag_2 = self.add_condition_value(
                                                             attribute_tag=attribute_tag, 
                                                             value = trait_node.get("value"),
                                                             trait_tag= trait_node["tag"], 
@@ -238,9 +341,7 @@ class Neo4JSubmissions(SubmissionsABC):
                         for child in trait_node["children"]:
                             self.handle_children(submission_tag, trait_node=trait_node, parent_tag=parent_tag_2)
     
-    
-    
-    def add_condition_value(self, submission_tag : str, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
+    def add_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
         """Adds a condition value to a submission. This is used to add conditions to the submission that are not specific to a sample but to the whole submission.
 
         Parameters
@@ -263,7 +364,7 @@ class Neo4JSubmissions(SubmissionsABC):
         """
         cv_tag = uuid.uuid4().hex
         query = (
-            "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
+            "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) " #maybe a ConditionValue or a ConditionApplication
             "MERGE (cv:ConditionValue {tag : $cv_tag, text : $cv_tag}) "
         )
         if value is not None:
@@ -276,19 +377,20 @@ class Neo4JSubmissions(SubmissionsABC):
                 "WITH ca,cv,a,t "
                 "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
                 "MERGE (cv)-[:HAS_TRAIT]-(t) "
-                "MERGE (ca)-[:HAS_VALUE]->(cv) "
+                "MERGE (ca)-[r:HAS_VALUE]->(cv) "
+                "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag "
             )
         
         self._driver.execute_query(query, value = value, trait_tag = trait_tag, cv_tag = cv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
         return cv_tag 
     
-    def insert_condition_procedure(self, tag : str, attribute_tag : str = None,  trait_tag : str = None, trait_data : List[dict] = None):
+    def insert_condition_application(self, tag : str, attribute_tag : str = None,  trait_tag : str = None, trait_data : List[dict] = None):
         """ Inserts a condition procedure into the database connect to a submission This indicates that all samples
         of the submission are affected by this condition. There are also ConditionApplication nodes that are connected to the samples via the 
-        HAS_PROCEDURE relationship and are manage by the Samples DB class. These are then specific for a given sample"""
+        HAS_APPLICATION relationship and are manage by the Samples DB class. These are then specific for a given sample"""
 
         submission_tag = tag
-        
+        print(trait_data, "trait data")
         if trait_tag is not None and trait_data is None or len(trait_data) == 0:
 
             trait_data = [
@@ -298,67 +400,40 @@ class Neo4JSubmissions(SubmissionsABC):
                  ]}
            ]    
 
-        node_hash_tag = create_hierarchical_hash(trait_data)
-        print(node_hash_tag)
-        # else:
+        ca_tag = create_hierarchical_hash(trait_data)
+        if self.condition_application_exists(tag = ca_tag):
+            ##if exists, then just connect to the submission
+            query = (
+                "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
+                "MATCH (s:Submission {tag : $submission_tag}) "
+                "MERGE (s)-[:HAS_APPLICATION]->(ca) "
+            )
 
-            #     submission_tag = tag 
-        #     sample_data = [
-        #             {
-        #                 "type": "Attribute",
-        #                 "tag": "att_compound",
-        #                 "children": [
-        #                     {
-        #                         "type": "Trait",
-        #                         "tag": "att_compound:dmso",
-        #                         "children": [
-        #                             {
-        #                                 "type": "Attribute",
-        #                                 "tag": "att_concentration",
-        #                                 "children": [
-        #                                     {"type": "Trait", "tag": "mM", "value": 2, 
-        #                                     "children": [
-        #                                         {"type" : "Attribute", "tag" : "temperature", "children" : [
-        #                                             {"type" : "Trait", "tag" : "high"}
-        #                                         ]}
-        #                                     ]}
-        #                                 ]
-        #                             },
-        #                             {
-        #                                 "type": "Attribute",
-        #                                 "tag": "Time",
-        #                                 "children": [
-        #                                     {"type": "Trait", "tag": "h", "value": 5, "children": []}
-        #                                 ]
-        #                             }
-        #                         ]
-        #                     }
-        #                 ]
-        #             }
-        #             ]
+            self._driver.execute_query(query, routing_="w", ca_tag = ca_tag, submission_tag = submission_tag)
+
+        else:
             
-            
-        for condition_application in trait_data:
-            attribute_tag = condition_application["tag"]
-            for trait_node in condition_application["children"]:
-                trait_tag = trait_node["tag"]
-                ca_tag = node_hash_tag 
-                query = (
-                    "MERGE (s:Submission {tag : $submission_tag}) "
-                    "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
-                    "WITH ca, s "
-                    "MERGE (a:Attribute {tag : $attribute_tag}) "
-                    "MERGE (t:Trait {tag : $trait_tag}) "
-                    #connect to sample 
-                    "MERGE (s)-[:HAS_PROCEDURE]->(ca) "
-                    "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
-                    "MERGE (ca)-[:INSTANCE_OF]-(t) "
-                )
-                
-                self._driver.execute_query(query, routing_= "w", ca_tag = ca_tag, submission_tag = submission_tag, trait_tag = trait_tag, attribute_tag = attribute_tag)        
-                
-                if len(trait_node.get("children",[])) > 0:
-                    for child in trait_node["children"]:
+            for condition_application in trait_data:
+                attribute_tag = condition_application["tag"]
+                for trait_node in condition_application["children"]:
+                    trait_tag = trait_node["tag"]
+                    ca_tag = ca_tag 
+                    query = (
+                        "MERGE (s:Submission {tag : $submission_tag}) "
+                        "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
+                        "WITH ca, s "
+                        "MERGE (a:Attribute {tag : $attribute_tag}) "
+                        "MERGE (t:Trait {tag : $trait_tag}) "
+                        #connect to submission 
+                        "MERGE (s)-[:HAS_APPLICATION]->(ca) "
+                        "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
+                        "MERGE (ca)-[:INSTANCE_OF]-(t) "
+                    )
+                    
+                    self._driver.execute_query(query, routing_= "w", ca_tag = ca_tag, submission_tag = submission_tag, trait_tag = trait_tag, attribute_tag = attribute_tag)        
+                    
+                    if len(trait_node.get("children",[])) > 0:
+                        # for child in trait_node["children"]:
                         self.handle_children(submission_tag, trait_node=trait_node, parent_tag=ca_tag)
                 
     
@@ -403,12 +478,12 @@ class Neo4JSubmissions(SubmissionsABC):
     def update_state(self, tag: str, new_state: SubmissionStatesEnums, user_tag : str) -> bool:
         "Updates the state of a submission."
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[r_prev:IN_SATE]->(prevState:State) "
+            "MATCH (submission:Submission {tag : $tag}) "
+            "OPTIONAL MATCH (submission)-[r_prev:IN_STATE]->(prevState:State) "
             "MATCH (newState:State {tag : $new_state}) "
             "CREATE (submission)-[r:IN_STATE]->(newState) "
             "SET r.created_at = timestamp(), r.user_tag = $user_tag "
-            "WITH r_prev "
-            "DELETE r_prev "
+
         )
         
         try: 
@@ -417,6 +492,27 @@ class Neo4JSubmissions(SubmissionsABC):
             print(e)
             return False 
         return True 
+    
+    
+    def set_state(self, tag: str, state: SubmissionStatesEnums, user_tag : str) -> bool:
+        """Sets the state of a submission. If the state already exists, it is updated. 
+        If the state does not exist, it is skipped and nothing happens.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+        state : SubmissionStatesEnums
+            The new state of the submission.
+        user_tag : str
+            The user tag of the user who sets the state.
+
+        Returns
+        -------
+        bool
+            True if the state was set successfully, False otherwise.
+        """
+        return self.update_state(tag=tag, new_state=state, user_tag=user_tag)
     
     
     def get_correlated_features(self, tags : List[str], 
@@ -489,18 +585,34 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
     def _add_limit(self, query : str, limit : int = None):
         ""
-        if limit is not None : query += "LIMIT $limit"
+        if limit is not None : query += "LIMIT $limit "
         return query 
         
     
-    def get_all_tags(self, limit : int = None)->List[str]:
-        "" 
+    def get_all_tags(self, limit : int = None, ordered : bool = True)->List[str]:
+        """Returns all submission tags in the database.
+        
+        Parameters
+        ----------
+        limit : int, optional
+            The maximum number of tags to return, by default None
+        ordered : bool, optional
+            If True, the tags are ordered by the creation date of the submission, by default True
+
+        Returns
+        -------
+        List[str]
+            A list of submission tags.
+        """ 
         query = (
                 "MATCH (submission:Submission) "
-                "RETURN DISTINCT submission.tag "
+                "RETURN submission.tag "
             )
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
+        
         query = self._add_limit(query,limit)
-        r = self._driver.execute_query(query, routing_="r",limit=limit,result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r",limit=limit, result_transformer_=Result.value)
         return r
     
     def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value"] = "state") -> pd.DataFrame:
@@ -538,7 +650,57 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
     
-    def filter_by_trait_tags(self, trait_tags : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+    
+    def group_by_state(self, tags : List[str] = None) -> Dict[str|int, List[str]]:
+        """Groups the submissions by their state and returns the counts of each state.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The submission tags to use. If None, all tags in the database are used.
+            If tags is an empty list, an empty dictionary is returned.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary with the state tag as key and a list of submission tags as value.
+            The keys are the state tags and the values are lists of submission tags.
+            If no submissions are found, an empty dictionary is returned.
+            
+        Raises
+        ------
+        TypeError
+            If the tags parameter is not a list of strings or None.
+        """
+        
+        if tags is not None and not isinstance(tags, list):
+            raise TypeError("The tags parameter must be a list of strings or None.")
+        elif len(tags) == 0:
+            return {}
+        
+        query = "MATCH (submission:Submission) "
+        
+        if tags is not None:
+            query += "WHERE submission.tag in $tags "
+        
+        query += (
+            "MATCH (submission)-[r:IN_STATE]->(state:State) WHERE r.created_at IS NOT NULL "
+            "WITH submission, "
+            "     state, "
+            "     r "
+            "ORDER BY r.created_at DESC "
+            "WITH submission, "
+            "    collect({state: state.tag, r: r}) AS rels "
+            "WITH submission, head(rels) AS latest "
+            "RETURN latest.state AS state_tag, collect(submission.tag) AS submission_tags "
+        )
+
+        r = self._driver.execute_query(query, tags = tags, routing_="r", database_="neo4j", result_transformer_=Result.data)
+        return dict((ri.get("state_tag"),ri.get("submission_tags")) for ri in r)
+    
+
+
+    def filter_by_trait_tags(self, trait_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
             "MATCH (submission:Submission)-[:HAS_TRAIT]->(t:Trait) "
@@ -548,12 +710,14 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN DISTINCT submission.tag "
         )
         query = self._add_limit(query,limit)
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         r = self._driver.execute_query(query, trait_tags = trait_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
 
         return r
-    
-            
-    def filter_by_attribute_tags(self, attribute_tag : List[str], submission_tags : List[str] = None, limit : int = None)->List[str]:
+
+
+    def filter_by_attribute_tags(self, attribute_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
             "MATCH (submission:Submission)-[:HAS_VALUES_FOR_ATTRIBUTE]->(av:Attribute) "
@@ -563,11 +727,13 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN DISTINCT submission.tag "
         )
         query = self._add_limit(query,limit)
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         r,_,_ = self._driver.execute_query(query, attribute_tags=attribute_tag, submission_tags = submission_tags, limit = limit)
         
         return [ri.value() for ri in r] 
     
-    def filter_by_genotype_tags(self, genotype_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+    def filter_by_genotype_tags(self, genotype_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
             "MATCH (g:Genotype) "
@@ -576,11 +742,14 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
             "RETURN DISTINCT submission.tag "
         )
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
+        
         r,_,_ = self._driver.execute_query(query, genotype_tags = genotype_tag, submission_tags = submission_tags, limit = limit)
         return [ri.value() for ri in r] 
     
-    def filter_by_user(self, user_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+    def filter_by_user(self, user_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
             "MATCH (submission:Submission) "
@@ -589,11 +758,14 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "WHERE u.tag in $user_tags AND ((u)-[:OWNS]-(submission) OR (u)-[:IS_PART]->(submission)) "
             "RETURN DISTINCT submission.tag "
         )
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
+        
         r,_,_ = self._driver.execute_query(query, user_tags=user_tag, submission_tags = submission_tags, limit = limit)
         return [ri.value() for ri in r] 
     
-    def filter_by_quantified_protein(self, protein_tag : List[str], submission_tags : List[str] = None, limit : int = None) -> List[str]:
+    def filter_by_quantified_protein(self, protein_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
             "MATCH (p:Protein ) "
@@ -602,39 +774,58 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
             "RETURN DISTINCT submission.tag "
         )
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
+        
         r,_,_ = self._driver.execute_query(query, protein_tags = protein_tag, submission_tags = submission_tags, limit = limit)
         return [ri.value() for ri in r] 
         
         
-    def filter_by_state(self, state : List[int], submission_tags : List[str] = None, limit : int = None):
+    def filter_by_state(self, states : List[int], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
+        print(states)
         query = (
-            "MATCH (state:State ) "
-            "WHERE state.tag in $state "
-            "MATCH (state)<-[:IN_STATE]-(submission:Submission) "
-            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "RETURN DISTINCT submission.tag "
-        )
+            # "MATCH (state:State ) "
+            # "WHERE state.tag in $state "
+            # "MATCH (state)<-[:IN_STATE]-(submission:Submission) "
+            # f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
+            # "RETURN DISTINCT submission.tag "
+
+            "MATCH (submission:Submission)-[r:IN_STATE]->(state:State) WHERE r.created_at IS NOT NULL "
+            "WITH submission, r, state "
+            "ORDER BY r.created_at DESC "
+            "WITH submission, collect({rel: r, state: state.tag}) AS rels "
+            #// Get the latest relationship and state per submission
+            "WITH submission, rels[0] AS latest "
+            #"// Filter submissions whose latest IN_STATE relationship points to the state you want
+            "WHERE latest.state IN $states "
+            "RETURN submission.tag "
+            )
+        
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
-        r = self._driver.execute_query(query, state = state, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-        print(state)
-        print("FILTER BY STATE", r)
+        r = self._driver.execute_query(query, states = states, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
+        print(r)
         return r
     
-    def filter_by_search_string(self, search_string : str, limit : int) -> List[str]:
+    def filter_by_search_string(self, search_string : str, limit : int, ordered : bool = True) -> List[str]:
         ""        
         query = (
             "MATCH (submission:Submission) "
             "WHERE toLower(submission.title) CONTAINS $search_string "
             "RETURN submission.tag "
         )
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
+        
         tags = self._driver.execute_query(query, routing_="r", result_transformer_= Result.value, search_string = search_string.lower(), limit = limit)
  
         return tags 
     
-    def get(self, 
+    def find(self, 
             search_string : str = None,
             state : List[int] = None, 
             trait_tags : List[str] = None, 
@@ -642,43 +833,44 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_tag : List[str] = None, 
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
+            ordered : bool = True,
             limit : int = 10) -> List[str]:
-        ""
-        
-        tags = None 
+        """Returns a list of submission tags that match the given filters."""
+
+        tags = None
         filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tag, protein_tag, genotype_tag])
         
         if search_string is not None:
             
             limit_ = limit if all(attr is None for attr in [state,trait_tags,attribute_tag,user_tag,protein_tag,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_search_string(search_string=search_string, limit=limit)
+            tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered)
         
         if state is not None:
             limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tag,protein_tag,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_state(state=state, submission_tags=tags, limit=limit_)
-        
+            tags = self.filter_by_state(states=state, submission_tags=tags, limit=limit_, ordered=ordered)
+
         if genotype_tag is not None:
             limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tag,protein_tag]) else None
-            tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_)
-        
+            tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_, ordered=ordered)
+
         if trait_tags is not None:
             limit_ = limit if all(attr is None for attr in [attribute_tag,user_tag,protein_tag]) else None
-            tags = self.filter_by_attribute_value_tags(trait_tags,submission_tags=tags,limit=limit_)
+            tags = self.filter_by_attribute_value_tags(trait_tags,submission_tags=tags,limit=limit_, ordered=ordered)
 
         if attribute_tag is not None:
             limit_ = limit if all(attr is None for attr in [user_tag,protein_tag]) else None
-            tags = self.filter_by_attribute_tags(attribute_tag,submission_tags=tags,limit=limit_)
-        
+            tags = self.filter_by_attribute_tags(attribute_tag,submission_tags=tags,limit=limit_, ordered=ordered)
+
         if user_tag is not None:
             limit_ = limit if protein_tag is None else None
-            tags = self.filter_by_user(user_tag,submission_tags=tags,limit=limit_)
-        
+            tags = self.filter_by_user(user_tag,submission_tags=tags,limit=limit_, ordered=ordered)
+
         if protein_tag is not None:
-            tags = self.filter_by_quantified_protein(protein_tag,submission_tags=tags,limit=limit)
+            tags = self.filter_by_quantified_protein(protein_tag,submission_tags=tags,limit=limit_, ordered=ordered)
             
         if not filter_defined: #none defined, then just return all. 
             
-            return self.get_all_tags(limit=limit)
+            return self.get_all_tags(limit=limit, ordered= ordered)
         
         if tags is None: return []
         

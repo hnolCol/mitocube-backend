@@ -69,13 +69,13 @@ class MinimalMetadataResponseModel(MinimalMetadataModel):
     "" 
     
 
-SampleAttributeTree = ForwardRef('SampleAttributeTree')
+AttributeTree = ForwardRef('AttributeTree')
     
-class SampleAttributeTree(BaseModel):
+class AttributeTree(BaseModel):
     tag : str # Attribute or Trait String 
-    type :  Literal["Attribute","Trait"]
-    value : float|int
-    children : Optional[List[SampleAttributeTree]]
+    type :  Literal["attribute","trait"]
+    value : float|int = None
+    children : Optional[List[AttributeTree]]
 
 
 class NewSubmissionModel(BaseModel):
@@ -87,44 +87,51 @@ class NewSubmissionModel(BaseModel):
 
 
     """
-    created_on : float = Field(..., default_factory= get_time_stamp)
-    sampleNames : List[str]
-    replicates : List[int]
-    collaborators : List[str] #List of users by their tag. 
-   # attributeTable : List[Dict[str,List[Union[AttributeValueModel,FeatureModel,FeatureNeoModel]]]]
-    metatext : Dict[str,str]
-    links : List[SubmissionLink]
-    genotypes : Optional[Dict[str,List[int]]] = None
     tag : str = Field(...,min_length=10, max_length=12)
+    #created_on : float = Field(..., default_factory= get_time_stamp)
+    sample_names : List[str]
+    replicates : List[int]
+    collaborators : List[str] = Field(...,default_factory=list)
     title : str 
-    datasetAttributes : Dict[str,List[str]] # <attribute_tag, List[trait_tag]>
-    samplesAttributes : Dict[str,Dict[str,List[int]]] # The sample attribute_tag - trait_tag - sample_index 
-    timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
-    includes_data : bool = False 
-    data_array : List[List[float|None]] = None 
-    data_sample_names : List[str] = None
-    data_index : List[str|None] = None 
-    datasetAttributeInput : Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None # Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None
+    metatext : Dict[str,str]
+    samples_attributes : List[List[AttributeTree]]
+    dataset_attributes : List[AttributeTree] 
+    # sampleNames : List[str]
+    #replicates : List[int]
+     #List of users by their tag. 
+   # attributeTable : List[Dict[str,List[Union[AttributeValueModel,FeatureModel,FeatureNeoModel]]]]
+    links : List[SubmissionLink] = None
+    # genotypes : Optional[Dict[str,List[int]]] = None
     
-    sample_attributes : List[List[SampleAttributeTree]]
+   
+    # datasetAttributes : Dict[str,List[str]] # <attribute_tag, List[trait_tag]>
+    # samplesAttributes : Dict[str,Dict[str,List[int]]] # The sample attribute_tag - trait_tag - sample_index 
+    # timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
+    # includes_data : bool = False 
+    # data_array : List[List[float|None]] = None 
+    # data_sample_names : List[str] = None
+    # data_index : List[str|None] = None 
+    # datasetAttributeInput : Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None # Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None
     
     
-    @field_validator("datasetAttributeInput", mode="after")
-    def validate_dataset_attribute_input(cls, v : Dict|None, config):
-        if v is None: return
-        return v
     
-    # @field_validator("samplesAttributesInput", mode="after")
-    # def validate_sample_attribute_input(cls, v : Dict[str,List[Dict]]|None, config):
-    #     """"""
+    
+    # @field_validator("datasetAttributeInput", mode="after")
+    # def validate_dataset_attribute_input(cls, v : Dict|None, config):
     #     if v is None: return
+    #     return v
+    
+    # # @field_validator("samplesAttributesInput", mode="after")
+    # # def validate_sample_attribute_input(cls, v : Dict[str,List[Dict]]|None, config):
+    # #     """"""
+    # #     if v is None: return
         
-    #     n_samples = len(cls.sampleNames)
-    #     input_with_values = [[xi for xi  in vi if len(xi) > 0] for vi in v.values()]
-    #     if any(n == n_samples for n in input_with_values):
-    #         raise ValueError("The length of the sample attribute input (units) must match the length of samples.")
+    # #     n_samples = len(cls.sampleNames)
+    # #     input_with_values = [[xi for xi  in vi if len(xi) > 0] for vi in v.values()]
+    # #     if any(n == n_samples for n in input_with_values):
+    # #         raise ValueError("The length of the sample attribute input (units) must match the length of samples.")
         
-    #     return v 
+    # #     return v 
  
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
@@ -269,7 +276,7 @@ class SubmissionByUserResponse(BaseModel):
     
 class SubmissionIDResponse(BaseModel):
     """BaseModel for an API ID Submission response"""
-    id: str = Field(default_factory= lambda : get_random_string(N=10))
+    tag: str = Field(default_factory= lambda : get_random_string(N=10))
     created_on : datetime = Field(default_factory= datetime.now)
 
 

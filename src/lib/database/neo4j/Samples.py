@@ -3,13 +3,30 @@ from neo4j import Driver, Result
 
 from lib.database.abstract.Samples import SamplesABC
 from services.encryption import create_hierarchical_hash
-
-
+from config.models.submissions.submissions import AttributeTree
+import uuid
 class Neo4JSamples(SamplesABC):
     "" 
     def __init__(self, driver : Driver):
         
         self._driver = driver 
+    
+    def _get_sample_tag(self, sample_name : str, submission_tag : str) -> str:
+        """Generates a sample tag based on the sample name and submission tag.
+        
+        Parameters
+        ----------
+        sample_name : str
+            The name of the sample.
+        submission_tag : str
+            The tag of the submission to which the sample belongs.
+        
+        Returns
+        -------
+        str
+            A unique sample tag.
+        """
+        return f"{submission_tag}|{sample_name}"
     
     def exists(self, tag : str) -> bool:
         "Check if a sample is associated with the given tag."
@@ -54,18 +71,21 @@ class Neo4JSamples(SamplesABC):
         return r[0]["count"] 
         
         
-    def insert(self, tag : str, submission_tag : str, sample_name : str, sample_index : int):
+    def insert(self, submission_tag : str, sample_name : str, sample_index : int) -> str:
         "Insert a new sample to a given submission" 
-        if self.exists(tag = tag): raise ValueError("Sample tag exists already. ")
-        
-        
+        #if self.exists(tag = tag): raise ValueError("Sample tag exists already. ")
+        sample_tag = self._get_sample_tag(sample_name, submission_tag)
+        if self.exists(tag = sample_tag): raise ValueError("Sample tag exists already. ")
         query = (
             "MATCH (s:Submission {tag : $submission_tag}) "
-            "MERGE (s)-[:HAS_SAMPLE]->(sample:Sample {tag : randomUUID(), name : $sample_name, sample_index : $sample_index, created_at = timestamp()}) "
+            "MERGE (sample:Sample {tag : $sample_tag, name : $sample_name, sample_index : $sample_index, created_at : timestamp()}) "
+            "MERGE (s)-[:HAS_SAMPLE]->(sample) "
+            "RETURN sample.tag "
         )
-        
-        self._driver.execute_query(query, routing_="w", result_transformer_=Result.value, 
-                                   submission_tag = submission_tag, sample_name = sample_name, sample_index = sample_index)    
+
+        r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value, sample_tag=sample_tag,
+                                   submission_tag=submission_tag, sample_name=sample_name, sample_index=sample_index)
+        return r[0] if len(r) > 0 else None
      
     def handle_children(self, sample_tag, trait_node, parent_tag):
         
@@ -81,10 +101,10 @@ class Neo4JSamples(SamplesABC):
     
     def insert_condition_value(self, sample_tag : str, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
         
-        cv_tag = f"{sample_tag}-cv-{parent_tag}-{trait_tag}"
+        cv_tag = uuid.uuid4().hex
         query = (
             "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
-            "MERGE (cv:ConditionValue {tag : $cv_tag, text : $cv_tag}) "
+            "MERGE (cv:ConditionValue {tag : $cv_tag, text : $value || $trait_tag}) "
         )
         if value is not None:
             query += "SET cv.value = $value "
@@ -96,13 +116,14 @@ class Neo4JSamples(SamplesABC):
                 "WITH ca,cv,a,t "
                 "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
                 "MERGE (cv)-[:HAS_TRAIT]-(t) "
-                "MERGE (ca)-[:HAS_VALUE]->(cv) "
+                "MERGE (ca)-[r:HAS_VALUE]->(cv) "
+                "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag"
             )
         
         self._driver.execute_query(query, value = value, trait_tag = trait_tag, cv_tag = cv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
         return cv_tag 
     
-    def insert_condition_application(self, sample_tag : str, sample_data : List[dict]):
+    def insert_condition_application(self, sample_tag : str, sample_data : List[AttributeTree]):
         """Insert a condition application for a given sample.
         The condition application is a hierarchical structure that describes the conditions applied to the sample. 
         The data structure is used to generate a unique tag for the condition application. Hence, if the datastructure is the same, the same tag will be used connecting the 
@@ -112,78 +133,42 @@ class Neo4JSamples(SamplesABC):
         ----------
         sample_tag : str
             The tag of the sample.
-        sample_data : List[dict]
+        sample_data : List[AttributeTree]
             The condition data to insert.
-        This data should be a list of dictionaries, where each dictionary represents a condition application.
+        This data should be a list of AttributeTree objects, where each object represents a condition application.
         Each dictionary should have the following structure, here is a complex example having multiple attributes and traits:
         {
-            "type": "Attribute",
+            "type": "attribute",
             "tag": "att_compound",
             "children": [               
                 {
-                    "type": "Trait",
+                    "type": "trait",
                     "tag": "att_compound:dmso",
                     "children": [       
                         {
-                            "type": "Attribute",
+                            "type": "attribute",
                             "tag": "att_concentration",
                             "children": [
-                                {"type": "Trait", "tag": "mM", "value": 2, 
+                                {"type": "trait", "tag": "mM", "value": 2, 
                                  "children": [
-                                     {"type" : "Attribute", "tag" : "temperature", "children" : [
-                                         {"type" : "Trait", "tag" : "high"}
+                                     {"type" : "attribute", "tag" : "temperature", "children" : [
+                                         {"type" : "trait", "tag" : "high"}
                                      ]}
                                  ]}
                             ]
                         },
                         {
-                            "type": "Attribute",
+                            "type": "attribute",
                             "tag": "Time",
                             "children": [
-                                {"type": "Trait", "tag": "h", "value": 5, "children": []}
+                                {"type": "trait", "tag": "h", "value": 5, "children": []}
                             ]
                         }
                     ]
 
         """
-        
-        
-        
-        # sample_data = [
-        #         {
-        #             "type": "Attribute",
-        #             "tag": "att_compound",
-        #             "children": [
-        #                 {
-        #                     "type": "Trait",
-        #                     "tag": "att_compound:dmso",
-        #                     "children": [
-        #                         {
-        #                             "type": "Attribute",
-        #                             "tag": "att_concentration",
-        #                             "children": [
-        #                                 {"type": "Trait", "tag": "mM", "value": 2, 
-        #                                  "children": [
-        #                                      {"type" : "Attribute", "tag" : "temperature", "children" : [
-        #                                          {"type" : "Trait", "tag" : "high"}
-        #                                      ]}
-        #                                  ]}
-        #                             ]
-        #                         },
-        #                         {
-        #                             "type": "Attribute",
-        #                             "tag": "Time",
-        #                             "children": [
-        #                                 {"type": "Trait", "tag": "h", "value": 5, "children": []}
-        #                             ]
-        #                         }
-        #                     ]
-        #                 }
-        #             ]
-        #         }
-        #         ]
-
-        
+        sample_data = [x.model_dump() for x in sample_data]  # Convert Pydantic models to dicts if necessary
+        print(sample_data)
         ca_tag = create_hierarchical_hash(sample_data)
     
 
@@ -192,19 +177,17 @@ class Neo4JSamples(SamplesABC):
             query = (
                 "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
                 "MATCH (s:Sample {tag : $sample_tag}) "
-                "MERGE (s)-[:HAS_PROCEDURE]->(ca) "
+                "MERGE (s)-[:HAS_APPLICATION]->(ca) "
             )
             
             self._driver.execute_query(query, routing_="w", ca_tag = ca_tag, sample_tag = sample_tag)
             
         else:
-           # self.create_condition_procedure(tag = ca_tag)
-
             for condition_application in sample_data:
                 attribute_tag = condition_application["tag"]
                 for trait_node in condition_application["children"]:
                     trait_tag = trait_node["tag"]
-                    ca_tag = f"{sample_tag}-{trait_tag}"
+                    
                     query = (
                         "MATCH (s:Sample {tag : $sample_tag}) "
                         "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
@@ -213,7 +196,7 @@ class Neo4JSamples(SamplesABC):
                         "MATCH (a:Attribute {tag : $attribute_tag})-[:PART_OF]->(ag:AttributeGroup {tag : 'sample'}) " #only sample attributes are allowed here "
                         "MATCH (t:Trait {tag : $trait_tag}) "
                         #connect to sample 
-                        "MERGE (s)-[:HAS_PROCEDURE]->(ca) "
+                        "MERGE (s)-[:HAS_APPLICATION]->(ca) "
                         "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
                         "MERGE (ca)-[:INSTANCE_OF]-(t) "
                     )
@@ -221,8 +204,8 @@ class Neo4JSamples(SamplesABC):
                     self._driver.execute_query(query, routing_= "w", ca_tag = ca_tag, sample_tag = sample_tag, trait_tag = trait_tag, attribute_tag = attribute_tag)        
                     
                     if len(trait_node.get("children",[])) > 0:
-                        for child in trait_node["children"]:
-                            self.handle_children(sample_tag, trait_node=trait_node, parent_tag=ca_tag)
+                        # for child in trait_node["children"]:
+                        self.handle_children(sample_tag, trait_node=trait_node, parent_tag=ca_tag)
                     
     
     def get_condition_procedure_by_sample(self, tag: str = None, sort_by_most_frequent : bool = True, limit : int = None) -> List[str]|str:
@@ -247,7 +230,7 @@ class Neo4JSamples(SamplesABC):
         """
         
         query = (
-            "MATCH (ca:ConditionApplication)<-[r:HAS_PROCEDURE]-(s:Sample) "
+            "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(s:Sample) "
         )
 
         if tag is not None:

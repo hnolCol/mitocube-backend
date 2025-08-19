@@ -27,7 +27,7 @@ from lib.database.abstract.Phenotypes import PhenotypeABC
 from lib.database.abstract.Maintenance import MaintenanceProcedureABC 
 from lib.database.abstract.SpareParts import SparePartsABC
 from lib.database.abstract.Symptoms import SymptomABC
-
+from lib.database.abstract.Samples import SamplesABC
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
 
@@ -78,6 +78,7 @@ class DatabaseABC(ABC):
     maintenance_procedures : MaintenanceProcedureABC  = None 
     spareparts : SparePartsABC = None
     symptoms : SymptomABC = None
+    samples : SamplesABC = None
    # performance : Per
     
 
@@ -195,8 +196,11 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the maintenance attribute defined.")
         if not isinstance(self.maintenance_procedures, MaintenanceProcedureABC):
             raise TypeError("The phenotype class must be an instance of the MaintenanceProcedureABC.")
-                
-        
+        if self.samples is None:
+            raise NotImplementedError("A database class must have the samples attribute defined.")
+        if not isinstance(self.samples, SamplesABC):
+            raise TypeError("The samples class must be an instance of the SamplesABC.")
+
         
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 

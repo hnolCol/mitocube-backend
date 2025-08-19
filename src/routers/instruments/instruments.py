@@ -51,10 +51,17 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
     instrument = DB.attributes.trait(trait_tag = instrument_tag)
     return instrument
 
-@router.get("/{instrument_tag}/states/history") 
-def get_instrument_state_history(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
-    "" 
-    return DB.instrument_states.get_history(instrument_tag = instrument_tag, limit = limit)
+@router.get("/{instrument_tag}/states/durations") 
+def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
+    "Returns the duration of all states for an instrument." 
+    return DB.instrument_states.get_state_durations(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+
+
+@router.get("/{instrument_tag}/states/{state_tag}/durations") 
+def get_instrument_specific_state_durations(instrument_tag : str, state_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
+    "Returns the duration of a specific state for an instrument." 
+    return DB.instrument_states.get_state_durations(instrument_tag = instrument_tag, state_tag = state_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+
 
 @router.get("/{instrument_tag}/projects/count")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):

@@ -33,7 +33,7 @@ def send_email_in_background(background_tasks : BackgroundTasks,
                              email_to: list[EmailStr], 
                              cc : list[EmailStr] = [], 
                              body : dict = {}, 
-                             template_mame : str = "verification_code.html",
+                             template_name : str = "verification_code.html",
                              include_setting_cc : bool = True) -> None:
     """Sends a message via mail"""
 
@@ -46,17 +46,17 @@ def send_email_in_background(background_tasks : BackgroundTasks,
     )
     fm = FastMail(MAIL_CONFIG)
 
-    if template_mame not in templates:
+    if template_name not in templates:
         raise ValueError("Template_name not found.")
 
-    background_tasks.add_task(fm.send_message, message, template_name=template_mame)
+    background_tasks.add_task(fm.send_message, message, template_name=template_name)
 
 
 async def async_send_email(subject : str, 
                              email_to: list[EmailStr], 
                              cc : list[EmailStr] = [], 
                              body : dict = {}, 
-                             template_mame : str = "verification_code.html",
+                             template_name : str = "verification_code.html",
                              include_setting_cc : bool = True) -> None:
     """"""
     message = MessageSchema(
@@ -67,4 +67,4 @@ async def async_send_email(subject : str,
         subtype=MessageType.html,
     )
     fm = FastMail(MAIL_CONFIG)
-    await fm.send_message(message,template_name=template_mame)
+    await fm.send_message(message, template_name=template_name)

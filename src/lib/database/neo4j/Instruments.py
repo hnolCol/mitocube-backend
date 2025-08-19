@@ -61,11 +61,29 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         return [InstrumentsStateResponseModel(**ri) for ri in r]
     
     
-    def get_history(self, instrument_tag : str = None, limit : int = None) -> List[InstrumentStateHistoryModel]:
+    
+    
+    
+    def get_state_durations(self, instrument_tag : str = None, state_tag : str = None, timestamp_min : float = None, timestamp_max : float = None, limit : int = None) -> List[InstrumentStateHistoryModel]:
         ""
         query = "MATCH (t:Trait)-[r:IN_STATE]->(state:InstrumentState) "
         if instrument_tag is not None:
             query += "WHERE t.tag = $instrument_tag "
+        elif timestamp_max is not None or timestamp_min is not None:
+            query += "WHERE "
+        elif state_tag is not None:
+            query += "WHERE state.tag = $state_tag "
+        
+        if timestamp_min is not None and timestamp_max is not None:
+            query += (      
+                "r.created_at >= $timestamp_min AND r.created_at <= $timestamp_max ")
+        elif timestamp_min is not None:
+            query += (      
+            "r.created_at >= $timestamp_min ")
+        elif timestamp_max is not None:
+            query += (      
+            "r.created_at <= $timestamp_max ")
+
             
         query += "WITH t, state, r.tag as tag, r.created_at AS created ORDER BY created ASC " 
         
@@ -85,7 +103,6 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
             "       }] AS durations "
             "RETURN durations "
         )
-        
         
         r = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.value)
         
@@ -113,7 +130,7 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         return super().insert(state)
     
     
-    def set(self, tag : str, instrument_tag : str, comment : str = None):
+    def set_state(self, tag : str, instrument_tag : str, comment : str = None):
         ""
         
         unique_tag = get_random_string(N = 10)
@@ -127,7 +144,6 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag, instrument_tag = instrument_tag, comment = comment, r_tag = unique_tag)
         
-
 
 class Neo4JInstruments(InstrumentsABC):
     

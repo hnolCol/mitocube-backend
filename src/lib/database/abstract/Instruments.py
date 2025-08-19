@@ -17,7 +17,7 @@ class InstrumentStatesABC(ABC):
     def get_instrument_state(self, instrument_tag : str, limit : int = 1) -> List[InstrumentsStateResponseModel]:
         ""
     @abstractmethod
-    def get_history(self, instrument_tag : str, limit : int = None) -> List[InstrumentStateHistoryModel]:
+    def get_state_durations(self, instrument_tag : str, limit : int = None) -> List[InstrumentStateHistoryModel]:
         "Returns the history of states for a given instrument"
         
     @abstractmethod
@@ -29,7 +29,7 @@ class InstrumentStatesABC(ABC):
         "Insert a new instrument state to the database."
     
     @abstractmethod
-    def set(self, tag : str, instrument_tag : str):
+    def set_state(self, tag : str, instrument_tag : str):
         "Sets the instrument in the state given by its tag."
 
 class InstrumentsABC(ABC):

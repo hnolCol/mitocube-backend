@@ -94,7 +94,7 @@ class UserDB:
                                 "first_name" : GENERAL_SETTINGS.lead_contact_first_name,
                                 "password" : auto_pw
                             },
-                            template_mame=EMAIL_SETTINGS.mail_account_generated_template,
+                            template_name=EMAIL_SETTINGS.mail_account_generated_template,
                             include_setting_cc=True))                    
         else:
             self.DB = [UserModel(**user_props, tag = user_props["label"]) for user_props in read_json(user_db_file)]

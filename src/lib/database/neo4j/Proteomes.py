@@ -28,33 +28,30 @@ class Neo4JProteomes(ProteomesABC):
         if "name" in proteome_info and "description" in proteome_info:
             proteome_info["text"] = proteome_info["name"]
             proteome_info["s"] = f"{proteome_tag} {proteome_info['description']} {proteome_info['name']}"
-        
-        proteome_info["attribute_tag"] = "att_proteome"
-        
+                
         query = (
-            "MERGE (av:AttributeValue {tag : $proteome_tag}) "
+            "MERGE (proteome:Proteome {tag : $proteome_tag}) "
             "ON CREATE "
-            "SET av.created_at = timestamp() "
+            "SET proteome.created_at = timestamp(), proteome.active = true  "
             "ON MATCH "
-            "SET av.modified_at = timestamp() "
-            "WITH av "
-            "SET av += $proteome_info "
-            "WITH av "
-            "MATCH (a:Attribute {tag : 'att_proteome'}) "
-            "MERGE (a)-[:HAS_VALUE]->(av) "
-            "RETURN av"
-            
+            "SET proteome.modified_at = timestamp() "
+            "WITH proteome "
+            "SET proteome += $proteome_info "
         ) 
         
         self._driver.execute_query(query, proteome_tag = proteome_tag, proteome_info = proteome_info)
-        print("done")
+        return True
+    
+    
         
     def count(self) -> int:
         query = (
-            "MATCH (a:Attribute {tag : 'att_proteome'})-[:HAS_TRAIT]->(av:Trait) "
-            "RETURN count(av) "
+            "MATCH (prot:Proteome) "
+            "RETURN count(prot) "
         )
         r = self._driver.execute_query(query_=query,routing_="r",result_transformer_=Result.value)
+        if len(r) == 0: return 0
+        return r[0]
         return r 
     
     def correlate_features(self, tag : str, cutoff : float = 0.5, min_data_points : int = 20, chunk_size : int = 20000):
@@ -98,8 +95,8 @@ class Neo4JProteomes(ProteomesABC):
     def delete(self, tag: str) -> bool:
 
         query = (
-            "MATCH (av:AttributeValue {tag : $proteome_tag}) "
-            "SET av.active = false "
+            "MATCH (prot:Proteome {tag : $proteome_tag}) "
+            "SET prot.active = false, prot.modified_at = timestamp() "
             )
         try:
             self._driver.execute_query(query_=query,routing_="w")
@@ -109,6 +106,28 @@ class Neo4JProteomes(ProteomesABC):
             return False 
         
     
+    def exists(self, tag: str) -> bool:
+        """Check if a proteome with the given tag exists.   
+        Parameters
+        ----------
+        tag : str
+            The proteome tag to check for existence.
+
+        Returns
+        -------
+        bool
+            True if the proteome exists, False otherwise.
+        """
+        
+        query = (
+            "MATCH (prot:Proteome {tag : $tag}) "
+            "RETURN count(prot) > 0 as exists"
+        )
+        
+        r = self._driver.execute_query(query=query, routing_="r", result_transformer_=Result.value, tag=tag)
+        
+        return r[0] if r else False
+    
     def exist(self, tags : str|List[str]) -> bool:
         """Check if tag/tags exists. If list is given,
         then it checks if ALL exist. If one is missing, 
@@ -117,7 +136,7 @@ class Neo4JProteomes(ProteomesABC):
         Parameters
         ----------
         tags : List[str]
-            _description_
+            Proteome tags to check for existence.(Uniprot proteome ids)
 
         Returns
         -------
@@ -128,9 +147,9 @@ class Neo4JProteomes(ProteomesABC):
         if isinstance(tags,str):
             tags = [tags]
         
-        query = ("MATCH (a:Attribute {tag : 'att_proteome'})-[:HAS_TRAIT]->(av:Trait) "
-                 "WHERE av.tag in $tags "
-                 "RETURN av.tag "
+        query = ("MATCH (prot:Proteome) "
+                 "WHERE prot.tag in $tags "
+                 "RETURN prot.tag "
                  )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_= Result.value, tags = tags)
@@ -206,10 +225,12 @@ class Neo4JProteomes(ProteomesABC):
         return r[0]
     
     def get_feature_abundance_dist(self, tag : str) -> QuantileModel:
-        "" 
+        """
+        Get the abundance distribution of features for a specific proteome.
+        """
         query = (
-            "MATCH (av:AttributeValue {tag : $tag}) "
-            "MATCH (av)<-[:IN_PROTEOME]-(p:Protein)<-[r:QUANTIFIED]-(s:Sample) "
+            "MATCH (prot:Proteome {tag : $tag}) "
+            "MATCH (prot)<-[:IN_PROTEOME]-(p:Protein)<-[r:QUANTIFIED]-(s:Sample) "
             "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N "
         )
         
@@ -253,7 +274,7 @@ class Neo4JProteomes(ProteomesABC):
         Parameters
         ----------
         data : pd.DataFrame
-            The protein data with the following headers
+            The protein data with the following headers. The headers are required and the names match the Uniprot API:
             
                 - Length (int) : The number of amino acids
                 - Gene names (str) : All gene names associated with the protein
@@ -271,32 +292,23 @@ class Neo4JProteomes(ProteomesABC):
         if any(column_name not in data.columns for column_name in ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version"]):
             raise ValueError('Column names incomplete. Must have ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version"]')
         
-        
         query = (
-            "MERGE (av:AttributeValue {tag : $proteome_attribute_tag}) "
+            "MERGE (proteome:Proteome {tag : $proteome_attribute_tag}) "
             "ON CREATE "
-            "SET av.created_at = timestamp(), av.user_tag = $user_tag "
+            "SET proteome.created_at = timestamp(), proteome.user_tag = $user_tag "
             "ON MATCH "
-            "SET av.modified_at = timestamp(), av.user_tag = $user_tag "
-            "MERGE (u:Unit {tag : 'feature:' + av.tag}) "
-            "ON CREATE "
-            "SET u.created_at = timestamp(), u.text = av.text, u.priority = 500, u.description = av.text "
-            "ON MATCH "
-            "SET u.modified_at = timestamp(), u.text = av.text, u.description = av.text  "
-            "WITH av, u "
-            "MATCH (ut:UnitType {tag : 'feature'}) "
-            "MERGE (u)<-[:HAS_UNIT]-(ut) "
-            "WITH av "
+            "SET proteome.modified_at = timestamp(), proteome.user_tag = $user_tag "
+            "WITH proteome "
             "UNWIND $uniprot_features as row "
-            "MERGE (n:Protein {tag : row.Entry}) "
+            "MERGE (protein:Protein {tag : row.Entry}) "
             "ON CREATE "
-            "   SET n += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_tag : $proteome_tag, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
+            "   SET protein += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_tag : $proteome_tag, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
             "ON MATCH "
-            "   SET n.gene_names = row.`Gene Names`, n.protein_name = row.`Protein names`, n.gene_name = row.`Gene Names (primary)`, n.aa_length = row.Length, n.proteome_tag = $proteome_tag "
-            "WITH n,av, row "
-            "MERGE (n)-[r:IN_PROTEOME]->(av) "
+            "   SET protein.gene_names = row.`Gene Names`, protein.protein_name = row.`Protein names`, protein.gene_name = row.`Gene Names (primary)`, protein.aa_length = row.Length, protein.proteome_tag = $proteome_tag "
+            "WITH protein, proteome, row "
+            "MERGE (protein)-[r:IN_PROTEOME]->(proteome) "
             "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
-            "MERGE (n)-[:HAS_SEQUENCE]-(sequence) "
+            "MERGE (protein)-[:HAS_SEQUENCE]-(sequence) "
         )
         self._driver.execute_query(query, 
                                    proteome_attribute_tag = proteome_tag, 

@@ -48,6 +48,7 @@ from routers.maintenance import symptoms
 from routers.maintenance import maintenance 
 from routers.maintenance import procedures
 from routers.maintenance import spareparts
+from routers.peptides import peptides
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
@@ -80,7 +81,8 @@ router_sources = [dataset,
                   states,
                   symptoms,
                   procedures,
-                  spareparts]
+                  spareparts, 
+                  peptides]
 
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
@@ -98,19 +100,41 @@ dataset_tag = "BkrjUoOjGN"#"LOGtC9tNC13b" # "BuXOSlIl6G" #"BuXOSlIl6G"#"0Ks1mc18
 #m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
 #print(m)
 #meta = DatasetSubmissionModel(**m, tag = m["label"])
-#d = pd.read_csv(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/data.txt", sep="\t").set_index("Key") #.sample(n=4000)
+d = pd.read_csv(f"/Users/hnolte/Desktop/peptide_test.txt", sep="\t") #.sample(n=4000)
+submission_tag = "blood"
+#DB.peptides.get_abundance(tag = "SPQLLIYAATSLADGVPSR") 
+#print("PEPTIDE DATA")
+#DB.proteomes.insert_uniprot_proteome(proteome_tags=["UP000000589"])
+#lf, tag : str, submission_tag : str, sample_name : str, sample_index : int):
+i = 0 
+d.loc[:,"tag"] = d["sequence"].values 
+# #DB.peptides._insert_peptides(data = d[["sequence", "protein_tag", "start", "end", "tag"]])
+# for colName in d.columns:
+#     if colName not in ["protein_tag", "start", "end","tag","sequence"]:
+#         print(colName)
+#         print(d[["tag", colName]].rename(columns={colName:"value"}))
+#         #sample_tag = DB.samples.insert(submission_tag=submission_tag, sample_name=colName, sample_index=i)
+#         DB.peptides.insert_quantification_data_from_df(submission_tag=submission_tag, 
+#                                                        sample_name=colName, 
+#                                                        quantification_data=d[["tag", colName]].rename(columns={colName:"value"}))
+#         i += 1
 
-DB.submissions.insert_condition_procedure(tag = "asda224", attribute_tag = "att_compound",
-                                          trait_tag = "att_compound:cccp") 
+# r = DB.peptides.correlate_to(tag = "EYLSMLTDINGK", exclude_within_protein_correlation=True, limit = 10, min_size=50)
+# print(r, "correlate to EYLSMLTDINGK")
+# r = DB.peptides.correlate_peptides_of_proteins(protein_tags=["E9Q414"])
+# print(r)
 
-DB.submissions.insert_condition_procedure(tag = "asda224",
-                                          trait_data = [
-                                              {"type" : "Attribute", "tag" : "att_compound", 
-                                               "children" : [
-                                                   {"type" : "Trait", "tag" : "att_compound:hydroxyurea",  
-                                                    "children" : [
-                                                        {"type" : "Attribute", "tag" : "att_concentration", 
-                                                         "children" : [{"type" : "Trait", "tag" : "att_concentration:M", "value" : 2}]}]}]}]) 
+# DB.submissions.insert_condition_application(tag = "asda224", attribute_tag = "att_compound",
+#                                           trait_tag = "att_compound:cccp") 
+
+# DB.submissions.insert_condition_application(tag = "asda224",
+#                                           trait_data = [
+#                                               {"type" : "Attribute", "tag" : "att_compound", 
+#                                                "children" : [
+#                                                    {"type" : "Trait", "tag" : "att_compound:hydroxyurea",  
+#                                                     "children" : [
+#                                                         {"type" : "Attribute", "tag" : "att_concentration", 
+#                                                          "children" : [{"type" : "Trait", "tag" : "att_concentration:M", "value" : 2}]}]}]}]) 
                                           
                                           
 #check for users

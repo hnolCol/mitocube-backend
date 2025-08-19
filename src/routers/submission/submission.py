@@ -15,19 +15,19 @@ from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 from config.settings.metatexts import MetaTexts
 from config.settings.email import get_email_settings
-from config.enums.users.roles import UserRolesEnum
+
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
 from config.models.searches import FulltextSearchResult
 from config.models.news.news import NewsModel
 
-from config.exceptions.HTTPExceptions import mandatory_dataset_attrs_not_found_exception, tag_not_found, user_role_too_low, user_not_found, user_forbidden
+from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
 from config.models.submissions.submissions import NewSubmissionModel, SubmissionQueryResponse, DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
 from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel, SubmissionCountResponse
-from config.models.submissions.states import StateResponse, StateChangeModel
+from config.models.submissions.states import StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.timeline import TimelineInputModel
 from config.models.submissions.runs import RunListRequestPropsModel, RunListResponseModel
@@ -35,16 +35,12 @@ from config.models.unit import UnitTypeInputModel
 from config.enums.units import UnitsEnum
 
 
-from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator, is_user_admin
-from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata, get_dataset_from_database, add_timeline_entry_to_metadata
-from services.json import save_json
-from services.mail import send_email_in_background
-from services.paths.utils import check_dir_exists, join_path
+from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin
+from services.submission import get_dataset_from_database
 
+from services.mail import send_email_in_background
 
 DB = Database.DB()
-
-
 
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
@@ -59,12 +55,89 @@ router = APIRouter(
 @router.get("/submissions/tag",
     summary = "Returns a unique tag for a new submission.",
     response_model = SubmissionIDResponse)
-def get_submission_id(user : UserModel = Depends(get_user_from_token)):
+def get_submission_tag(user : UserModel = Depends(get_user_from_token)):
     """
     A unique id that cannot be changed for a project/data/submission.
     TODO Check if its really unique ;) dummy func. 
     """
-    return SubmissionIDResponse()
+    tag = DB.submissions.get_unique_tag()
+    return SubmissionIDResponse(tag = tag)   
+
+
+@router.get("/submissions/q")
+def get_submission_by_query(state : str|int = None,
+                            search_string : str = None,
+                            feature_key : str = None, 
+                            trait_tags : str = None, 
+                            attribute_tag : str = None, 
+                            genotype_tag : str = None, 
+                            user_tag : str = None,
+                            limit : int = 20, 
+                            ordered : bool = True,
+                            group_by_state : bool = True,
+                            user : UserModel = Depends(get_user_from_token)
+                            ) -> List[str]| Dict[str|int, List[str]]: 
+    """Returns the submissions that match a given filter. 
+
+    Parameters
+    ----------
+    state : str | int, optional
+        _description_, by default None
+    query : Annotated[str  |  None, Query, optional
+        _description_, by default 1)]=None
+    feature_key : str, optional
+        _description_, by default None
+    trait_tags : str, optional
+        _description_, by default None
+    attribute_tag : str, optional
+        _description_, by default None
+    genotype_tag : str, optional
+        _description_, by default None
+    user_tag : str, optional
+        _description_, by default None
+    limit : int, optional
+        _description_, by default 50
+    ordered : bool, optional
+        _description_, by default True
+    group_by_state : bool, optional
+        groups the submission tags by state, by default True
+    user : UserModel, optional
+        _description_, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    List of submission tags that match the filtering. 
+    
+    # SubmissionQueryResponse
+    #     Summarizes the result with the following keys:
+    #         - 'submission' (List[Dict]) : Minimal information about a submission.
+    #         - 'tags' (List[str]) : List of submission tags 
+    #         - 'query_count' : The number of submissions that match the filtering ignoring
+    #         the provided limit.
+    #         - 'total_count' (int) : The number of all submissions in the dataset. 
+    """
+
+
+
+
+    N = DB.submissions.count()
+    tags = DB.submission_filter.find(
+            search_string = search_string,
+            state = APIParamInt(param = state).param, 
+            attribute_tag=APIParamString(param=attribute_tag).param,
+            trait_tags=APIParamString(param=trait_tags).param,
+            protein_tag=APIParamString(param=feature_key).param,
+            user_tag=APIParamString(param=user_tag).param,
+            genotype_tag = APIParamString(param=genotype_tag).param,
+            ordered = ordered,
+            limit = limit
+            )
+    
+    if group_by_state:
+        #group by state
+        tags = DB.submission_filter.group_by_state(tags = tags)
+    return tags 
+    
 
 
 # @router.patch("/submissions/{submission_label}/metatext", summary="Update the metatext of a submission.")
@@ -86,12 +159,20 @@ def get_submission_id(user : UserModel = Depends(get_user_from_token)):
     
 
 @router.get("/submissions/{submission_tag}/title")
-def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
     "Returns the submission title by its tag."
     if not DB.submissions.exists(tag = submission_tag):
         return tag_not_found
     return DB.submissions.get_title(tag = submission_tag)
 
+
+
+@router.get("/submissions/{submission_tag}/createdat")
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> float:
+    "Returns the submission created at by its tag."
+    if not DB.submissions.exists(tag = submission_tag):
+        return tag_not_found
+    return DB.submissions.get_created_at(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/metatext")
 def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
@@ -118,9 +199,9 @@ def get_meta_text(user : UserModel = Depends(get_user_from_token)):
 
 
 @router.get("/submissions/states", summary="Returns the states enum as well as colors associated with the state.")
-def get_project_states(user : UserModel = Depends(get_user_from_token)):
+def get_states(user : UserModel = Depends(get_user_from_token)):
     """"""
-    return StateResponse()
+    return DB.submissions.get_states()
 
 
 @router.get("/submissions/{submission_tag}/users")
@@ -326,88 +407,6 @@ def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)
     print(matches)
 
 
-
-@router.get("/submissions/q")
-def get_submission_by_query(state : str|int = None,
-                            search_string : str = None,
-                            feature_key : str = None, 
-                            trait_tags : str = None, 
-                            attribute_tag : str = None, 
-                            genotype_tag : str = None, 
-                            user_tag : str = None,
-                            max_submissions : int = 50, 
-                            user : UserModel = Depends(get_user_from_token)
-                            ) -> List[str]: 
-    """Counting the submissions based on various filter criteria. 
-
-    Parameters
-    ----------
-    state : str | int, optional
-        _description_, by default None
-    query : Annotated[str  |  None, Query, optional
-        _description_, by default 1)]=None
-    feature_key : str, optional
-        _description_, by default None
-    trait_tags : str, optional
-        _description_, by default None
-    attribute_tag : str, optional
-        _description_, by default None
-    genotype_tag : str, optional
-        _description_, by default None
-    user_tag : str, optional
-        _description_, by default None
-    max_submissions : int, optional
-        _description_, by default 50
-    user : UserModel, optional
-        _description_, by default Depends(get_user_from_token)
-
-    Returns
-    -------
-    List of submission tags that match the filtering. 
-    
-    # SubmissionQueryResponse
-    #     Summarizes the result with the following keys:
-    #         - 'submission' (List[Dict]) : Minimal information about a submission.
-    #         - 'tags' (List[str]) : List of submission tags 
-    #         - 'query_count' : The number of submissions that match the filtering ignoring
-    #         the provided limit.
-    #         - 'total_count' (int) : The number of all submissions in the dataset. 
-    """
-
-
-
-
-    N = DB.submissions.count()
-    tags = DB.submission_filter.get(
-            search_string = search_string,
-            state = APIParamInt(param = state).param, 
-            attribute_tag=APIParamString(param=attribute_tag).param,
-            trait_tags=APIParamString(param=trait_tags).param,
-            protein_tag=APIParamString(param=feature_key).param,
-            user_tag=APIParamString(param=user_tag).param,
-            genotype_tag = APIParamString(param=genotype_tag).param,
-            limit = max_submissions
-            )
-    print(tags)
-    return tags 
-    print(tags)
-    if len(tags) == 0: 
-        #empty response
-        return SubmissionQueryResponse(submissions=[],query_count=0,total_count=N,tags=[])
-    
-    meta_data = DB.meta.get(tags = tags)
-    print(meta_data)
-    
-    d = {
-        "submissions" : meta_data,
-        "tags" : tags,
-        "query_count"  : len(tags),
-        "total_count" : N
-    }
-    print(SubmissionQueryResponse(**d))
-    return SubmissionQueryResponse(**d)
-    
-    
     
 @router.post("/submissions", summary="Add submission to the database")
 def add_submission(background_task : BackgroundTasks , submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
@@ -415,44 +414,64 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     Adds a submission to the database
     """    
     if DB.submission_exists(tag = submission.tag):
-        raise HTTPException(status_code=409, detail="Submission label exists already. Use the update function to update the submission tag.")
+        raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update the submission or use a different tag (/api/submissions/tag).")
 
-    mandatory_attributes = DB.attributes.get_mandatory_attributes()
-    missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
+
+    print(submission, "submission worked")
+    DB.submissions.insert(tag = submission.tag,
+                          title = submission.title,
+                          user_tag = user.tag,
+                          collaborators = submission.collaborators)
+    #set the state to submitted
+    DB.submissions.set_state(tag = submission.tag, state = SubmissionStatesEnums.SUBMITTED, user_tag = user.tag) 
+    DB.submissions.insert_attributes(tag = submission.tag, traits = submission.dataset_attributes) 
+    #insert sampples and sample conditions (attributes/traits)
+    for idx,sample_name in enumerate(submission.sample_names):
+            sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
+            sample_attributes = submission.samples_attributes[idx] 
+            print(sample_attributes)
+            DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
+
+    return 
     
-    if len(missing_mand_attributes) > 0:
-        exception = mandatory_dataset_attrs_not_found_exception
-        raise exception
+
+
+    # mandatory_attributes = DB.attributes.get_mandatory_attributes()
+    # missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
+    
+    # if len(missing_mand_attributes) > 0:
+    #     exception = mandatory_dataset_attrs_not_found_exception
+    #     raise exception
 
     
-    metadata = DatasetSubmissionModel(
-        created_on=submission.created_on,
-        title=submission.title,
-        tag= submission.tag,
-        replicates=submission.replicates,
-        n_samples=len(submission.sampleNames),
-        user_tag=user.tag, 
-        collaborators=submission.collaborators,
-        state = SubmissionStatesEnums.DONE if submission.includes_data else SubmissionStatesEnums.SUBMITTED,
-        sample_names=submission.sampleNames,
-        dataset_attributes=submission.datasetAttributes,
-        samples_attributes=submission.samplesAttributes,
-        samples_genotypes=submission.genotypes,
-        dataset_attribute_input=submission.datasetAttributeInput,
-        metatext=submission.metatext
-    )
+    # metadata = DatasetSubmissionModel(
+    #     created_on=submission.created_on,
+    #     title=submission.title,
+    #     tag= submission.tag,
+    #     replicates=submission.replicates,
+    #     n_samples=len(submission.sampleNames),
+    #     user_tag=user.tag, 
+    #     collaborators=submission.collaborators,
+    #     state = SubmissionStatesEnums.DONE if submission.includes_data else SubmissionStatesEnums.SUBMITTED,
+    #     sample_names=submission.sampleNames,
+    #     dataset_attributes=submission.datasetAttributes,
+    #     samples_attributes=submission.samplesAttributes,
+    #     samples_genotypes=submission.genotypes,
+    #     dataset_attribute_input=submission.datasetAttributeInput,
+    #     metatext=submission.metatext
+    # )
 
     
-    #save_json(metadata.model_dump(),"MODEL.json")
-    try:
-        DB.insert_meta(meta_data=metadata)
-    except ConstraintError:
-        #should not happen, since it is controlled before, delete?
-        raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update a submission.")
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail="An unknown error occured.")
-    check_collaborators = are_public_users_allowed(user_tags=metadata.collaborators)
+    # #save_json(metadata.model_dump(),"MODEL.json")
+    # try:
+    #     DB.insert_meta(meta_data=metadata)
+    # except ConstraintError:
+    #     #should not happen, since it is controlled before, delete?
+    #     raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update a submission.")
+    # except Exception as e:
+    #     print(e)
+    #     raise HTTPException(status_code=500, detail="An unknown error occured.")
+    # check_collaborators = are_public_users_allowed(user_tags=metadata.collaborators)
     
     if not submission.includes_data:
         DB.news.insert(NewsModel(user_tag=user.tag,
@@ -491,7 +510,61 @@ def get_submission_attributes(submission_tag : str,
             'tag' : submission_tag,
             }
 
-@router.patch("/submissions/{submission_tag}/state")
+@router.patch("/submissions/{submission_tag}/state/{state_tag}")
+def update_submission_state(background_task : BackgroundTasks, 
+                          submission_tag : str, 
+                          state_tag : SubmissionStatesEnums, 
+                          user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+    """
+    Updates the state of a submission. The user must be at least curator to update the state.
+    Returns the updated version of the complete submission.
+    
+    Parameters
+    ----------
+    background_task : BackgroundTasks
+        Background task to send an email in the background.
+    submission_tag : str
+        The tag of the submission to update.
+    user : UserModel, optional
+        The user making the request, by default Depends(is_user_at_least_curator)
+
+    Returns
+    -------
+    bool
+        True if the state was updated successfully.
+    
+    Raises
+    ------
+    HTTPException
+        If the submission with the given tag does not exist or if there is an error during the update.
+    """
+    
+    if not DB.submissions.exists(tag = submission_tag): raise tag_not_found
+    
+    ok = DB.submissions.update_state(tag = submission_tag, new_state = SubmissionStatesEnums.DONE, user_tag = user.tag)
+    
+    if ok:
+        submission_title = DB.submissions.get_title(tag = submission_tag) # to check if the submission exists and to get the title
+        submission_user_tags = DB.submissions.get_users(tag = submission_tag)
+        submission_users = [DB.users.get_user_by_tag(tag = user_tag) for user_tag in submission_user_tags if DB.users.exists(tag = user_tag)]
+        if len(submission_users) == 0:
+            raise HTTPException(status_code=404, detail="Submission user not found. The state of the submission has been updated, but the user could not be found.")
+        user_emails = [user.email] + [user.email for user in submission_users]
+        first_names = [user.firstname for user in submission_users]
+        
+        send_email_in_background(background_tasks=background_task,
+                             subject=f"Project {submission_title} ({submission_tag}) state updated.",
+                             email_to=user_emails,
+                             include_setting_cc=True,
+                             body={
+                                 "app_name" : GENERAL_SETTINGS.app_name,
+                                 "first_name" : ", ".join(first_names),
+                                 "state" : SubmissionStatesEnums(state_tag).name,
+                                 "title" : submission_title,
+                                 "submission_label" : submission_tag,
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission_tag}" #pydanitc HttpUrl (url) returns www.__.com/  
+                             },
+                             template_name=EMAIL_SETTINGS.mail_project_state_template)
 
 @router.patch("/submissions/{submission_tag}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 

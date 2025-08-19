@@ -214,7 +214,7 @@ class AttributesABC(ABC):
     
     @abstractmethod    
     def find_attributes_and_traits(self, 
-                                                   search_string : str, 
+                                                   search_string : str = None, 
                                                    min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                                    limit : int = None,
                                                     ) -> List[AttributeTraitResponseModel]:

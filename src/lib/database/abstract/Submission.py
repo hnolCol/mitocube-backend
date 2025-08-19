@@ -9,7 +9,7 @@ from deprecated import deprecated
 import pandas as pd
 
 from config.settings.db import get_db_settings
-from config.models.submissions.submissions import DatasetSubmissionModel
+from config.models.submissions.submissions import DatasetSubmissionModel, AttributeTree
 from config.models.submissions.comments import SubmissionCommentModel
 from config.enums.states import SubmissionStatesEnums
 
@@ -79,7 +79,22 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def get_title(self, tag : str) -> str:
         "Return the title of a given submission."
-    
+        
+    @abstractmethod
+    def get_created_at(self, tag : str) -> float:
+        """Returns the created at timestamp of a submission.
+        
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        float
+            The created at timestamp of the submission.
+        """
+
     @abstractmethod
     def get(self, tag : str) -> DatasetSubmissionModel:
         """Returns the submission
@@ -107,6 +122,36 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def get_samples(self, tag : str)-> List:
         "Returns the samples of a submission"
+    
+    @abstractmethod
+    def get_states(self) -> List[int]:
+        "Returns the available submission states in the database."
+        
+    @abstractmethod
+    def get_creator(self, tag : str) -> str| None:
+        """
+        Returns the user tag of the creator of the submission.
+        Parameters
+        ----------
+        tag : str 
+            The tag of the submission.  
+            
+        Returns     
+        ------- 
+        str   the user tag of the creator of the submission.
+        """
+    @abstractmethod   
+    def get_users(self, tag : str) -> List[str]: 
+        """Returns the users that are associated with the submission.
+        Parameters 
+        ----------
+        tag : str
+            The tag of the submission.  
+        Returns     
+        -------     
+        List[str]   A list of user tags that are associated with the submission.
+        """
+    
     
     @abstractmethod
     def get_state(self, tag: str) -> SubmissionStatesEnums:
@@ -150,6 +195,14 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):
         "Inserts a comment for a submission." 
+        
+        
+    @abstractmethod
+    def insert_attributes(self, tag : str, traits : List[AttributeTree]) -> bool:
+        """Inserts the dataset attributes for a submission. 
+        The dataset attributes are the traits that are associated with the submission.
+        """
+        
     
     @abstractmethod
     def delete(self, tag : str) -> bool:
@@ -241,15 +294,30 @@ class SubmissionFilterABC(ABC):
             If the database query throws an exception. 
         """
         
+    @abstractmethod
+    def group_by_state(self, tags : List[str] = None) -> Dict[str, List[str]]:
+        """Groups the submission tags by state. 
+        Parameters
+        ----------
+        tags : List[str], optional
+            The submission tags to consider, if None all submission are considered, by default None
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary where the keys are the state tags and the values are the submission tags associated with the state. 
+        """
     
     @abstractmethod
-    def get(self,
+    def find(self,
             state : List[int] = None, 
             trait_tags : List[str] = None, 
             attribute_tag : List[str]= None, 
             user_tag : List[str] = None, 
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
+            ordered : bool = True,
+            search_string : str = None,
             limit : int = 10) -> List[str]:
         """Returns the submission tags that match the filtering. 
         The filtering is performed using the AND operator throughout. 
@@ -268,6 +336,10 @@ class SubmissionFilterABC(ABC):
             _description_, by default None
         genotype_tag : List[str], optional
             _description_, by default None
+        ordered : bool, optional
+            If True, the results are ordered by the submission creation date in descending order, by default True
+        search_string : str, optional
+            A string to search for in the submission tags. If provided, the filtering is done on the search string, by default None
         limit : int, optional
             The maximum number of submissions to be returned that match the filtering, by default 10
 

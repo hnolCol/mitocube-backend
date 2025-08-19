@@ -556,6 +556,28 @@ class Neo4JFeatures(FeaturesABC):
         return [FeatureNeoModel(**f) for f in r]
                
         
+    def variance(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:
+        """Returns the variance of the quantification of a feature in a list of submissions."""
+        
+        query = (
+            "MATCH (p:Protein)-[r:QUANTIFIED]->(sample:Sample)<-[:HAS_SAMPLE]->(submission:Submission) "
+            "WHERE p.tag in $tags "
+        )
+        
+        if submission_tags is not None:
+            query += "AND submission.tag in $submission_tags "
+            
+        
+        query += (
+            "MATCH (sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "RETURN p.tag as tag, ca.tag as condition_application_tag, avg(r.value) as std, size(sample) as n_samples, size(submission) as n_submissions "
+        )
+        
+        r = self._driver.execute_query(query, 
+                                       routing_="r", 
+                                       tags = tags, 
+                                       submission_tags = submission_tags, 
+                                       result_transformer_=Result.to_df)
     # def find_datasets(self, tags : List[str], filter_tag : str = None) -> pd.DataFrame:
     # put in dataasets 
     #     "Finds the dataset in which the feature is quantified."

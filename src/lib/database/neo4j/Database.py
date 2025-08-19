@@ -50,7 +50,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.qc = Neo4JQC(driver = self.connection.driver)
-        self.peptides = Neo4JPeptides(driver = self.connection.driver)
+        
         self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)
         self.unittypes = Neo4JUnitTypes(driver = self.connection.driver)
         self.instruments = Neo4JInstruments(driver=self.connection.driver)
@@ -59,6 +59,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.phenotypes = Neo4JPhenotypes(driver = self.connection.driver)
         self.samples = Neo4JSamples(driver=self.connection.driver)
+        self.peptides = Neo4JPeptides(driver = self.connection.driver, samples=self.samples)
         self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
         self.maintenance_event = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)

@@ -50,6 +50,8 @@ def get_attributes(search_string : Optional[str] = None,
         else:
             return DB.attributes.find_attribute(search_string, attribute_group = attribute_group, limit = limit, min_state=min_state)
     #return all attributes
+    if include_traits:
+            return DB.attributes.find_attributes_and_traits( min_state=min_state, limit = limit)
     return DB.attributes.get(limit = limit, attribute_group=attribute_group, min_state=min_state)
 
 

@@ -9,7 +9,7 @@ class General(BaseSettings):
     """Class model for general settings"""
     app_name : str = "MitoCube"
     version : str = "0.1"
-    url : HttpUrl = "https://app.mitocube.com"
+    url : HttpUrl = "https://mitocube.age.mpg.de"
     lead_contact_first_name : str = "Hendrik"
     lead_contact_last_name : str = "Nolte"
     lead_contact_institute : str = "Max Planck Istitute for Biology of Ageing"
