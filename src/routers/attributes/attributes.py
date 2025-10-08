@@ -3,25 +3,16 @@ from typing import List, Optional, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
-from config.models.annotations.feature import FeatureDataResponseModel, FeatureModel
 from config.models.attributes import AttributeModel, AttribteValueInsertModel
 from config.enums.states import SubmissionStatesEnums
-from lib.data.annotations.ABCAnnotations import AnnotationDatabase
+
 from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attribute_in_metadata
-from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
-from lib.database.ABCDatabase import MCAttributes
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel
+
+
+from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel
 from config.models.parameter import APIParamString
-from lib.database.ABCDatabase import MCDatabase
-from lib.data.transform.FeatureData import FeatureData
-from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
-from services.submission import map_tags
 
 from lib.database.Database import Database
-from config.models.unit import UnitTypeResponseModel
-from config.models.prefix import PrefixModel
-from config.models.feature import FeatureNeoModel
 
 DB = Database.DB()
 
@@ -34,25 +25,48 @@ router = APIRouter(
 
 
 ##rather use /q here? 
-@router.get("/q") #AttributeResponseModel
-def get_attributes(search_string : Optional[str] = None, 
-                   min_state : SubmissionStatesEnums = None, 
-                   attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None,
-                   include_traits : bool = True,
-                   limit : int = 20,
-                   user : UserModel = Depends(get_user_from_token)) -> List[AttributeTraitTagResponseModel]|List[str]:
+@router.get("/q")
+def get_attributes(
+    search_string: Optional[str] = None,
+    min_state: SubmissionStatesEnums = None,
+    attribute_groups: Optional[str] = None,  # Accept any string, handle parsing below
+    include_traits: bool = True,
+    limit: int = 20,
+    group_by : Optional[Literal["attribute_group","min_state"]] = None,
+    user: UserModel = Depends(get_user_from_token)
+) -> List[AttributeTraitTagResponseModel] | List[str] | Dict[str, List[str]]:
     """
     Returns the stored attribute and traits.
+    Allows multiple attribute groups separated by ';'.
     """
-    if search_string is not None and isinstance(search_string,str) and len(search_string) > 0:
-        if include_traits:
-            return DB.attributes.find_attributes_and_traits(search_string=search_string, min_state=min_state, limit = limit)
-        else:
-            return DB.attributes.find_attribute(search_string, attribute_group = attribute_group, limit = limit, min_state=min_state)
-    #return all attributes
+
+    if attribute_groups is not None:
+        attribute_groups = APIParamString(param = attribute_groups).param
+        
     if include_traits:
-            return DB.attributes.find_attributes_and_traits( min_state=min_state, limit = limit)
-    return DB.attributes.get(limit = limit, attribute_group=attribute_group, min_state=min_state)
+            return DB.attributes.find_attributes_and_traits(
+                search_string=search_string,
+                min_state=min_state,
+                limit=limit,
+                attribute_groups=attribute_groups
+            )
+        
+    if search_string is not None and isinstance(search_string, str) and len(search_string) > 0:
+        
+            return DB.attributes.find_attribute(
+                search_string,
+                attribute_groups=attribute_groups,
+                limit=limit,
+                min_state=min_state,
+                group_by=group_by
+            )
+    #return all attributes 
+    return DB.attributes.get(
+        limit=limit,
+        attribute_groups=attribute_groups,
+        min_state=min_state,
+        group_by=group_by
+    )
 
 
 @router.get("/hierarchy")
@@ -61,19 +75,13 @@ def get_attribute_hierarchy(tags : str, submission_tag  : str,  user : UserModel
     attribute_hierarchy = DB.attributes.get_attribute_hierarchy(tags=APIParamString(param=tags).param, submission_tag = submission_tag)
     return attribute_hierarchy
 
-
-
-@router.get("/user", response_model=AttributeResponseModel)
-def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
+@router.get("/groups", summary="Returns the attribute group tags present in the database.")
+def get_attribute_groups(limit : int = None) -> List[str]:
     """
-    Returns the stored attribute and attribute value definitions that can be used to define a user.
+    Returns the attribute group tags present in the database.
     """
-    
-    attributes = DB.attributes.get_attributes_for_user()
-    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+    return DB.attributes.get_attribute_group_tags(limit=limit)
 
-    return AttributeResponseModel(attributes=attributes,
-                                  attribute_values=attribute_values)
 
 
 
@@ -100,6 +108,21 @@ def get_mandatory_attributes(state : SubmissionStatesEnums = SubmissionStatesEnu
     return DB.attributes.get_mandatory_attributes(state)
 
 
+@router.get("/count", summary="Returns the number of attributes in the database.")
+def get_attribute_count(user : UserModel = Depends(get_user_from_token)) -> int:
+    """Returns the number of attributes in the database.
+
+    Parameters
+    ----------
+    user : UserModel, optional
+        The user making the request, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    int
+        The number of attributes in the database.
+    """
+    return DB.attributes.count()
 
 @router.get("/dataset")
 def get_dataset_attributes(user : UserModel = Depends(get_user_from_token), min_state : Optional[SubmissionStatesEnums] = None) -> List[AttributeModel]:
@@ -129,13 +152,13 @@ def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel]:
 
 
 @router.get("/groups/{group_tag}")
-def get_attribute_tags_by_group(group_tag : Literal["mandatory","dataset","qc"], min_state : SubmissionStatesEnums = None, limit : int = None) -> List[str]:
-    ""
-    return DB.attributes.find_attribute(attribute_group=group_tag, min_state = min_state, limit=limit)
+def get_attribute_tags_by_group(group_tag : str, min_state : SubmissionStatesEnums = None, limit : int = None) -> List[str]:
+    """Returns the attribute tags associated with a specific group."""
+    return DB.attributes.find_attribute(attribute_groups=APIParamString(param=group_tag).param, min_state = min_state, limit=limit)
 
 
 @router.get("/{attribute_tag}")
-def get_attribute_by_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> AttributeModel:
+def get_attribute_by_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
     "Returns a single attribute by its tag"     
     attribute = DB.attributes.attribute(tag=attribute_tag)
     return attribute
@@ -164,6 +187,12 @@ def get_trait(trait_tag : str, include_input : bool = False, submission_tag : st
         
     raise HTTPException(status_code=404,detail="Tag not associated with a trait/attribute value")
 
+@router.get("/traits/{trait_tag}/text")
+def get_trait_text(trait_tag : str) -> str:
+    "Returns the text associated with a trait tag"
+    trait_text = DB.attributes.get_trait_text(tag = trait_tag)
+    return trait_text
+
 
 @router.get("/{attribute_tag}/traits") 
 def get_all_traits_for_attribute_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
@@ -172,6 +201,17 @@ def get_all_traits_for_attribute_tag(attribute_tag : str, user : UserModel = Dep
         raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
     
     return DB.attributes.get_trait_tags(tag = attribute_tag)
+
+@router.get("/{attribute_tag}/traits/count") 
+def get_all_traits_count_for_attribute_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
+    "Returns the count of all trait tags associated with an attribute"
+    if not DB.attributes.exists(tag = attribute_tag): 
+        raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
+
+    return DB.attributes.count_traits(tag = attribute_tag)
+
+    return DB.attributes.get_trait_tags(tag = attribute_tag)
+
 
 @router.get("/{attribute_tag}/children")
 def get_attribute_children(attribute_tag : str) -> List[str]:
@@ -182,43 +222,48 @@ def get_attribute_children(attribute_tag : str) -> List[str]:
     
     return DB.attributes.get_children(tag = attribute_tag)
 
-@router.get("/{attribute_tag}/unittypes")
-def get_unittypes_by_attribute_tag(attribute_tag : str) -> Dict[str,List[str]]:
-    """_summary_
+
+
+@router.get("/{attribute_tag}/min_state")
+def get_min_state_for_attribute(attribute_tag : str) -> SubmissionStatesEnums:
+    """Returns the minimum state for an attribute.
 
     Parameters
     ----------
     attribute_tag : str
-        The attribute's tag to get the unittype for. 
+        The tag of the attribute.
 
     Returns
     -------
-    Dict
-        key = attribute_tag
-        values = List[unittype_tags] ["concentration"] 
-
-
-    Raises
-    ------
-    HTTPException
-        _description_
+    SubmissionStatesEnums
+        The minimum state for the attribute.
     """
     
-    if not DB.unittypes.has_attribute_unit_types(attribute_tag=attribute_tag):
-        raise HTTPException(status_code=404, detail="The attribute is not associated with a unittype.")
+    if not DB.attributes.exists(tag = attribute_tag): 
+        raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
     
-    unit_types = DB.attributes.get_unittype(tags = [attribute_tag])    
-    return unit_types
-
-@router.get("/units", deprecated=True)
-def get_attribute_value_units(tag : str):
-    ""     
-    r = DB.attributes.unit(tags = APIParamString(param=tag).param)
-    if len(r) == 0: return {"units" : [], "prefixes" : PrefixModel()}
-    return {"units" : r, "prefixes" : PrefixModel()}
+    return DB.attributes.get_min_state(tag = attribute_tag)
 
 
+@router.get("/{attribute_tag}/priority")
+def get_priority_for_attribute(attribute_tag : str) -> int:
+    """Returns the priority for an attribute.
 
+    Parameters
+    ----------
+    attribute_tag : str
+        The tag of the attribute.
+
+    Returns
+    -------
+    int
+        The priority for the attribute.
+    """
+    
+    if not DB.attributes.exists(tag = attribute_tag): 
+        raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
+
+    return DB.attributes.get_priority(tag = attribute_tag)
 
 
 @router.get("/attribute_values/q")

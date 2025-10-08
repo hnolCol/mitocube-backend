@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, Depends
 from typing import List 
 
 from lib.database.Database import Database
@@ -7,11 +7,7 @@ from config.models.user import UserModel
 from config.models.submissions.comments import SubmissionCommentModel 
 from config.exceptions.HTTPExceptions import tag_not_found
 
-from services.users import get_user_from_token, are_public_users_allowed, is_user_at_least_curator, is_user_admin
-from services.submission import submission_to_json, check_for_missing_mandatory_attribute, map_tags_to_attribute_in_metadata, get_dataset_from_database, add_timeline_entry_to_metadata
-from services.json import save_json
-from services.mail import send_email_in_background
-from services.paths.utils import check_dir_exists, join_path
+from services.users import get_user_from_token
 
 
 DB = Database.DB()

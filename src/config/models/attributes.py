@@ -6,7 +6,32 @@ from config.models.feature import FeatureNeoModel
 
 from config.enums.units import UnitsEnum
 from config.models.unit import UnitInputResponseModel
-class AttributeModel(BaseModel):
+
+
+class AttributeBaseModel(BaseModel):
+    """Base model for all attributes.
+
+    Parameters
+    ----------
+    BaseModel : _type_
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+
+    Raises
+    ------
+    ValueError
+        _description_
+    """
+    tag : str 
+    text : str
+    priority : int = 500  # attributes will be sorted by priority in descending order
+
+class AttributeModel(AttributeBaseModel):
+
     """
     BaseModel for Attributes
     id : int 
@@ -53,30 +78,15 @@ class AttributeModel(BaseModel):
         The unit type
     """
     
-    id : int = None
-    tag : str 
-    text : str 
-    priority : int = 500  # attributes will be sorted by priority in descending order
-    #parent_id : Optional[int] = None  # parent attribute should be Attribute type
     parent_tag : Optional[str] = None  # parent tag
     group_tag : str  # attribute grouping
     s : Optional[str] = None # search string (no caps)
     children : Optional[List[str]] = None# list of strings that are children of this attribute (for example if an attribute has values to be entered by the user, the attribute must have UnitAttributes as children.)
-    type : Optional[Literal["Investigation","Study","Assay","Measurement","Instrument","InstrumentType","User","Unit"]] = None 
     allow_input : bool #if the attribute allows for data input by the user. For example, a concentration.
-    mandatory_for_submission : bool = False  # must be defined by an attribute value for a submission
-    mandatory_for_active : bool = False  # must be defined by an attribute value for an active (published) state
     has_features_value : Optional[bool] = False  # if true, features (e.g. proteins) can be selected for this attribute
     has_numeric_input : Optional[bool] = False  # if true, attribute can be defined by the user (numeric input)
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
-    allow_for_qc : bool = False  # attributes that are required for qc runs
-    allow_as_filter : bool = True  # attributes allow to filter datasets
-    allow_for_measurement : bool = True  # attribute that are required when state of project changes to measuring, ToDO: I think this is covered by min_state? 
-    allow_for_genotype : bool = False  # attributes that are allowed for specifying a genotype.
-    allow_for_dataset : bool = False  # allow to use this attribute to define a dataset.
-    allow_for_user : bool = False
-    #has_unit : bool = False 
-    #unit : Optional[List[UnitsEnum]] = None # ToDo: define units like this? 
+   
     
     class Config:  
         use_enum_values = True
@@ -91,10 +101,12 @@ class AttributeModel(BaseModel):
     @field_validator('children', mode="before")
     def check_children(cls, v : List[str]|str, field):
         ""
+        if v is None: return None
         if isinstance(v,list): return v 
         if isinstance(v,str): return v.split("|")
+        print(f"Warning: children should be a list of strings, got {type(v)}, input {v}. Converting to empty list.")
+        return []
         
-        return v  # should give an error, if it reaches here
     
     # @field_validator('unit', mode="before")
     # def check_unit(cls, v : str|List[str], field):
@@ -149,6 +161,13 @@ class AttributeModel(BaseModel):
             raise ValueError("Attribute Tags must start 'att_'. Example : 'att_organism")
         return str(v)
 
+
+
+
+class AttributeResponseModel(AttributeBaseModel):
+    allow_input : bool = False  # if the attribute allows for data input by the user. For example, a concentration.
+
+
 AttributeTreeNode = ForwardRef('AttributeTreeNode')
 class AttributeTreeNode(BaseModel):
     """_summary_
@@ -170,10 +189,10 @@ class AttributeTreeNode(BaseModel):
     IS_PARENT_OF : Optional[List[AttributeTreeNode]] = []
 
 
-AttributeTreeNode.model_rebuild()
+# AttributeTreeNode.model_rebuild()
 
 
-print(AttributeTreeNode)
+# print(AttributeTreeNode)
 
 class TraitUnitInput(BaseModel):
     unit_tag : str 
@@ -312,19 +331,19 @@ class AttributeTraitTagResponseModel(BaseModel):
     attribute_tag: str 
     trait_tags: List[str]
 
-class AttributeResponseModel(BaseModel):
-    """
-    Response model for receiving attributes.
-    Parameters
-    ----------
-    attributes : List[AttributeModel]
-        The list of of attributes stored in the database. 
+# class AttributeResponseModel(BaseModel):
+#     """
+#     Response model for receiving attributes.
+#     Parameters
+#     ----------
+#     attributes : List[AttributeModel]
+#         The list of of attributes stored in the database. 
 
-    attribute_values : List[AttributeValueModel]
-        The list of attribute_values. 
-    """
-    attributes : List[AttributeModel]
-    attribute_values : List[AttributeValueModel|FeatureNeoModel]
+#     attribute_values : List[AttributeValueModel]
+#         The list of attribute_values. 
+#     """
+#     attributes : List[AttributeModel]
+#     attribute_values : List[AttributeValueModel|FeatureNeoModel]
 
 
 

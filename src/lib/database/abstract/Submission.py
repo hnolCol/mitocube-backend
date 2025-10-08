@@ -11,6 +11,8 @@ import pandas as pd
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel, AttributeTree
 from config.models.submissions.comments import SubmissionCommentModel
+from config.models.submissions.quantifications import ProteinQuantificationModel, PrecursorQuantificationModel
+from config.models.conditions_applications import ConditionApplicationAttributeModel 
 from config.enums.states import SubmissionStatesEnums
 
 
@@ -75,10 +77,43 @@ class SubmissionsABC(ABC):
         bool
             If the submission tag was found. 
         """
+
+    
+    @abstractmethod
+    def get_research_aim(self, tag: str) -> str:
+        "Returns the research aim of the submission by its tag."
     
     @abstractmethod
     def get_title(self, tag : str) -> str:
         "Return the title of a given submission."
+        
+    @abstractmethod
+    def set_title(self, tag : str, title : str)-> bool:
+        "Sets the title of the submission."
+    
+    @abstractmethod
+    def get_conditions_applications(self, tag : str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+        """Returns the condition application tag for the submission by its tag.
+        
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+        group_by_attribute : bool, optional
+            If True, the condition applications are grouped by attribute, by default False  
+        Returns
+        -------
+        List[str]|List[Dict]
+            The condition application tags for the submission.
+            If group_by_attribute is True, a list of dictionaries is returned where each dictionary has the following structure:
+            ```
+            {
+                "attribute_tag": str,
+                "condition_application_tags": List[str]
+            }
+            ```
+            If group_by_attribute is False, a list of condition application tags (str) is returned.
+        """
         
     @abstractmethod
     def get_created_at(self, tag : str) -> float:
@@ -94,6 +129,31 @@ class SubmissionsABC(ABC):
         float
             The created at timestamp of the submission.
         """
+        
+    @abstractmethod
+    def get_durations_between_states(state_01 : SubmissionStatesEnums, state_02 : SubmissionStatesEnums) -> List[Dict]:
+        """Returns the duration for each submission between two states. 
+        For example, the average duration between SUBMITTED and DONE. 
+
+        Parameters
+        ----------
+        state_01 : SubmissionStatesEnums
+            The first state.
+        state_02 : SubmissionStatesEnums
+            The second state.
+
+        Returns
+        -------
+        List[Dict]
+            List of dictionaries with the following structure:
+            ```
+            {
+                "submission_tag": str,
+                "duration": float # duration in milliseconds
+            }
+            ```
+        """
+        pass
 
     @abstractmethod
     def get(self, tag : str) -> DatasetSubmissionModel:
@@ -120,7 +180,7 @@ class SubmissionsABC(ABC):
         "Returns the comments associated with a submission."
         
     @abstractmethod
-    def get_samples(self, tag : str)-> List:
+    def get_samples(self, tag : str)-> List[str]:
         "Returns the samples of a submission"
     
     @abstractmethod
@@ -168,6 +228,10 @@ class SubmissionsABC(ABC):
         SubmissionStatesEnums
             The state of the submission.
         """
+        
+    @abstractmethod
+    def get_views(self, tag : str) -> int:
+        "Returns the number of views for a submission."
     
     @abstractmethod
     def insert(self, submission : DatasetSubmissionModel) -> bool:
@@ -190,8 +254,63 @@ class SubmissionsABC(ABC):
             If the proteome is not yet in the database. 
         
         """
-    
-    
+    @abstractmethod
+    def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinQuantificationModel]) -> int:   
+        """
+        Inserts protein quantifications for a given submission.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the submission.
+        quantifications : List[Dict]
+            List of protein quantifications to insert.
+
+        Returns
+        -------
+        int
+            Number of inserted protein quantifications.
+        """
+    @abstractmethod
+    def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
+        """
+        Inserts precursor quantifications for a given submission.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the submission.
+        quantifications : List[Dict]
+            List of precursor quantifications to insert.
+
+        Returns
+        -------
+        int
+            Number of inserted precursor quantifications.
+        """
+    @abstractmethod  
+    def insert_research_aim(self, tag : str, research_aim : str, user_tag : str) -> bool:
+        """Inserts a research aim for a given submission.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag
+        research_aim : str
+            The research aim to insert
+        user_tag : str
+            The user tag of the user inserting the research aim
+
+        Returns
+        -------
+        bool
+            True if the research aim was inserted successfully, False otherwise
+        """        
+
+    @abstractmethod
+    def insert_view(self, tag : str, user_tag : str) -> bool:
+        "Inserts a view for a submission."
+
     @abstractmethod
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):
         "Inserts a comment for a submission." 
@@ -237,7 +356,10 @@ class SubmissionsABC(ABC):
         bool
             _description_
         """
-        
+    @abstractmethod
+    def quantification_exists(self, tag : str, type : Literal["proteins","precursors","any"]) -> bool:
+        """Checks if samples have quantification data for a given submission."""
+        pass 
 
 class SubmissionFilterABC(ABC):
     
@@ -353,5 +475,3 @@ class SubmissionFilterABC(ABC):
         Exception
             _description_
         """
-
-    

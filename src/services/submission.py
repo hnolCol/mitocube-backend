@@ -1,6 +1,6 @@
 from datetime import datetime
 from collections import OrderedDict
-from lib.database.ABCDatabase import MCAttributes, MCDatabase
+
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.genotype.PandaGenotype import PandaFileGenotype
 
@@ -174,8 +174,6 @@ def map_tags_to_attribute_in_metadata(submission : DatasetSubmissionModel):
                             
     return DatasetSubmissionResponseModel(**metadata)
 
-    # return AttributeResponseModel(attributes=db_attributes.getAttributes().to_dict(orient="records"),
-    #                               attribute_values=db_attributes.getAttributeValues().to_dict(orient="records"))
     
 
 def check_for_missing_mandatory_attribute(submission : NewSubmissionModel, attributes : List[AttributeModel]) -> List[AttributeModel]:

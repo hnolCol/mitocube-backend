@@ -7,7 +7,7 @@ from lib.database.abstract.Attributes import AttributesABC
 
 from config.enums.states import SubmissionStatesEnums
 
-from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitResponseModel, AttributeResponseModel, AttributeTraitResponseModel, TraitModel, AttributeTraitTagResponseModel
+from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitResponseModel,  AttributeResponseModel, TraitModel, AttributeTraitTagResponseModel
 from config.models.annotations.feature import FeatureModel 
 from config.models.feature import FeatureNeoModel
 from config.models.attributes import AttributeTreeNode
@@ -40,7 +40,7 @@ class Neo4JAttributes(AttributesABC):
         
         min_state_attributes = attribute_df.loc[:,["tag","min_state"]].to_dict(orient="records")
         
-        multi_label_attribute_tags = [a.tag for a in attribute_models if a.type is not None]
+        multi_label_attribute_tags = []# [a.tag for a in attribute_models if a.type is not None]
         
         children = [{"tag" : a.tag, "children" : a.children} for a in attribute_models if isinstance(a.children,list) and len(a.children) > 0]
         #add attribute groups 
@@ -208,7 +208,7 @@ class Neo4JAttributes(AttributesABC):
                 values = [AttributeValueModel(**av) for av in ri[1]]
             return (attribute,values)
         
-    def attribute(self, tag : str) -> AttributeModel:
+    def attribute(self, tag : str) -> AttributeResponseModel:
         """Returns an attribute by tag."""
         
         if not self.exists(tag=tag):
@@ -223,46 +223,73 @@ class Neo4JAttributes(AttributesABC):
     
     
     def find_attribute(self, search_string : str = None, 
-                       attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None,
+                       attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
                        min_state : SubmissionStatesEnums = None, 
-                       limit : int = 20) -> List[str]:
-        
-        if all(a is None for a in [search_string,attribute_group]): raise ValueError("Either 'search_string', 'attribute_group' or 'min_state' must be provided.")
-        
+                       limit : int = 20,
+                       group_by : Literal["attribute_group"] = None) -> List[str]|Dict[str, List[str]]:
+        if all(a is None for a in [search_string, attribute_groups]): raise ValueError("Either 'search_string', 'attribute_groups' or 'min_state' must be provided.")
+
         query = "MATCH (a:Attribute) WHERE "
             
         if search_string is not None:
             query += "a.s CONTAINS $search_string "
         
-        if attribute_group is not None:
+        if attribute_groups is not None:
+
+            if isinstance(attribute_groups, str):
+                attribute_groups = [attribute_groups]
+
             if search_string is not None:
                 query += "AND "
 
-            query += "EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)} "
+            query += "EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
             
             
         if min_state is not None:
-            if search_string is not None or attribute_group is not None:
+            if search_string is not None or (attribute_groups is not None and len(attribute_groups) > 0):
                 query += "AND "
             query += " EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             
-            
-        query += "RETURN a.tag ORDER BY a.priority "
         
-        
+        if group_by is not None:
+            if group_by == "attribute_group":
+                query += "MATCH (groupByNode:AttributeGroup)<-[:PART_OF]-(a) "
+            elif group_by == "min_state":
+                query += "MATCH (groupByNode:State)<-[:REQUIRES_STATE]-(a) "
+
+            query += "WITH groupByNode.tag as group_by_node, a.tag as tag, a.priority as priority "
+            query += "ORDER BY priority DESC, a.text ASC "
+            query += "RETURN group_by_node, collect(tag) as tags "
+        else:
+            query += "RETURN a.tag ORDER BY a.priority DESC, a.text ASC "
+
+
         if limit is not None:
             query += "LIMIT $limit"
+            
+        if group_by is not None:
+            grouped_attribute_tags = self._driver.execute_query(query_=query,
+                        routing_="r",
+                        attribute_groups = attribute_groups,
+                        result_transformer_=Result.values, #requires this to make the correct grouping
+                        min_state = min_state,
+                        search_string = search_string.lower() if isinstance(search_string,str) else "",
+                        limit = limit)
+            
+            return OrderedDict(grouped_attribute_tags) 
         
-        trait_tags = self._driver.execute_query(
+        else:   
+            attribute_tags = self._driver.execute_query(
                         query_=query,
                         routing_="r",
-                        attribute_group = attribute_group,
+                        attribute_groups = attribute_groups,
                         result_transformer_=Result.value,
                         min_state = min_state,
                         search_string = search_string.lower() if isinstance(search_string,str) else "",
                         limit = limit)
         
-        return trait_tags
+        
+            return attribute_tags 
         
         
     def count(self) -> int:
@@ -273,35 +300,6 @@ class Neo4JAttributes(AttributesABC):
         )
         
         r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value)
-        return r[0]
-        
-    def count_values(self, attribute_tag: str = None) -> int:
-        """Returns the number of attribute value by attribute_tag.
-
-        Parameters
-        ----------
-        attribute_tag : str, optional
-            The attribute tag to get the values count from., by default None
-
-        Returns
-        -------
-        int
-            _description_
-        """
-        if attribute_tag is None:
-            query = (
-                "MATCH (av:AttributeValue) "
-                "WHERE NOT 'Protein' in labels(av) "
-                "RETURN count(av) "
-            )
-        else:
-            query = (
-                "MATCH (av:AttributeValue) "
-                "WHERE NOT 'Protein' in labels(av) AND av.tag = attribute_tag "
-                "RETURN count(av) "
-            )
- 
-        r = self._driver.execute_query(query_=query,routing_="r", attribute_tag = attribute_tag, result_transformer_=Result.value)
         return r[0]
     
     def delete(self, tag: str) -> bool:
@@ -375,16 +373,34 @@ class Neo4JAttributes(AttributesABC):
         return trait_tags
         
         
+            
+    # def find_attribute(self, search_string : str = None, 
+    #                    attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
+    #                    min_state : SubmissionStatesEnums = None, 
+    #                    limit : int = 20) -> List[str]:
+    #     if all(a is None for a in [search_string, attribute_groups]): raise ValueError("Either 'search_string', 'attribute_groups' or 'min_state' must be provided.")
+
+    #     query = "MATCH (a:Attribute) WHERE "
+            
+    #     if search_string is not None:
+    #         query += "a.s CONTAINS $search_string "
         
+    #     if attribute_groups is not None:
+
+    #         if isinstance(attribute_groups, str):
+    #             attribute_groups = [attribute_groups]
+
+    #         if search_string is not None:
+    #             query += "AND "
+
+    #         query += "EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
     
     def get(self, 
             tags : List[str] = None,
-            attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None, 
-            # param_name : Literal["allow_for_dataset","allow_as_filter",
-            #                     "allow_for_genotype","allow_for_measurement","allow_for_qc",
-            #                     "mandatory_for_submission","mandatory_for_active"] = None,
+            attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
             min_state : SubmissionStatesEnums = None, 
-            limit : int = None) -> List[str]:
+            limit : int = None,
+            group_by : Literal["attribute_group","min_state"] = None) -> List[str]|Dict[str, List[str]]:
         ""
         
         query = (
@@ -396,31 +412,55 @@ class Neo4JAttributes(AttributesABC):
                 "WHERE a.tag in $tags "
             )
         
-        if attribute_group is not None:
+        if attribute_groups is not None:
+            if isinstance(attribute_groups,str):
+                attribute_groups = [attribute_groups]
+                
             if tags is None:
-                query += "WHERE EXISTS {(a)-[:PART_OF]-(:AttributeGroup {tag : $attribute_group})} "
+                query += "WHERE EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups}"
             else:
-                query += "AND EXISTS {(a)-[:PART_OF]-(:AttributeGroup {tag : $attribute_group})} "
+                query += "AND EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
             
         if min_state is not None:
-            if tags is None and attribute_group is None:
+            if tags is None and attribute_groups is None:
                 query += "WHERE EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             else:
                 query += "AND EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             
-        query += "RETURN a.tag ORDER BY a.priority DESC "
+        if group_by is not None:
+            if group_by == "attribute_group":
+                query += "MATCH (groupByNode:AttributeGroup)<-[:PART_OF]-(a) "
+            elif group_by == "min_state":
+                query += "MATCH (groupByNode:State)<-[:REQUIRES_STATE]-(a) "
+
+            query += "WITH groupByNode.tag as group_by_node, a.tag as tag, a.priority as priority "
+            query += "ORDER BY priority DESC "
+            query += "RETURN group_by_node, collect(tag) as tags "
+        else:
+            query += "RETURN a.tag ORDER BY a.priority DESC "
 
         if limit is not None:
             query += "LIMIT $limit"
 
-        attribute_tags = self._driver.execute_query(query_=query, 
-                                                routing_="r",
-                                                result_transformer_ = Result.value, 
-                                                tags = tags, 
-                                                attribute_group = attribute_group, 
-                                                min_state = min_state,
-                                                limit = limit)
-        return attribute_tags
+        if group_by is not None:
+            grouped_attribute_tags = self._driver.execute_query(query_=query, 
+                                                    routing_="r",
+                                                    result_transformer_ = Result.values, 
+                                                    tags = tags, 
+                                                    attribute_groups = attribute_groups, 
+                                                    min_state = min_state,
+                                                    limit = limit)
+
+            return OrderedDict(grouped_attribute_tags) 
+        else:   
+            attribute_tags = self._driver.execute_query(query_=query, 
+                                                    routing_="r",
+                                                    result_transformer_ = Result.value, 
+                                                    tags = tags, 
+                                                    attribute_groups = attribute_groups, 
+                                                    min_state = min_state,
+                                                    limit = limit)
+            return attribute_tags
 
 
     def values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
@@ -456,6 +496,18 @@ class Neo4JAttributes(AttributesABC):
             return TraitModel(**r[0])
         
         raise ValueError("The trait tag is not known.")
+
+
+    def get_attribute_group_tags(self, limit : int = None) -> List[str]:
+        """Returns the attribute group tags."""
+        query = (
+            "MATCH (ag:AttributeGroup) "
+            "RETURN ag.tag "
+        )
+        if limit is not None:
+            query += "LIMIT $limit "
+        attribute_group_tags = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value, limit = limit)
+        return attribute_group_tags
 
     def get_children(self, tag : str, limit  : int = None) -> List[str]:
         "Returns the attribute's children tags."
@@ -493,7 +545,28 @@ class Neo4JAttributes(AttributesABC):
 
         r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value, tag = tag, limit = limit)
         return r 
-    
+
+        
+    def get_trait_text(self, tag : str) -> str:
+        "Returns the text associated with a trait tag. If not found, an empty string is returned."
+
+        query = "MATCH (t:Trait {tag : $tag}) RETURN t.text "
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        
+        return r[0] if len(r) > 0 else ""
+        
+
+    def count_traits(self, tag : str) -> int:
+        """Returns the number of traits for a single attribute tag"""
+        query = (
+            "MATCH (a:Attribute)-[:HAS_TRAIT]->(trait:Trait) "
+            "WHERE a.tag = $tag "
+        )
+        
+        query += "RETURN count(trait) "
+        
+        r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value, tag = tag)
+        return r[0]
     
     def get_values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
         """Returns the attribute values by a list of attribute value tags.
@@ -567,20 +640,20 @@ class Neo4JAttributes(AttributesABC):
        # attribute_values_props = [av.value() for av in attribute_values]
         return [AttributeValueModel(**av) for av in attribute_values]
     
-    def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
+    # def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
         
-        query = (
-            "MATCH (submission:Submission {tag : $submission_tag}) "
-            "MATCH (a:Attribute)<-[:HAS_VALUES_FOR_ATTRIBUTE]-(submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
-            "WITH a, av "
-            "ORDER BY a.priority DESC, a.min_state ASC " 
-            "WITH {attributes : collect(DISTINCT properties(a)), attribute_values : collect(DISTINCT properties(av))} as output "
-            "RETURN output"
-        )
+    #     query = (
+    #         "MATCH (submission:Submission {tag : $submission_tag}) "
+    #         "MATCH (a:Attribute)<-[:HAS_VALUES_FOR_ATTRIBUTE]-(submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue) "
+    #         "WITH a, av "
+    #         "ORDER BY a.priority DESC, a.min_state ASC " 
+    #         "WITH {attributes : collect(DISTINCT properties(a)), attribute_values : collect(DISTINCT properties(av))} as output "
+    #         "RETURN output"
+    #     )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, submission_tag=submission_tag)
+    #     r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, submission_tag=submission_tag)
     
-        return AttributeResponseModel(**r[0])
+    #     return AttributeResponseModel(**r[0])
     
     
     def get_attribute_values_by_dataset_tags(self, dataset_tags : List[str], attribute_tags : list[str] = None, attribute_value_tags : List[str] = None) -> List[AttributeValuesBySubmissionModel]:
@@ -673,6 +746,39 @@ class Neo4JAttributes(AttributesABC):
             
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, state=state, mandatory_name="mandatory_for_active")
         return [AttributeModel(**ri) for ri in r]
+    
+    
+    def get_min_state(self, tag : str) -> SubmissionStatesEnums:
+        """Returns the minimum state for the given attribute tag."""
+        
+        query = (
+            "MATCH (a:Attribute)-[:REQUIRES_STATE]->(s:State) "
+            "WHERE a.tag = $tag "
+            "RETURN s.tag  "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+
+        if len(r) == 0:
+            raise ValueError(f"Attribute with tag {tag} does not have a minimum state defined.")
+        return SubmissionStatesEnums(int(r[0]))
+
+
+    def get_priority(self, tag : str) -> int:
+        """Returns the priority of the attribute with the given tag."""
+        
+        query = (
+            "MATCH (a:Attribute) "
+            "WHERE a.tag = $tag "
+            "RETURN a.priority "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        
+        if len(r) == 0:
+            raise ValueError(f"Attribute with tag {tag} does not exist.")
+        
+        return r[0] 
     
     def get_dataset_attributes(self, min_state : SubmissionStatesEnums = None):
         """Returns attribute that can be used to define a dataset.
@@ -836,7 +942,7 @@ class Neo4JAttributes(AttributesABC):
                                     search_string : str = None, 
                                     min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                     limit : int = None, 
-                                    attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None) -> List[AttributeTraitTagResponseModel]:
+                                    attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] ]= None) -> List[AttributeTraitTagResponseModel]:
         """Finds the attribute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
         The result is ordered by the attribute priority and trait priority.
@@ -864,14 +970,14 @@ class Neo4JAttributes(AttributesABC):
             params["search_string"] = search_string.lower()
         if min_state is not None:
             params["min_state"] = min_state
-        if attribute_group is not None:
-            params["attribute_group"] = attribute_group
+        if attribute_groups is not None:
+            params["attribute_groups"] = attribute_groups
 
 
         if min_state is not None:
             where_clauses.append("EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag <= $min_state}")
-        if attribute_group is not None:
-            where_clauses.append("EXISTS {(ag:AttributeGroup {tag : $attribute_group})<-[:PART_OF]-(a)}")
+        if attribute_groups is not None:
+            where_clauses.append("EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a)} WHERE ag.tag IN $attribute_groups")
 
         if where_clauses:
             query += "WHERE " + " AND ".join(where_clauses) + " "
@@ -894,7 +1000,7 @@ class Neo4JAttributes(AttributesABC):
             search_string=search_string.lower() if search_string is not None else "",
             limit = limit,
             min_state = min_state, 
-            attribute_group = attribute_group,
+            attribute_groups = attribute_groups,
             result_transformer_= Result.data,
             routing_="r", 
             database_="neo4j")

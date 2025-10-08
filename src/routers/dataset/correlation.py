@@ -9,8 +9,7 @@ from lib.database.Database import Database
 
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 
-from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attribute_in_metadata, get_dataset_from_database
+from services.users import get_user_from_token
 
 DB = Database.DB()
 

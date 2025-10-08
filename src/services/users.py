@@ -3,7 +3,7 @@ from fastapi import Depends
 from pydantic import EmailStr
 from typing import List, Tuple
 from services.encryption import verify_password, get_decoded_token
-from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentials_exception, user_blocked, user_role_too_low, token_not_valid_exception
+from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentials_exception, user_blocked, user_role_too_low, token_not_valid_exception, submission_tag_not_found
 from config.models.user import UserModel, UserRolesEnum, PublicUser
 
 from lib.user.UserHandling import UserDB
@@ -21,7 +21,7 @@ def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends()) -> Us
     """Returns the user from a login"""
     user  = DB.users.get_user_by_email(form_data.username)
     #user verification check
-    user_in_db = check_user_allowed(user is not None,user)
+    user_in_db = check_user_allowed(user is not None, user)
 
     if not verify_password(form_data.password, user_in_db.password.get_secret_value()):
         raise credentials_exception
@@ -73,7 +73,6 @@ def get_user_from_token(token = Depends(check_token_verified)) -> UserModel:
 def is_user_at_least_curator(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     """Checks if the user is at least curator.
     raises an exception if the userrole is not at least curator."""
-    print(user)
     if (user.role >= UserRolesEnum.CURATOR):
         return user
     raise user_role_too_low
@@ -83,4 +82,19 @@ def is_user_admin(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     raises an exception if the userrole is not admin."""
     if (user.role >= UserRolesEnum.ADMIN):
         return user
+    raise user_role_too_low
+
+
+def is_creator_of_submission_or_curator(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> UserModel:
+    """Checks if the user is the creator of a submission.
+    raises an exception if the user is not the creator of the submission."""
+    print(user.tag, submission_tag, "IN DEPENDS")
+    if not DB.submissions.exists(tag = submission_tag):
+        raise submission_tag_not_found
+    creator_tag = DB.submissions.get_creator(tag = submission_tag)
+    if user.tag == creator_tag:
+        return user 
+    else:
+        if user.role >= UserRolesEnum.CURATOR:
+            return user
     raise user_role_too_low

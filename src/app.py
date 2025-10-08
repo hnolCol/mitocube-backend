@@ -10,6 +10,7 @@ import uvicorn
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
 
+from config.enums.states import SubmissionStatesEnums
 from config.settings.proteomes.control_proteomes import get_control_proteome_settings
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.submissions import DatasetSubmissionModel
@@ -25,7 +26,8 @@ from services.paths.utils import get_absolute_path_to_dir
 
 ### import routers
 from routers.dataset import dataset, heatmap, volcano, correlation
-from routers.submission import submission, comments, count
+from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim
+from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
 from routers.info import info
 from routers.annotations import annotations
@@ -37,27 +39,43 @@ from routers.network import network
 from routers.filter import filter
 from routers.rc import rc
 from routers.proteomes import proteomes
-from routers.news import news
+from routers.news import news 
+from routers.news import permissions as news_permissions
 from routers.performance import performance
-from routers.unittypes import unittypes
+from routers.users import views as user_views
 from routers.timelines import timelines
 from routers.researchgroups import researchgroup
 from routers.phenotypes import phenotypes
 from routers.states import states
+from routers.samples import samples
 from routers.maintenance import symptoms
 from routers.maintenance import maintenance 
 from routers.maintenance import procedures
 from routers.maintenance import spareparts
 from routers.peptides import peptides
+from routers.metatexts import metatexts
+from routers.condition_applications import condition_applications
+from routers.ai import openai
+
+from routers.stats import submissions as submission_stats
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
 
-router_sources = [dataset, 
+
+#the order of these matters for the functioning of the routes
+router_sources = [dataset,
+                  submissions_permissions,
+                  submission_stats,
+                  quantifications,
+                  researchaim,
                   submission, 
                   comments,
                   count,
-                  token, user, 
+                  ca,
+                  user_views,
+                  token, 
+                  user, 
                   features, 
                   info, 
                   annotations,
@@ -70,9 +88,9 @@ router_sources = [dataset,
                   filter, 
                   rc, 
                   proteomes, 
+                  news_permissions,
                   news, 
                   performance, 
-                  unittypes,
                   timelines,
                   correlation,
                   researchgroup,
@@ -82,8 +100,15 @@ router_sources = [dataset,
                   symptoms,
                   procedures,
                   spareparts, 
-                  peptides]
-
+                  peptides,
+                  samples,
+                  condition_applications,
+                  metatext, # submission specific metatexts
+                  metatexts, # metatexts in general
+                  openai,
+                  
+]
+    
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
@@ -92,22 +117,33 @@ ROOT_PATH = get_absolute_path_to_dir(__file__)
 CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
-print(DB)
-print(DB.submissions.count(state=4))
-print(DB.submissions.count(state=3))
+
+DB.attributes._utils_insert_from_file()
+# print("DURATION",DB.submissions.get_durations_between_states(state_01 = SubmissionStatesEnums.SUBMITTED, state_02 = SubmissionStatesEnums.DONE))
+
+# print("USER TAGS", DB.submission_filter.filter_by_user(user_tags=["QCQ2qU5c"]))
+DB.submissions.insert_view(tag="lpFT2EPDd0", user_tag="QCQ2qU5c")
+DB.submissions.get_views(tag="lpFT2EPDd0")
 import pandas as pd 
 dataset_tag = "BkrjUoOjGN"#"LOGtC9tNC13b" # "BuXOSlIl6G" #"BuXOSlIl6G"#"0Ks1mc18NL" #"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
 #m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
 #print(m)
-#meta = DatasetSubmissionModel(**m, tag = m["label"])
-d = pd.read_csv(f"/Users/hnolte/Desktop/peptide_test.txt", sep="\t") #.sample(n=4000)
+#meta = DatasetSubmissionModel(**m
+# 
+# 
+#print(DB.condition_applications.find(sort_by_frequency = True, limit = 1), "submission tag filter ca")
+#DB.submissions.get_conditions_applications(tag = "lpFT2EPDd0")
+#DB.submissions.get_conditions_applications(tag = "lpFT2EPDd0", group_by_attribute = True)
+#print(DB.condition_applications.get(tag = "7ba3e7778b33e4bfe591cdd4b010246602e9e008f3b7fcb0c0659eb87ea344db"))
+# , tag = m["label"])
+#d = pd.read_csv(f"/Users/hnolte/Desktop/peptide_test.txt", sep="\t") #.sample(n=4000)
 submission_tag = "blood"
 #DB.peptides.get_abundance(tag = "SPQLLIYAATSLADGVPSR") 
 #print("PEPTIDE DATA")
 #DB.proteomes.insert_uniprot_proteome(proteome_tags=["UP000000589"])
 #lf, tag : str, submission_tag : str, sample_name : str, sample_index : int):
-i = 0 
-d.loc[:,"tag"] = d["sequence"].values 
+#i = 0 
+#d.loc[:,"tag"] = d["sequence"].values 
 # #DB.peptides._insert_peptides(data = d[["sequence", "protein_tag", "start", "end", "tag"]])
 # for colName in d.columns:
 #     if colName not in ["protein_tag", "start", "end","tag","sequence"]:
@@ -177,17 +213,6 @@ for rs in router_sources:
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
-# db_features = PandaFeatureDatabase()
-# db_features.update()  # load all configured Features (UniProt)
-
-# db_annotations = AnnotationDatabase()
-# db_annotations.update()  # load all configured Annotations
-
-# db_attributes = MCAttributes.getAttributeDatabase()
-# db_attributes.update()  # pre-loads the general attribution table (not the attributes from dataset)
-
-# db_genotypes = MCGenotypes.getGenotypeDatabase()
-# db_genotypes.update()
 
 
 @app.get("/", include_in_schema=False)

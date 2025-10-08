@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
-from lib.database.ABCDatabase import MCAttributes
 from services.users import is_user_admin, get_user_from_token
 
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper

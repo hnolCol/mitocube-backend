@@ -1,9 +1,12 @@
-from typing import List, Tuple, Literal
+from typing import List, Dict
 from neo4j import Driver, Result
 
 from lib.database.abstract.Samples import SamplesABC
 from services.encryption import create_hierarchical_hash
 from config.models.submissions.submissions import AttributeTree
+from config.models.conditions_applications import ConditionApplicationAttributeModel
+from config.models.samples import SampleModel
+
 import uuid
 class Neo4JSamples(SamplesABC):
     "" 
@@ -28,6 +31,7 @@ class Neo4JSamples(SamplesABC):
         """
         return f"{submission_tag}|{sample_name}"
     
+
     def exists(self, tag : str) -> bool:
         "Check if a sample is associated with the given tag."
         
@@ -38,6 +42,19 @@ class Neo4JSamples(SamplesABC):
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
         return r[0]
+
+
+    def get(self, tag : str) -> SampleModel:
+        "Returns the sample information for a given sample tag."
+        
+        query = (
+            "MATCH (s:Sample {tag : $tag}) " 
+            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at}  "
+        )
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
+
+        return  r[0] if len(r) > 0 else None
 
 
     def condition_procedure_exists(self, tag : str) -> bool:
@@ -78,7 +95,7 @@ class Neo4JSamples(SamplesABC):
         if self.exists(tag = sample_tag): raise ValueError("Sample tag exists already. ")
         query = (
             "MATCH (s:Submission {tag : $submission_tag}) "
-            "MERGE (sample:Sample {tag : $sample_tag, name : $sample_name, sample_index : $sample_index, created_at : timestamp()}) "
+            "MERGE (sample:Sample {tag : $sample_tag, text : $sample_name, sample_index : $sample_index, created_at : timestamp()}) "
             "MERGE (s)-[:HAS_SAMPLE]->(sample) "
             "RETURN sample.tag "
         )
@@ -87,24 +104,24 @@ class Neo4JSamples(SamplesABC):
                                    submission_tag=submission_tag, sample_name=sample_name, sample_index=sample_index)
         return r[0] if len(r) > 0 else None
      
-    def handle_children(self, sample_tag, trait_node, parent_tag):
+    def handle_children(self, trait_node, parent_tag):
         
         for attribute_node in trait_node["children"]:
             attribute_tag = attribute_node["tag"]
             trait_nodes = attribute_node["children"]
             if len(trait_nodes) > 0:
                 for trait_node in trait_nodes:
-                    parent_tag_2 = self.insert_condition_value(sample_tag, attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag)
+                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag)
                     if len(trait_node.get("children",[])) > 0:
                        # for child in trait_node["children"]:
-                        self.handle_children(sample_tag, trait_node=trait_node, parent_tag=parent_tag_2)
+                        self.handle_children(trait_node=trait_node, parent_tag=parent_tag_2)
     
-    def insert_condition_value(self, sample_tag : str, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
+    def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
         
         cv_tag = uuid.uuid4().hex
         query = (
             "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
-            "MERGE (cv:ConditionValue {tag : $cv_tag, text : $value || $trait_tag}) "
+            "MERGE (cv:ConditionValue {tag : $cv_tag}) "
         )
         if value is not None:
             query += "SET cv.value = $value "
@@ -168,26 +185,28 @@ class Neo4JSamples(SamplesABC):
 
         """
         sample_data = [x.model_dump() for x in sample_data]  # Convert Pydantic models to dicts if necessary
-        print(sample_data)
-        ca_tag = create_hierarchical_hash(sample_data)
-    
-
-        if self.condition_procedure_exists(tag = ca_tag):
-            ##if exists, then just connect to the samples 
-            query = (
-                "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
-                "MATCH (s:Sample {tag : $sample_tag}) "
-                "MERGE (s)-[:HAS_APPLICATION]->(ca) "
-            )
-            
-            self._driver.execute_query(query, routing_="w", ca_tag = ca_tag, sample_tag = sample_tag)
-            
-        else:
-            for condition_application in sample_data:
-                attribute_tag = condition_application["tag"]
-                for trait_node in condition_application["children"]:
-                    trait_tag = trait_node["tag"]
+        
+        for condition_application in sample_data:
+            attribute_tag = condition_application["tag"]
+            for trait_node in condition_application["children"]:
+                trait_tag = trait_node["tag"]
+                #this is the root of the condition applications . 
+                #however they might be multiple traits 
+                #calculate the condition application tag 
+                ca_tag = create_hierarchical_hash(trait_node)
+                
+                if self.condition_procedure_exists(tag = ca_tag):
+                    ##if exists, then just connect to the samples 
+                    query = (
+                        "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
+                        "MATCH (s:Sample {tag : $sample_tag}) "
+                        "MERGE (s)-[:HAS_APPLICATION]->(ca) "
+                    )
                     
+                    self._driver.execute_query(query, routing_="w", ca_tag = ca_tag, sample_tag = sample_tag)
+                    
+                else:
+                
                     query = (
                         "MATCH (s:Sample {tag : $sample_tag}) "
                         "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
@@ -205,22 +224,20 @@ class Neo4JSamples(SamplesABC):
                     
                     if len(trait_node.get("children",[])) > 0:
                         # for child in trait_node["children"]:
-                        self.handle_children(sample_tag, trait_node=trait_node, parent_tag=ca_tag)
+                        self.handle_children(trait_node=trait_node, parent_tag=ca_tag)
                     
     
-    def get_condition_procedure_by_sample(self, tag: str = None, sort_by_most_frequent : bool = True, limit : int = None) -> List[str]|str:
+    def get_condition_procedure(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
         """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
         You may also sort the results by the most frequent condition procedures.
         If only one tag is found, a single string is returned. If no tag is found, an empty list is returned. 
         
         Parameters
         ----------
-        tag : str, optional
+        tag : str
             The tag of the sample to get the condition procedures for.
-        sort_by_most_frequent : bool
-            If True, the results are sorted by the most frequent condition procedures.
-        limit : int, optional
-            The maximum number of results to return. If None, all results are returned.
+        group_by_attribute : bool, optional
+            If True, the results are grouped by attribute and returned as a list of ConditionApplicationAttribute
             
         Returns
         -------
@@ -229,36 +246,31 @@ class Neo4JSamples(SamplesABC):
             If no tag is found, an empty list is returned.
         """
         
-        query = (
-            "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(s:Sample) "
-        )
-
-        if tag is not None:
-            query += "WHERE s.tag = $tag "
+        
             
-        query += "RETURN ca.tag as tag "
-        if sort_by_most_frequent:
-            query += "ORDER BY count(r) DESC "
-        if limit is not None:
-            query += "LIMIT $limit "    
-
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag=tag)
-        if len(r) == 1:
-            return r[0] 
+        query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication)" 
+        if group_by_attribute:
+            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) RETURN a.tag, collect(condition.tag) "
         else:
-            return r
+            query += "RETURN collect(condition.tag) "
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.values if group_by_attribute else Result.value)
+        if group_by_attribute:
+            return [{"attribute_tag" : ri[0], "condition_application_tags" : ri[1]} for ri in r]
+        return r[0] if len(r) > 0 else []
+        
+
     
         
-    def get_condition_procedure(self, tag : str):
-        """Get a condition procedure by its tag."""
+    # def get_condition_procedure(self, tag : str):
+    #     """Get a condition procedure by its tag."""
         
-        query = (
-            "MATCH (ca:ConditionApplication {tag : $tag}) "
-            "RETURN ca.tag as tag, ca.text as text, ca.created_at as created_at "
-        )
+    #     query = (
+    #         "MATCH (ca:ConditionApplication {tag : $tag}) "
+    #         "RETURN ca.tag as tag, ca.text as text, ca.created_at as created_at "
+    #     )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag=tag)
-        return r[0] if len(r) > 0 else None 
+    #     r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag=tag)
+    #     return r[0] if len(r) > 0 else None 
         
     
     def get_samples_by_genotype(self, genotype_tag : str):
@@ -272,54 +284,51 @@ class Neo4JSamples(SamplesABC):
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag=genotype_tag)
         return r 
 
-    def get_sample(self, tag : str):
+    def get_sample(self, tag : str) -> Dict:
         "Returns a sample an its trait as well genotype annotation."
         
         query = (
-            "MATCH (s:Sample {tag : $tag})-[:HAS_SAMPLE]-(submission:Submission) " 
-            "OPTIONAL MATCH (s)-[:HAS_GENOTYPE]->(g:Genotype) "
-            "OPTIONAL MATCH (s)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(trait:AttributeValue)"
-            "RETURN s.tag as tag, g.tag as genotype_tag, trait.tag as trait_tag, submission.tag as submission_tag "
+            "MATCH (s:Sample {tag : $tag}) " 
+            "RETURN {tag : s.tag, text : s.text, sample_index : s.sample_index, created_at : s.created_at}  "
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.data, tag = tag)
-        return  r 
-    
-
-    
-    def get_sample_string(self, tag : str) -> str:
-        """Return a string for sample that describes the traits for a given sample. 
-        This should be used to either visualize the sample in the gui. Or to access
-        statistics as the string will be explicit for the trait/attributes"""
-        
-        query = (
-            "MATCH (ca:ConditionApplication)-[]-(s:Sample {tag : $tag}) " 
-            "CALL apoc.path.expand(ca, 'HAS_VALUE|HAS_UNIT|HAS_CHILD>', null, 1, 10) YIELD path "
-            "WITH path "
-            "WITH nodes(path) AS nodelist, length(path) AS depth "
-
-            "WITH [x IN nodelist WHERE x:Trait OR x:ConditionValue | x.tag] AS tags, depth "
-
-            "ORDER BY depth DESC "
-
-            "WITH collect(tags) AS tagpaths "
-
-            "WITH [tp IN tagpaths | "
-            "reduce(output = "", tag IN reverse(tp) | "
-            "   CASE output "
-            "    WHEN "" THEN tag "
-            "    ELSE tag + '(' + output + ')' "
-            "    END) "
-            "] AS nestedStrings "
-
-            "RETURN nestedStrings "
-
-            )
-        
-        r = self._driver.execute_query(query, routing = "r", result_transformer_=Result.value, tag = tag)
         print(r)
+        return  r[0] if len(r) > 0 else None
+
+    # def get_sample_string(self, tag : str) -> str:
+    #     """Return a string for sample that describes the traits for a given sample. 
+    #     This should be used to either visualize the sample in the gui. Or to access
+    #     statistics as the string will be explicit for the trait/attributes"""
         
-        return r 
+    #     query = (
+    #         "MATCH (ca:ConditionApplication)-[]-(s:Sample {tag : $tag}) " 
+    #         "CALL apoc.path.expand(ca, 'HAS_VALUE|HAS_UNIT|HAS_CHILD>', null, 1, 10) YIELD path "
+    #         "WITH path "
+    #         "WITH nodes(path) AS nodelist, length(path) AS depth "
+
+    #         "WITH [x IN nodelist WHERE x:Trait OR x:ConditionValue | x.tag] AS tags, depth "
+
+    #         "ORDER BY depth DESC "
+
+    #         "WITH collect(tags) AS tagpaths "
+
+    #         "WITH [tp IN tagpaths | "
+    #         "reduce(output = "", tag IN reverse(tp) | "
+    #         "   CASE output "
+    #         "    WHEN "" THEN tag "
+    #         "    ELSE tag + '(' + output + ')' "
+    #         "    END) "
+    #         "] AS nestedStrings "
+
+    #         "RETURN nestedStrings "
+
+    #         )
+        
+    #     r = self._driver.execute_query(query, routing = "r", result_transformer_=Result.value, tag = tag)
+    #     print(r)
+        
+    #     return r 
     
     
     

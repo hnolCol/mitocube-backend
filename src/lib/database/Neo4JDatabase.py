@@ -1,7 +1,6 @@
 
 from neo4j import GraphDatabase, Driver, Result
 
-from lib.database.ABCDatabase import DatabaseABC
 from typing import List, Tuple, Any, Dict, Literal
 from collections import OrderedDict
 from lib.database.neo4j.Users import Neo4JUser
@@ -35,13 +34,11 @@ from enum import Enum
 import time 
 import pandas as pd 
 import numpy as np 
-from lib.user.UserHandling import UserDB
 from random import randrange
 
 
 from lib.data.utils.pearson import pearson
-users_from_db = UserDB.get_users()
-#print(users_from_db[0])
+
 
 
 #genotypes = [GenotypeModel(**x) for x  in read_json("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json")]
@@ -178,7 +175,9 @@ constraints = [
     ConstraintModel(constrain_label  = "spare_part_tag",node_label = NodeLabelModel(label = "SparePart"),property_name = "tag"),
     ConstraintModel(constrain_label  = "maintenance_state_tag",node_label = NodeLabelModel(label = "MaintenanceState"), property_name = "tag"),
     ConstraintModel(constrain_label  = "maintenance_event_tag",node_label = NodeLabelModel(label = "MaintenanceEvent"), property_name = "tag"),
-    ConstraintModel(constrain_label  = "condition_application_tag",node_label = NodeLabelModel(label = "ConditionApplication"), property_name = "tag")
+    ConstraintModel(constrain_label  = "condition_application_tag",node_label = NodeLabelModel(label = "ConditionApplication"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "meta_text_tag",node_label = NodeLabelModel(label = "MetaText"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "view_counter_tag",node_label = NodeLabelModel(label = "ViewCounter"), property_name = "tag")
 ]
 
 
@@ -554,7 +553,7 @@ class Neo4JConnection:
         self.driver.close()
 
 
-class MCNeo4JDatabase(DatabaseABC):
+class MCNeo4JDatabase(object):
     
     
     def __init__(self):
@@ -590,15 +589,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.constructor._screen_pubmed_for_proteins()
         self.constructor._add_genotypes(genotypes=genotypes)
         self.constructor._add_fulltext_dataset_search_nodes()
-        #print(self.submission_filter.get_counts())
-       # self.update_state('Q7JgoEYTqy',5,"123asd")
-       # self.factory.create_text_index("dataset_searcg",NodeLabelModel(label = "Query"),"s")
-        #rr = self.attributes.get_attribute_values_by_attribute_tag()
-        #self.user.add_users(users_from_db)
-       # self.insert_meta(meta)
-        #self.meta.get_metatext(tags=[meta.tag])
-       # self.dataset_values.get_abundance_distribution()
-       # self.dataset_values.get_abundance_distribution(filter_tag="MitoCarta 3.0")
+       
         
         self.submission_filter.full_dataset_text_search("LOGtC9tNC13b DNAJC15 Timm Mitochondrial proteases GHITM TMBIM5")
         # self.submission_filter.get_submissions(protein_tag=APIParamString(param="Q86X40"))

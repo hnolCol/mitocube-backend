@@ -4,7 +4,7 @@ from typing import List
 
 from config.models.user import UserModel
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeResponseModel
-from lib.database.ABCDatabase import MCDatabase, MCAttributes
+
 from config.enums.users.roles import UserRolesEnum
 from services.users import get_user_from_token
 from services.enums import get_enum_as_dict
@@ -22,49 +22,49 @@ router = APIRouter(
     )
 
 
-@router.get("/attributes", response_model=AttributeResponseModel)
-def get_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
-    """
-    Returns the stored attribute and attribute values.
-    """
+# @router.get("/attributes", response_model=AttributeResponseModel)
+# def get_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
+#     """
+#     Returns the stored attribute and attribute values.
+#     """
     
-    attributes = DB.attributes.get()
-    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
-    print(attributes)
-    #db_attributes = MCAttributes.getAttributeDatabase()
+#     attributes = DB.attributes.get()
+#     attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+#     print(attributes)
+#     #db_attributes = MCAttributes.getAttributeDatabase()
 
-    return AttributeResponseModel(attributes=attributes,
-                                  attribute_values=attribute_values)
+#     return AttributeResponseModel(attributes=attributes,
+#                                   attribute_values=attribute_values)
 
 
-@router.get("/attributes/user", response_model=AttributeResponseModel)
-def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
-    """
-    Returns the stored attribute and attribute value definitions that can be assigned to a user.
-    """
+# @router.get("/attributes/user", response_model=AttributeResponseModel)
+# def get_user_attributes(user : UserModel = Depends(get_user_from_token)) -> AttributeResponseModel:
+#     """
+#     Returns the stored attribute and attribute value definitions that can be assigned to a user.
+#     """
     
-    attributes = DB.attributes.get_attributes_for_user()
-    attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
-    #db_attributes = MCAttributes.getAttributeDatabase()
+#     attributes = DB.attributes.get_attributes_for_user()
+#     attribute_values = DB.attributes.values(tags = [a.tag for a in attributes])
+#     #db_attributes = MCAttributes.getAttributeDatabase()
 
-    # attributes = db_attributes.getAttributes()
-    # attributes = attributes.loc[attributes["allow_for_user"], :]
+#     # attributes = db_attributes.getAttributes()
+#     # attributes = attributes.loc[attributes["allow_for_user"], :]
 
-    # attribute_values = db_attributes.getAttributeValues()
-    # attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
+#     # attribute_values = db_attributes.getAttributeValues()
+#     # attribute_values = attribute_values.loc[attribute_values["attribute_id"].isin(attributes["id"].values)]
 
-    # Todo: Do not understand what you mean with that.
-    # if user.role == UserRolesEnum.ADMIN:
-    #     # only admin can change the user role
-    #     max_attr_value_id = db.attribute_values["id"].max()
-    #     role_attr = [attr for attr in attrs if attr.tag == "att_user_role"][0]
-    #     user_roles = get_enum_as_dict(UserRolesEnum)
-    #     attrValues.extend([{"id" : max_attr_value_id + 1, "attribute_id" : role_attr.id, "details" : role_name.title(), "name" : role, "tag" : f"att_user_role:{role}"} for n,(role_name, role) in enumerate(user_roles.items())])
-    # else:
-    #     attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
+#     # Todo: Do not understand what you mean with that.
+#     # if user.role == UserRolesEnum.ADMIN:
+#     #     # only admin can change the user role
+#     #     max_attr_value_id = db.attribute_values["id"].max()
+#     #     role_attr = [attr for attr in attrs if attr.tag == "att_user_role"][0]
+#     #     user_roles = get_enum_as_dict(UserRolesEnum)
+#     #     attrValues.extend([{"id" : max_attr_value_id + 1, "attribute_id" : role_attr.id, "details" : role_name.title(), "name" : role, "tag" : f"att_user_role:{role}"} for n,(role_name, role) in enumerate(user_roles.items())])
+#     # else:
+#     #     attrs = [attr for attr in attrs if attr.tag != "att_user_role"]
 
-    return AttributeResponseModel(attributes=attributes,
-                                  attribute_values=attribute_values)
+#     return AttributeResponseModel(attributes=attributes,
+#                                   attribute_values=attribute_values)
 
 
 # @router.post("/attributes")

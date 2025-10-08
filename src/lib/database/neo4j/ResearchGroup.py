@@ -40,26 +40,33 @@ class Neo4JResearchGroup(ResearchGroupABC):
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return r[0]
     
-    def get(self, tags : List[str] = None, limit : int = None) -> List[ResearchGroupModel]:
+    def find(self, search_string : str, limit : int = 20) -> List[str]:
+        ""
+        query = (
+            "MATCH (rg:ResearchGroup) "
+            "WHERE toLower(rg.text) CONTAINS $search_string OR toLower(rg.abbreviation) CONTAINS $search_string OR toLower(rg.tag) CONTAINS $search_string "
+            "RETURN rg.tag "
+            
+        )
+        if limit is not None:
+            query += "LIMIT $limit"
+            
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, search_string=search_string.lower(), limit=limit)
+        return r
+    
+    def get(self, tag : str) -> ResearchGroupModel:
         
         query = (
             "MATCH (rg:ResearchGroup) "
-            
+            "WHERE rg.tag = $tag "
+            "RETURN properties(rg) "
         )
-        if tags is not None and isinstance(tags,list) and len(tags) > 0:
-            query += "WHERE rg.tag in $tags "
-            
-        query += "RETURN properties(rg) "
-        
-        if limit is not None:
-            query += "LIMIT $limit"
 
-        r = self._driver.execute_query(query, routing_="r",result_transformer_=Result.value, tags = tags, limit = limit)
-        print(r)
-        
-        return [ResearchGroupModel(**ri) for ri in r]
-        
-        
+        r = self._driver.execute_query(query, routing_="r",result_transformer_=Result.value, tag = tag)
+
+        return ResearchGroupModel(**r[0]) if len(r) > 0 else None
+
+
     def get_tags(self, limit : int = 40) -> List[str]:
         ""
         
@@ -82,6 +89,18 @@ class Neo4JResearchGroup(ResearchGroupABC):
         if len(r) == 0:  return []
         return r[0]
         
+        
+    def get_users_count(self, tag : str) -> int:
+        "Returns the number of users that are part of the research group"
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[r:IS_PART_OF]-(u:User) "
+            "RETURN count(u) "
+        )
+        
+        r = self._driver.execute_query(query, tag = tag, routing_= "r", result_transformer_=Result.value)
+        if len(r) == 0:  return 0
+        return r[0]
+    
     def insert(self, research_group : ResearchGroupInput):
         "" 
         if self.exists(research_group.tag): raise ValueError("Tag exists already. Delete first or use the update function.")
@@ -89,10 +108,10 @@ class Neo4JResearchGroup(ResearchGroupABC):
         query = (
             "MERGE (rg:ResearchGroup {tag : $research_group.tag}) "
             "ON CREATE "
-            "SET rg.created_at = timestamp(), rg.name =  $research_group.name, rg.abbreviation =  $research_group.abbreviation, "
+            "SET rg.created_at = timestamp(), rg.text =  $research_group.text, rg.abbreviation =  $research_group.abbreviation, "
             "rg.address =  $research_group.address, rg.email =  $research_group.email "   
             "ON MATCH "
-            "SET rg.modified_at = timestamp(), rg.name =  $research_group.name, rg.abbreviation =  $research_group.abbreviation, "
+            "SET rg.modified_at = timestamp(), rg.text =  $research_group.text, rg.abbreviation =  $research_group.abbreviation, "
             "rg.address =  $research_group.address, rg.email =  $research_group.email "   
         )
         

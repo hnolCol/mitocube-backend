@@ -16,7 +16,6 @@ from lib.database.neo4j.News import Neo4JNews
 from lib.database.neo4j.Peptides import Neo4JPeptides
 from lib.database.Neo4JDatabase import Neo4JFactory, Neo4JConnection, Neo4JConstructor
 from lib.database.neo4j.QC import Neo4JQC
-from lib.database.neo4j.UnitTypes import Neo4JUnitTypes
 from lib.database.neo4j.Instruments import Neo4JInstruments, Neo4JInstrumentStates
 from lib.database.neo4j.Timeline import Neo4JTimeline
 from lib.database.neo4j.ResearchGroup import Neo4JResearchGroup
@@ -25,6 +24,10 @@ from lib.database.neo4j.Samples import Neo4JSamples
 from lib.database.neo4j.Maintenance import Neo4JMaintenanceProcedure, Neo4JMaintenanceEvent
 from lib.database.neo4j.Symptoms import Neo4jSymptoms
 from lib.database.neo4j.SpareParts import Neo4jSpareParts
+from lib.database.neo4j.ConditionApplications import Neo4JConditionApplications
+from lib.database.neo4j.Metatext import Neo4JMetaText
+from lib.database.neo4j.Cache import Neo4JCache
+from lib.database.neo4j.ProteinGroups import Neo4JProteinGroups
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 import pandas as pd 
@@ -50,9 +53,8 @@ class MCNeo4JDatabase(DatabaseABC):
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.qc = Neo4JQC(driver = self.connection.driver)
-        
+        self.protein_groups = Neo4JProteinGroups(driver = self.connection.driver)
         self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)
-        self.unittypes = Neo4JUnitTypes(driver = self.connection.driver)
         self.instruments = Neo4JInstruments(driver=self.connection.driver)
         self.instrument_states = Neo4JInstrumentStates(driver = self.connection.driver)
         self.timeline = Neo4JTimeline(driver=self.connection.driver)
@@ -64,6 +66,9 @@ class MCNeo4JDatabase(DatabaseABC):
         self.maintenance_event = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
+        self.condition_applications = Neo4JConditionApplications(driver=self.connection.driver)
+        self.metatexts = Neo4JMetaText(driver=self.connection.driver)
+        self.cache = Neo4JCache()
         #checks if all is correctly defined 
         super(MCNeo4JDatabase, self).__init__()
     

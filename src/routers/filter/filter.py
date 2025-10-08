@@ -12,7 +12,7 @@ from config.models.user import UserModel
 from config.models.parameter import APIParamString
 from config.models.filter import FilterModel, FilterProps
 from services.users import get_user_from_token, is_user_admin
-from services.submission import map_tags_to_attribute_in_metadata
+
 
 DB = Database.DB()
 

@@ -223,5 +223,3 @@ class UserDB:
         self._save_db()
         
         
-
-UserDB = UserDB() #ensure it is like a singleton 

@@ -10,7 +10,7 @@ from config.models.submissions.submissions import DatasetSubmissionModel, Datase
 from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
 from config.models.annotations.feature import FeatureModel
 
-from lib.database.ABCDatabase import MCDatabase, MCAttributes
+
 from lib.database.Database import Database
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.transform.PCA import PCATransform
@@ -20,7 +20,6 @@ from lib.data.filter.NoMissingValues import NoNaNFilter
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 
 from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attribute_in_metadata, get_dataset_from_database
 
 DB = Database.DB()
 

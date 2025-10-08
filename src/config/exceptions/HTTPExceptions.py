@@ -18,6 +18,13 @@ user_form_data_incorrect = HTTPException(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+
+submission_tag_not_found = HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Submission with tag {submission_tag} not found.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 user_role_too_low = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="The required user role is not matched.",

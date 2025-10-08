@@ -189,26 +189,7 @@ class Neo4JDataset(DatasetABC):
     
     def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
         ""
-        # query = (
-        #     "MATCH (submission:Submission {tag : $tag}) "
-        # )
-        # if filter_tag is not None:
-        #     query += (
-        #         "MATCH (f:Filter) "
-        #         "WHERE f.tag = $filter_tag "
-        #         "MATCH (submission)<-[r:QUANTIFIED_IN]-(p:Protein)-[:PART_OF]->(f)"
-        #         )
-        # else:
-        #     query += (
-        #         "MATCH (submission)<-[r:QUANTIFIED_IN]-(p:Protein) "
-        #         )
-        # query += "RETURN r.qs AS qs, r.sample_index AS idx, p.tag AS tag"
-   
-        # datatable_long = self._driver.execute_query(query, routing_="r",tag = tag, filter_tag = filter_tag, result_transformer_=Result.to_df)
         
-        # datatable = datatable_long.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
-        
-        # return datatable
         if filter_tag is None:
             query = (
             "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:Protein) "

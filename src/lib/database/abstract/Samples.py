@@ -1,12 +1,17 @@
 from abc import abstractmethod, ABC 
 from typing import List 
 
-from config.models.performance import QCRunModel
-
+from config.models.conditions_applications import ConditionApplicationAttributeModel
+from config.models.samples import SampleModel
 
 class SamplesABC(ABC):
     def __init__(self) -> None:
         ""
+        
+        
+    @abstractmethod
+    def get(self, tag : str) -> SampleModel:
+        "Returns the sample information for a given sample tag."
         
     @abstractmethod
     def exists(self, tag : str) -> bool: 
@@ -44,5 +49,25 @@ class SamplesABC(ABC):
         
     
     @abstractmethod
-    def get_sample(tag : str):
+    def get_sample(tag : str) -> SampleModel:
         ""
+        
+    @abstractmethod
+    def get_condition_procedure(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+        """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
+        You may also sort the results by the most frequent condition procedures.
+        If only one tag is found, a single string is returned. If no tag is found, an empty list is returned. 
+        
+        Parameters
+        ----------
+        tag : str
+            The tag of the sample to get the condition procedures for.
+        group_by_attribute : bool, optional
+            If True, the results are grouped by attribute and returned as a list of ConditionApplicationAttribute
+            
+        Returns
+        -------
+        List[str]|str
+            A list of condition procedure tags. If only a single tag is found, a single string is returned.
+            If no tag is found, an empty list is returned.
+        """

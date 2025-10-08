@@ -9,17 +9,6 @@ from deprecated import deprecated
 from neo4j import Driver 
 
 import pandas as pd
-
-from lib.data.dataset.ABCDataset import MCDataset
-from lib.DesignPatterns import SingletonABCMeta  # , ExpiringValue
-from lib.database.abstract.Attributes import AttributesABC
-
-from config.settings.db import get_db_settings
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel
-from config.models.submissions.submissions import DatasetSubmissionModel
-from config.models.user import UserModel 
-from config.models.feature import FeatureNeoModel
-from config.models.filter import FilterModel
    
     
 class DatasetABC(ABC):

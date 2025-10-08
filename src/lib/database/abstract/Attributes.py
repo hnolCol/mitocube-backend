@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from config.enums.states import SubmissionStatesEnums
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeResponseModel, AttributeTreeNode, AttributeTraitResponseModel
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeTreeNode, AttributeTraitResponseModel
 from config.models.feature import FeatureNeoModel 
 
 class AttributesABC(ABC):
@@ -47,19 +47,7 @@ class AttributesABC(ABC):
             The number of attributes in the
             database.
         """
-    
-    @abstractmethod
-    def count_values(self, attribute_tag : str = None) -> int:
-        """The total number of attribute values or 
-        the number of attribute values for a given attribute tag
 
-        Returns
-        -------
-        int
-            The number of attribute values
-            in the database 
-        """
-        
     @abstractmethod
     def delete(self, tag : str) -> bool:
         """Deletes an attribute and its attribute values by its attribute tag. 
@@ -111,13 +99,10 @@ class AttributesABC(ABC):
     
     @abstractmethod
     def get(self, 
-            tags : List[str] = None, 
-            #type : Literal["investigation","study","assay","measurement"] = None, 
-            attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None, 
-            param_name : Literal["allow_for_dataset","allow_as_filter", "allow_for_sample",
-                                "allow_for_genotype","allow_for_measurement","allow_for_qc",
-                                "mandatory_for_submission","mandatory_for_active"] = None,
-            min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[str]:
+        tags : List[str] = None, 
+        attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None, 
+        group_by : Literal["attribute_group"] = None,
+        min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[str]:
         """Returns attributes by their tags. If the tag is not in the 
         database it is simply ignored. 
 
@@ -157,6 +142,10 @@ class AttributesABC(ABC):
         """
         
     @abstractmethod
+    def get_attribute_group_tags(self, limit : int = None) -> List[str]:
+        """Returns the attribute group tags present in the database."""
+        
+    @abstractmethod
     def get_attribute_hierarchy(self, tags : List[str], submission_tag : str) -> List[AttributeTreeNode]:
         """Returns the hierarchy of the attributes, that 
         match the given tags. 
@@ -181,22 +170,22 @@ class AttributesABC(ABC):
         ""
         
         
-    @abstractmethod
-    def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
-        """Returns the attribute/value properties and values that are associated with a 
-        submission tag. This includes dataset as well as sample attributes. The attributes should be sorted by
-        the attribute priority and the min_state properties.
+    # @abstractmethod
+    # def get_attributes_and_values_for_submission(self, submission_tag : str) -> AttributeResponseModel:
+    #     """Returns the attribute/value properties and values that are associated with a 
+    #     submission tag. This includes dataset as well as sample attributes. The attributes should be sorted by
+    #     the attribute priority and the min_state properties.
 
-        Parameters
-        ----------
-        submission_tag : str
-            The submission tag
+    #     Parameters
+    #     ----------
+    #     submission_tag : str
+    #         The submission tag
 
-        Returns
-        -------
-        Dict[]
-            _description_
-        """
+    #     Returns
+    #     -------
+    #     Dict[]
+    #         _description_
+    #     """
         
     @abstractmethod    
     def get_attributes_by_search_string(self, 
@@ -217,6 +206,7 @@ class AttributesABC(ABC):
                                                    search_string : str = None, 
                                                    min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                                    limit : int = None,
+                                                   attribute_groups : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None
                                                     ) -> List[AttributeTraitResponseModel]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
@@ -268,6 +258,13 @@ class AttributesABC(ABC):
                 - tags (List[str]) : List of dataset tags that have the attribute value
                 - counts (int) : The number of datasets tags, equals len(tags)
         """
+    @abstractmethod
+    def get_min_state(self, tag : str) -> SubmissionStatesEnums:
+        """Returns the minimum state for the given attribute tag."""
+    
+    @abstractmethod
+    def get_priority(self, tag : str) -> int:
+        """Returns the priority of the attribute with the given tag."""
         
     @abstractmethod
     def get_mandatory_attributes(self, state : SubmissionStatesEnums = None)->List[AttributeModel]:
@@ -299,7 +296,8 @@ class AttributesABC(ABC):
     def find_attribute(self, search_string : str, 
                        attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None, 
                        min_state : SubmissionStatesEnums = None,
-                       limit : int = 20) -> List[str]:    
+                       limit : int = 20,
+                       group_by : Literal["attribute_group"] = None) -> List[str]|Dict[str, List[str]]:
         "Finds attribute tags"
     
     @abstractmethod
@@ -331,6 +329,14 @@ class AttributesABC(ABC):
     @abstractmethod
     def get_trait_tags(self, tag : str = None, limit : int = None) ->  List[AttributeValueModel]:
         "Return the trait_tags for a given attribute_tag"
+        
+    @abstractmethod
+    def get_trait_text(self, tag : str) -> str:
+        "Returns the text associated with a trait tag. If not found, an empty string is returned."
+        
+    @abstractmethod
+    def count_traits(self, tag : str) -> int:
+        """Returns the number of traits for a single attribute tag"""
         
     @abstractmethod
     def insert(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:

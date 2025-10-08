@@ -56,15 +56,13 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     """
     
     
-    
-    
     #db_helper = MCDatabaseHelper.getDatabaseHelper()
     key_figures = OrderedDict()
     
     if KEY_FIGURE_SETTINGS.number_submissions:
         key_figures["Submissions"] = len(DB.get_submission_tags())
     if KEY_FIGURE_SETTINGS.number_published_datasets:
-        published_datasets = DB.submission_filter.get(state = [SubmissionStatesEnums.ACTIVE])
+        published_datasets = DB.submission_filter.find(state = [SubmissionStatesEnums.ACTIVE])
         key_figures["Published Data"] = len(published_datasets)
     if KEY_FIGURE_SETTINGS.number_proteins:
         key_figures["Proteins"] = DB.features.count(quantified=True)

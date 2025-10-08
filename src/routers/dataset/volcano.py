@@ -12,7 +12,7 @@ from config.models.annotations.feature import FeatureModel
 
 
 from lib.database.Database import Database 
-from lib.database.ABCDatabase import MCDatabase, MCAttributes
+
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from lib.data.transform.PCA import PCATransform
@@ -23,9 +23,6 @@ from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 from lib.data.imputation.StandardImputation import StandardImputation
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 
-from services.users import get_user_from_token, is_user_at_least_curator
-from services.submission import map_tags_to_attribute_in_metadata
-from services.attributes import get_suffix_from_attributes_and_attribute_tags
 
 DB = Database.DB()
 

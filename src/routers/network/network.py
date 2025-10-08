@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List, Literal
-from lib.database.ABCDatabase import MCDatabase, MCAttributes
+
 from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
 from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
 from services.users import is_user_admin, get_user_from_token
@@ -16,7 +16,6 @@ from config.enums.states import SubmissionStatesEnums
 from lib.user.UserHandling import UserDB
 
 
-from services.submission import get_dataset_from_database
 from services.attributes import get_suffix_from_attributes_and_attribute_tags
 import json 
 import os 

@@ -7,7 +7,6 @@ from config.models.feature import FeatureSequenceResponseModel
 from config.models.annotations.feature import FeatureDataResponseModel, FeatureNeoModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
-from services.submission import map_tags_to_attribute_in_metadata
 from config.models.parameter import APIParamString
 from config.models.calculations.quantile import QuantileModel 
 

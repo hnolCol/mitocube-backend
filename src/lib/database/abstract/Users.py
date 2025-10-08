@@ -52,6 +52,26 @@ class UserABC(ABC):
     def exists(self, tag : str) -> bool:
         return self.is_user(tag)
     
+    
+    @abstractmethod
+    def find(self, search_string : str = None, limit : int = 40) -> List[str]:
+        """Finds user by 'search_string' string. The result is limited to a number of
+        users given by 'limit'.
+
+        Parameters
+        ----------
+        search_string : str
+            The query string used to filter the data. If the query is None, all users are returned respecting the limit.
+        limit : int, optional
+            The maximum of users that should be returned, by default 40
+
+        Returns
+        -------
+        List[str]
+            List of users tags. The maximum length
+            is limit (default 40) but can be smaller if less user match.
+        """
+    
     @abstractmethod
     def get_user_by_email(self, email : str) -> None|UserModel:
         """Returns the user in the database using the database. 
@@ -92,7 +112,11 @@ class UserABC(ABC):
         Exception
             If the database query resulted in an error. 
         """
-    
+        
+    @abstractmethod
+    def get_user_submission_views(self, tag : str, limit : int = None) -> List[str]:
+        "Returns the submissions that have been viewed by the user."
+            
     @abstractmethod
     def delete_user(self, tag : str) -> bool:
         "" 
@@ -118,6 +142,20 @@ class UserABC(ABC):
         ------
         Exception
             If the database query resulted in an error. 
+        """
+    @abstractmethod
+    def is_user_active(self, tag: str) -> bool:
+        """Checks if a user is active by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the user to be checked.
+
+        Returns
+        -------
+        bool
+            If the user is active.
         """
 
 

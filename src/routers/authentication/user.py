@@ -4,7 +4,7 @@ from typing import List, Dict
 from config.exceptions.HTTPExceptions import user_role_too_low, user_not_found
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
-from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser
+from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser, UserCreateModel, UserInsertModel
 from config.models.parameter import APIParamString
 from services.encryption import decode_token
 from services.users import is_user_admin, get_user_from_token
@@ -30,40 +30,51 @@ def get_user_tags(limit : int = None, user : UserModel = Depends(get_user_from_t
 
 
 @router.post("/users", summary="Add a new user to the database.")
-def add_user_to_the_database(background_task : BackgroundTasks, user_props : AddUserPropsModel, user : UserModel = Depends(is_user_admin)):
+def add_user_to_the_database(background_task : BackgroundTasks, user_props : UserCreateModel, user : UserModel = Depends(is_user_admin)):
     """
     Adds a user to the database. Currently requires admin rights.
     """
-    #user_props = AddUserPropsModel(**user_props)
-    #TO DO: should find another solution for this renmaing, also in patch 
-    user_props = user_props.model_dump(exclude_none=True)
-    try:
-        user_to_add = UserModelForRegistration(**user_props )
-    except Exception as e:
-        raise HTTPException(status_code=422,detail=str(e))
-    try:
-        DB.users.add_user(user_to_add)
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail = str(e))
-        return 
-    
-    #UserDB.add_user(user_props=user_to_add) #throws ane exception if there is a problem
+
+    tag = DB.users.get_new_tag() 
+    plain_pw = DB.users.create_plain_password() 
+    hashed_pw = DB.users.hash_password(plain_pw)
+    user_props = UserInsertModel(**user_props.model_dump(), tag=tag, password=hashed_pw)
+    ok = DB.users.insert(user_props)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not insert user in the database.")
 
     send_email_in_background(background_tasks=background_task,
                              subject="Account generated.",
-                             email_to=[user_to_add.email],
+                             email_to=[user_props.email],
                              include_setting_cc=False, #do not include the setting based ccs
                              body={
                                  "app_name" : GENERAL_SETTINGS.app_name,
-                                 "first_name" : user_to_add.firstname,
-                                 "password" : user_to_add.password,
+                                 "first_name" : user_props.firstname,
+                                 "password" : plain_pw,
                                  "url" : GENERAL_SETTINGS.url
                              },
-                             template_mame=EMAIL_SETTINGS.mail_account_generated_template)
+                             template_name=EMAIL_SETTINGS.mail_account_generated_template)
 
+
+
+@router.get("/users/count", summary="Returns the number of users in the database.")
+def count_user_db(exclude_inactive : bool = True, user : UserModel = Depends(get_user_from_token)) -> int:
+    """Returns the number of users in the database.
+    
+    Parameters
+    ----------
+    exclude_inactive : bool, optional   
+        If True, inactive users are not counted, by default True
+        
+    Returns     
+    -------
+    int
+        The number of users in the database.
+    """
+    return DB.users.count(exclude_inactive=exclude_inactive)
 
 @router.get("/users/q")
-def query_user_db(query : str = None, limit : int = 40, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def query_user_db(search_string : str = None, limit : int = 40, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     """Query user in the database and returns the tags 
 
     Parameters
@@ -78,9 +89,8 @@ def query_user_db(query : str = None, limit : int = 40, user : UserModel = Depen
     _type_
         _description_
     """
-    
-    return DB.users.find_user(query, limit=limit)
-    
+
+    return DB.users.find(search_string, limit=limit)
 
 @router.post("/users/pw",summary="Allows users to change the password for themselves.")
 def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
@@ -160,6 +170,12 @@ def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Deletes specific user. Returns an error if token does not belong to admin"""    
     
 
+@router.get("/users/{user_tag}/submissions/count", summary="Returns the number of submissions of a user by its tag.")
+def count_user_submissions(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
+    """Counts the number of submissions for a user by its tag."""
+    if not DB.users.exists(tag = user_tag): raise user_not_found
+    return len(DB.submission_filter.filter_by_user(user_tags=[user_tag]))
+
 ## inconsistent!  - change to have user_label in url 
 
 @router.post("/users/{user_tag}/block", summary="Block a user. Requires admin rights.")
@@ -167,6 +183,18 @@ def block_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Blocks the user. Limited to admin users."""
     DB.users.block_user_by_tag(tag = user_tag)
     #UserDB.block_user_by_label(user_props.label)
+    
+    
+@router.get("/users/{user_tag}/exists", summary="Checks if a user exists by its tag.")
+def check_if_user_exists(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+    """Checks if a user exists by its tag."""
+    return DB.users.exists(tag = user_tag)
+
+@router.get("/users/{user_tag}/is_active", summary="Checks if a user is active by its tag.")
+def check_if_user_is_active(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+    """Checks if a user is active by its tag."""
+    return DB.users.is_user_active(tag = user_tag)
+
     
     
 @router.post("/users/{user_label}/useterms", summary="Accept useterms. Can only be done by the user itself.")
@@ -183,28 +211,3 @@ def accept_use_terms(user_label : str, accept : bool, user : UserModel = Depends
         _description_, by default Depends(get_user_from_token)
     """
     #TODO add functionality to UserDB.
-
-# @router.post("/")
-# def add_user(user : UserModel = Depends(is_user_admin)):
-#     """
-#     """
-
-#     return {}
-
-
-# @router.get("/{user_id}")
-# def get_user_by_id():
-#     """
-#     Returns a user by the user id.
-#     Requires admin rights
-#     """
-
-#     return {}
-
-# @router.get("/{user_email}")
-# def get_user_by_email():
-#     """
-#     Returns an user by its email
-#     """
-
-#     return {}

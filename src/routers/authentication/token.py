@@ -14,7 +14,7 @@ from services.users import get_user_from_login, check_user_allowed, is_user_admi
 from services.encryption import create_access_token, check_for_verification_code_in_token, check_share_token_password
 from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked
 
-from lib.user.UserHandling import UserDB
+
 from lib.database.Database import Database
 DB = Database.DB()
 
@@ -26,14 +26,6 @@ router = APIRouter(
     )
 
 
-# @router.get("/user")
-# def get_users(user : UserModel = Depends(is_user_admin)):
-#     """
-#     Returns a list of users.
-#     """
-#     print(user)
-#     users = UserDB.get_users()
-#     return users
 
 @router.post("/", response_description="Returns a jwt token after login .", response_model=TokenResponse)
 def login_for_access_token(background_task : BackgroundTasks, 
@@ -76,7 +68,7 @@ def login_for_access_token(background_task : BackgroundTasks,
             "first_name" : user.firstname,
             "verification_code" : verification_code
         },
-        template_mame=EMAIL_SETTINGS.mail_verification_template
+        template_name=EMAIL_SETTINGS.mail_verification_template
     )
 
     return TokenResponse(success=True,token=jwt_token,verified=False)

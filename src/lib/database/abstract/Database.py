@@ -19,7 +19,6 @@ from lib.database.abstract.Dataset import DatasetABC
 from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.Peptides import PeptidesABC
 from lib.database.abstract.QC import QCABC
-from lib.database.abstract.UnitTypes import UnitTypesABC
 from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesABC
 from lib.database.abstract.Timeline import TimelineABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
@@ -28,6 +27,12 @@ from lib.database.abstract.Maintenance import MaintenanceProcedureABC
 from lib.database.abstract.SpareParts import SparePartsABC
 from lib.database.abstract.Symptoms import SymptomABC
 from lib.database.abstract.Samples import SamplesABC
+from lib.database.abstract.ConditionApplications import ConditionApplicationABC
+from lib.database.abstract.Metatext import MetaTextABC
+from lib.database.abstract.News import NewsABC
+from lib.database.abstract.OpenAi import OpenAIClient
+from lib.database.abstract.Cache import CacheABC
+from lib.database.abstract.ProteinGroups import ProteinGroupsABC
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
 
@@ -68,8 +73,8 @@ class DatabaseABC(ABC):
     genotypes : GenotypeABC = None
     qc : QCABC = None 
     peptides : PeptidesABC = None 
+    protein_groups : ProteinGroupsABC = None 
     submission_summary : SubmissionSummaryABC = None
-    unittypes : UnitTypesABC = None
     instruments : InstrumentsABC = None
     instrument_states : InstrumentStatesABC = None
     timeline : TimelineABC = None 
@@ -79,8 +84,11 @@ class DatabaseABC(ABC):
     spareparts : SparePartsABC = None
     symptoms : SymptomABC = None
     samples : SamplesABC = None
-   # performance : Per
-    
+    condition_applications : ConditionApplicationABC = None
+    metatexts : MetaTextABC = None
+    news : NewsABC = None
+    openai : OpenAIClient = OpenAIClient()
+    cache : CacheABC = None 
 
     def __init__(self):
         """The abstract database class that defines
@@ -201,6 +209,31 @@ class DatabaseABC(ABC):
         if not isinstance(self.samples, SamplesABC):
             raise TypeError("The samples class must be an instance of the SamplesABC.")
 
+        if self.condition_applications is None:
+            raise NotImplementedError("A database class must have the condition_applications attribute defined.")
+        if not isinstance(self.condition_applications, ConditionApplicationABC):
+            raise TypeError("The condition_applications class must be an instance of the ConditionApplicationABC.")
+
+        if self.news is None:
+            raise NotImplementedError("A database class must have the news attribute defined.")
+        if not isinstance(self.news, NewsABC):
+            raise TypeError("The news class must be an instance of the NewsABC.")
+        
+        if self.metatexts is None:
+            raise NotImplementedError("A database class must have the metatexts attribute defined.")
+        if not isinstance(self.metatexts, MetaTextABC):     
+            raise TypeError("The metatexts class must be an instance of the MetaTextABC.")
+        
+        if self.cache is None:
+            raise NotImplementedError("A database class must have the cache attribute defined.")
+        if not isinstance(self.cache, CacheABC):
+            raise TypeError("The cache class must be an instance of the CacheABC.")
+        
+        if self.protein_groups is None:
+            raise NotImplementedError("A database class must have the protein_groups attribute defined.")
+        if not isinstance(self.protein_groups, ProteinGroupsABC):
+            raise TypeError("The protein_groups class must be an instance of the ProteinGroupsABC.")
+        
         
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 
@@ -276,7 +309,13 @@ class DatabaseABC(ABC):
         pd.DataFrame
             _description_
         """
-        return self.datasets.get_datatable(tag = tag, filter_tag = filter_tag)
+    
+        cache_key = self.cache.calculate_key([tag,filter_tag if filter_tag is not None else ""])
+        if self.cache.exists(cache_key):
+            return self.cache.get(cache_key)
+        datatable = self.datasets.get_datatable(tag = tag, filter_tag = filter_tag)
+        self.cache.insert(cache_key, datatable)
+        return datatable 
         
    
     def get_meta_data(self, tag : str) -> DatasetSubmissionModel:

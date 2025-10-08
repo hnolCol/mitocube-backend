@@ -5,7 +5,7 @@ from collections import OrderedDict
 from neo4j.exceptions import ConstraintError
 import pandas as pd 
 
-from lib.database.ABCDatabase import MCDatabase, MCAttributes
+
 from lib.data.runs.runs import RunListCreator
 from lib.user.UserHandling import UserDB
 from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
@@ -35,8 +35,8 @@ from config.models.unit import UnitTypeInputModel
 from config.enums.units import UnitsEnum
 
 
-from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin
-from services.submission import get_dataset_from_database
+from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin, is_creator_of_submission_or_curator
+
 
 from services.mail import send_email_in_background
 
@@ -71,7 +71,7 @@ def get_submission_by_query(state : str|int = None,
                             trait_tags : str = None, 
                             attribute_tag : str = None, 
                             genotype_tag : str = None, 
-                            user_tag : str = None,
+                            user_tags : str = None,
                             limit : int = 20, 
                             ordered : bool = True,
                             group_by_state : bool = True,
@@ -127,7 +127,7 @@ def get_submission_by_query(state : str|int = None,
             attribute_tag=APIParamString(param=attribute_tag).param,
             trait_tags=APIParamString(param=trait_tags).param,
             protein_tag=APIParamString(param=feature_key).param,
-            user_tag=APIParamString(param=user_tag).param,
+            user_tags=APIParamString(param=user_tags).param,
             genotype_tag = APIParamString(param=genotype_tag).param,
             ordered = ordered,
             limit = limit
@@ -158,6 +158,13 @@ def get_submission_by_query(state : str|int = None,
 #     return True 
     
 
+
+@router.get("/submissions/{submission_tag}/exists")
+def check_submission_exists(submission_tag: str) -> bool:
+    "Checks if a submission exists by its tag."
+    return DB.submissions.exists(tag=submission_tag)    
+
+
 @router.get("/submissions/{submission_tag}/title")
 def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
     "Returns the submission title by its tag."
@@ -166,6 +173,12 @@ def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_use
     return DB.submissions.get_title(tag = submission_tag)
 
 
+@router.patch("/submissions/{submission_tag}/title")
+def update_submission_title(submission_tag : str, title : str, user : UserModel = Depends(is_creator_of_submission_or_curator)) -> bool:
+    "Updates the submission title by its tag."
+    if not DB.submissions.exists(tag = submission_tag):
+        return tag_not_found
+    return DB.submissions.set_title(tag = submission_tag, title = title)
 
 @router.get("/submissions/{submission_tag}/createdat")
 def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> float:
@@ -175,11 +188,10 @@ def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_use
     return DB.submissions.get_created_at(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/metatext")
-def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
-    ""
-    meta_text = DB.meta.get_metatext(tags = APIParamString(param=submission_tag).param)
-    
-    return meta_text.to_dict(orient="records")
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the metatext tags associated with the given submission"
+    return DB.metatexts.find(submission_tag = submission_tag)
+
 
 @router.get("/submissions/{submission_tag}/metatext/{metatext_tag}")
 def get_metatext_by_tag(submission_tag : str, metatext_tag : str, user : UserModel = Depends(get_user_from_token)):
@@ -205,15 +217,15 @@ def get_states(user : UserModel = Depends(get_user_from_token)):
 
 
 @router.get("/submissions/{submission_tag}/users")
-def get_users_associated_with_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[PublicUser]:
-    """_summary_
+def get_users_associated_with_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    """Returns all users that are associated with a submission. 
 
     Parameters
     ----------
     submission_tag : str
-        _description_
+        The tag of the submission to get users for.
     user : UserModel, optional
-        _description_, by default Depends(get_user_from_token)
+        The user making the request, by default Depends(get_user_from_token)
 
     Returns
     -------
@@ -228,7 +240,7 @@ def get_users_associated_with_submission(submission_tag : str, user : UserModel 
         
     """
     if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    return DB.meta.get_users(tag=submission_tag)
+    return DB.submissions.get_users(tag=submission_tag)
 
 
 @router.post("/submissions/{submission_tag}/collaborators")
@@ -253,13 +265,6 @@ def add_collaborators(submission_tag : str, collaborators : str, replace : bool 
     """
     
     
-    db = MCDatabase.getDatabase()
-    dataset = get_dataset_from_database(db,submission_tag)
-    metadata = dataset.getMetaJson().model_dump()
-    query_collaborators = [ UserDB.get_user_by_label(user_label=coll_label) for coll_label in collaborators.split(";")]
-    filtered_collaborators = [user for exists,user in query_collaborators if exists and user.allow_login]
-    metadata["collaborators"] = filtered_collaborators
-    return True
 
 
 @router.get("/submissions/{submission_tag}/owner", response_model=PublicUser)
@@ -336,9 +341,6 @@ def change_submission_owner(submission_tag : str,
     return True
 
 
-
-
-
 @router.get("/submissions/{submission_tag}/state", response_model=SubmissionStatesEnums)
 def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
     """Returns the state of a submission. 
@@ -363,6 +365,52 @@ def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_us
     return DB.submissions.get_state(tag = submission_tag)
 
 
+
+@router.get("/submissions/{submission_tag}/views")
+def get_submission_views(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    """Returns the view count of a submission.
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission the views should be returned.
+
+    Returns
+    -------
+    int
+        The view count of the submission.
+
+    Raises
+    ------
+    tag_not_found
+       The submission_tag was not found.
+    """
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
+    return DB.submissions.get_views(tag = submission_tag)
+
+
+@router.post("/submissions/{submission_tag}/views")
+def insert_submission_view(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    """Inserts a view for a submission.
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission to insert a view for.
+
+    Returns
+    -------
+    bool
+        Returns true if the view was successfully inserted.
+
+    Raises
+    ------
+    tag_not_found
+       The submission_tag was not found.
+    """
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
+    DB.submissions.insert_view(tag = submission_tag, user_tag = user.tag)
+    return True
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
 def get_submissions_by_user_label(tags : str = None, group : Literal["state","user","attribute","attribute_value","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token)):
@@ -429,8 +477,9 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     for idx,sample_name in enumerate(submission.sample_names):
             sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
             sample_attributes = submission.samples_attributes[idx] 
-            print(sample_attributes)
             DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
+    ## add meta text 
+    
 
     return 
     
@@ -523,6 +572,8 @@ def update_submission_state(background_task : BackgroundTasks,
     ----------
     background_task : BackgroundTasks
         Background task to send an email in the background.
+    state_tag : SubmissionStatesEnums
+        The new state to set.
     submission_tag : str
         The tag of the submission to update.
     user : UserModel, optional
@@ -540,13 +591,17 @@ def update_submission_state(background_task : BackgroundTasks,
     """
     
     if not DB.submissions.exists(tag = submission_tag): raise tag_not_found
-    
-    ok = DB.submissions.update_state(tag = submission_tag, new_state = SubmissionStatesEnums.DONE, user_tag = user.tag)
-    
+  
+    ok = DB.submissions.update_state(tag = submission_tag, new_state = state_tag, user_tag = user.tag)
+
     if ok:
         submission_title = DB.submissions.get_title(tag = submission_tag) # to check if the submission exists and to get the title
         submission_user_tags = DB.submissions.get_users(tag = submission_tag)
+        print(submission_user_tags,"tags")
         submission_users = [DB.users.get_user_by_tag(tag = user_tag) for user_tag in submission_user_tags if DB.users.exists(tag = user_tag)]
+        
+        print(submission_users)
+        
         if len(submission_users) == 0:
             raise HTTPException(status_code=404, detail="Submission user not found. The state of the submission has been updated, but the user could not be found.")
         user_emails = [user.email] + [user.email for user in submission_users]
@@ -565,6 +620,7 @@ def update_submission_state(background_task : BackgroundTasks,
                                  "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission_tag}" #pydanitc HttpUrl (url) returns www.__.com/  
                              },
                              template_name=EMAIL_SETTINGS.mail_project_state_template)
+    return ok 
 
 @router.patch("/submissions/{submission_tag}/datasetattributes", summary = "Updates a submissions dataset attributes along with an optional change of state.")
 def update_submission(background_task : BackgroundTasks, 
@@ -598,61 +654,6 @@ def update_submission(background_task : BackgroundTasks,
         raise HTTPException(status_code=400, detail=str(e))
     return True
 
-    #notify the user if the state updated. For regular updates, no email is sent. 
-    if state_change.prev_state != state_change.state:
-        send_email_in_background(background_tasks=background_task,
-                             subject=f"Project {submission.title} ({submission.tag}) state updated.",
-                             email_to=[submission_user.email, user.email],
-                             include_setting_cc=True,
-                             body={
-                                 "app_name" : GENERAL_SETTINGS.app_name,
-                                 "first_name" : submission_user.firstname,
-                                 "state" : SubmissionStatesEnums(updated_submission.state).name,
-                                 "title" : submission.title,
-                                 "submission_label" : submission_label,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.tag}" #pydanitc HttpUrl (url) returns www.__.com/  
-                             },
-                             template_mame=EMAIL_SETTINGS.mail_project_state_template)
-    print(datasetAttributes)
-   # DB.meta.update_dataset_attributes(submisison_tag, )
-    return 
-    
-    db = MCDatabase.getDatabase()
-    if not db.doesLabelExists(submission_label): return tag_not_found
-    # get submission from database 
-    dataset = db.getDataset(submission_label)
-    submission_state = state_change.state
-    metadata = dataset.getMetaJson()
-    submission_user_label = metadata.user_label 
-    exists, submission_user = UserDB.get_user_by_label(user_label=submission_user_label)
-    if not exists:
-        raise HTTPException(status_code=404,details="The submission user label has not been found. Please change the owner of this submission first.")
-    # dump the model to a dict to modify it.
-    metadata = metadata.model_dump()
-    # update state using the State enumerater 
-    metadata["state"] =  submission_state
-    metadata["modified_on"] = datasetAttributes.modified_on 
-    
-    ## TODO : - move to service function
-    time_line = metadata["timeline"].copy()
-    updated_entries = time_line["entries"] + [TimeLineEntryModel(id=1,user_label=user.label,comment=state_change.comment,state=state_change.state).model_dump()]
-    time_line["entries"] = updated_entries
-    metadata["timeline"] = TimeLineModel(**time_line)
-
-    # save dataset attributes 
-    updated_dataset_attributes = OrderedDict([(attr.tag,[attrValue.tag for attrValue in datasetAttributes.datasetAttributeValues[attr.tag]]) 
-                                      for attr in datasetAttributes.datasetAttributes if attr.tag in datasetAttributes.datasetAttributeValues])
-    # pool dataset attributes
-    metadata["dataset_attributes"] = {**metadata["dataset_attributes"], **updated_dataset_attributes}
-    updated_submission = DatasetSubmissionModel(**metadata)
-    #update meta data in dataset and write json file.
-    
-    dataset.write_json(updated_submission, update = True)
-    
-    
-
-    return updated_submission    
-
 @router.patch("/submissions/{label}/sampleattributes")
 def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curator)):
     pass 
@@ -677,9 +678,13 @@ def get_submission_summary_string(submission_tag : str, user : UserModel = Depen
     return "\n".join(summary_strings)
 
 @router.get("/submissions/{submission_tag}/samples")
-def get_submission_summary_string(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
-    "Returns a string with dataset and sample attributes"
-    samples = DB.submissions.get_samples(tag=submission_tag)
+def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the samples associated with the submission"
+    return DB.submissions.get_samples(tag=submission_tag)
+
+@router.get("/submissions/{submission_tag}/samplelist")
+def get_sample_list_as_tsv(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
+    samples = DB.submissions.get_sample_list(tag=submission_tag)
     samples_string = pd.DataFrame.from_dict(samples).sort_values(by="index")
     return samples_string.to_csv(sep="\t", index = None)
 

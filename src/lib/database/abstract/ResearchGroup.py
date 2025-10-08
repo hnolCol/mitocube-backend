@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
 from typing import List, Dict 
 
-from config.models.performance import QCRunModel
+from config.models.researchgroup import ResearchGroupModel
 
 
 class ResearchGroupABC(ABC):
@@ -14,7 +14,12 @@ class ResearchGroupABC(ABC):
     @abstractmethod
     def exists(self, tag : str) -> bool:
         "" 
-        
+    @abstractmethod
+    def get(self, tag : str) -> ResearchGroupModel:
+        ""
+    @abstractmethod
+    def get_users_count(self, tag : str) -> int:
+        " "
     @abstractmethod    
     def insert(self, research_group):
         "" 

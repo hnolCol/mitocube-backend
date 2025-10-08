@@ -55,7 +55,7 @@ attr_values["tag"] = [f"{attr_tag}:{tag}" for attr_tag, tag in attr_values[["att
 attrs = attr.dropna(how="all")
 attrs["id"] = np.arange(attrs.index.size)
 tag_mapper = dict([(tag,id) for tag, id in attrs[["tag","id"]].values])
-parent_ids = attrs["parent_tag"].map(tag_mapper)
+#parent_ids = attrs["parent_tag"].map(tag_mapper)
 
 
 
@@ -63,7 +63,7 @@ parent_ids = attrs["parent_tag"].map(tag_mapper)
 attr_values.loc[:,"attribute_id"] = attr_values["attribute_tag"].map(tag_mapper)
 attr_values = attr_values.dropna(how="all")
 attr_values.dropna(subset=["attribute_id"], inplace=True)
-attr_values["id"] = np.arange(attr_values.index.size)
+#attr_values["id"] = np.arange(attr_values.index.size)
 
 
 JSON = {"attributes" : attrs.to_dict(orient="records"), "traits" : attr_values.to_dict(orient="records")}

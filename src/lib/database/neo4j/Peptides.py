@@ -4,6 +4,7 @@ import pandas as pd
 
 from lib.database.abstract.Peptides import PeptidesABC
 from lib.database.abstract.Samples import SamplesABC
+from lib.database.abstract.Cache import CacheABC
 from config.settings.proteomes.annotations import UniprotAnnotationSettings
 
 from services.annotations.uniprot import download_proteome_annotations
@@ -13,10 +14,11 @@ from config.models.peptides import PeptideResponseModel
 
 class Neo4JPeptides(PeptidesABC):
      
-    def __init__(self, driver : Driver, samples : SamplesABC) -> None:
+    def __init__(self, driver : Driver, samples : SamplesABC, cache : CacheABC = None) -> None:
         ""
         self._driver = driver 
         self._samples = samples 
+        self.cache = cache
         
         
     def _insert_peptides(self, data : pd.DataFrame) -> int:
@@ -84,7 +86,11 @@ class Neo4JPeptides(PeptidesABC):
         
         if not self.exists(tag=tag):
             raise ValueError(f"Peptide with tag {tag} does not exist.")
-        
+        if self.cache is not None:
+            cache_key = self.cache.calculate_key([tag, min_size, limit if limit is not None else "None", filter_tag if filter_tag is not None else "None", exclude_within_protein_correlation])
+            if self.cache.exists(cache_key):
+                return self.cache.get(cache_key)
+
         query = (
                 "MATCH (prot1:Protein)-[:HAS_PEPTIDE]->(p1:Peptide {tag: $tag})<-[r1:QUANTIFIED]-(s:Sample)-[r2:QUANTIFIED]->(p2:Peptide)<-[:HAS_PEPTIDE]-(prot2:Protein) "
             )
@@ -110,7 +116,10 @@ class Neo4JPeptides(PeptidesABC):
             query += "LIMIT $limit "
 
         r = self._driver.execute_query(query, tag=tag, min_size=min_size, limit=limit, routing_="r", result_transformer_=Result.data)
-        return pd.DataFrame(r)
+        peptide_correction = pd.DataFrame(r)
+        if self.cache is not None:
+            elf.cache.insert(cache_key, peptide_correction)
+        return peptide_correction
     
     def correlate_peptides_of_proteins(self, protein_tags: List[str], min_size : int = 4, limit : int = None) -> pd.DataFrame:
         """Correlates peptides within a list of proteins based on their quantification data.
@@ -243,15 +252,22 @@ class Neo4JPeptides(PeptidesABC):
         if not self.exists(tag=tag):
             raise ValueError(f"Peptide with tag {tag} does not exist.")
         
+        if self.cache is not None:
+            cache_key = self.cache.calculate_key([tag, submission_tags if submission_tags is not None else "None"])
+            if self.cache.exists(cache_key):
+                return self.cache.get(cache_key)
+        
         query = "MATCH (p:Peptide {tag : $tag})<-[r:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]-(sub:Submission)"
         
         if submission_tags is not None:
-            query += " WHERE sub.tag IN $submission_tags} "
+            query += " WHERE sub.tag IN $submission_tags "
         query += "RETURN p.tag as peptide_tag, s.tag as sample_tag, sub.tag as submission_tag, r.value as value"
         
         r = self._driver.execute_query(query, tag=tag, submission_tags=submission_tags, result_transformer_=Result.to_df, routing_="r")
         if r.empty:
             raise ValueError(f"No abundance data found for peptide with tag {tag}.")
+        if self.cache is not None:
+            self.cache.insert(cache_key, r)
         return r 
 
 

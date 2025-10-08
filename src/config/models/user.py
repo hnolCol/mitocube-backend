@@ -25,9 +25,9 @@ class BasicUser(BaseModel):
     tag : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
     firstname : str 
     lastname : str 
-    institute : str 
-    research_group : str 
-    created_on : float = Field(default_factory=get_time_stamp)
+    institute :  Optional[str] = None 
+    research_group : Optional[str] = None 
+    created_at : float
 
 class BasicUserWithEmail(BasicUser):
     """
@@ -42,7 +42,8 @@ class BasicUserWithEmail(BasicUser):
 
 class UserModel(BasicUserWithEmail):
     """BaseModel for a user"""
-    updated_on : float = None
+    
+    updated_at : float = None
     agreed_to_terms : Optional[bool] = None
     expires_after : float = None
     password : SecretStr = None
@@ -62,6 +63,39 @@ class UserModelForRegistration(BasicUserWithEmail):
     def validate_role(v : str):
         """From a post request"""
         return int(v)
+
+
+class UserInsertModel(BaseModel):
+    """BaseModel for inserting a user into the database."""
+    tag : str 
+    firstname : str 
+    lastname : str 
+    institute : Optional[str] = None  
+    research_group : Optional[str] = None  
+    email : EmailStr 
+    agreed_to_terms : Optional[bool] = False
+    expires_after : float = None
+    password : SecretStr 
+    allow_login : bool = True 
+    role : UserRolesEnum = UserRolesEnum.STANDARD
+    is_lead_admin : bool = False
+    #salt : str = None 
+    
+    
+class UserCreateModel(BaseModel):
+    """BaseModel for creating a user in the database."""
+    firstname : str 
+    lastname : str 
+    institute : Optional[str] = None 
+    research_group : Optional[str] = None  
+    email : EmailStr 
+    role : UserRolesEnum = UserRolesEnum.STANDARD
+    allow_login : bool = True 
+    agreed_to_terms : Optional[bool] = False
+    #salt : str = None
+
+
+
 
 
 class AddUserPropsModel(BaseModel):
@@ -130,12 +164,13 @@ class PublicUser(BaseModel):
     tag : str = None
     firstname : str
     lastname : str 
-    research_group : str 
-    institute : str 
+    institute : Optional[str] = None
+    research_group : Optional[str] = None
     email : EmailStr
+    created_at : float 
 
 class CollaboratorsResponseModel(BaseModel):
-    """Collaborators Mdeol"""
+    """Collaborators Model"""
     users : List[PublicUser]
 
 
