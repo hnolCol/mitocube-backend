@@ -33,6 +33,7 @@ from lib.database.abstract.News import NewsABC
 from lib.database.abstract.OpenAi import OpenAIClient
 from lib.database.abstract.Cache import CacheABC
 from lib.database.abstract.ProteinGroups import ProteinGroupsABC
+from lib.database.abstract.Proteins import ProteinsABC
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
 
@@ -87,8 +88,9 @@ class DatabaseABC(ABC):
     condition_applications : ConditionApplicationABC = None
     metatexts : MetaTextABC = None
     news : NewsABC = None
-    openai : OpenAIClient = OpenAIClient()
+    openai : OpenAIClient  = None #not checked for existence, since it is not mandatory
     cache : CacheABC = None 
+    proteins :  ProteinsABC = None
 
     def __init__(self):
         """The abstract database class that defines
@@ -233,8 +235,15 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the protein_groups attribute defined.")
         if not isinstance(self.protein_groups, ProteinGroupsABC):
             raise TypeError("The protein_groups class must be an instance of the ProteinGroupsABC.")
-        
-        
+
+        if self.proteins is None:
+            raise NotImplementedError("A database class must have the proteins attribute defined.")
+        if not isinstance(self.proteins, ProteinsABC):
+            raise TypeError("The proteins class must be an instance of the ProteinsABC.")
+
+
+
+
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 
         Use this function to check if a tag exists. 

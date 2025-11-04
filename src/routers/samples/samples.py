@@ -14,8 +14,15 @@ router = APIRouter(
     )
 
 
+@router.get("/count", summary="Get the total number of samples in the database.")
+def get_sample_count(protein_group_tag : str = None, submission_tag : str = None, trait_tag : str = None, has_protein_quantification : bool = False, has_peptide_quantification : bool = False, user : UserModel = Depends(get_user_from_token)) -> int:
+    "Returns the total number of samples in the database."
+    return DB.samples.count(protein_group_tag=protein_group_tag, submission_tag=submission_tag, trait_tag=trait_tag, has_protein_quantification=has_protein_quantification, has_peptide_quantification=has_peptide_quantification)
+
+
+
 @router.get("/{sample_tag}")
-def get_sample(sample_tag : str, user : UserModel = Depends(get_user_from_token)) -> SampleResponseModel:
+def get_sample(sample_tag : str, user : UserModel = Depends(get_user_from_token)):
     "Returns the sample information for a given sample tag."
     if not DB.samples.exists(tag = sample_tag):
         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
@@ -23,7 +30,6 @@ def get_sample(sample_tag : str, user : UserModel = Depends(get_user_from_token)
     sample = DB.samples.get(tag=sample_tag)
     if sample is None:
         raise HTTPException(status_code=404, detail=f"Sample found for tag {sample_tag} but the DB returned None")
-    S
     return sample 
 
 @router.get("/{sample_tag}/ca")

@@ -76,7 +76,7 @@ class Neo4JFeatures(FeaturesABC):
     def exists(self, tag: str) -> bool:
         
         query = (
-            "WITH EXISTS {(p:Protein {tag : $tag})} as exists "
+            "WITH EXISTS {(p:ProteinGroup|Peptide|Protein {tag : $tag})} as exists "
             "RETURN exists"
         )
         
@@ -508,7 +508,7 @@ class Neo4JFeatures(FeaturesABC):
 
         return [FeatureNeoModel(**f) for f in r]
         
-    def find(self, query : str, proteome_tags : str|List[str] = None, limit : int = 10) -> List[FeatureNeoModel]:
+    def find(self, search_string : str, limit : int = 10) -> List[str]:
         """Returns a list of features that are found by a query string. 
 
         Parameters
@@ -525,35 +525,53 @@ class Neo4JFeatures(FeaturesABC):
             The list has a maximum length of limit. 
         """
         
-        if proteome_tags is None:
-            cypher_query = (
-                "MATCH (p:Protein) "
-                "WHERE p.s CONTAINS $query_string "
-                "RETURN properties(p) LIMIT $limit" 
-            )
+        
+        query = ("MATCH (p:Protein)-[:HAS_PEPTIDE]->(peptide:Peptide) "
+                 "WHERE toLower(p.s) CONTAINS toLower($query_string) OR toLower(peptide.tag) CONTAINS toLower($query_string) OR toLower(p.gene_name) CONTAINS toLower($query_string) "
+                 "WITH p.tag as tag, collect(peptide.tag) as peptides, p "
+                 "RETURN tag, peptides ORDER BY p.viewed DESC ")
+
+        if limit is not None:
+            query += "LIMIT $limit"
             
-        else:
-            if isinstance(proteome_tags,str):
-                proteome_id = [proteome_id]
-            cypher_query = (
-                "MATCH (p:Protein) "
-                "WHERE p.s CONTAINS $query_string AND p.proteome_tag in $proteome_tags "
-                "RETURN properties(p) LIMIT $limit" 
-            )
+            
+        r = self._driver.execute_query(query, 
+                                       routing_="r", 
+                                       result_transformer_= Result.values,
+                                       query_string = search_string,
+                                       limit = limit)
+        
+        print(r)
+        
+        # if proteome_tags is None:
+        #     cypher_query = (
+        #         "MATCH (p:Protein) "
+        #         "WHERE p.s CONTAINS $query_string "
+        #         "RETURN properties(p) LIMIT $limit" 
+        #     )
+            
+        # else:
+        #     if isinstance(proteome_tags,str):
+        #         proteome_id = [proteome_id]
+        #     cypher_query = (
+        #         "MATCH (p:Protein) "
+        #         "WHERE p.s CONTAINS $query_string AND p.proteome_tag in $proteome_tags "
+        #         "RETURN properties(p) LIMIT $limit" 
+        #     )
 
   
-        try:
-            r = self._driver.execute_query(cypher_query, 
-                                        database_="neo4j", 
-                                        routing_="r", 
-                                        result_transformer_= Result.value,
-                                        query_string = query.lower(),
-                                        proteome_tags = proteome_tags,
-                                        limit = limit)
-        except Exception as e:
-            print("Query finding resulted in an error " + str(e))
-            return []
-        return [FeatureNeoModel(**f) for f in r]
+        # try:
+        #     r = self._driver.execute_query(cypher_query, 
+        #                                 database_="neo4j", 
+        #                                 routing_="r", 
+        #                                 result_transformer_= Result.value,
+        #                                 query_string = query.lower(),
+        #                                 proteome_tags = proteome_tags,
+        #                                 limit = limit)
+        # except Exception as e:
+        #     print("Query finding resulted in an error " + str(e))
+        #     return []
+        # return [FeatureNeoModel(**f) for f in r]
                
         
     def variance(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:

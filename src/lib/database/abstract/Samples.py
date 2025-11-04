@@ -1,6 +1,6 @@
 from abc import abstractmethod, ABC 
 from typing import List 
-
+import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleModel
 
@@ -8,6 +8,36 @@ class SamplesABC(ABC):
     def __init__(self) -> None:
         ""
         
+    @abstractmethod
+    def count(self,
+              has_protein_quantification : bool = False, 
+              has_peptide_quantification : bool = False, 
+              protein_group_tag : str = None, 
+              trait_tag : str = None, 
+              submission_tag : str = None) -> int:
+        
+        """Counts the number of samples. The filters are optional. However no combination is supported.
+        If protein_group_tag is provided, only samples that have quantified the given protein group are counted, but the 
+        submission_tag and trait_tag filters are ignored. The quantification filters are applied in any case.+.
+        
+        Parameters
+        ----------  
+        has_protein_quantification : bool, optional
+            If True, only counts samples that have at least one quantified feature are counted
+        has_peptide_quantification : bool, optional
+            If True, only counts samples that have at least one quantified peptide are counted
+        protein_group_tag : str, optional
+            If provided, only counts samples that have quantified the given protein group.
+        submission_tag : str, optional
+            If provided, only counts samples that are part of the given submission.
+        trait_tag : str, optional
+            If provided, only counts samples that have the given trait. 
+            
+        Returns 
+        -------
+        int
+            The number of samples matching the criteria.
+        """
         
     @abstractmethod
     def get(self, tag : str) -> SampleModel:
@@ -51,6 +81,9 @@ class SamplesABC(ABC):
     @abstractmethod
     def get_sample(tag : str) -> SampleModel:
         ""
+    @abstractmethod
+    def get_sample_tag_by_index_and_submission(self, sample_index : int, submission_tag : str) -> List[str]:
+        "Returns a sample an its trait as well genotype annotation."
         
     @abstractmethod
     def get_condition_procedure(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
@@ -71,3 +104,28 @@ class SamplesABC(ABC):
             A list of condition procedure tags. If only a single tag is found, a single string is returned.
             If no tag is found, an empty list is returned.
         """
+        
+    @abstractmethod
+    def get_condition_procedures_by_sample_index_for_submission(self, submission_tag : str) -> pd.DataFrame:
+        """Get all condition procedures for all samples in a submission, indexed by sample index. 
+        
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag to get the condition procedures for.
+        
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with sample indices as index and condition procedures as columns.
+            The columns names represent the instance attribute (e.g. att_environment).
+            The values are the condition procedure tags. 
+            Multiple tags are separated by a semicolon.
+        """
+        pass
+    @abstractmethod
+    def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float|None: 
+        """Get the quantified data for a given sample and feature.
+        A feature may be protein group or peptide. Returns None if no data is found.
+        """
+        pass

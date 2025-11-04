@@ -11,7 +11,7 @@ import pandas as pd
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel, AttributeTree
 from config.models.submissions.comments import SubmissionCommentModel
-from config.models.submissions.quantifications import ProteinQuantificationModel, PrecursorQuantificationModel
+from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel 
 from config.enums.states import SubmissionStatesEnums
 
@@ -255,7 +255,7 @@ class SubmissionsABC(ABC):
         
         """
     @abstractmethod
-    def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinQuantificationModel]) -> int:   
+    def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinGroupQuantificationModel]) -> int:   
         """
         Inserts protein quantifications for a given submission.
 

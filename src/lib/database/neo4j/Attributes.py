@@ -44,9 +44,12 @@ class Neo4JAttributes(AttributesABC):
         
         children = [{"tag" : a.tag, "children" : a.children} for a in attribute_models if isinstance(a.children,list) and len(a.children) > 0]
         #add attribute groups 
-        
+
+        requirements = [{"tag" : tag, "r" : rs.split("|")} for tag, rs in attribute_df.loc[:,["tag","requires"]].dropna(subset=["requires"]).values]
+        print(requirements)
+
         unique_attribute_groups = np.unique([attribute_group for attribute_group in attribute_df.loc[:,"attribute_group"].dropna().str.split("|", expand = True).values.flatten() if isinstance(attribute_group,str)])
-        attribute_tag_groups = [{'tag' : tag, 'group_tag' : group_tag} for tag, group in attribute_df.loc[:,["tag","attribute_group"]].values if isinstance(group,str) and len(group) > 0 for group_tag in group.split("|")]
+        attribute_tag_group  = [{'tag' : tag, 'group_tag' : group_tag} for tag, group in attribute_df.loc[:,["tag","attribute_group"]].values if isinstance(group,str) and len(group) > 0 for group_tag in group.split("|")]
 
         query = (
             "UNWIND $attr_group_tags as ag_tag "
@@ -102,7 +105,7 @@ class Neo4JAttributes(AttributesABC):
             "MERGE (a)-[:PART_OF]->(ag) "
         )
         
-        self._driver.execute_query(query, attr_group = attribute_tag_groups)
+        self._driver.execute_query(query, attr_group = attribute_tag_group)
         
         #add min state for attributes
         query = (
@@ -138,9 +141,22 @@ class Neo4JAttributes(AttributesABC):
         )
         
         r = self._driver.execute_query(query, children = children, routing_="w", traits = [trait.model_dump(exclude_none=True) for trait in trait_models], result_transformer_=Result.value)
-
+        
         print(f"Added {r} traits.")
         
+        
+        
+        if requirements is not None and len(requirements) > 0:
+            query = (
+                "UNWIND $props as prop "
+                "MATCH (a:Attribute {tag : prop.tag}) "
+                "UNWIND prop.r as req_tag "
+                "MATCH (t:Trait {tag : req_tag}) "
+                "MERGE (a)-[r:REQUIRES_TRAIT]->(t) "
+                "RETURN count(r) as count "
+            )
+            r = self._driver.execute_query(query, props = requirements, routing_="w", result_transformer_=Result.value)
+            print(r,"requirements added.")
         
         #print(types)
         #eyJhbGciOiJQUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Ii4rQC4rIiwibWl4cGFuZWxJZCI6IiRkZXZpY2U6Y2Y3ZWI3ODgtNDdmMy00YzE0LTgxNmItN2E1NGVjODUwYzlmIiwibWl4cGFuZWxQcm9qZWN0SWQiOiI0YmZiMjQxNGFiOTczYzc0MWI2ZjA2N2JmMDZkNTU3NSIsIm9yZyI6Ii4qIiwicHViIjoibmVvNGouY29tIiwicmVnIjoiICIsInN1YiI6Im5lbzRqLWRlc2t0b3AiLCJleHAiOjE3NzkzNzQ3NTUsInZlciI6IioiLCJpc3MiOiJuZW80ai5jb20iLCJuYmYiOjE3NDc4Mzg3NTUsImlhdCI6MTc0NzgzODc1NSwianRpIjoianRfbXc2QVRnIn0.tRRLGKLkEqfALrRSzqjjVx8qAt_4jsWCR6fWZPLkacvVcpNvuWV5DBwZTjYGfpqKelt2307NlquRCsTyP6vXOhLtVWq43PndrOK1aF4H8LwE6l80bxL4QucxxEhHi0aQL0n-IDcZ5YJRintJ1dDCoG6biTcDquxPT4vZNZLeHMYv3Eo4WWmtgLqrMUN1hhADYHKO3MhFaRp7otXIAeNuSx_Ok2fE5kruZBbi18mW5bCWxmKkopAemb4CbW-81C-lCxDNlXL7cYLFWir1Lk4c-60CUSWTgd2h1LW-aZeqL4yC7jGXi1JEj0JX7bThrfbHrCgE4ZCuZAIKLAOTRQH2tQ
@@ -291,6 +307,16 @@ class Neo4JAttributes(AttributesABC):
         
             return attribute_tags 
         
+        
+    def get_required_traits(self, tag: str) -> List[str]:
+        ""
+        query = (
+            "MATCH (a:Attribute {tag : $tag})-[:REQUIRES_TRAIT]->(t:Trait) "
+            "RETURN t.tag as tag ORDER BY t.priority "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r
         
     def count(self) -> int:
         

@@ -3,13 +3,13 @@ from typing import List, Dict
 
 
 
-class ProteinQuantificationModel(BaseModel):
-    tag : str # Protein tag 
+class ProteinGroupQuantificationModel(BaseModel):
+    tag : str # Protein group tag 
     sample_tag : str # Sample tag 
     value : float  # Quantification value (intensity, such as LFQ, iBAQ, TMT, etc)
 
 class ProteinQuantificationBulkInsertModel(BaseModel):
-    quantifications : List[ProteinQuantificationModel] 
+    quantifications: List[ProteinGroupQuantificationModel]
 
 class PrecursorQuantificationModel(BaseModel):
     tag : str # Peptide tag

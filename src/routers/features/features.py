@@ -22,28 +22,146 @@ router = APIRouter(
     tags=["Features"]
     )
 
-@router.get("")
-def get_features_by_query(query : str, proteome_tags : str = None, limit : int = 30)->List[FeatureNeoModel]:
-    """Finds query by feautre 
 
+
+
+
+
+@router.get("/q")
+def find_feature_by_query(search_string : str = None, submission_tag : str = None, include_types : str = None, exclude_types : str = None, limit : int = 30):
+
+    include_types = APIParamString(param=include_types).param
+    exclude_types = APIParamString(param=exclude_types).param
+
+    if include_types is not None:
+        if any([t not in ["protein_groups","peptides"] for t in include_types]):
+            raise HTTPException(status_code=400, detail="include_types must be one of 'protein_groups', 'peptides'.")
+    if exclude_types is not None:
+        if any([t not in ["protein_groups","peptides"] for t in exclude_types]):
+            raise HTTPException(status_code=400, detail="exclude_types must be one of 'protein_groups', 'peptides'.")
+    if include_types is not None and exclude_types is not None:
+        if any([t in exclude_types for t in include_types]):
+            raise HTTPException(status_code=400, detail="include_types and exclude_types must not contain the same types.")
+    
+    if (include_types is None and exclude_types is None) or (len(include_types) == 0 and len(exclude_types) == 0):
+        include_types = ["protein_groups","peptides"]
+        
+    print(include_types,exclude_types)
+    pgs = []
+    peptides = []
+    pg_peptides = {}
+    if "protein_groups" in include_types:
+        
+        pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag)
+        print("pgs_search_result ", pgs_search_result)
+    if "peptides" in include_types:
+        
+        peptides = DB.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)
+        
+        for peptide, pgs in peptides:
+            for pg in pgs:
+                if pg not in pg_peptides:
+                    pg_peptides[pg] = []
+                pg_peptides[pg].append(peptide)
+                
+    peptide_only_matches_pgs = [pg for pg in pg_peptides if pg not in pgs_search_result]
+
+   
+    pgs_with_peptides = [{"tag" : pg, "pg_match" : True,  "protein_tags" : pg.split(";"), "peptide_match" : pg in pg_peptides, "peptide_tags" : pg_peptides[pg] if pg in pg_peptides else []} for pg in pgs_search_result]
+    peptide_only = [{"tag" : pg, "pg_match" : False, "protein_tags" : pg.split(";"), "peptide_match" : True, "peptide_tags" : peptides} for pg,peptides in pg_peptides.items() if pg in peptide_only_matches_pgs]
+
+
+    result = pgs_with_peptides + peptide_only
+    return result[:limit]
+
+    
+        
+@router.get("/{feature_tag}/d")
+def get_feature_data(feature_tag : str, submission_tag : str, append_condition_procedure : bool = True, user : UserModel = Depends(get_user_from_token)):
+    """Returns the data for a specific feature in all datasets it was detected in. 
+    This Endpoint combines peptide and protein group features. If you know what type the 
+    feature has, you should likely use the more specific endpoints (proteins/{protein_tag}/d). 
+    
+    API Endpoint
+    ------------
+    ``GET api/features/{feature_key}/d```
+    
     Parameters
     ----------
-    query : str
-        The query string 
-    proteome_ids : str, optional
-        The list of proteomes to query the feature in. If None, alle available features will be searched for
-        If multiple proteomes should be provided, separate them by a ';'. 
-    limit : int, optional
-        The maximum number of features to be returned.
-    user : UserModel, optional
-        _description_, by default Depends(get_user_from_token)
-
+    feature_key : str
+        The key of the feature (UniprotIDs for protein groups
+        ) and peptide sequences for peptides .
+    user : UserModel
+        The user that was identified by the token.
+    
     Returns
     -------
-    _type_
-        _description_
+    List[Dict]
+    
+    Raises
+    ------
+    HTTPException
+        If the feature with the given key does not exist.
+    
     """
-    return DB.features.find(query, proteome_tags = APIParamString(param=proteome_tags).param, limit = limit)
+    
+    if not DB.features.exists(tag = feature_tag):
+        raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
+    if not DB.submissions.exists(tag = submission_tag):
+        raise HTTPException(status_code=404, detail = "Submission tag not found in the database.")
+    
+    sample_tags = DB.submissions.get_samples(tag = submission_tag) # check if submission has samples
+    if not sample_tags:
+        raise HTTPException(status_code=404, detail = "No samples found for submission tag.")
+    d = []
+    attribute_tags = set()
+    for sample_tag in sample_tags:
+        di = {"tag" : sample_tag, "value" : None}
+        if not DB.samples.exists(tag = sample_tag):
+            continue 
+        quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag)
+        di["value"] = quantified_value
+        if append_condition_procedure:
+            ca_tags = DB.samples.get_condition_procedure(tag=sample_tag, group_by_attribute=True)
+            
+            for ca_tag in ca_tags:
+                attribute_tag = ca_tag.get("attribute_tag")
+                if attribute_tag is None:   
+                    continue
+                attribute_tags.add(attribute_tag)
+                condition_application_tags = ";".join(ca_tag.get("condition_application_tags", []))
+                di[attribute_tag] = condition_application_tags
+                #else:
+        d.append(di)
+
+    return {"data" : d, "attribute_tags" : list(attribute_tags), "feature_tag" : feature_tag, "submission_tag" : submission_tag}
+    
+    
+    
+    
+    
+# @router.get("")
+# def get_features_by_query(query : str, proteome_tags : str = None, limit : int = 30)->List[FeatureNeoModel]:
+#     """Finds query by feautre 
+
+#     Parameters
+#     ----------
+#     query : str
+#         The query string 
+#     proteome_ids : str, optional
+#         The list of proteomes to query the feature in. If None, alle available features will be searched for
+#         If multiple proteomes should be provided, separate them by a ';'. 
+#     limit : int, optional
+#         The maximum number of features to be returned.
+#     user : UserModel, optional
+#         _description_, by default Depends(get_user_from_token)
+
+#     Returns
+#     -------
+#     _type_
+#         _description_
+#     """
+#     return DB.features.find(search_string = query, proteome_tags = APIParamString(param=proteome_tags).param, limit = limit)
     
 
     
@@ -62,13 +180,22 @@ def get_pairwise_quantification(feature_tag_x : str, feature_tag_y : str):
 
 
 @router.get("/{feature_tag}")
-def get_feature_by_tag(feature_tag : str, user : UserModel = Depends(get_user_from_token)) -> FeatureNeoModel:
+def get_feature_by_tag(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
     "" 
-    if not DB.features.exists(tag = feature_tag):
-        raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
-    feature = DB.features.get_protein_by_tags(tags=[feature_tag], as_data_frame=False)
-    if len(feature) == 1:
-        return feature[0]
+    if DB.proteins.exists(tag = feature_tag):
+        return DB.proteins.get(tag = feature_tag)
+    if DB.protein_groups.exists(tag = feature_tag):
+        return DB.protein_groups.get(tag = feature_tag)
+    if DB.peptides.exists(tag = feature_tag):
+        return DB.peptides.get(tag = feature_tag)
+    
+    raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
+
+    # if not DB.features.exists(tag = feature_tag):
+    #     raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
+    # feature = DB.features.get_protein_by_tags(tags=[feature_tag], as_data_frame=False)
+    # if len(feature) == 1:
+    #     return feature[0]
     
 
 @router.get("/{feature_tag}/i")

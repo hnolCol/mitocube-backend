@@ -115,7 +115,8 @@ class Neo4JUser(UserABC):
         "Returns the submissions that have been viewed by the user."
         query = (
             "MATCH (u:User {tag : $user_tag})-[r:VIEWED]->(submission:Submission) "
-            "RETURN DISTINCT submission.tag ORDER BY r.created_at DESC "
+            "WITH DISTINCT submission ORDER BY submission.created_at DESC "
+            "RETURN submission.tag "
         )
         if limit is not None:
             query += "LIMIT $limit"

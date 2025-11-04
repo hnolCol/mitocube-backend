@@ -64,13 +64,15 @@ class ProteinGroupsABC(ABC):
         
         
     @abstractmethod
-    def find(self, search_string : str, limit : int = None) -> List[str]:
+    def find(self, search_string : str = None, submission_tag : str = None, limit : int = None) -> List[str]:
         """Finds all protein group tags matching the search string.
 
         Parameters
         ----------
         search_string : str
             The search string to match against protein group tags.
+        submission_tag : str, optional
+            If provided, only protein groups associated with the given submission are returned, by default None
         limit : int, optional
             If provided, limits the number of results returned, by default None
 
@@ -112,3 +114,8 @@ class ProteinGroupsABC(ABC):
         bool
             True if the insertion was successful, False otherwise.
         """
+        
+    @abstractmethod
+    def insert_bulk(self, protein_groups : List[str]) -> int:
+        """Inserts multiple protein groups into the database. If they do not exist yet. 
+        Each protein group is connected to its proteins. Returns the number of protein groups added."""

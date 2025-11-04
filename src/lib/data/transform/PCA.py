@@ -47,7 +47,13 @@ class PCATransform(DatasetTransform):
         X = data.to_numpy()
         
         if self._scale:
-            X = scale(X, axis=1)
+            # === Step 2: Center per protein (subtract row mean) ===
+            centered = X - X.mean(axis=1, keepdims=True)
+
+            # === Step 3: Pareto scale (divide by sqrt of SD) ===
+            X = centered / np.sqrt(X.std(axis=1, keepdims=True))
+            # X.sub(log_data.mean(axis=1), axis=0)
+            # X = scale(X, axis=1)
 
         pca = PCA(n_components=self._n_components)  
         pca.fit(X)

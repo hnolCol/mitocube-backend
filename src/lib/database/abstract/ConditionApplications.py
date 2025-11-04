@@ -7,7 +7,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from neo4j import Driver 
-
+from config.models.conditions_applications import ConditionApplicationTreeModel
 import pandas as pd
 
 
@@ -64,6 +64,11 @@ class ConditionApplicationABC(ABC):
     @abstractmethod
     def get(self, tag: str) -> Dict:
         "Return the condition application details."
+        
+    @abstractmethod
+    def get_tree(self, tag : str) -> ConditionApplicationTreeModel:
+        """Returns a hierarchical tree representation of the condition application.
+        """
         
     @abstractmethod
     def insert(self, condition_application : Dict) -> bool:

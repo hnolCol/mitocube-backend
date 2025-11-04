@@ -9,9 +9,10 @@ from pydantic import field_validator
 from pydantic import field_serializer
 
 from config.models.user import PublicUser
-from config.models.attributes import AttributeModel, AttributeValueModel
+from config.models.attributes import AttributeModel, AttributeValueModel, AttributeTree
 from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
 from config.models.submissions.runs import RunListModel
+
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel
 from config.models.annotations.feature import FeatureModel
 from config.models.unit import InputModel, UnitTypeInputModel
@@ -69,14 +70,6 @@ class MinimalMetadataResponseModel(MinimalMetadataModel):
     "" 
     
 
-AttributeTree = ForwardRef('AttributeTree')
-    
-class AttributeTree(BaseModel):
-    tag : str # Attribute or Trait String 
-    type :  Literal["attribute","trait"]
-    value : float|int = None
-    children : Optional[List[AttributeTree]]
-
 
 class NewSubmissionModel(BaseModel):
     """
@@ -96,6 +89,7 @@ class NewSubmissionModel(BaseModel):
     metatext : Dict[str,str]
     samples_attributes : List[List[AttributeTree]]
     dataset_attributes : List[AttributeTree] 
+    research_aim : str
     # sampleNames : List[str]
     #replicates : List[int]
      #List of users by their tag. 

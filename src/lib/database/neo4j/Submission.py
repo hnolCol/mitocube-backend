@@ -12,7 +12,7 @@ from lib.database.abstract.Proteomes import ProteomesABC
 from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import AttributeTree, DatasetSubmissionModel
-from config.models.submissions.quantifications import ProteinQuantificationModel, PrecursorQuantificationModel
+from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 from config.models.conditions_applications import ConditionApplicationAttributeModel 
 
@@ -310,7 +310,7 @@ class Neo4JSubmissions(SubmissionsABC):
         self._driver.execute_query(query, routing_="w", tag=tag, research_aim=research_aim, user_tag=user_tag)
         return True
     
-    def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinQuantificationModel]) -> int:   
+    def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinGroupQuantificationModel]) -> int:   
         """
         Inserts protein quantifications for a given submission.
 
@@ -329,13 +329,14 @@ class Neo4JSubmissions(SubmissionsABC):
         query = (
             "MATCH (submission:Submission {tag : $tag}) "
             "UNWIND $quantifications as quantification "
-            "MATCH (protein:Protein {tag : quantification.tag}) "
+            "MATCH (pg:ProteinGroup {tag : quantification.tag}) "
             "MATCH (sample:Sample {tag : quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
-            "MERGE (sample)-[q:QUANTIFIED]->(protein) "
+            "MERGE (sample)-[q:QUANTIFIED]->(pg) "
             "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
             "RETURN count(q) "
         )
-        r = self._driver.execute_query(query, routing_="w", tag=tag, quantifications=quantifications)
+        r = self._driver.execute_query(query, routing_="w", tag=tag, quantifications=quantifications, result_transformer_=Result.value)
+        print(r[0] if len(r) > 0 else 0)
         return r[0] if len(r) > 0 else 0
     
     def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.Database import Database
 from config.models.user import UserModel
-from config.models.submissions.quantifications import ProteinQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel
+from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token, is_user_at_least_curator
 from typing import Dict, List, Literal
@@ -15,8 +15,8 @@ router = APIRouter(
 
 from pydantic import BaseModel
 
-class ProteinQuantificationListModel(BaseModel):
-    quantifications: List[ProteinQuantificationModel]
+class ProteinGroupQuantificationListModel(BaseModel):
+    quantifications: List[ProteinGroupQuantificationModel]
     
     
     
@@ -45,7 +45,7 @@ def get_submission_quant_exists(submission_tag : str, quantification_type :  Lit
 @router.post("/{submission_tag}/quantifications/proteins", summary="Insert protein quantifications for a given submission. Requires curator rights.")
 def insert_protein_quantifications(
     submission_tag: str,
-    quantifications: ProteinQuantificationListModel,
+    quantifications: ProteinQuantificationBulkInsertModel,
     user: UserModel = Depends(is_user_at_least_curator)
 ) -> int:
     """
@@ -69,7 +69,12 @@ def insert_protein_quantifications(
     if DB.submissions.exists(tag=submission_tag) is False:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    return DB.submissions.insert_protein_quantifications(submission_tag=submission_tag, quantifications=quantifications)
+    ##first check if all proteins exist
+    print(quantifications)
+    N = DB.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
+    print(f"N: {N} protein groups added.")
+    print(quantifications.model_dump().get("quantifications", []))
+    return DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=quantifications.model_dump().get("quantifications", []))
 
 
 

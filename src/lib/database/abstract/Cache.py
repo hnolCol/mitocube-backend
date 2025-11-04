@@ -2,7 +2,7 @@ import hashlib
 from abc import ABC, abstractmethod
 from typing import List 
 class CacheABC(ABC):
-    def __init__(self, max_items: int):
+    def __init__(self, max_items: int = 200):
         self.max_items = max_items
         self._cache = {}
         
@@ -16,8 +16,6 @@ class CacheABC(ABC):
         """
         Retrieve a value from the cache by key. Returns None if the key is not found.
         """
-        print("Cache get:", key, "GETTING DATA FROM CACHE!! ")
-        print("INFO")
         return self._cache.get(key, None)
 
     def insert(self, key: str, value):

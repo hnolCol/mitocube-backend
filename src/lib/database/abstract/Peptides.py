@@ -36,6 +36,21 @@ class PeptidesABC(ABC):
         """
         
     @abstractmethod
+    def count(self, submission_tag : str = None) -> int:
+        """Counts the number of peptides.
+
+        Parameters
+        ----------
+        submission_tag : str, optional
+            The tag of the submission to count peptides for. If None, counts all peptides, by default None.
+
+        Returns
+        -------
+        int
+            The number of peptides in the submission.
+        """
+    
+    @abstractmethod
     def exists(self, tag : str) -> bool:
         """Checks if a given tag is associates with a peptide (e.g. sequence) 
 
@@ -51,19 +66,24 @@ class PeptidesABC(ABC):
         """
         
     @abstractmethod
-    def find(self, search_string : str, limit : int = None) -> List[str]:
+    def find(self, search_string : str, submission_tag : str = None, limit : int = None, provide_protein_info : bool = False) -> List[str]|List[Tuple[str,List[str]]]:
         """Finds all peptides matching the search string.
 
         Parameters
         ----------
         search_string : str
             The search string to match against peptide sequences.
+        submission_tag : str, optional
+            If provided, only peptides associated/quantified in the given submission are returned, by default None
         limit : int, optional
             The maximum number of results to return. If None, all matching peptides are returned.
+        provide_protein_info : bool, optional
+            If True, returns a list of tuples with the peptide sequence and a list of associated protein tags, by default False.
         Returns
         -------
-        List[str]
+        List[str]|List[Tuple[str,List[str]]]
             A list of matching peptide tags (e.g. the sequence).
+            If provide_protein_info is True, returns a list of tuples with the peptide sequence and a list of associated protein tags.
         """
         
         

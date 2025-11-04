@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from typing import List 
 from neo4j import Driver
 
-from config.models.genotype import MinimalGenotypeModel, GenotypeModel 
+from config.models.genotype import MinimalGenotypeModel, GenotypeModel , InsertGeneticApplicationModel
 
 
 class GenotypeABC(ABC):
@@ -28,7 +28,7 @@ class GenotypeABC(ABC):
         
         
     @abstractmethod
-    def get(self, tags : List[str] = None, proteome_tags : List[str] = None, protein_tags : List[str] = None) -> List[MinimalGenotypeModel]:
+    def get(self, tag) -> List[MinimalGenotypeModel]:
         """Returns the genotypes by the tags. 
         If tag is None (default) all genotypes will be returned. 
 
@@ -49,15 +49,32 @@ class GenotypeABC(ABC):
         """
         
     
-        
-    def find(self, query : str) -> List[MinimalGenotypeModel]:
-        #TEST!! 
-        query_string = query.lower() 
-        query = (
-            "MATCH (g:Genotype) "
-            "WHERE g.s CONTAINS $query_string "
-            "RETURN g.tag as tag, g.text as text, g.proteome_id as proteome_id "
-        )
-        
-        r, _ , _= self._driver.execute_query(query, query_string = query_string, routing_="r", database_="neo4j")
-        return [MinimalGenotypeModel(**ri.data()) for ri in r]
+    @abstractmethod
+    def find(self, search_string : str) -> List[str]:
+        """Finds genotype tags that match the search string. 
+
+        Parameters
+        ----------
+        search_string : str
+            The search string to look for in the genotype tags. 
+
+        Returns
+        -------
+        List[str]
+            A list of matching genotype tags. 
+        """
+    
+    @abstractmethod
+    def insert(self, data : InsertGeneticApplicationModel) -> bool:
+        """Inserts a new genotype into the database.
+
+        Parameters
+        ----------
+        data : InsertGeneticApplicationModel
+            The genotype information to be inserted.
+
+        Returns
+        -------
+        bool
+            True if the insertion was successful, False otherwise.
+        """

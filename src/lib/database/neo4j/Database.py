@@ -1,4 +1,5 @@
 
+from lib2to3.pgen2 import driver
 from typing import List, Dict 
 
 from lib.database.abstract.Database import DatabaseABC 
@@ -28,6 +29,8 @@ from lib.database.neo4j.ConditionApplications import Neo4JConditionApplications
 from lib.database.neo4j.Metatext import Neo4JMetaText
 from lib.database.neo4j.Cache import Neo4JCache
 from lib.database.neo4j.ProteinGroups import Neo4JProteinGroups
+from lib.database.neo4j.Proteins import Neo4JProteins
+from lib.database.neo4j.OpenAI import Neo4JOpenAI
 from config.models.submissions.submissions import DatasetSubmissionModel
 
 import pandas as pd 
@@ -68,15 +71,29 @@ class MCNeo4JDatabase(DatabaseABC):
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
         self.condition_applications = Neo4JConditionApplications(driver=self.connection.driver)
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
+        self.proteins = Neo4JProteins(driver = self.connection.driver)
         self.cache = Neo4JCache()
+        self.openai = Neo4JOpenAI(driver = self.connection.driver)
         #checks if all is correctly defined 
+        self.__create_fulltext_search()
         super(MCNeo4JDatabase, self).__init__()
-    
+
     
         #self.constructor.set_up_units()
         #self.constructor.set_up_attributes()
         #self.constructor._add_
-
+    def __create_fulltext_search(self):
+        """Creates the fulltext search index for the database. 
+        This includes submission and research aim fulltext search, as well as metatext
+        """
+        query = """
+            CREATE FULLTEXT INDEX submission_researchaim_metatext_search IF NOT EXISTS 
+            FOR (n:Submission|ResearchAim|MetaText)
+            ON EACH [n.title, n.text];
+            """
+        self._driver.execute_query(query_=query, routing_="w", database_="neo4j")
+               
+    
     def get_feature_data(self, tag : str) -> List[Dict]:
         """Returns the feature (protein) data
         by its tag.

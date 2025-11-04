@@ -6,7 +6,7 @@ from services.encryption import create_hierarchical_hash
 from config.models.submissions.submissions import AttributeTree
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleModel
-
+import pandas as pd
 import uuid
 class Neo4JSamples(SamplesABC):
     "" 
@@ -30,7 +30,69 @@ class Neo4JSamples(SamplesABC):
             A unique sample tag.
         """
         return f"{submission_tag}|{sample_name}"
-    
+
+    def count(self, 
+              has_protein_quantification : bool = False, 
+              has_peptide_quantification : bool = False,
+              protein_group_tag : str = None, 
+              submission_tag : str = None, 
+              trait_tag : str = None) -> int:
+
+        "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
+        if protein_group_tag is not None:
+            query = (
+                "MATCH (s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup {tag : $protein_group_tag})-[:HAS_PROTEINS]->(p:Protein)-[:IN_PROTEOME]-(proteome:Proteome) "
+            )
+        elif trait_tag is not None:
+            query = (
+                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(trait:Trait) "
+                "WHERE trait.tag = $trait_tag "
+            )
+        elif submission_tag is not None:
+            query = (
+                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag}) "
+            )
+        else:
+            query = (
+                "MATCH (s:Sample) "
+            )
+        
+        ## handle quantification filters
+        if trait_tag is not None:
+            query += (
+                "AND "
+            )
+        elif (has_protein_quantification or has_peptide_quantification):
+            query += (
+                "WHERE "
+            )
+
+        if has_protein_quantification:
+            if protein_group_tag is not None: 
+                query += (
+                " EXISTS {(s)-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(:Protein)-[:IN_PROTEOME]-(proteome)} "
+            )
+            else:
+                query += (
+                " EXISTS {(s)-[:QUANTIFIED]->(:ProteinGroup)} "
+            )
+        if has_peptide_quantification:
+            if has_protein_quantification:
+                query += "AND "
+            query += (
+                "EXISTS {(s)-[:QUANTIFIED]->(:Peptide)} "
+            )
+        query += (
+            "RETURN count(s) as count "
+        )
+        
+        print(query)
+            
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag)
+        return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
+
+
 
     def exists(self, tag : str) -> bool:
         "Check if a sample is associated with the given tag."
@@ -57,6 +119,22 @@ class Neo4JSamples(SamplesABC):
         return  r[0] if len(r) > 0 else None
 
 
+    def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float: 
+        """Get the quantified data for a given sample and feature.
+        A feature may be protein group or peptide.
+        """
+        
+        if self.exists(tag = tag) is False: raise ValueError("Sample tag does not exist. ")
+        
+        query = (
+            "MATCH (s:Sample {tag : $tag})-[r:QUANTIFIED]->(f:ProteinGroup|Peptide {tag : $feature_tag}) "
+            "RETURN r.value as value "
+        )
+        
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag, feature_tag = feature_tag)
+        return r[0] if len(r) > 0 else None
+
+
     def condition_procedure_exists(self, tag : str) -> bool:
         "Check if a condition procedure exists for the given tag."
         
@@ -68,24 +146,7 @@ class Neo4JSamples(SamplesABC):
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
         return r[0]
     
-    def count(self, trait_tag : str = None) -> int:
-        
-        "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
-        
-        if trait_tag is not None:
-            query = (
-                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(trait:Trait) "
-                "WHERE trait.tag = $trait_tag "
-                "RETURN count(s) as count"
-            )
-        else:
-            query = (
-                "MATCH (s:Sample) "
-                "RETURN count(s) as count"
-            )
-        
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, trait_tag = trait_tag)
-        return r[0]["count"] 
+    
         
         
     def insert(self, submission_tag : str, sample_name : str, sample_index : int) -> str:
@@ -132,7 +193,7 @@ class Neo4JSamples(SamplesABC):
                 "MERGE (t:Trait {tag : $trait_tag}) "
                 "WITH ca,cv,a,t "
                 "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
-                "MERGE (cv)-[:HAS_TRAIT]-(t) "
+                "MERGE (cv)-[:INSTANCE_OF]-(t) "
                 "MERGE (ca)-[r:HAS_VALUE]->(cv) "
                 "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag"
             )
@@ -184,7 +245,7 @@ class Neo4JSamples(SamplesABC):
                     ]
 
         """
-        sample_data = [x.model_dump() for x in sample_data]  # Convert Pydantic models to dicts if necessary
+        sample_data = [x.model_dump() for x in sample_data]  # Convert Pydantic models to list of dicts if necessary
         
         for condition_application in sample_data:
             attribute_tag = condition_application["tag"]
@@ -192,7 +253,7 @@ class Neo4JSamples(SamplesABC):
                 trait_tag = trait_node["tag"]
                 #this is the root of the condition applications . 
                 #however they might be multiple traits 
-                #calculate the condition application tag 
+                #calculate the condition application tag, only unique combinations exist
                 ca_tag = create_hierarchical_hash(trait_node)
                 
                 if self.condition_procedure_exists(tag = ca_tag):
@@ -212,7 +273,7 @@ class Neo4JSamples(SamplesABC):
                         "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
                         "ON CREATE SET ca.created_at = timestamp() "
                         "WITH ca, s "
-                        "MATCH (a:Attribute {tag : $attribute_tag})-[:PART_OF]->(ag:AttributeGroup {tag : 'sample'}) " #only sample attributes are allowed here "
+                        "MATCH (a:Attribute {tag : $attribute_tag}) " #-[:PART_OF]->(ag:AttributeGroup {tag : 'sample'}) " #only sample attributes are allowed here "
                         "MATCH (t:Trait {tag : $trait_tag}) "
                         #connect to sample 
                         "MERGE (s)-[:HAS_APPLICATION]->(ca) "
@@ -245,8 +306,6 @@ class Neo4JSamples(SamplesABC):
             A list of condition procedure tags. If only a single tag is found, a single string is returned.
             If no tag is found, an empty list is returned.
         """
-        
-        
             
         query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication)" 
         if group_by_attribute:
@@ -257,20 +316,6 @@ class Neo4JSamples(SamplesABC):
         if group_by_attribute:
             return [{"attribute_tag" : ri[0], "condition_application_tags" : ri[1]} for ri in r]
         return r[0] if len(r) > 0 else []
-        
-
-    
-        
-    # def get_condition_procedure(self, tag : str):
-    #     """Get a condition procedure by its tag."""
-        
-    #     query = (
-    #         "MATCH (ca:ConditionApplication {tag : $tag}) "
-    #         "RETURN ca.tag as tag, ca.text as text, ca.created_at as created_at "
-    #     )
-        
-    #     r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag=tag)
-    #     return r[0] if len(r) > 0 else None 
         
     
     def get_samples_by_genotype(self, genotype_tag : str):
@@ -296,39 +341,54 @@ class Neo4JSamples(SamplesABC):
         print(r)
         return  r[0] if len(r) > 0 else None
 
-    # def get_sample_string(self, tag : str) -> str:
-    #     """Return a string for sample that describes the traits for a given sample. 
-    #     This should be used to either visualize the sample in the gui. Or to access
-    #     statistics as the string will be explicit for the trait/attributes"""
+
+    def get_sample_tag_by_index_and_submission(self, sample_index : int, submission_tag : str) -> List[str]:
+        "Returns a sample an its trait as well genotype annotation."
         
-    #     query = (
-    #         "MATCH (ca:ConditionApplication)-[]-(s:Sample {tag : $tag}) " 
-    #         "CALL apoc.path.expand(ca, 'HAS_VALUE|HAS_UNIT|HAS_CHILD>', null, 1, 10) YIELD path "
-    #         "WITH path "
-    #         "WITH nodes(path) AS nodelist, length(path) AS depth "
-
-    #         "WITH [x IN nodelist WHERE x:Trait OR x:ConditionValue | x.tag] AS tags, depth "
-
-    #         "ORDER BY depth DESC "
-
-    #         "WITH collect(tags) AS tagpaths "
-
-    #         "WITH [tp IN tagpaths | "
-    #         "reduce(output = "", tag IN reverse(tp) | "
-    #         "   CASE output "
-    #         "    WHEN "" THEN tag "
-    #         "    ELSE tag + '(' + output + ')' "
-    #         "    END) "
-    #         "] AS nestedStrings "
-
-    #         "RETURN nestedStrings "
-
-    #         )
+        query = (
+            "MATCH (s:Sample {sample_index : $sample_index})<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag}) " 
+            "RETURN s.tag ORDER BY s.sample_index ASC "
+        )
         
-    #     r = self._driver.execute_query(query, routing = "r", result_transformer_=Result.value, tag = tag)
-    #     print(r)
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, sample_index = sample_index, submission_tag = submission_tag)
+        print(r)
+        return  r[0] if len(r) > 0 else None
+
+    def get_condition_procedures_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True) -> pd.DataFrame:
+        """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
-    #     return r 
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag to get the condition procedures for.
+        join : str, optional
+            If provided, multiple condition procedure tags will be joined into a single string using this separator.
+        pivot : bool, optional
+            If True, the result will be pivoted to have attributes as columns.
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with sample indices as index and condition procedures as columns.
+            The columns names represent the instance attribute (e.g. att_environment).
+            The values are the condition procedure tags. 
+            Multiple tags are separated by a semicolon, if join is provided.
+            
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "RETURN s.sample_index as sample_index, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
+            "ORDER BY s.sample_index ASC "
+        )
+        df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag)
+        print(df)
+        df.set_index("sample_index", inplace=True)
+        if join is not None:
+            df["condition_tags"] = df["condition_tags"].apply(lambda x: ";".join(x))
+            if pivot:
+                df = df.pivot_table(index=df.index, columns="attribute_tag", values="condition_tags", aggfunc='first')
+        return df
+
     
     
     

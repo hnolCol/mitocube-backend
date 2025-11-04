@@ -62,9 +62,9 @@ def add_protein_by_proteome_tag(background_task : BackgroundTasks, proteome_tag:
                                  "n_proteins" : N
                                  
                              },
-                             template_mame=EMAIL_SETTINGS.mail_proteome_added_template)
+                             template_name=EMAIL_SETTINGS.mail_proteome_added_template)
     
-    
+    return {"message" : f"The proteome {proteome_tag} was added with {N} proteins."}
     
 @router.get("/{proteome_tag}/correlation/{feature_tag}")
 def get_feature_correlation_across_proteome(proteome_tag : str, feature_tag : str , filter_tag : str = None, direction : Literal["positive","negative","both"] = "positive", min_data_points : int = 5, limit : int = 20) -> List:

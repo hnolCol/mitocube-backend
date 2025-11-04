@@ -13,6 +13,6 @@ class DatasetPCAResponse(BaseModel):
     projection : List[Dict]
     drivers : List[Dict]
     variance_explained : List[float]
-    samples_attributes : Dict[str,Dict[str,List[int]]]
+    # samples_attributes : Dict[str,Dict[str,List[int]]]
 
     

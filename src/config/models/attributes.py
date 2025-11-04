@@ -8,6 +8,20 @@ from config.enums.units import UnitsEnum
 from config.models.unit import UnitInputResponseModel
 
 
+
+
+AttributeTree = ForwardRef('AttributeTree')
+    
+class AttributeTree(BaseModel):
+    """Describes a tree structure of attributes and traits. 
+    This structure is excepted from the frontend when inserting genetic and condition applications.
+    This is used for genetic applications and and condition applications"""
+    
+    tag : str # Attribute or Trait String 
+    type :  Literal["attribute","trait"]
+    value : float|int|str = None
+    children : Optional[List[AttributeTree]]
+    
 class AttributeBaseModel(BaseModel):
     """Base model for all attributes.
 

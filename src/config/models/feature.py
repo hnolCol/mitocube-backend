@@ -18,7 +18,6 @@ class FeatureDataResponseModel(BaseModel):
 
 class FeatureNeoModel(BaseModel):
     """Base Model for a Feature"""
-    key : Optional[str] = None
     tag : str
     gene_name : str 
     gene_names : str = None

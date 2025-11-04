@@ -1,6 +1,6 @@
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
-from config.models.conditions_applications import ConditionApplicationItemModel
-
+from config.models.conditions_applications import ConditionApplicationItemModel, ConditionApplicationTreeModel
+from services.condition_application import build_condition_application_tree
 from typing import Dict, List 
 from neo4j import Driver, Result 
 
@@ -43,7 +43,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             "                { "
             "                       label: labels(n)[0], " #label of the node 
             "                   tag : n.tag, "
-            "                   trait_tag: [(n)-[:HAS_TRAIT|INSTANCE_OF]->(t:Trait) | t.tag][0], "
+            "                   trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
             "                    attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0], "
             "                    value : n.value      "           
             "                    } "
@@ -53,6 +53,13 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
         r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
         return [[ConditionApplicationItemModel(**rii) for rii in ri] for ri in r[0]] if len(r) > 0 and len(r[0]) > 0 else [[]]
+
+
+    def get_tree(self, tag: str) -> ConditionApplicationTreeModel:
+        "Return a human-readable text representation of the condition application."
+
+        ca = self.get(tag)
+        return build_condition_application_tree(ca)
 
     def insert(self, condition_application : Dict) -> bool:
         """Inserts a new condition application into the database.
@@ -105,7 +112,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             if trait_tag is not None:
                 if attribute_tag is not None:
                     query += "AND "
-                query += "(EXISTS {(ca)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:HAS_TRAIT]->(t:Trait {tag : $trait_tag})}) "
+                query += "(EXISTS {(ca)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})}) "
         
         query += "RETURN ca.tag, count(r) as freq "
 

@@ -1,11 +1,11 @@
 
 from typing import List 
-from neo4j import Driver
+from neo4j import Driver, Result
 
-from config.models.genotype import MinimalGenotypeModel, GenotypeModel 
-
+from config.models.genotype import MinimalGenotypeModel, GenotypeModel, InsertGeneticApplicationModel
+from config.models.attributes import AttributeTree
 from lib.database.abstract.Genotypes import GenotypeABC
-
+from services.encryption import create_hierarchical_hash
 class Neo4JGenotype(GenotypeABC):
     """
     Database class  that handles the genotypes. """
@@ -80,6 +80,25 @@ class Neo4JGenotype(GenotypeABC):
         
         self._driver.execute_query(query, genotypes = genotype_props, user_tag = user_tag, routing_="w",  database_="neo4j")
         
+    def exists(self, tag : str) -> bool:
+        "Checks if a genotype with the given tag exists in the database."
+        query = (
+            "WITH EXISTS {MATCH (g:Genotype) WHERE g.tag = $tag} AS genotype_exists "
+            "RETURN genotype_exists"
+        )
+        
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+
+    def component_exists(self, tag : str) -> bool:
+        "Checks if a genotype component with the given tag exists in the database."
+        query = (
+            "WITH EXISTS {MATCH (gc:GenotypeComponent) WHERE gc.tag = $tag} AS genotype_component_exists "
+            "RETURN genotype_component_exists"
+        )   
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+
     def add_genotypes(self, genotypes : List[GenotypeModel], user_tag : str = None):
         """Adds multiple genotypes into the database. 
 
@@ -106,7 +125,7 @@ class Neo4JGenotype(GenotypeABC):
         self._add([genotype], user_tag = user_tag)
         
         
-    def get(self, tags : List[str] = None, proteome_tags : List[str] = None, protein_tags : List[str] = None) -> List[MinimalGenotypeModel]:
+    def get(self, tag : str) -> MinimalGenotypeModel:
         """Returns the genotypes by the tags. 
         If tag is None (default) all genotypes will be returned. 
 
@@ -126,44 +145,93 @@ class Neo4JGenotype(GenotypeABC):
             _description_
         """
         
-        if tags is not None:
-            
-            query = (
-                 "MATCH (g:Genotype) "
-                 "WHERE g.tag in $tags "
-            )
+        query = (
+            "MATCH (g:Genotype) "
+            "WHERE g.tag = $tag "
+            "RETURN g.tag as tag, g.text as text, g.proteome_tag as proteome_tag"
+        )
         
-        elif protein_tags is not None and proteome_tags is not None:
-            query = (
-                "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
-                "WHERE p.tag in $protein_tags AND g.proteome_tag in $proteome_tags "
-            )
-        elif protein_tags is None and proteome_tags is not None:
-            query = (
-                "MATCH (g:Genotype) "
-                "WHERE g.proteome_tag in $proteome_tags "
-            )
-        elif protein_tags is not None and proteome_tags is None:
-            #since protein_tags are proteome_id specific this is actually not very logical
-            query = (
-                "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
-                "WHERE p.tag in $protein_tags "
-            )
-        else:
-            query = ("MATCH (g:Genotype) ")
-        
-        query += "RETURN g.tag as tag, g.text as text, g.proteome_tag as proteome_tag "
-
-        r, _, _ = self._driver.execute_query(query, 
-                                             tags = tags,
-                                             proteome_tags = proteome_tags, 
-                                             protein_tags = protein_tags, 
-                                             routing_="r", 
-                                             database_="neo4j")
-        return [MinimalGenotypeModel(**ri.data()) for ri in r]
+        r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+        return MinimalGenotypeModel(**r[0].data()) if r.size() > 0 else None
     
+
+
+    def insert_component(self, data : AttributeTree) -> bool:
+        """Inserts a new genotype into the database.
+        Based on the hierarchical attribute tree, a unique hash tag is created.
         
-    def find(self, query : str) -> List[MinimalGenotypeModel]:
+        Parameters
+        ----------
+        data : InsertGeneticApplicationModel
+            The genotype information to be inserted.
+
+        Returns
+        -------
+        str
+            The hash tag of the inserted component, or None if the insertion failed.
+        """
+        
+        hash_tag = create_hierarchical_hash(data)
+        print("HASH:", hash_tag)
+        
+        if self.component_exists(hash_tag):
+            return hash_tag
+        
+        
+    def insert_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+        """Inserts a new genotype into the database.
+        Parameters
+        ----------
+        tag : str
+            _description_
+        text : str
+            _description_
+        component_tags : List[str]
+            The tags the genotype is connected to. 
+        description : str|None
+        """
+        query = (
+            "MERGE (gc:Genotype {tag : $tag}) "
+            "ON CREATE "
+            "SET gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text "
+            "ON MATCH "
+            "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text "
+            "WITH gc "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MERGE (u)-[r_defined:CREATED {tag : gc.tag}]->(gc) "
+            "WITH gc "
+            "UNWIND $component_tags as component_tag "
+            "MATCH (comp:GenotypeComponent {tag : component_tag}) "
+            "MERGE (gc)-[r:HAS_COMPONENT]->(comp) "
+            
+        )
+
+        self._driver.execute_query(query, tag = tag, text = text, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j")
+        return True
+
+    def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+        """Inserts a new genotype into the database.
+
+        Parameters
+        ----------
+        data : InsertGeneticApplicationModel
+            The genotype information to be inserted.
+
+        Returns
+        -------
+        bool
+            True if the insertion was successful, False otherwise.
+        """
+
+        tags = [] 
+        for attribute_tree in data.components:
+            tag = self.insert_component(attribute_tree)
+            tags.append(tag)
+        self.insert_genotype(tag = tags[0], text = data.text, component_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text)
+        return True
+    
+    
+    def find(self, search_string : str) -> List[str]:
         query_string = query.lower() 
         query = (
             "MATCH (g:Genotype) "

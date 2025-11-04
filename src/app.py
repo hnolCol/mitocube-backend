@@ -22,16 +22,21 @@ from lib.database.Database import Database
 ### import services
 from services.paths.utils import get_absolute_path_to_dir
 
+from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publications
 #from migration.load_data import MigrateScripts 
 
 ### import routers
 from routers.dataset import dataset, heatmap, volcano, correlation
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim
+from routers.submission.analysis import pca
 from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
 from routers.info import info
 from routers.annotations import annotations
 from routers.features import features
+from routers.features.protein_groups import protein_groups
+from routers.features.proteins import find as protein_find
+from routers.features.proteins import receive as protein_receive
 from routers.genotypes import genotypes
 from routers.attributes import attributes
 from routers.instruments import instruments
@@ -65,6 +70,9 @@ from services.json import read_json
 
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
+                  protein_groups,
+                  protein_find,
+                  protein_receive,
                   submissions_permissions,
                   submission_stats,
                   quantifications,
@@ -106,7 +114,7 @@ router_sources = [dataset,
                   metatext, # submission specific metatexts
                   metatexts, # metatexts in general
                   openai,
-                  
+                  pca
 ]
     
 # router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
@@ -121,16 +129,30 @@ DB = Database.DB()
 DB.attributes._utils_insert_from_file()
 # print("DURATION",DB.submissions.get_durations_between_states(state_01 = SubmissionStatesEnums.SUBMITTED, state_02 = SubmissionStatesEnums.DONE))
 
+DB.features.find(search_string = "Plxnb")
+print("FOUND FEATURES", DB.features.find(search_string = "Plxnb", limit = 10))
+DB.peptides.find(search_string="A", provide_protein_info=True, limit = 5)
+print("FOUND PEPTIDES", DB.peptides.find(search_string="A", limit=10, provide_protein_info=False))
 # print("USER TAGS", DB.submission_filter.filter_by_user(user_tags=["QCQ2qU5c"]))
-DB.submissions.insert_view(tag="lpFT2EPDd0", user_tag="QCQ2qU5c")
-DB.submissions.get_views(tag="lpFT2EPDd0")
+#DB.submissions.insert_view(tag="lpFT2EPDd0", user_tag="QCQ2qU5c")
+#DB.submissions.get_views(tag="lpFT2EPDd0")
 import pandas as pd 
 dataset_tag = "BkrjUoOjGN"#"LOGtC9tNC13b" # "BuXOSlIl6G" #"BuXOSlIl6G"#"0Ks1mc18NL" #"LOGtC9tNC13b"# "LOGtC9tNC13b" # "BuXOSlIl6G" #"LOGtC9tNC13b" #  #   #"MpHCYf9mShVR" # #
 #m = read_json(f"/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data/{dataset_tag}/params.json")
 #print(m)
 #meta = DatasetSubmissionModel(**m
+#DB.openai.generate_cypher_query_for_prompt("Is there a protein that is only quantified in a specific tissue ?")
 # 
 # 
+# pubmed_results = get_pubmed_ids_by_query("OMA1")
+# print(pubmed_results)
+# print(pubmed_results.keys())
+# print(pubmed_results["esearchresult"]["idlist"])
+# text = get_pubmed_publications(pubmed_results["esearchresult"]["idlist"])
+# r = DB.openai.summarize_pubmed_publications(prompt=text)
+# print(r)
+# print(text)
+print("ARTICLES!")
 #print(DB.condition_applications.find(sort_by_frequency = True, limit = 1), "submission tag filter ca")
 #DB.submissions.get_conditions_applications(tag = "lpFT2EPDd0")
 #DB.submissions.get_conditions_applications(tag = "lpFT2EPDd0", group_by_attribute = True)

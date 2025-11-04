@@ -4,7 +4,7 @@ from typing import Optional, List, Dict
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
 from config.models.parameter import APIParamString
-from config.models.genotype import GenotypeModel, MinimalGenotypeModel
+from config.models.genotype import GenotypeModel, MinimalGenotypeModel, InsertGeneticApplicationModel
 
 from services.users import is_user_admin, get_user_from_token
 
@@ -29,8 +29,8 @@ def get_genotype_by_query(query : str) -> List[MinimalGenotypeModel]:
     return DB.genotypes.find(query)
 
 
-@router.get("/genotypes/{genotype_label}")
-def get_genotype_by_label(genotype_label : str):
+@router.get("/genotypes/{genotype_tag}")
+def get_genotype_by_label(genotype_tag : str):
     """_summary_
 
     Parameters
@@ -60,9 +60,8 @@ def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[s
     return r 
 
 
-
 @router.post("/genotypes")
-def add_genotype(genotype : GenotypeModel, user : UserModel = Depends(get_user_from_token)):
+def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters
@@ -70,7 +69,8 @@ def add_genotype(genotype : GenotypeModel, user : UserModel = Depends(get_user_f
     genotype : GenotypeModel
         The defined genotype.
     """
-    DB.genotypes.add(genotype, user_tag = user.tag)
+    print(genotype)
+    
     
     return True 
 

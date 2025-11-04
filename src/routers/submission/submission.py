@@ -479,7 +479,7 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
             sample_attributes = submission.samples_attributes[idx] 
             DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
     ## add meta text 
-    
+    DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
 
     return 
     
@@ -544,7 +544,7 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                             "tag" : submission.tag,
                             "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.tag}"
                         },
-                        template_mame=EMAIL_SETTINGS.mail_submission_complete_template)    
+                        template_name=EMAIL_SETTINGS.mail_submission_complete_template)    
 
     return 
     

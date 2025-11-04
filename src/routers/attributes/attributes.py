@@ -164,6 +164,11 @@ def get_attribute_by_tag(attribute_tag : str, user : UserModel = Depends(get_use
     return attribute
 
 
+@router.get("/{attribute_tag}/required_traits")
+def get_attribute_required_traits(attribute_tag : str) -> List[str]:
+    "Returns the list of required traits for an attribute by its tag"
+    return DB.attributes.get_required_traits(tag=attribute_tag)
+
 @router.get("/traits/q")
 def query_trait(search_string : str, attribute_tag : str = None, limit : int = 50) -> List[str]:
     "Queries the trait database and returns the tags that match the search string."

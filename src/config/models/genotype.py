@@ -1,9 +1,11 @@
 from pydantic import BaseModel, field_validator
-from typing import Optional, Union, List, Dict, Literal
+from typing import Optional, Union, List, Dict, Literal, ForwardRef
 
 from config.models.annotations.feature import FeatureModel
-from config.models.attributes import AttributeValueModel
+from config.models.attributes import AttributeValueModel, AttributeTree
 from config.models.feature import FeatureNeoModel
+
+
 
 class MutationPositionModel(BaseModel):
     attribute_value : AttributeValueModel
@@ -68,3 +70,19 @@ class GenotypeModel(BaseModel):
     gene_modifications : List[GeneModificationModel]
     
     
+GeneticApplicationTreeModel = ForwardRef('GeneticApplicationTreeModel')
+
+class GeneticApplicationTreeModel(BaseModel):
+    trait_tag : str 
+    attribute_tag : str 
+    value : Optional[str|float|int] = None
+    children : List[GeneticApplicationTreeModel] = []
+class InsertGeneticApplicationModel(BaseModel):
+    text : str 
+    description : Optional[str] = None
+    publication : Optional[str] = None 
+    technical_text : Optional[str] = None
+    components : List[AttributeTree] # the list of components as attribute tree
+
+
+

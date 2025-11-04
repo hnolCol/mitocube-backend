@@ -5,17 +5,17 @@ from typing import List, Dict
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
 from config.models.parameter import APIParamString
-from config.models.dataset.data import DatasetPCAResponse
+
 from config.models.submissions.submissions import DatasetSubmissionModel, DatasetSubmissionResponseModel, MinimalMetadataResponseModel
-from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
-from config.models.annotations.feature import FeatureModel
+# from config.models.submissions.runs import RunListModel, RunListRequestPropsModel
+# from config.models.annotations.feature import FeatureModel
 
 
 from lib.database.Database import Database
-from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
-from lib.data.transform.PCA import PCATransform
-from lib.data.transform.FeatureData import FeatureData
-from lib.data.filter.NoMissingValues import NoNaNFilter
+# from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
+# from lib.data.transform.PCA import PCATransform
+# from lib.data.transform.FeatureData import FeatureData
+# from lib.data.filter.NoMissingValues import NoNaNFilter
 
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 
@@ -167,41 +167,41 @@ def get_dataset_sample_info(dataset_tag : str):
     }
 
 
-#pca endpoints
-@router.get("/datasets/{dataset_tag}/pca",
-            response_model=DatasetPCAResponse,
-            tags=["Dimensional reduction","PCA"])
+# #pca endpoints
+# @router.get("/datasets/{dataset_tag}/pca",
+#             response_model=DatasetPCAResponse,
+#             tags=["Dimensional reduction","PCA"])
 
-def get_dataset_pca(dataset_tag : str, filter_tag : str = None, scale : bool = True): #user : UserModel = Depends(get_user_from_token))
-    """
-    Returns the result of a Principal component analysis (PCA).
-    """
-    if not DB.datasets.exists(tag = dataset_tag): raise no_data_found_http_exception
+# def get_dataset_pca(dataset_tag : str, filter_tag : str = None, scale : bool = True): #user : UserModel = Depends(get_user_from_token))
+#     """
+#     Returns the result of a Principal component analysis (PCA).
+#     """
+#     if not DB.datasets.exists(tag = dataset_tag): raise no_data_found_http_exception
 
 
-    #if not DB.dataset_has_data(tag = dataset_tag): raise no_data_found_http_exception
-    data_table = DB.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
-    projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
-                                        n_components=4,
-                                        scale = scale).transform()
+#     #if not DB.dataset_has_data(tag = dataset_tag): raise no_data_found_http_exception
+#     data_table = DB.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
+#     projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
+#                                         n_components=4,
+#                                         scale = scale).transform()
    
-    sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)     
-    #match the sample attributes to the PCA projection.
-    projected_data = projected_data.join(sample_map)
-    projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")    
+#     sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)     
+#     #match the sample attributes to the PCA projection.
+#     projected_data = projected_data.join(sample_map)
+#     projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")    
     
-    # add feature information to drivers
-    feature_keys = drivers.index 
-    features = DB.features.get_protein_by_tags(tags = feature_keys.tolist(), as_data_frame=True)
-    #features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
+#     # add feature information to drivers
+#     feature_keys = drivers.index 
+#     features = DB.features.get_protein_by_tags(tags = feature_keys.tolist(), as_data_frame=True)
+#     #features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
    
-    drivers_with_feature_info = pd.concat([drivers,features],axis=1)
-    drivers_with_feature_info.reset_index(names="index", inplace=True)
-    drivers_to_browser = drivers_with_feature_info.to_dict(orient="records")
-    return DatasetPCAResponse(
-        projection = projected_data_to_browser,
-        drivers = drivers_to_browser,
-        variance_explained = variance_explained, 
-        samples_attributes = sample_attributes
-        )
+#     drivers_with_feature_info = pd.concat([drivers,features],axis=1)
+#     drivers_with_feature_info.reset_index(names="index", inplace=True)
+#     drivers_to_browser = drivers_with_feature_info.to_dict(orient="records")
+#     return DatasetPCAResponse(
+#         projection = projected_data_to_browser,
+#         drivers = drivers_to_browser,
+#         variance_explained = variance_explained, 
+#         samples_attributes = sample_attributes
+#         )
 

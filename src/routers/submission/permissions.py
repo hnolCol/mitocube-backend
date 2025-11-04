@@ -28,7 +28,6 @@ def get_submission_permissions(submission_tag: str, user: UserModel = Depends(ge
     user_tag = DB.submissions.get_creator(tag = submission_tag)  # Ensure the submission exists
     is_creator = (user.tag == user_tag)
     is_at_least_curator = (user.role >= UserRolesEnum.CURATOR)  # Assuming curator 
-
     return PermissionResponseModel(user_tag = user.tag, 
                                    role = user.role,
                                    tag = submission_tag,
