@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List, Literal
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
-from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+
 from lib.database.Database import Database
 
 

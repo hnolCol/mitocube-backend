@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from config.enums.states import SubmissionStatesEnums, SubmissionStateColors
 
-from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+
 from lib.database.Database import Database
 
 

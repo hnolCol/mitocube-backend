@@ -6,7 +6,7 @@ from services.encryption import verify_password, get_decoded_token
 from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentials_exception, user_blocked, user_role_too_low, token_not_valid_exception, submission_tag_not_found
 from config.models.user import UserModel, UserRolesEnum, PublicUser
 
-from lib.user.UserHandling import UserDB
+
 from lib.database.Database import Database
 DB = Database.DB()
 

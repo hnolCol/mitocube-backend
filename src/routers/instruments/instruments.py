@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
 from services.users import is_user_admin, get_user_from_token
 
-from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+
 
 from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel, TraitModel
 from config.enums.states import SubmissionStatesEnums
 
 from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel
-from lib.user.UserHandling import UserDB
+
 
 from lib.database.Database import Database
 

@@ -14,11 +14,11 @@ from config.enums.states import SubmissionStatesEnums
 from config.settings.proteomes.control_proteomes import get_control_proteome_settings
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.submissions import DatasetSubmissionModel
-# from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase, AnnotationDatabase
+# f, AnnotationDatabase
 # from lib.database.ABCDatabase import MCAttributes
 from lib.database.Database import Database
-# from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
-# from lib.data.database_helper.ABCDatabaseHelper import MCDatabaseHelper
+# 
+# 
 ### import services
 from services.paths.utils import get_absolute_path_to_dir
 
@@ -32,7 +32,6 @@ from routers.submission.analysis import pca
 from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
 from routers.info import info
-from routers.annotations import annotations
 from routers.features import features
 from routers.features.protein_groups import protein_groups
 from routers.features.proteins import find as protein_find
@@ -86,7 +85,7 @@ router_sources = [dataset,
                   user, 
                   features, 
                   info, 
-                  annotations,
+                  #annotations,
                   heatmap, 
                   volcano, 
                   genotypes, 

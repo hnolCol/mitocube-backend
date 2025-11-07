@@ -15,12 +15,12 @@ class DB(BaseSettings):
     data_id_length : int = 8 #length of the dataID (randomly generated string)
 
     attribute_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json"
-    genotype_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json"
+    #genotype_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json"
     db_handler :Literal["pandafiles","postgresql","neo4j"] = "neo4j"  
     
     
     db_datadir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data"
-    db_userdir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/users"
+    # : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/users"
     # db_features : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/annotations"  # ToDo: Question, should annotation (as DB) also be here?
 
     db_uri : Optional[str] = None  # ToDo: create validation conditions if db_handler is postgresql? Good idea. I would use the @field_validator function which is also availabe in  pydantic Settings 

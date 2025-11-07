@@ -4,8 +4,6 @@ from collections import OrderedDict
 
 from lib.database.Database import Database
 
-from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
-
 from lib.data.statistic.ANOVA import OneWayANOVA
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 

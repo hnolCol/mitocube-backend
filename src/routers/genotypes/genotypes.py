@@ -8,8 +8,7 @@ from config.models.genotype import GenotypeModel, MinimalGenotypeModel, InsertGe
 
 from services.users import is_user_admin, get_user_from_token
 
-from lib.data.genotype.ABCGenotypeDatabase import MCGenotypes
-from lib.data.annotations.ABCAnnotations import PandaFeatureDatabase
+
 from lib.database.Database import Database
 DB = Database.DB()
 

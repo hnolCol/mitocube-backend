@@ -10,7 +10,7 @@ from services.encryption import decode_token
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 from services.enums import get_enum_as_dict
-from lib.user.UserHandling import UserDB
+
 from config.settings.general import get_general_settings
 from lib.database.Database import Database
 DB = Database.DB()

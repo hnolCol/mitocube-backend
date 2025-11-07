@@ -181,9 +181,7 @@ constraints = [
     ConstraintModel(constrain_label  = "protein_group_tag",node_label = NodeLabelModel(label = "ProteinGroup"), property_name = "tag"),
     ConstraintModel(constrain_label  = "genotype_tag",node_label = NodeLabelModel(label = "Genotype"), property_name = "tag"),
     ConstraintModel(constrain_label  = "genetic_component_tag",node_label = NodeLabelModel(label = "GeneticComponent"), property_name = "tag"),
-    ConstraintModel(constrain_label  = "genetic_component_value_tag",node_label = NodeLabelModel(label = "GeneticComponentValue"), property_name = "tag"),
-
-
+    ConstraintModel(constrain_label  = "genetic_component_value_tag",node_label = NodeLabelModel(label = "GeneticComponentValue"), property_name = "tag")
 ]
 
 
@@ -196,7 +194,6 @@ constraints = [
 
 DB_SETTINGS = get_db_settings()
 
-attributes = read_json(DB_SETTINGS.attribute_file)
 
 
 class DatasetNode(BaseModel):
@@ -216,18 +213,6 @@ class SampleNode(BaseModel):
     replicate : int 
     
 
-    
-    
-    
-
-#attribute_models = [AttributeModel(**k, s = [k["text"],k["tag"],k["group_tag"]]) for k in attributes["attributes"]]
-#attribute_value_models = [AttributeValueModel(**k, s = [str(k["text"]),k["description"]]) for k in attributes["attribute_values"]]
-
-#print(attribute_value_models)
-
-
-#mitocarta3 = pd.read_csv("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/filter/human_mitocarta/data.txt",sep="\t")
-#print(mitocarta3)
 
 
 def transform_model_to_cypher_string(baseModel : BaseModel) -> str:
