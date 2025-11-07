@@ -131,17 +131,19 @@ class Neo4JUser(UserABC):
         ""
         if self.count() == 0:
             auto_pw = get_random_string(10)
-            lead_contact = UserModel(
+            lead_contact = UserInsertModel(
                 password=create_password_hash(auto_pw),
                 firstname=GENERAL_SETTINGS.lead_contact_first_name,
                 lastname=GENERAL_SETTINGS.lead_contact_last_name,
                 email=GENERAL_SETTINGS.lead_contact,
                 research_group=GENERAL_SETTINGS.lead_contact_group,
-                institute=GENERAL_SETTINGS.lead_contact_institute,
+                institute=GENERAL_SETTINGS.lead_contact_institute,  
                 role=UserRolesEnum.ADMIN,
-                is_lead_admin=True
-                )
-            self.add_user(lead_contact)
+                is_lead_admin=True,
+                tag=self.get_new_tag()  
+            )
+      
+            self.insert(user = lead_contact)
             print("Lead user created...")
             asyncio.run(async_send_email(
                             subject="Lead Account Generated",
