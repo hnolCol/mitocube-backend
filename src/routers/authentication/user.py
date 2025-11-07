@@ -170,6 +170,12 @@ def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Deletes specific user. Returns an error if token does not belong to admin"""    
     
 
+@router.get("/users/roles/{user_tag}", summary="Returns the roles of a user by its tag.", response_model=int)
+def get_user_role(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
+    """Returns the role of a user by its tag."""
+    return user.role 
+
+
 @router.get("/users/{user_tag}/submissions/count", summary="Returns the number of submissions of a user by its tag.")
 def count_user_submissions(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
     """Counts the number of submissions for a user by its tag."""
@@ -197,8 +203,8 @@ def check_if_user_is_active(user_tag : str, user : UserModel = Depends(get_user_
 
     
     
-@router.post("/users/{user_label}/useterms", summary="Accept useterms. Can only be done by the user itself.")
-def accept_use_terms(user_label : str, accept : bool, user : UserModel = Depends(get_user_from_token)):
+@router.post("/users/{user_tag}/useterms", summary="Accept useterms. Can only be done by the user itself.")
+def accept_use_terms(user_tag : str, accept : bool, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters

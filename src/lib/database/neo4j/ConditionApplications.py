@@ -1,6 +1,8 @@
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from config.models.conditions_applications import ConditionApplicationItemModel, ConditionApplicationTreeModel
 from services.condition_application import build_condition_application_tree
+from config.models.attributes import AttributeTree
+from services.encryption import create_hierarchical_hash
 from typing import Dict, List 
 from neo4j import Driver, Result 
 
@@ -41,9 +43,9 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             "RETURN [path IN paths | "
             "            [n IN path | "
             "                { "
-            "                       label: labels(n)[0], " #label of the node 
+        "                       label: labels(n)[0], " #label of the node 
             "                   tag : n.tag, "
-            "                   trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
+            "                    trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
             "                    attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0], "
             "                    value : n.value      "           
             "                    } "
@@ -61,20 +63,116 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         ca = self.get(tag)
         return build_condition_application_tree(ca)
 
-    def insert(self, condition_application : Dict) -> bool:
+
+    def _handle_children(self, trait_node : dict, parent_tag : str):
+        
+        for attribute_node in trait_node.get("children", []):
+            if attribute_node.get("type") != "attribute":
+                raise ValueError("Child node is not of type attribute.")
+            attribute_tag = attribute_node["tag"]
+            trait_nodes = attribute_node["children"]
+            if len(trait_nodes) > 0:
+                for trait_node in trait_nodes:
+                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag)
+                    if len(trait_node.get("children",[])) > 0:
+                        self._handle_children(trait_node=trait_node, parent_tag=parent_tag_2)
+            
+    def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
+                
+        gcv_tag = create_hierarchical_hash(data = {"attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value})
+        query = (
+            "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
+            "MERGE (cv:ConditionValue {tag : $gcv_tag}) "
+            "ON CREATE SET cv.created_at = timestamp() "
+        )
+        if value is not None:
+            query += "SET cv.value = $value "
+            
+        query += (
+                "WITH ca,cv "
+                "MERGE (a:Attribute {tag : $attribute_tag}) "
+                "MERGE (t:Trait {tag : $trait_tag}) "
+                "WITH ca,cv,a,t "
+                "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
+                "MERGE (cv)-[:INSTANCE_OF]-(t) "
+                "MERGE (ca)-[r:HAS_VALUE]->(cv) "
+                "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag"
+            )
+        
+        self._driver.execute_query(query, value = value, trait_tag = trait_tag, gcv_tag = gcv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
+        return gcv_tag
+
+
+    def insert(self, condition_application : AttributeTree) -> str:
         """Inserts a new condition application into the database.
 
         Parameters
         ----------
-        condition_application : Dict
-            The condition application data to insert.
+        condition_application : AttributeTree
+            The condition application to insert.
+            The condition application to insert.
+
 
         Returns
         -------
-        bool
-            True if the insertion was successful, False otherwise.
-        """
+        str
+            The tag of the inserted condition application.
 
+        This data should be a list of AttributeTree objects, where each object represents a condition application.
+        Each dictionary should have the following structure, here is a complex example having multiple attributes and traits:
+        {
+            "type": "attribute",
+            "tag": "att_compound",
+            "children": [               
+                {
+                    "type": "trait",
+                    "tag": "att_compound:dmso",
+                    "children": [       
+                        {
+                            "type": "attribute",
+                            "tag": "att_concentration",
+                            "children": [
+                                {"type": "trait", "tag": "mM", "value": 2, 
+                                 "children": [
+                                     {"type" : "attribute", "tag" : "temperature", "children" : [
+                                         {"type" : "trait", "tag" : "high"}
+                                     ]}
+                                 ]}
+                            ]
+                        },
+                        {
+                            "type": "attribute",
+                            "tag": "Time",
+                            "children": [
+                                {"type": "trait", "tag": "h", "value": 5, "children": []}
+                            ]
+                        }
+                    ]
+
+        """
+        component = condition_application.model_dump()  # Convert Pydantic models to list of dicts if necessary
+        hash_tag = create_hierarchical_hash(component)
+        
+        if not self.exists(hash_tag):
+            attribute_tag = component.get("tag") 
+            for child in component.get("children", []):
+                child_tag = child.get("tag")
+                
+                query = (
+                    "MERGE (ca:ConditionApplication {tag : $hash_tag}) "
+                    "ON CREATE SET ca.created_at = timestamp() "
+                    "WITH ca "
+                    "MATCH (a:Attribute {tag : $attribute_tag}) "
+                    "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
+                    "WITH ca, a "
+                    "MATCH (t:Trait {tag : $child_tag}) "
+                    "MERGE (ca)-[:INSTANCE_OF]->(t) "
+                )
+                self._driver.execute_query(query, hash_tag = hash_tag, routing_="w", database_="neo4j", child_tag = child_tag, attribute_tag=attribute_tag)
+                if len(child.get("children",[])) > 0:
+                    self._handle_children(trait_node=child, parent_tag=hash_tag)     
+        return hash_tag
+    
     def delete(self, tag: str) -> bool:
         """Deletes a condition application from the database.
 

@@ -27,7 +27,7 @@ router = APIRouter(
 
 
 
-@router.post("/", response_description="Returns a jwt token after login .", response_model=TokenResponse)
+@router.post("/", response_description="Returns a jwt token This token still has to be verified by a one time password.", response_model=TokenResponse)
 def login_for_access_token(background_task : BackgroundTasks, 
                            user : UserModel = Depends(get_user_from_login), 
                            verification_code : str = Depends(lambda : get_random_string(12))) -> TokenResponse:
@@ -75,11 +75,12 @@ def login_for_access_token(background_task : BackgroundTasks,
 
 
 
-@router.get("/valid", response_description="Checks if a token from local storage is valid and returns the user's role and details",
+@router.get("/valid", 
+            response_description="Checks if a token from local storage is valid and returns the user's role and details",
             response_model=TokenValidResponse)
 def check_token(user : UserModel = Depends(get_user_from_token)):
     """
-    Checks if a token from local storage is valid and returns the user's role and details. 
+    Checks if a token from local storage is valid and returns the user's role and tag. 
     
     Parameters
     ----------
@@ -94,9 +95,9 @@ def check_token(user : UserModel = Depends(get_user_from_token)):
         success=True,
         role = user.role, 
         verified = True, 
-        firstname=user.firstname, 
-        lastname=user.lastname, 
         tag=user.tag)
+    
+    
 
 @router.post("/verify", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 

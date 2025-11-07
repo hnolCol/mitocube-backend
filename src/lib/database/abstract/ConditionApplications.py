@@ -8,6 +8,7 @@ from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from neo4j import Driver 
 from config.models.conditions_applications import ConditionApplicationTreeModel
+from config.models.attributes import AttributeTree
 import pandas as pd
 
 
@@ -71,7 +72,7 @@ class ConditionApplicationABC(ABC):
         """
         
     @abstractmethod
-    def insert(self, condition_application : Dict) -> bool:
+    def insert(self, condition_application : AttributeTree) -> bool:
         """Inserts a new condition application into the database.
 
         Parameters

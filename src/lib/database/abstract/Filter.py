@@ -58,10 +58,23 @@ class FilterABC(ABC):
             The size (e.g. number of features).
             If the tag does not exists, 0 will be returned. 
         """
-    
+    @abstractmethod
+    def get(tag : str) -> FilterModel:
+        """Returns the details of a specific filter by its tag. 
+
+        Parameters
+        ----------
+        tag : str
+            The filter tag. 
+
+        Returns
+        -------
+        Filter
+            The filter details. 
+        """
     
     @abstractmethod
-    def get(self, tag : str = None, proteome_tags : List[str] = None, feature_tag : str = None) -> List[FilterModel]:
+    def find(self, tag : str = None, proteome_tags : List[str] = None, protein_tag : str = None) -> List[str]:
         """Returns the details of the available 
         filters/protein sets from the database.
 
@@ -73,14 +86,13 @@ class FilterABC(ABC):
         proteome_tags : List[str]
             List of proteome tags. If just proteome tags are given, then all 
             filters of a specific proteome are returned, ignored of tag is given. 
-        feature_tag : str 
-            A feature tag that must be in the filter, ignored if tag is not None or proteome_tags is provided.     
+        protein_tag : str 
+            A protein tag that must be in the filter, ignored if tag is not None or proteome_tags is provided.     
         
         Returns
         -------
-        List[Filter]
-            The filters detected in the database. All if tag is None. 
-            Otherwise a subset. 
+        List[str]
+            The filter tags that match the query criteria.
         """
         
     @abstractmethod    

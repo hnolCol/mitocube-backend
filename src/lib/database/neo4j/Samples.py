@@ -5,15 +5,18 @@ from lib.database.abstract.Samples import SamplesABC
 from services.encryption import create_hierarchical_hash
 from config.models.submissions.submissions import AttributeTree
 from config.models.conditions_applications import ConditionApplicationAttributeModel
+from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from config.models.samples import SampleModel
 import pandas as pd
 import uuid
 class Neo4JSamples(SamplesABC):
-    "" 
-    def __init__(self, driver : Driver):
-        
-        self._driver = driver 
-    
+    """
+    Neo4J implementation of the SamplesABC interface.
+    """
+    def __init__(self, driver : Driver, condition_applications : ConditionApplicationABC):
+        self._driver = driver
+        self._condition_applications = condition_applications
+
     def _get_sample_tag(self, sample_name : str, submission_tag : str) -> str:
         """Generates a sample tag based on the sample name and submission tag.
         
@@ -133,21 +136,7 @@ class Neo4JSamples(SamplesABC):
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag, feature_tag = feature_tag)
         return r[0] if len(r) > 0 else None
-
-
-    def condition_procedure_exists(self, tag : str) -> bool:
-        "Check if a condition procedure exists for the given tag."
-        
-        query = (
-            "WITH EXISTS {(ca:ConditionApplication {tag : $tag})} as exists "
-            "RETURN exists"
-        )
-        
-        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
-        return r[0]
     
-    
-        
         
     def insert(self, submission_tag : str, sample_name : str, sample_index : int) -> str:
         "Insert a new sample to a given submission" 
@@ -165,41 +154,6 @@ class Neo4JSamples(SamplesABC):
                                    submission_tag=submission_tag, sample_name=sample_name, sample_index=sample_index)
         return r[0] if len(r) > 0 else None
      
-    def handle_children(self, trait_node, parent_tag):
-        
-        for attribute_node in trait_node["children"]:
-            attribute_tag = attribute_node["tag"]
-            trait_nodes = attribute_node["children"]
-            if len(trait_nodes) > 0:
-                for trait_node in trait_nodes:
-                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag)
-                    if len(trait_node.get("children",[])) > 0:
-                       # for child in trait_node["children"]:
-                        self.handle_children(trait_node=trait_node, parent_tag=parent_tag_2)
-    
-    def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
-        
-        cv_tag = uuid.uuid4().hex
-        query = (
-            "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
-            "MERGE (cv:ConditionValue {tag : $cv_tag}) "
-        )
-        if value is not None:
-            query += "SET cv.value = $value "
-            
-        query += (
-                "WITH ca,cv "
-                "MERGE (a:Attribute {tag : $attribute_tag}) "
-                "MERGE (t:Trait {tag : $trait_tag}) "
-                "WITH ca,cv,a,t "
-                "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
-                "MERGE (cv)-[:INSTANCE_OF]-(t) "
-                "MERGE (ca)-[r:HAS_VALUE]->(cv) "
-                "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag"
-            )
-        
-        self._driver.execute_query(query, value = value, trait_tag = trait_tag, cv_tag = cv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
-        return cv_tag 
     
     def insert_condition_application(self, sample_tag : str, sample_data : List[AttributeTree]):
         """Insert a condition application for a given sample.
@@ -245,49 +199,22 @@ class Neo4JSamples(SamplesABC):
                     ]
 
         """
-        sample_data = [x.model_dump() for x in sample_data]  # Convert Pydantic models to list of dicts if necessary
+        ts = []
+        for attribute_tree in sample_data:
+            tag = self._condition_applications.insert(condition_application=attribute_tree)
+            ts.append(tag)
+
+        ##connect sample to condition applications
+        query = ("MATCH (s:Sample {tag : $sample_tag}) "
+                 "MATCH (ca:ConditionApplication) "
+                 "WHERE ca.tag IN $tags "
+                 "MERGE (s)-[r:HAS_APPLICATION]->(ca) "
+                 "SET r.created_at = timestamp() ")
         
-        for condition_application in sample_data:
-            attribute_tag = condition_application["tag"]
-            for trait_node in condition_application["children"]:
-                trait_tag = trait_node["tag"]
-                #this is the root of the condition applications . 
-                #however they might be multiple traits 
-                #calculate the condition application tag, only unique combinations exist
-                ca_tag = create_hierarchical_hash(trait_node)
-                
-                if self.condition_procedure_exists(tag = ca_tag):
-                    ##if exists, then just connect to the samples 
-                    query = (
-                        "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
-                        "MATCH (s:Sample {tag : $sample_tag}) "
-                        "MERGE (s)-[:HAS_APPLICATION]->(ca) "
-                    )
-                    
-                    self._driver.execute_query(query, routing_="w", ca_tag = ca_tag, sample_tag = sample_tag)
-                    
-                else:
-                
-                    query = (
-                        "MATCH (s:Sample {tag : $sample_tag}) "
-                        "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
-                        "ON CREATE SET ca.created_at = timestamp() "
-                        "WITH ca, s "
-                        "MATCH (a:Attribute {tag : $attribute_tag}) " #-[:PART_OF]->(ag:AttributeGroup {tag : 'sample'}) " #only sample attributes are allowed here "
-                        "MATCH (t:Trait {tag : $trait_tag}) "
-                        #connect to sample 
-                        "MERGE (s)-[:HAS_APPLICATION]->(ca) "
-                        "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
-                        "MERGE (ca)-[:INSTANCE_OF]-(t) "
-                    )
-                    
-                    self._driver.execute_query(query, routing_= "w", ca_tag = ca_tag, sample_tag = sample_tag, trait_tag = trait_tag, attribute_tag = attribute_tag)        
-                    
-                    if len(trait_node.get("children",[])) > 0:
-                        # for child in trait_node["children"]:
-                        self.handle_children(trait_node=trait_node, parent_tag=ca_tag)
-                    
-    
+        self._driver.execute_query(query, routing_="w", sample_tag=sample_tag, tags=ts)
+        
+        
+        
     def get_condition_procedure(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
         """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
         You may also sort the results by the most frequent condition procedures.
@@ -381,7 +308,6 @@ class Neo4JSamples(SamplesABC):
             "ORDER BY s.sample_index ASC "
         )
         df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag)
-        print(df)
         df.set_index("sample_index", inplace=True)
         if join is not None:
             df["condition_tags"] = df["condition_tags"].apply(lambda x: ";".join(x))

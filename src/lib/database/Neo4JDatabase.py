@@ -178,7 +178,11 @@ constraints = [
     ConstraintModel(constrain_label  = "condition_application_tag",node_label = NodeLabelModel(label = "ConditionApplication"), property_name = "tag"),
     ConstraintModel(constrain_label  = "meta_text_tag",node_label = NodeLabelModel(label = "MetaText"), property_name = "tag"),
     ConstraintModel(constrain_label  = "view_counter_tag",node_label = NodeLabelModel(label = "ViewCounter"), property_name = "tag"),
-    ConstraintModel(constrain_label  = "protein_group_tag",node_label = NodeLabelModel(label = "ProteinGroup"), property_name = "tag")
+    ConstraintModel(constrain_label  = "protein_group_tag",node_label = NodeLabelModel(label = "ProteinGroup"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "genotype_tag",node_label = NodeLabelModel(label = "Genotype"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "genetic_component_tag",node_label = NodeLabelModel(label = "GeneticComponent"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "genetic_component_value_tag",node_label = NodeLabelModel(label = "GeneticComponentValue"), property_name = "tag"),
+
 
 ]
 

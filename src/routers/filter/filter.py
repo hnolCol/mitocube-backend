@@ -22,14 +22,14 @@ router = APIRouter(
     tags=["Heatmap"]
 )
 #heatmap endpoints 
-@router.get("/filters",
+@router.get("/filters/q", response_model=List[str],
             tags=["Filter"])
 def get_available_filters(proteome_tags : str = None, 
-                          feature_tag : str = None, 
+                          protein_tag : str = None, 
                           submission_tag : str = None,
                           user : UserModel = Depends(get_user_from_token),
                           
-                          ) -> List[FilterModel]:
+                          ) -> List[str]:
     """Returns the filter set that are available in the database.
 
     Parameters
@@ -50,10 +50,10 @@ def get_available_filters(proteome_tags : str = None,
         Filters available in the database.
     """
     
-    filters = DB.filters.get(proteome_tags = APIParamString(param=proteome_tags).param,
+    filter_tags = DB.filters.find(proteome_tags = APIParamString(param=proteome_tags).param,
                              submission_tags = APIParamString(param=submission_tag).param,
-                            feature_tag = feature_tag)
-    return filters
+                            protein_tag = protein_tag)
+    return filter_tags
 
 
 @router.get("filters/{filter_tag}")

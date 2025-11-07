@@ -228,9 +228,11 @@ class OpenAI(BaseSettings):
                         (ConditionApplication)-[:OF_ATTRIBUTE]->(Attribute)
                         
                         (ConditionApplication)-[:HAS_VALUE]->(ConditionValue)
+                        
                         (ConditionValue)-[:OF_ATTRIBUTE]->(Attribute)
                         (ConditionValue)-[:INSTANCE_OF]->(Trait)
                         
+                        This explain the hierarchical structure of ConditionApplications.
                         
                         The ConditionValue represents a user defined value for the attribute. For example if the attribute is att_age, the ConditionValue.value param would be a specific age like 30.
                         ConditionValue nodes are optional. ConditionValue nodes are only present if the user provided a specific value for the attribute. The ConditionValue is always connected to an Attribute.
@@ -284,6 +286,51 @@ class OpenAI(BaseSettings):
                         RETURN DISTINCT t.tag as treatment_trait_tag, t.text as treatment_trait_name
 
                         The Unit of the ConditionValues are always stored in a Trait Node such min or hour, the Attribute provides the type of the unit such as duration. The representation is always in the text param of the nodes.
+                        
+                        Genotypes
+                        Each Sample can have a Genotype that describes the genotype of the sample.
+                        A Genotype has the paramaters:
+                        - tag: unique tag of the genotype
+                        - text: human readable description of the genotype
+                        - description: longer description of the genotype (optional)
+                        - technical_text: technical description of the genotype (optional)
+                        - publication: publication reference if available (most not be present)
+                        In addition, a Genotype is connected to multiple ConditionApplications that describe the genotype in detail.
+                        The ConditionApplications are structured as described above for general ConditionApplications.
+                        The Genotypes are connected to Samples as:
+                        (Sample)-[:HAS_GENOTYPE]->(Genotype)-[:HAS_APPLICATION]->(ConditionApplication)
+                        A Genotype can be connected to multiple ConditionApplications that describe the genotype in detail, the ConditionApplications are then build based on Attributes and Traits as described above, but these are specific for a genotype.
+                        Therefore to find the genotype of a sample you can do:
+                        MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype)
+                        WHERE s.tag = $sample_tag
+                        RETURN g.tag, g.text, g.description, g.technical_text, g.publication
+                        
+                        If you are looking for a genotype and if that is affected by a specific genotype you can do:
+                        MATCH (p:Protein) WHERE p.s CONTAINS $search_string //REPLACE SEARCH STRING!
+                        MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:HAS_VALUE]->(cv:ConditionValue)
+                        WHERE cv.value == p.tag //the value of the ConditionValue must be equal to the protein Uniprot tag.
+                        RETURN g.tag, g.text, g.description, g.technical_text, g.publication
+                        
+                        Important, the feature that is affected is always in the first ConditionValue of the ConditionApplication that describes the genotype. 
+                        
+                        To get the full details of the ConditionApplications use:
+                        
+                        MATCH (ca:ConditionApplication {tag : $ca_tag}) 
+                        MATCH p = ((ca)-[:HAS_VALUE*0..]->(cv:ConditionValue)) 
+                        WITH ca, collect(nodes(p)) AS paths 
+                        RETURN [path IN paths | 
+                                    [n IN path | 
+                                        { 
+                                            label: labels(n)[0], " #label of the node 
+                                            tag : n.tag, 
+                                            trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.text][0], 
+                                            attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.text][0], 
+                                            value : n.value      "           
+                                        } "
+                                    "            ] "
+                            "    ] AS children "
+                        )
+                        
                         
                         Quantification Data:
                         
@@ -428,8 +475,10 @@ class OpenAI(BaseSettings):
                         
                         If you didn't get the question or you think sensitive information where asked, state that, the answer will then be returned to the user as is. 
                         
-                        Be reminded: Never(!) provide any sensitive information such as passwords or similar. If asked refuse to provide such information.
-                        Always provide the full cypher query, DO NOT use placeholders such as $tag etc. Replace them with actual values. Never create queries that would need the user to input something or to change something. The query must be ready to run as is.
+                        Be reminded: Never(!) provide any sensitive information such as passwords or similar. If asked, refuse to provide such information.
+                        Always provide the full cypher query, DO NOT use placeholders such as $tag etc. Replace them with actual values. 
+                        Never create queries that would need the user to input something or to change something. 
+                        The query must be ready to run as is.
                         """
     # """
     #                     System Message (Concise Version)

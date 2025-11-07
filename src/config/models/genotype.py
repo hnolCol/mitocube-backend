@@ -77,6 +77,9 @@ class GeneticApplicationTreeModel(BaseModel):
     attribute_tag : str 
     value : Optional[str|float|int] = None
     children : List[GeneticApplicationTreeModel] = []
+
+
+
 class InsertGeneticApplicationModel(BaseModel):
     text : str 
     description : Optional[str] = None

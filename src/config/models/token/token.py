@@ -36,6 +36,4 @@ class TokenValidResponse(BaseModel):
     success : bool
     role : UserRolesEnum = 0
     verified : bool = False
-    firstname : str 
-    lastname : str 
     tag : str

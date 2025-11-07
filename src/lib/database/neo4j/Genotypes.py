@@ -5,14 +5,17 @@ from neo4j import Driver, Result
 from config.models.genotype import MinimalGenotypeModel, GenotypeModel, InsertGeneticApplicationModel
 from config.models.attributes import AttributeTree
 from lib.database.abstract.Genotypes import GenotypeABC
+from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from services.encryption import create_hierarchical_hash
+import uuid
 class Neo4JGenotype(GenotypeABC):
     """
     Database class  that handles the genotypes. """
     
-    def __init__(self, driver : Driver) -> None:
+    def __init__(self, driver : Driver, condition_applications : ConditionApplicationABC) -> None:
 
-        self._driver = driver 
+        self._driver = driver
+        self._condition_applications = condition_applications
         
         
     def _add(self, genotypes : List[GenotypeModel], user_tag : str = None):
@@ -154,31 +157,8 @@ class Neo4JGenotype(GenotypeABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return MinimalGenotypeModel(**r[0].data()) if r.size() > 0 else None
     
-
-
-    def insert_component(self, data : AttributeTree) -> bool:
-        """Inserts a new genotype into the database.
-        Based on the hierarchical attribute tree, a unique hash tag is created.
         
-        Parameters
-        ----------
-        data : InsertGeneticApplicationModel
-            The genotype information to be inserted.
-
-        Returns
-        -------
-        str
-            The hash tag of the inserted component, or None if the insertion failed.
-        """
-        
-        hash_tag = create_hierarchical_hash(data)
-        print("HASH:", hash_tag)
-        
-        if self.component_exists(hash_tag):
-            return hash_tag
-        
-        
-    def insert_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+    def insert_genotype(self, tag : str,  text : str, application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
         """Inserts a new genotype into the database.
         Parameters
         ----------
@@ -186,7 +166,7 @@ class Neo4JGenotype(GenotypeABC):
             _description_
         text : str
             _description_
-        component_tags : List[str]
+        application_tags : List[str]
             The tags the genotype is connected to. 
         description : str|None
         """
@@ -200,13 +180,13 @@ class Neo4JGenotype(GenotypeABC):
             "MATCH (u:User {tag : $user_tag}) "
             "MERGE (u)-[r_defined:CREATED {tag : gc.tag}]->(gc) "
             "WITH gc "
-            "UNWIND $component_tags as component_tag "
-            "MATCH (comp:GenotypeComponent {tag : component_tag}) "
-            "MERGE (gc)-[r:HAS_COMPONENT]->(comp) "
+            "UNWIND $application_tags as application_tag "
+            "MATCH (comp:ConditionApplication {tag : application_tag}) "
+            "MERGE (gc)-[r:HAS_APPLICATION]->(comp) "
             
         )
 
-        self._driver.execute_query(query, tag = tag, text = text, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j")
+        self._driver.execute_query(query, tag = tag, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j")
         return True
 
     def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
@@ -216,18 +196,23 @@ class Neo4JGenotype(GenotypeABC):
         ----------
         data : InsertGeneticApplicationModel
             The genotype information to be inserted.
-
+        user_tag : str
+            The user who is inserting the genotype.
         Returns
         -------
         bool
             True if the insertion was successful, False otherwise.
         """
+        genotype_tag = create_hierarchical_hash([d.model_dump() for d in data.components])
+        if self.exists(genotype_tag):
+            return False
 
-        tags = [] 
+        tags = []
         for attribute_tree in data.components:
-            tag = self.insert_component(attribute_tree)
+            tag = self._condition_applications.insert(condition_application=attribute_tree) 
             tags.append(tag)
-        self.insert_genotype(tag = tags[0], text = data.text, component_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text)
+        
+        self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text)
         return True
     
     

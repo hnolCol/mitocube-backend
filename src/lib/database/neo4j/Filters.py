@@ -104,7 +104,36 @@ class Neo4JFilter(FilterABC):
         r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value)
         return r [0]
     
-    def get(self, tag : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, feature_tag : str = None) -> List[FilterModel]:
+    def get(self, tag : str) -> FilterModel:
+        """Returns the details of a specific filter by its tag. 
+
+        Parameters
+        ----------
+        tag : str
+            The filter tag. 
+
+        Returns
+        -------
+        Filter
+            The filter details. 
+        """
+        query = (
+            "MATCH (f:Filter {tag : $tag}) "
+            "MATCH (f)-[:BASED_ON]-(pub:Publication) "
+            "WITH {publication : pub.tag} as pub_tag, f "
+            "RETURN apoc.map.merge(properties(f), pub_tag) "
+        )
+        r = self._driver.execute_query(query, 
+                                    database_="neo4j", 
+                                    routing_="r",
+                                    tag = tag,
+                                    result_transformer_= Result.value)
+        if len(r) == 0:
+            raise Exception(f"Filter with tag {tag} not found in the database.")
+        return FilterModel(**r[0])
+    
+    
+    def find(self, tag : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, protein_tag : str = None) -> List[str]:
         ""
         print(submission_tags)
         if tag is not None:
@@ -126,10 +155,10 @@ class Neo4JFilter(FilterABC):
                 "MATCH (f:Filter) "
                 "WHERE f.proteome_tag in $proteome_tags "
             )
-        elif feature_tag is not None:
+        elif protein_tag is not None:
             query = (
                 "MATCH (f:Filter)<-[:PART_OF]-(p:Protein) "
-                "WHERE p.tag = $feature_tag "
+                "WHERE p.tag = $protein_tag "
             )
         else:
             query = (
@@ -137,19 +166,17 @@ class Neo4JFilter(FilterABC):
             )
         
         query += (
-            "MATCH (f)-[:BASED_ON]-(pub:Publication) "
-            "WITH {publication : pub.tag} as pub_tag, f "
-            "RETURN apoc.map.merge(properties(f), pub_tag) "
+            "RETURN f.tag"
         )
         r = self._driver.execute_query(query, 
                                     database_="neo4j", 
                                     routing_="r",
-                                    feature_tag = feature_tag,
+                                    protein_tag = protein_tag,
                                     submission_tags = submission_tags,
                                     tag = tag,
                                     proteome_tags = proteome_tags,
                                     result_transformer_= Result.value)
-        return [FilterModel(**f) for f in r] 
+        return r 
         
         
     def get_features(self, tag : str) -> List[FeatureModel]:

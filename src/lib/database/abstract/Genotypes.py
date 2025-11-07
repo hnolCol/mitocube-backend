@@ -3,7 +3,7 @@ from typing import List
 from neo4j import Driver
 
 from config.models.genotype import MinimalGenotypeModel, GenotypeModel , InsertGeneticApplicationModel
-
+from config.models.attributes import AttributeTree
 
 class GenotypeABC(ABC):
     """
@@ -65,16 +65,38 @@ class GenotypeABC(ABC):
         """
     
     @abstractmethod
-    def insert(self, data : InsertGeneticApplicationModel) -> bool:
+    def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
         """Inserts a new genotype into the database.
-
+        This method should be used to insert a genotype. The components will be created from here.
         Parameters
         ----------
         data : InsertGeneticApplicationModel
             The genotype information to be inserted.
-
+        user_tag : str
+            The user who is inserting the genotype.
         Returns
         -------
         bool
             True if the insertion was successful, False otherwise.
+        """
+
+        return True
+
+    @abstractmethod
+    def insert_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+        """Inserts a new genotype into the database.
+        Parameters
+        ----------
+        tag : str
+            _description_
+        text : str
+            _description_
+        component_tags : List[str]
+            The tags the genotype is connected to. 
+        description : str|None
+            _description_
+        publication : Optional[str], optional
+            _description_, by default None
+        technical_text : Optional[str], optional
+            _description_, by default None
         """

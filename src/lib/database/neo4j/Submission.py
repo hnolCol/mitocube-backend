@@ -9,6 +9,7 @@ from lib.database.abstract.Submission import SubmissionFilterABC, SubmissionsABC
 from lib.database.abstract.Meta import MetaABC
 from lib.database.abstract.Attributes import AttributesABC
 from lib.database.abstract.Proteomes import ProteomesABC
+from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import AttributeTree, DatasetSubmissionModel
@@ -20,12 +21,13 @@ from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
 
 class Neo4JSubmissions(SubmissionsABC):
-    
-    def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC) -> None:
-        self._meta = meta 
+
+    def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC, condition_applications : ConditionApplicationABC) -> None:
+        self._meta = meta
         self._driver = driver
         self._proteomes = proteomes
-        
+        self._condition_applications = condition_applications
+
     def count(self, state : SubmissionStatesEnums = None) -> int:
         """Counts the total number of submissions in the database
 
@@ -351,246 +353,38 @@ class Neo4JSubmissions(SubmissionsABC):
         )
 
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
-        print(r, "viewss")
         return r[0] if len(r) > 0 else 0
 
 
-        # dataset_attribute_input = submission.dataset_attribute_input
-        # genotypes_added = 0 
-        # sample_attributes_added = 0 
-        
-        # dataset_props = {
-        #     "title" : submission.title, 
-        #     "n_samples" : submission.n_samples, 
-        #     "created_at" : submission.created_on,
-        #     "state" : submission.state, 
-        #     "n_replicates" : len(set(submission.replicates))
-        #     }
-        # #get the state tag 
-        # #state_tag =  SubmissionStatesEnums(submission.state).name
-        # if "att_proteome" not in submission.dataset_attributes:
-        #     raise ProteomeNotFoundError("The proteome dataset attribute was not found.")
-        
-        # for proteome_tag in submission.dataset_attributes["att_proteome"]:
-        #     if not self._proteomes.exist(proteome_tag):
-        #         raise ProteomeNotFoundError(f"The proteome {proteome_tag} was not found in the database. Please add it before inserting the submission.")
-        
-        # samples = [{"tag" : sample_name, "props" : {"index" : idx, "replicate" : submission.replicates[idx], "text" : sample_name}} for idx,sample_name in enumerate(sample_names)]
-        # dataset_attributes =  [tag for tag in submission.dataset_attributes.keys()]
-
-                
-        # dataset_attribute_values = [{"attribute_value_tag" : tag, #remove!! att_ is history 
-        #                              "attribute_tag" : attribute_tag, 
-        #                              "trait_value" : extract_user_input(dataset_attribute_input[attribute_tag][tag]) if attribute_tag in dataset_attribute_input and dataset_attribute_input[attribute_tag][tag] else []} 
-        #                             for attribute_tag,tags in submission.dataset_attributes.items() for tag in tags]
-        
-        # dataset_attributes_units = [x for x in dataset_attribute_values if isinstance(x["trait_value"],list) and len(x["trait_value"]) > 0]
-        
-        # query = (
-        #     "MERGE (submission:Submission {tag : $submission_tag}) "
-        #     "SET submission += $dataset_props "
-        #     "WITH submission "
-        #     "MATCH (state:State {tag : $state_tag}) "
-        #     "MERGE (submission)-[r_in_state:IN_STATE]->(state) "
-        #     "SET r_in_state.created_at = timestamp(), r_in_state.user_tag = $user_tag "
-        #     "WITH submission "
-        #     "UNWIND $samples as sample_name "
-        #     "MERGE (s:Sample {tag : sample_name.tag}) "
-        #     "SET s += sample_name.props "
-        #     "SET s.created_at = timestamp() "
-        #     "WITH s, submission "
-        #     "MERGE (s)<-[:HAS_SAMPLE]-(submission) "   
-        #     "WITH submission "
-        #     "UNWIND $dataset_attributes as attribute_tag "
-        #     "MATCH (a:Attribute {tag : attribute_tag}) "
-        #     "MERGE (submission)-[:HAS_VALUES_FOR_ATTRIBUTE]->(a) "
-        #     "WITH submission "
-        #     "UNWIND $dataset_attribute_values as attribute_value "
-        #     "MATCH (av:AttributeValue {tag : attribute_value.attribute_value_tag}) "
-        #     "MATCH (a:Attribute {tag : attribute_value.attribute_tag}) "
-        #     "MERGE (submission)-[r:HAS_ATTRIBUTE_VALUE]->(av) "
-        #     "SET r.created_at = timestamp(), r.attribute_tag = a.tag "
-        #     "MERGE (av)-[:HAS_VALUE]-(a) "
-
-        #     ""
-        # )
-    
-        # self._driver.execute_query(query, routing_="w", 
-        #                            samples = samples, 
-        #                            user_tag = submission.user_tag,
-        #                            submission_tag = submission_tag, 
-        #                            dataset_attributes  = dataset_attributes, 
-        #                            state_tag = submission.state, 
-        #                            dataset_props = dataset_props, 
-        #                            dataset_attribute_values = dataset_attribute_values)
-        
-        
-        # #add units 
-        # if len(dataset_attributes_units) > 0:
-        #     query = (
-        #         "MATCH (submission:Submission {tag : $submission_tag}) "
-        #         "UNWIND $dataset_attribute_values AS attribute_value "
-        #         "UNWIND attribute_value.trait_value AS trait "
-        #         "WITH attribute_value, trait "
-        #         "MATCH (av:AttributeValue {tag: attribute_value.attribute_value_tag}) "
-        #         "MATCH (unit:Unit {tag: trait.unit_tag}) "
-        #         "MERGE (av)-[r:HAS_VALUE_OF_UNIT]-(unit) "
-        #         "SET r.value = trait.value, r.submission_tag = $submission_tag, r.unittype_tag = trait.unittype_tag "
-        #         "RETURN av, unit, r "
-        #     )
-        #     r = self._driver.execute_query(query,routing_="w",submission_tag = submission_tag, dataset_attribute_values = dataset_attributes_units, result_transformer_=Result.value)
-        
-        # try:
-        #     self._meta.add_samples_attributes(meta_data=submission)
-        #     sample_attributes_added = 1 
-        # except Exception as e:
-        #     print(e) 
-        #     print("No sample attributes added ")
-        # try:
-        #     self._meta.add_samples_genotypes(meta_data=submission)
-        #     genotypes_added = 1 
-        # except:
-        #     print("No genotypes found")
-            
-        # if genotypes_added == 0 and sample_attributes_added == 0: raise ValueError("Neither genotypes nor sample attributes could be defined for this project. ")
-        
-        # self._meta.add_owner(tag=submission_tag, user_tag=submission.user_tag)
-        # self._meta.add_collaborators(tag=submission_tag, user_tags=submission.collaborators)
-        
-        # print(submission.metatext)
-        
-        # self._meta.add_metatext(tag=submission_tag, user_tag= submission.user_tag, meta_texts=submission.metatext)
-        
     
     def insert_attributes(self, tag, traits : List[AttributeTree]) -> bool:
-        """Inserts the dataset attributes for a submission. 
-        """
-         
-         
+        """Inserts the dataset attributes for a submission. """
+        
         if not self.exists(tag):  
             raise ValueError("Submission with this tag does not exist. Please create the submission first.")
         for attribute_tree in traits:
             self.insert_condition_application(tag = tag,
-                                        trait_data = [attribute_tree.model_dump()]) 
-        
-    def handle_children(self, submission_tag, trait_node, parent_tag):
-        
-        for attribute_node in trait_node["children"]:
-            if attribute_node.get("type") != "attribute":
-                raise ValueError("The child node is not an Attribute node. Attribute and Trait nodes must always be used as children of a ConditionApplication node in alternating order.")
-            attribute_tag = attribute_node["tag"]
-            trait_nodes = attribute_node["children"]
-            if len(trait_nodes) > 0:
-                for trait_node in trait_nodes:
-                    if trait_node.get("type") != "trait":
-                        raise ValueError("The child node is not a Trait node.")
-                    parent_tag_2 = self.add_condition_value(
-                                                            attribute_tag=attribute_tag, 
-                                                            value = trait_node.get("value"),
-                                                            trait_tag= trait_node["tag"], 
-                                                            parent_tag=parent_tag)
-                    
-                    if len(trait_node.get("children",[])) > 0:
-                        self.handle_children(submission_tag, trait_node=trait_node, parent_tag=parent_tag_2)
+                                        data = attribute_tree) 
     
-    def add_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
-        """Adds a condition value to a submission. This is used to add conditions to the submission that are not specific to a sample but to the whole submission.
-
-        Parameters
-        ----------
-        submission_tag : str
-            The submission tag to which the condition value should be added.
-        parent_tag : str
-            The parent tag of the condition value.
-        attribute_tag : str
-            The attribute tag of the condition value.
-        trait_tag : str
-            The trait tag of the condition value.
-        value : str | float | int, optional
-            The value of the condition. This is usually a concentration or a temperature (very likely to be numeric). , by default None
-
-        Returns
-        -------
-        _type_
-            _description_
-        """
-        cv_tag = uuid.uuid4().hex
-        query = (
-            "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) " #maybe a ConditionValue or a ConditionApplication
-            "MERGE (cv:ConditionValue {tag : $cv_tag, text : $cv_tag}) "
-        )
-        if value is not None:
-            query += "SET cv.value = $value "
-            
-        query += (
-                "WITH ca,cv "
-                "MATCH (a:Attribute {tag : $attribute_tag})-[:PART_OF]->(ag:AttributeGroup {tag : 'dataset'}) " #only dataset attributes are allowed here
-                "MATCH (t:Trait {tag : $trait_tag}) "
-                "WITH ca,cv,a,t "
-                "MERGE (cv)-[:OF_ATTRIBUTE]-(a) "
-                "MERGE (cv)-[:HAS_TRAIT]-(t) "
-                "MERGE (ca)-[r:HAS_VALUE]->(cv) "
-                "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag "
-            )
-        
-        self._driver.execute_query(query, value = value, trait_tag = trait_tag, cv_tag = cv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
-        return cv_tag 
-    
-    def insert_condition_application(self, tag : str, attribute_tag : str = None,  trait_tag : str = None, trait_data : List[dict] = None):
+    def insert_condition_application(self, tag : str, attribute_tree : AttributeTree):
         """ Inserts a condition procedure into the database connect to a submission This indicates that all samples
         of the submission are affected by this condition. There are also ConditionApplication nodes that are connected to the samples via the 
         HAS_APPLICATION relationship and are manage by the Samples DB class. These are then specific for a given sample"""
 
-        submission_tag = tag
-        print(trait_data, "trait data")
-        if trait_tag is not None and trait_data is None or len(trait_data) == 0:
-
-            trait_data = [
-                {"type" : "attribute", "tag" : "att_compound", 
-                 "children" : [
-                     {"type": "trait", "tag": trait_tag, "children": []}
-                 ]}
-           ]    
-
-        ca_tag = create_hierarchical_hash(trait_data)
-        if self.condition_application_exists(tag = ca_tag):
-            ##if exists, then just connect to the submission
-            query = (
-                "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
-                "MATCH (s:Submission {tag : $submission_tag}) "
-                "MERGE (s)-[:HAS_APPLICATION]->(ca) "
-            )
-
-            self._driver.execute_query(query, routing_="w", ca_tag = ca_tag, submission_tag = submission_tag)
-
-        else:
-            
-            for condition_application in trait_data:
-                attribute_tag = condition_application["tag"]
-                for trait_node in condition_application["children"]:
-                    trait_tag = trait_node["tag"]
-                    query = (
-                        "MERGE (s:Submission {tag : $submission_tag}) "
-                        "MERGE (ca:ConditionApplication {tag : $ca_tag}) "
-                        "WITH ca, s "
-                        "MERGE (a:Attribute {tag : $attribute_tag}) "
-                        "MERGE (t:Trait {tag : $trait_tag}) "
-                        #connect to submission 
-                        "MERGE (s)-[:HAS_APPLICATION]->(ca) "
-                        "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
-                        "MERGE (ca)-[:INSTANCE_OF]-(t) "
-                    )
-                    
-                    self._driver.execute_query(query, routing_= "w", ca_tag = ca_tag, submission_tag = submission_tag, trait_tag = trait_tag, attribute_tag = attribute_tag)        
-                    
-                    if len(trait_node.get("children",[])) > 0:
-                        # for child in trait_node["children"]:
-                        print("has children!! ", trait_node["children"])
-                        self.handle_children(submission_tag, trait_node=trait_node, parent_tag=ca_tag)
-                
-    
-    
-    
+        if not self.exists(tag):  
+            raise ValueError("Submission with this tag does not exist. Please create the submission first.")
+        submission_tag = tag        
+        tag = self._condition_applications.insert(condition_application=attribute_tree) 
+        if tag is None:
+            raise ValueError("Condition application could not be inserted.") 
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag}) "
+            "MATCH (ca:ConditionApplication {tag : $tag}) "
+            "MERGE (submission)-[r:HAS_APPLICATION]->(ca) "
+            "SET r.created_at = timestamp() "
+        )
+        self._driver.execute_query(query, submission_tag = submission_tag, tag = tag)
 
 
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):

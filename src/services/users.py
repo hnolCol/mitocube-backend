@@ -65,7 +65,7 @@ def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
 def get_user_from_token(token = Depends(check_token_verified)) -> UserModel:
     """Extracts the user from a token"""
     #DB.get_user_by_id()
-    if "label" not in token : token_not_valid_exception
+    if "tag" not in token : token_not_valid_exception
     user_in_db = DB.users.get_user_by_tag(tag = token["tag"])
     user  = check_user_allowed(user_in_db is not None,user_in_db)
     return user 
