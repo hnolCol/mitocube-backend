@@ -2,7 +2,7 @@
 from abc import abstractmethod, ABC 
 import pandas as pd 
 
-from lib.data.dataset.ABCDataset import MCDataset
+
 
 
 class DatasetFilter(ABC):
@@ -11,7 +11,7 @@ class DatasetFilter(ABC):
 
     Parameters
     ----------
-    dataset : MCDataset
+    dataset : pd.DataFrame
         The dataset to be filtered.
 
     Methods
@@ -20,7 +20,7 @@ class DatasetFilter(ABC):
         Returns the pd.Index of the dataset data that match the filtering.     
 
     """
-    def __init__(self, dataset : MCDataset) -> None:
+    def __init__(self, dataset : pd.DataFrame) -> None:
         """
         """
         self._dataset = dataset

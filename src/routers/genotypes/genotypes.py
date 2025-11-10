@@ -23,9 +23,19 @@ router = APIRouter(
 
 
 @router.get("/genotypes/q")
-def get_genotype_by_query(search_string : str = None) -> List[str]:
-    """"""
-    return DB.genotypes.find(search_string=search_string)
+def get_genotype_by_query(search_string : str = None, user_tag : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    """
+    Finds genotype tags that match the search string.
+    Parameters
+    ----------
+    search_string : str, optional
+        The search string to look for in the genotype tags., by default None
+    user_tag : str, optional
+        If provided, only genotypes created by the given user_tag are returned., by default None
+    limit : int, optional
+        The maximum number of genotype tags to return., by default None
+    """
+    return DB.genotypes.find(search_string=search_string, user_tag=user_tag, limit=limit)
 
 
 @router.get("/genotypes/{genotype_tag}")

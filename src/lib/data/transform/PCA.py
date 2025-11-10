@@ -6,7 +6,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import scale
 
-from lib.data.dataset.ABCDataset import MCDataset
+
 from lib.data.transform.ABCTransform import DatasetTransform
 from lib.data.annotate.samples.SampleAttributes import SampleAttributeAnnotation
 
@@ -17,7 +17,7 @@ class PCATransform(DatasetTransform):
 
         Parameters
         ----------
-        dataset : MCDataset
+        dataset : pd.DataFrame
            The dataset from the dataset
         n_components : int, optional
             The number of components to be calculated by the PCA, by default 3

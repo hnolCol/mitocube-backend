@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
 import pandas as pd 
 from typing import Tuple
-from lib.data.dataset.ABCDataset import MCDataset
+
 
 
 class DatasetImputation(ABC):
@@ -10,7 +10,7 @@ class DatasetImputation(ABC):
 
     Parameters
     ----------
-    dataset : MCDataset
+    dataset : pd.DataFrame
         The dataset to be used for the imputation 
 
     Methods
@@ -20,7 +20,7 @@ class DatasetImputation(ABC):
         that indicates the imputed values.
 
     """
-    def __init__(self, dataset : MCDataset) -> None:
+    def __init__(self, dataset : pd.DataFrame) -> None:
         """
         """
         self._dataset = dataset

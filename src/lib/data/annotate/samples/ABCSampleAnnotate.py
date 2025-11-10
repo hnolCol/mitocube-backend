@@ -2,14 +2,14 @@ from abc import abstractmethod, ABC
 from deprecated import deprecated
 import pandas as pd 
 
-from lib.data.dataset.ABCDataset import MCDataset
+
 
 
 @deprecated(reason="Please use the MCAttribute, MCDatabase or MCDataset related classes")
 class SampleAnnotation(ABC):
     """
     """
-    def __init__(self, dataset : MCDataset) -> None:
+    def __init__(self, dataset : pd.DataFrame) -> None:
         """
         """
         self._dataset = dataset

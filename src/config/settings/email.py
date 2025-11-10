@@ -25,7 +25,7 @@ class Email(BaseSettings):
     mail_validate_certs : bool = False
     mail_from_name : str = "MitoCube Support"
     mail_cc : List[EmailStr] = ["h.nolte@age.mpg.de","mitocube@age.mpg.de"] #"dominique.diehl@age.mpg.de", 
-    mail_template_dir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/templates/email"
+    mail_template_dir : DirectoryPath
     mail_verification_template : str = "verification_code.html"
     mail_confirmation_template : str = "email_confirmation.html"
     mail_project_state_template : str = "state_changed.html"

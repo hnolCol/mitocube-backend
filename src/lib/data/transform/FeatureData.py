@@ -5,7 +5,7 @@ from typing import Tuple
 from lib.data.annotations.ABCAnnotations import AnnotationDatabase
 from services.transforms import value_mapper_from_dict
 
-from lib.data.dataset.ABCDataset import MCDataset
+
 from lib.data.transform.ABCTransform import DatasetTransform
 from lib.data.annotate.samples.SampleAttributes import SampleAttributeAnnotation
 

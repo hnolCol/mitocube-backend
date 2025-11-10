@@ -3,14 +3,14 @@
 from abc import abstractmethod, ABC 
 
 from typing import Tuple
+import pandas as pd
 
-from lib.data.dataset.ABCDataset import MCDataset
 
 
 class DatasetTransform(ABC):
     """
     """
-    def __init__(self, dataset : MCDataset) -> None:
+    def __init__(self, dataset : pd.DataFrame) -> None:
         """
         """
         self._dataset = dataset

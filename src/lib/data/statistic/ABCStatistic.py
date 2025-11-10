@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
 import pandas as pd 
 
-from lib.data.dataset.ABCDataset import MCDataset
+
 
 
 class DatasetStatistic(ABC):
@@ -10,7 +10,7 @@ class DatasetStatistic(ABC):
 
     Parameters
     ----------
-    dataset : MCDataset
+    dataset : pd.DataFrame
         The dataset to be used for the statitiscal test. 
 
     Methods
