@@ -48,9 +48,9 @@ class GenotypeABC(ABC):
             _description_
         """
         
-    
+
     @abstractmethod
-    def find(self, search_string : str) -> List[str]:
+    def find(self, search_string : str = None, limit : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
 
         Parameters

@@ -23,9 +23,9 @@ router = APIRouter(
 
 
 @router.get("/genotypes/q")
-def get_genotype_by_query(query : str) -> List[MinimalGenotypeModel]:
+def get_genotype_by_query(search_string : str = None) -> List[str]:
     """"""
-    return DB.genotypes.find(query)
+    return DB.genotypes.find(search_string=search_string)
 
 
 @router.get("/genotypes/{genotype_tag}")

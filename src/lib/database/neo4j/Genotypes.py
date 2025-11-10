@@ -158,7 +158,7 @@ class Neo4JGenotype(GenotypeABC):
         return MinimalGenotypeModel(**r[0].data()) if r.size() > 0 else None
     
         
-    def insert_genotype(self, tag : str,  text : str, application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+    def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None) -> bool:
         """Inserts a new genotype into the database.
         Parameters
         ----------
@@ -173,9 +173,9 @@ class Neo4JGenotype(GenotypeABC):
         query = (
             "MERGE (gc:Genotype {tag : $tag}) "
             "ON CREATE "
-            "SET gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text "
+            "SET gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
             "ON MATCH "
-            "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text "
+            "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
             "WITH gc "
             "MATCH (u:User {tag : $user_tag}) "
             "MERGE (u)-[r_defined:CREATED {tag : gc.tag}]->(gc) "
@@ -183,10 +183,14 @@ class Neo4JGenotype(GenotypeABC):
             "UNWIND $application_tags as application_tag "
             "MATCH (comp:ConditionApplication {tag : application_tag}) "
             "MERGE (gc)-[r:HAS_APPLICATION]->(comp) "
-            
+            "WITH gc "
+            "UNWIND $protein_tags as protein_tag "
+            "MATCH (p:Protein {tag : protein_tag}) "
+            "MERGE (gc)-[r_effects:EFFECTS {tag : gc.tag}]->(p) "
+            "SET r_effects.created_at = timestamp() "
         )
 
-        self._driver.execute_query(query, tag = tag, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j")
+        self._driver.execute_query(query, tag = tag, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
         return True
 
     def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
@@ -203,6 +207,23 @@ class Neo4JGenotype(GenotypeABC):
         bool
             True if the insertion was successful, False otherwise.
         """
+        def _is_feature(component : AttributeTree) -> bool:
+            return component.type == "attribute" and component.tag == "att_feature"
+
+        def _find_protein_tag(components : List[AttributeTree]) -> str:
+            
+            for component in components:
+                if _is_feature(component) and len(component.children) > 0:
+                    #the value is actually in the children 
+                    return component.children[0].value
+                if len(component.children) > 0:
+                    return _find_protein_tag(component.children)
+
+            return None 
+
+        protein_tags = [_find_protein_tag([c]) for c in data.components]
+        if len(protein_tags) == 0:
+            raise ValueError("No feature (protein tag) found in the genotype components.")
         genotype_tag = create_hierarchical_hash([d.model_dump() for d in data.components])
         if self.exists(genotype_tag):
             return False
@@ -211,18 +232,26 @@ class Neo4JGenotype(GenotypeABC):
         for attribute_tree in data.components:
             tag = self._condition_applications.insert(condition_application=attribute_tree) 
             tags.append(tag)
-        
-        self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text)
+
+        self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
+                             protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
     
     
-    def find(self, search_string : str) -> List[str]:
-        query_string = query.lower() 
-        query = (
-            "MATCH (g:Genotype) "
-            "WHERE g.s CONTAINS $query_string "
-            "RETURN g.tag as tag, g.text as text, g.proteome_tag as proteome_tag"
-        )
+    def find(self, search_string : str = None, limit : int = None, user_tag : str = None) -> List[str]:
+        """Finds genotype tags that match the search string. 
+        Returns the genotype tags that contain the search string.
+        """ 
         
-        r, _ , _= self._driver.execute_query(query, query_string = query_string, routing_="r", database_="neo4j")
-        return [MinimalGenotypeModel(**ri.data()) for ri in r]
+        if user_tag is not None:
+            query = "MATCH (u:User {tag : $user_tag})-[:CREATED]->(g:Genotype)-[:EFFECTS]->(p:Protein)  "
+        else:
+            query = "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) " 
+        if search_string is not None and search_string != "":
+            query += "WHERE g.s CONTAINS $query_string OR p.s CONTAINS $query_string "
+        query += "RETURN DISTINCT g.tag as tag " 
+        if limit is not None:
+            query += " LIMIT $limit"
+
+        r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit)
+        return r

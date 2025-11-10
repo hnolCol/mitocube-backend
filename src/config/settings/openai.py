@@ -313,6 +313,15 @@ class OpenAI(BaseSettings):
                         
                         Important, the feature that is affected is always in the first ConditionValue of the ConditionApplication that describes the genotype. 
                         
+                        In addition, Genotypes are always connected to the affected Protein as:
+                        (Genotype)-[:EFFECTS]->(Protein)
+                        Therefore to find genotypes that affect a specific protein you can do:
+                        MATCH (p:Protein) WHERE p.s CONTAINS $search_string //REPLACE SEARCH STRING!
+                        MATCH (g:Genotype)-[:EFFECTS]->(p)  
+                        RETURN g.tag, g.text, g.description, g.technical_text, g.publication
+                        
+                        Please note that there might be multiple genotypes affecting the same protein and Genotypes can affect multiple proteins.
+                        
                         To get the full details of the ConditionApplications use:
                         
                         MATCH (ca:ConditionApplication {tag : $ca_tag}) 
