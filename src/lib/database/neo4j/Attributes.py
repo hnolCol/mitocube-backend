@@ -158,64 +158,6 @@ class Neo4JAttributes(AttributesABC):
             r = self._driver.execute_query(query, props = requirements, routing_="w", result_transformer_=Result.value)
             print(r,"requirements added.")
         
-        #print(types)
-        #eyJhbGciOiJQUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Ii4rQC4rIiwibWl4cGFuZWxJZCI6IiRkZXZpY2U6Y2Y3ZWI3ODgtNDdmMy00YzE0LTgxNmItN2E1NGVjODUwYzlmIiwibWl4cGFuZWxQcm9qZWN0SWQiOiI0YmZiMjQxNGFiOTczYzc0MWI2ZjA2N2JmMDZkNTU3NSIsIm9yZyI6Ii4qIiwicHViIjoibmVvNGouY29tIiwicmVnIjoiICIsInN1YiI6Im5lbzRqLWRlc2t0b3AiLCJleHAiOjE3NzkzNzQ3NTUsInZlciI6IioiLCJpc3MiOiJuZW80ai5jb20iLCJuYmYiOjE3NDc4Mzg3NTUsImlhdCI6MTc0NzgzODc1NSwianRpIjoianRfbXc2QVRnIn0.tRRLGKLkEqfALrRSzqjjVx8qAt_4jsWCR6fWZPLkacvVcpNvuWV5DBwZTjYGfpqKelt2307NlquRCsTyP6vXOhLtVWq43PndrOK1aF4H8LwE6l80bxL4QucxxEhHi0aQL0n-IDcZ5YJRintJ1dDCoG6biTcDquxPT4vZNZLeHMYv3Eo4WWmtgLqrMUN1hhADYHKO3MhFaRp7otXIAeNuSx_Ok2fE5kruZBbi18mW5bCWxmKkopAemb4CbW-81C-lCxDNlXL7cYLFWir1Lk4c-60CUSWTgd2h1LW-aZeqL4yC7jGXi1JEj0JX7bThrfbHrCgE4ZCuZAIKLAOTRQH2tQ
-        #r = self._driver.execute_query(query, routing_="w", ms = [maintenance.model_dump(exclude_none=True) for maintenance in records])
-        
-        # attribute_df = pd.DataFrame().from_dict(attributes["attributes"])
-        # attribute_value_df = pd.DataFrame().from_dict([av.model_dump() for av in attribute_value_models])
-        # rels = []
-        # min_state_attributes = []
-        # for attribute_tag in attribute_df.loc[:,"tag"].unique():
-        #     bool_match = attribute_value_df.loc[:,"attribute_tag"] == attribute_tag
-        #     attribute_values = attribute_value_df.loc[bool_match,:]
-        #     rels.extend([{"source": {"tag" : attribute_tag}, "target" : {"tag" : attr_value}} for attr_value in attribute_values.loc[:,"tag"]])
-        #     min_state_attributes.append({"tag" : attribute_tag, "min_state" : attribute_df.loc[attribute_df.loc[:,"tag"] == attribute_tag]["min_state"].values[0]})
-
-        # self.factory.create_multiple_nodes(NodeLabelModel(label="AttributeValue"),nodes=attribute_value_models)
-        # self.factory.create_multiple_nodes(NodeLabelModel(label="Attribute"),nodes=attribute_models)
-        # self.factory.connect_two_nodes_by_tag(NodeLabelModel(label="Attribute",cypher_label="sn"), 
-        #                                 NodeLabelModel(cypher_label="tn",label="AttributeValue"), relationship_label="HAS_VALUE", 
-        #                                 properties=rels)
-        
-        # hierarchy = attribute_df[["tag","parent_tag"]].dropna(subset="parent_tag").to_dict(orient="records")
-        # 
-        # ## connect states         
-        # query = (
-        #     "UNWIND $props as prop "
-        #     "MATCH (a:Attribute {tag : prop.tag}) "
-        #     "MATCH (s:State {tag : prop.min_state}) " 
-        #     "MERGE (a)-[:REQUIRES_STATE]->(s) "
-        # )
-        # self._driver.execute_query(query,props = min_state_attributes)
-        
-        
-        # ## add hierarchy 
-        # query = (
-        #     "UNWIND $hierarchy as h "
-        #     "MATCH (a:Attribute {tag: h.tag}) "
-        #     "MATCH (parent:Attribute {tag: h.parent_tag}) "
-        #     "MERGE (parent)-[:IS_PARENT_OF]->(a) "
-        # )
-        # self._driver.execute_query(query, hierarchy = hierarchy, routing_="w")
-        
-  
-        
-        
-        # ## add units 
-        # query = (
-        #     "MATCH (a:Attribute) "
-        #     "WHERE a.has_unit "
-        #     "UNWIND a.unit as a_unit_type_tag "
-        #     "MATCH (unittype:UnitType) "
-        #     "WHERE unittype.tag = a_unit_type_tag "
-        #     "MERGE (a)-[:HAS_UNIT_TYPE]->(unittype) "
-        #     "RETURN a, unittype "
-        #     )
-        
-        # r,_,_ = self._driver.execute_query(query)
-        
-    
     def __read_attributes_values_from_tuple_results(self,ri):
             attribute = AttributeModel(**ri[0])
             if attribute.has_features_value:
