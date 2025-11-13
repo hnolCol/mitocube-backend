@@ -22,7 +22,7 @@ class Neo4JAttributes(AttributesABC):
         self._driver = driver
         
         
-    def _utils_insert_from_file(self, path_to_file : str = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json", *args, **kwargs) -> None:
+    def _utils_insert_from_file(self, path_to_file : str = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json", *args, **kwargs) -> None:
         ""    
         
         

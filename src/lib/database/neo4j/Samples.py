@@ -39,7 +39,8 @@ class Neo4JSamples(SamplesABC):
               has_peptide_quantification : bool = False,
               protein_group_tag : str = None, 
               submission_tag : str = None, 
-              trait_tag : str = None) -> int:
+              trait_tag : str = None,
+              genotype_tag : str = None) -> int:
 
         "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
         if protein_group_tag is not None:
@@ -54,6 +55,10 @@ class Neo4JSamples(SamplesABC):
         elif submission_tag is not None:
             query = (
                 "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag}) "
+            )
+        elif genotype_tag is not None:
+            query = (
+                "MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype {tag : $genotype_tag})"
             )
         else:
             query = (
@@ -92,7 +97,7 @@ class Neo4JSamples(SamplesABC):
         print(query)
             
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
 
@@ -316,9 +321,29 @@ class Neo4JSamples(SamplesABC):
         return df
 
     
+        # add useGetSampleGenotype
     
     
     
-    
-    
-    
+    def get_sample_genotype(self, tag : str) -> str :
+        """Get the genotype tag associated with a given sample.
+
+        Parameters
+        ----------
+        tag : str
+            The sample tag whose genotype should be returned.
+
+        Returns
+        -------
+        str
+            The genotype tag linked to the given sample.
+        """
+
+        query = (
+            "MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype)"
+            "RETURN g.tag"
+        )
+
+
+        genotype = self._driver.execute_query(query, tag=tag, routing_="r")
+        return genotype

@@ -4,6 +4,9 @@ from neo4j import Driver
 
 from config.models.genotype import MinimalGenotypeModel, GenotypeModel , InsertGeneticApplicationModel
 from config.models.attributes import AttributeTree
+from config.models.user import UserModel
+from config.models.permissions import PermissionResponseModel 
+
 
 class GenotypeABC(ABC):
     """
@@ -26,6 +29,10 @@ class GenotypeABC(ABC):
             _description_
         """
         
+
+    @abstractmethod
+    def exists(self, tag : str) -> bool:
+        "Checks if tag is associateed with genotype"
         
     @abstractmethod
     def get(self, tag) -> List[MinimalGenotypeModel]:
@@ -48,9 +55,25 @@ class GenotypeABC(ABC):
             _description_
         """
         
+    @abstractmethod
+    def get_text(self, tag : str) -> str:
+        "Gets the text of the genotype"
 
     @abstractmethod
-    def find(self, search_string : str = None, limit : str = None) -> List[str]:
+    def get_description(self, tag : str) -> str:
+        "Gets the description of the genotype"
+
+    @abstractmethod
+    def get_item(self, tag : str) -> dict[str]:
+        "Gets the items of the genotype"
+
+    @abstractmethod
+    def get_proteins(self, tag : str) -> List[str]:
+        "Gets the proteins affetced by the genotype"
+
+
+    @abstractmethod
+    def find(self, search_string : str = None, user_tag : str = None, limit : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
 
         Parameters
@@ -100,3 +123,11 @@ class GenotypeABC(ABC):
         technical_text : Optional[str], optional
             _description_, by default None
         """
+
+    @abstractmethod
+    def count_samples(self, tag : str) -> int:
+        "Counts the number of relationships of the genotype"
+
+    @abstractmethod
+    def delete(self, tag : str) -> bool:
+        "Deletes a genotype"
