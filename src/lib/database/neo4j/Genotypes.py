@@ -8,6 +8,7 @@ from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from services.encryption import create_hierarchical_hash
 import uuid
+
 class Neo4JGenotype(GenotypeABC):
     """
     Database class  that handles the genotypes. """
@@ -157,7 +158,90 @@ class Neo4JGenotype(GenotypeABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return MinimalGenotypeModel(**r[0].data()) if r.size() > 0 else None
     
-        
+    def get_text(self, tag: str) -> str|None:
+        """Returns the text of a genotype by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The unique genotype tag.
+
+        Returns
+        -------
+        The text, if found, otherwise None.
+        """
+        query = (
+            "MATCH (g:Genotype) "
+            "WHERE g.tag = $tag "
+            "RETURN g.text "
+        )
+
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+    
+    def get_description(self, tag: str) -> str | None:
+        """Returns the description of a genotype by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The unique genotype tag.
+
+        Returns
+        -------
+        str | None
+            The description, if found, otherwise None.
+        """
+        query = (
+            "MATCH (g:Genotype) "
+            "WHERE g.tag = $tag "
+            "RETURN g.description"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if r else None
+    
+    def get_item(self, tag: str) -> dict[str, str] | None:
+        """Returns combined information about a genotype (text, description).
+
+        Parameters
+        ----------
+        tag : str
+            The unique genotype tag.
+
+        Returns
+        -------
+        dict[str, str] | None
+            A dictionary with text, and description(if found), otherwise None.
+        """
+        query = (
+            "MATCH (g:Genotype) "
+            "WHERE g.tag = $tag "
+            "RETURN g.text AS text, g.description AS description"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.data)
+        return r[0] if r else None
+    
+    def get_proteins(self, tag: str) -> list[str] | None:
+        """Returns the proteins affected by a genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The unique genotype tag.
+
+        Returns
+        -------
+        list[str] | None
+            A list of affected protein tags, if any exist.
+        """
+        query = (
+            "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
+            "WHERE g.tag = $tag "
+            "RETURN p.tag"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r if r else None
+    
     def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None) -> bool:
         """Inserts a new genotype into the database.
         Parameters
@@ -192,6 +276,7 @@ class Neo4JGenotype(GenotypeABC):
 
         self._driver.execute_query(query, tag = tag, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
         return True
+    
 
     def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
         """Inserts a new genotype into the database.
@@ -255,3 +340,50 @@ class Neo4JGenotype(GenotypeABC):
 
         r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit)
         return r
+    
+    def count(self, tag) -> int:
+        """Counts the number of relationships associated with a genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The unique genotype tag.
+
+        Returns
+        -------
+        int
+            The number of relationships (samples linked to the genotype).
+        """
+
+        query = (
+        "MATCH (g:Genotype {tag: $tag})-[r]->(s:Sample) "
+        "RETURN count(r) AS count"
+    )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r if r else None
+
+
+    def delete(self, tag) -> bool:
+        """Detach and delete a genotype by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag to delete.
+
+        Returns
+        -------
+        bool
+            True if deleted successfully, False otherwise.
+        """
+        if not self.exists(tag): False
+
+        query = (
+            "MATCH (g:Genotype) WHERE g.tag = $tag "
+            "DETACH DELETE g "
+        )
+        try:
+            r = self._driver.execute_query(query, routing_="w", tag = tag)
+        except:
+            False
+        return True

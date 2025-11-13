@@ -15,7 +15,7 @@ router = APIRouter(
 
 
 @router.get("/count", summary="Get the total number of samples in the database.")
-def get_sample_count(protein_group_tag : str = None, submission_tag : str = None, trait_tag : str = None, has_protein_quantification : bool = False, has_peptide_quantification : bool = False, user : UserModel = Depends(get_user_from_token)) -> int:
+def get_sample_count(protein_group_tag : str = None, submission_tag : str = None, genotype_tag : str = None, trait_tag : str = None, has_protein_quantification : bool = False, has_peptide_quantification : bool = False, user : UserModel = Depends(get_user_from_token)) -> int:
     "Returns the total number of samples in the database."
     return DB.samples.count(protein_group_tag=protein_group_tag, submission_tag=submission_tag, trait_tag=trait_tag, has_protein_quantification=has_protein_quantification, has_peptide_quantification=has_peptide_quantification)
 
@@ -36,3 +36,10 @@ def get_sample(sample_tag : str, user : UserModel = Depends(get_user_from_token)
 def get_sample_condition_applications(sample_tag: str, group_by_attribute : bool = True, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
     "Return the condition applications for a given sample."
     return DB.samples.get_condition_procedure(tag = sample_tag, group_by_attribute=group_by_attribute)
+
+
+@router.get("/{sample_tag}/{genotype_tag}")
+def get_sample_genotype(sample_tag : str, user: UserModel = Depends(get_user_from_token)) -> str:
+    "Return the genotype for the given sample."
+    return DB.samples.get_sample_genotype(tag = sample_tag)
+

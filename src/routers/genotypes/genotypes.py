@@ -6,14 +6,14 @@ from config.models.user import UserModel
 from config.models.parameter import APIParamString
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel, InsertGeneticApplicationModel
 
-from services.users import is_user_admin, get_user_from_token
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 
 
 from lib.database.Database import Database
 DB = Database.DB()
 
 
-
+genotype_not_found = HTTPException(status_code=404, detail="Genotype not associated with tag.")
 
 router = APIRouter(
     prefix="/api",
@@ -21,6 +21,49 @@ router = APIRouter(
 )
 
 
+@router.get("/genotypes/{genotype_tag}/proteins")
+def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the proteins of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = DB.genotypes.get_proteins(tag = genotype_tag)
+
+    return genotype
+
+@router.get("/genotypes/{genotype_tag}/item")
+def get_genotype_item(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the item of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = DB.genotypes.get_item(tag = genotype_tag)
+
+    return genotype
+
+@router.get("/genotypes/{genotype_tag}/description")
+def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the description of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise 
+    genotype = DB.genotypes.get_description(tag = genotype_tag)
+
+    return genotype
+
+@router.get("/genotypes/{genotype_tag}/text")
+def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the full text information of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = DB.genotypes.get_text(tag = genotype_tag)
+
+    return genotype
 
 @router.get("/genotypes/q")
 def get_genotype_by_query(search_string : str = None, user_tag : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
@@ -108,4 +151,25 @@ def delete_genotype_by_label(genotype_label : str, user : UserModel = Depends(is
         raise HTTPException(status_code=500, detail=str(e))
     return db_genotype.delete(label=genotype_label)
 
+@router.get("/genotypes/{genotype_tag}/relationships/count")
+def get_genotype_relationship_count(genotype_tag: str,user: UserModel = Depends(get_user_from_token)):
+    """
+    Count how many relationships (e.g., samples) are linked to the given genotype.
+    """
 
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    count = DB.genotypes.count(tag=genotype_tag)
+
+    return count
+
+@router.delete("/genotype/{genotype_tag}")
+def delete_genotype(genotype_tag: str, user: UserModel = Depends(is_user_at_least_curator)):
+    """
+    Delete a genotype by its tag.
+    """
+    deleted = DB.genotypes.delete(genotype_tag)
+
+    if not deleted:
+        raise genotype_not_found
+    
+    return {f"Genotype '{genotype_tag}' deleted."}

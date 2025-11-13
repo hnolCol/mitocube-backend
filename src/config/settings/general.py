@@ -18,10 +18,10 @@ class General(BaseSettings):
     description : str = "MitoCube offers protein-centric searches to explore the expression of a protein in all acquired proteomic datasets."
     allowed_email_domains : List[str] = ["@uni-koeln.de","@age.mpg.de","@uni-bonn.de","@instantclue.de"]
 
-    frontend_build : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-frontend/dist"
-    frontend_build_assets : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-frontend/dist/assets"
+    frontend_build : DirectoryPath
+    frontend_build_assets : DirectoryPath
     
-    use_terms_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/terms/usage.json"
+    use_terms_file : FilePath = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/terms/usage.json"
     
     class Config:
          env_file = ".env"
