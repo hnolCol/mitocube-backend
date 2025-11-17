@@ -9,7 +9,7 @@ from lib.database.Database import Database
 
 from services.users import get_user_from_token
 
-from services.condition_application import build_condition_application_tree 
+from services.condition_application import build_condition_application_tree
 
 DB = Database.DB()
 
@@ -119,9 +119,20 @@ def get_ca_name_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_to
     
     if not DB.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
     ca_tree = DB.condition_applications.get_tree(tag = ca_tag)
+
+
+
     t = ""
     for c in ca_tree: 
         t+= extract_ca_item(c)
     return t
 
 
+@router.get("/{tag}/tree_for_ui")
+def get_tree_for_ui(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> Dict:
+    """
+    Returns the condition application tree transformed for UI display.
+    """
+    ca = DB.condition_applications.get_tree(tag= ca_tag)
+    ui_tree = DB.condition_applications.transform_for_ui(ca)
+    return [ui_tree]

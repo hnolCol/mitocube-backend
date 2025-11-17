@@ -221,6 +221,18 @@ class Neo4JGenotype(GenotypeABC):
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.data)
         return r[0] if r else None
     
+    def get_condition_applications(self, tag : str) -> List[str]:
+
+        query = (
+            "MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE g.tag = $tag "
+            "RETURN ca.tag AS tag"
+        )
+
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r
+
+
     def get_proteins(self, tag: str) -> list[str] | None:
         """Returns the proteins affected by a genotype.
 
@@ -322,7 +334,40 @@ class Neo4JGenotype(GenotypeABC):
                              protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
     
-    
+    def edit_genotype( self, tag: str, text: str, protein_tags: List[str], application_tags: List[str], description: str | None, publication: str | None, technical_text: str | None,) -> bool:
+        """Edits the existing genotype.
+        """
+
+        query = (
+            "MATCH (gc:Genotype {tag : $tag}) "
+            "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
+
+            "WITH gc "
+            "MATCH (gc)-[oldApp:HAS_APPLICATION]->() "
+            "DELETE oldApp "
+
+            "WITH gc "
+            "UNWIND $application_tags AS application_tag "
+            "MATCH (comp:ConditionApplication {tag : application_tag}) "
+            "MERGE (gc)-[:HAS_APPLICATION]->(comp) "
+
+            "WITH gc "
+            "MATCH (gc)-[oldEff:EFFECTS]->() "
+            "DELETE oldEff "
+
+            "WITH gc "
+            "UNWIND $protein_tags AS protein_tag "
+            "MATCH (p:Protein {tag : protein_tag}) "
+            "MERGE (gc)-[r_effects:EFFECTS {tag : gc.tag}]->(p) "
+            "SET r_effects.created_at = timestamp() "
+        )
+
+
+        self._driver.execute_query(query,routing_="w", tag=tag, text=text, description=description, publication=publication,technical_text=technical_text, protein_tags=protein_tags, application_tags=application_tags,)
+        
+        return True
+        
+
     def find(self, search_string : str = None, limit : int = None, user_tag : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
         Returns the genotype tags that contain the search string.
@@ -341,7 +386,7 @@ class Neo4JGenotype(GenotypeABC):
         r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit)
         return r
     
-    def count(self, tag) -> int:
+    def count_samples(self, tag) -> int:
         """Counts the number of relationships associated with a genotype.
 
         Parameters
@@ -387,3 +432,4 @@ class Neo4JGenotype(GenotypeABC):
         except:
             False
         return True
+    

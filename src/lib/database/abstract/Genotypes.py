@@ -125,6 +125,26 @@ class GenotypeABC(ABC):
         """
 
     @abstractmethod
+    def edit_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+        """Edits the genotype in the database.
+        Parameters
+        ----------
+        tag : str
+            _description_
+        text : str
+            _description_
+        component_tags : List[str]
+            The tags the genotype is connected to. 
+        description : str|None
+            _description_
+        publication : Optional[str], optional
+            _description_, by default None
+        technical_text : Optional[str], optional
+            _description_, by default None
+        """
+    
+
+    @abstractmethod
     def count_samples(self, tag : str) -> int:
         "Counts the number of relationships of the genotype"
 
