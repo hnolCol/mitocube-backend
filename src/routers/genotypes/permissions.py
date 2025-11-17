@@ -1,6 +1,3 @@
-# permission for genotype for user, only admin and creater can edit and delete
-# but everyone can create 
-
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.Database import Database
 from config.models.user import UserModel
@@ -16,13 +13,13 @@ router = APIRouter(
     tags=["Permissions"],
 )
 
-
-@router.get("/permissions")
-def get_permissions(user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
+# permission for genotype for user, only curator can edit and delete, but everyone can create 
+@router.get("/{genotype_tag}/permissions")
+def get_permissions(genotype_tag : str, user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
 
     return PermissionResponseModel(user_tag = user.tag, 
                                    role = user.role, 
-                                   insert = user.role > UserRolesEnum.STANDARD, 
-                                   delete = user.role > UserRolesEnum.CURATOR,
-                                   edit = user.role > UserRolesEnum.CURATOR)
+                                   insert = user.role >= UserRolesEnum.STANDARD, 
+                                   delete = user.role >= UserRolesEnum.CURATOR,
+                                   edit = user.role >= UserRolesEnum.CURATOR)
 

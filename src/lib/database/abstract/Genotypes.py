@@ -6,6 +6,7 @@ from config.models.genotype import MinimalGenotypeModel, GenotypeModel , InsertG
 from config.models.attributes import AttributeTree
 from config.models.user import UserModel
 from config.models.permissions import PermissionResponseModel 
+from config.models.conditions_applications import ConditionApplicationTreeModel
 
 
 class GenotypeABC(ABC):
@@ -142,7 +143,7 @@ class GenotypeABC(ABC):
         technical_text : Optional[str], optional
             _description_, by default None
         """
-    
+
 
     @abstractmethod
     def count_samples(self, tag : str) -> int:
@@ -151,3 +152,35 @@ class GenotypeABC(ABC):
     @abstractmethod
     def delete(self, tag : str) -> bool:
         "Deletes a genotype"
+
+
+    @abstractmethod
+    def condition_applications(self, tag : str) -> List[str]:
+        """Gets the condition applications associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[str]
+            A list of condition application tags associated with the genotype.
+        """
+
+    @abstractmethod
+    def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
+        """Gets the condition application data associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[ConditionApplicationTreeModel]
+            A list of condition application data associated with the genotype.
+        """
+

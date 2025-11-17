@@ -205,3 +205,21 @@ def delete_genotype(genotype_tag: str, user: UserModel = Depends(is_user_at_leas
         raise genotype_not_found
     
     return {f"Genotype '{genotype_tag}' deleted."}
+
+
+@router.get("/genotypes/{genotype_tag}/condition_applications")
+def genotype_condition_applications(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+
+    ca = DB.genotypes.genotype_condition_applications(tag=genotype_tag)
+    return ca
+
+@router.get("/genotypes/{tag}/condition_applications/data")
+def genotype_condition_applications_data(tag: str, user: UserModel = Depends(get_user_from_token)):
+
+    if not DB.genotypes.exists(tag=tag): raise genotype_not_found
+
+    data = DB.genotypes.genotype_condition_applications_data(tag=tag)
+    return data
+

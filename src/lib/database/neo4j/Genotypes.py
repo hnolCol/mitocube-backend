@@ -4,6 +4,7 @@ from neo4j import Driver, Result
 
 from config.models.genotype import MinimalGenotypeModel, GenotypeModel, InsertGeneticApplicationModel
 from config.models.attributes import AttributeTree
+from config.models.conditions_applications import ConditionApplicationTreeModel
 from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from services.encryption import create_hierarchical_hash
@@ -433,3 +434,48 @@ class Neo4JGenotype(GenotypeABC):
             False
         return True
     
+    def condition_applications(self, tag : str) -> List[str]:
+        """Gets the condition applications associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[str]
+            A list of condition application tags associated with the genotype.
+        """
+
+        query = (
+            "MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE g.tag = $tag "
+            "RETURN ca.tag AS tag"
+        )
+
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r
+    
+    def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
+        """Gets the condition application data associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[ConditionApplicationTreeModel]
+            A list of condition application tree models associated with the genotype.
+        """
+
+        query = (
+            "MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE g.tag = $tag "
+            "RETURN ca"
+        )
+
+        ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]
