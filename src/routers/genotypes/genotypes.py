@@ -152,7 +152,7 @@ def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel =
 
     return True 
 
-@router.update("/genotypes/{tag}")
+@router.put("/genotypes/{tag}")
 def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token)):
     """
     Parameters
@@ -162,8 +162,9 @@ def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserM
     genotype : InsertGeneticApplicationModel
         The updated genotype data.
     """
-
-    edit = DB.genotypes.edit_genotype(genotype, user_tag = user.tag)
+    
+    print(genotype,tag)
+    edit = DB.genotypes.edit(tag = tag, data = genotype, user_tag = user.tag)
 
     if not edit:
         raise HTTPException(status_code=400, detail="Failed to update genotype.")
@@ -212,7 +213,7 @@ def genotype_condition_applications(genotype_tag: str, user: UserModel = Depends
 
     if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
 
-    ca = DB.genotypes.genotype_condition_applications(tag=genotype_tag)
+    ca = DB.genotypes.get_condition_applications(tag=genotype_tag)
     return ca
 
 @router.get("/genotypes/{tag}/condition_applications/data")
@@ -220,6 +221,6 @@ def genotype_condition_applications_data(tag: str, user: UserModel = Depends(get
 
     if not DB.genotypes.exists(tag=tag): raise genotype_not_found
 
-    data = DB.genotypes.genotype_condition_applications_data(tag=tag)
+    data = DB.genotypes.get_condition_application_data(tag=tag)
     return data
 

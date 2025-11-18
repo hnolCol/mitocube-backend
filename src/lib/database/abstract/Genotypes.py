@@ -126,6 +126,11 @@ class GenotypeABC(ABC):
         """
 
     @abstractmethod
+    def edit(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+        """Edits the genotype in the database.
+        """
+
+    @abstractmethod
     def edit_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
         """Edits the genotype in the database.
         Parameters

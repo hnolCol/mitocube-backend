@@ -334,8 +334,8 @@ class Neo4JGenotype(GenotypeABC):
         self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
                              protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
-    
-    def edit_genotype( self, tag: str, text: str, protein_tags: List[str], application_tags: List[str], description: str | None, publication: str | None, technical_text: str | None,) -> bool:
+
+    def edit_genotype( self, tag: str, text: str, application_tags: List[str], protein_tags: List[str], description: str | None, publication: str | None, technical_text: str | None,) -> bool:
         """Edits the existing genotype.
         """
 
@@ -364,8 +364,54 @@ class Neo4JGenotype(GenotypeABC):
         )
 
 
-        self._driver.execute_query(query,routing_="w", tag=tag, text=text, description=description, publication=publication,technical_text=technical_text, protein_tags=protein_tags, application_tags=application_tags,)
+        self._driver.execute_query(query, tag = tag, text = text, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
+        return True
+    
+
+    def edit(self, tag : str, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+        """Edits an existing genotype in the database.
+
+        Parameters
+        ----------
+        data : InsertGeneticApplicationModel
+            The genotype information to be edited.
+        user_tag : str
+            The user who is editing the genotype.
+        Returns
+        -------
+        bool
+            True if the edit was successful, False otherwise.
+        """
+        genotype_tag = tag
+        if not self.exists(genotype_tag):
+            raise ValueError(f"Genotype with tag {genotype_tag} does not exist.")
         
+        def _is_feature(component : AttributeTree) -> bool:
+            return component.type == "attribute" and component.tag == "att_feature"
+
+        def _find_protein_tag(components : List[AttributeTree]) -> str:
+            
+            for component in components:
+                if _is_feature(component) and len(component.children) > 0:
+                    #the value is actually in the children 
+                    return component.children[0].value
+                if len(component.children) > 0:
+                    return _find_protein_tag(component.children)
+
+            return None 
+
+        protein_tags = [_find_protein_tag([c]) for c in data.components]
+        if len(protein_tags) == 0:
+            raise ValueError("No feature (protein tag) found in the genotype components.")
+        
+
+        tags = []
+        for attribute_tree in data.components:
+            tag = self._condition_applications.insert(condition_application=attribute_tree) 
+            tags.append(tag)
+
+        self.edit_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
+                             protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
         
 
