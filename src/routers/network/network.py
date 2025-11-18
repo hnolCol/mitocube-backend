@@ -16,7 +16,6 @@ from config.enums.states import SubmissionStatesEnums
 
 
 
-from services.attributes import get_suffix_from_attributes_and_attribute_tags
 import json 
 import os 
 import numpy as np 
@@ -71,65 +70,62 @@ def get_network(dataset_label : str,
                 impute : bool = False,
                 split_string : str = ";"
                 ):
-    
+    pass
 
-    db = MCDatabase.getDatabase()
-    attributes_db = MCAttributes.getAttributeDatabase()
-    feature_db = PandaFeatureDatabase()
-    genotype_db = MCGenotypes.getGenotypeDatabase()
-    stats = pd.DataFrame() 
-    dataset = get_dataset_from_database(db,label=dataset_label)
-    metadata = dataset.getMetaJson()
-    within_attribute_tag = within_attribute_tag.split(split_string) if within_attribute_tag is not None else []
-    within_attribute_value_tag = within_attribute_value_tag.split(split_string) if within_attribute_value_tag is not None else []
-    proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
+    # db = MCDatabase.getDatabase()
+    # attributes_db = MCAttributes.getAttributeDatabase()
+    # feature_db = PandaFeatureDatabase()
+    # genotype_db = MCGenotypes.getGenotypeDatabase()
+    # stats = pd.DataFrame() 
+    # metadata = dataset.getMetaJson()
+    # within_attribute_tag = within_attribute_tag.split(split_string) if within_attribute_tag is not None else []
+    # within_attribute_value_tag = within_attribute_value_tag.split(split_string) if within_attribute_value_tag is not None else []
+    # proteome_ids =  [organism.split(":")[1] for organism in metadata.dataset_attributes["att_organism"]]
     
-    if all(attr is not None for attr in [sample_attribute_tag,attribute_value_tag_left,attribute_value_tag_right]):
+    # if all(attr is not None for attr in [sample_attribute_tag,attribute_value_tag_left,attribute_value_tag_right]):
         
         
-        #attribute_values = db_attributes.getAttributeValues(tags=[attribute_value_tag_left,attribute_value_tag_right,within_sample_attribute_value_tag]).set_index("tag", drop=False)
-        #attribute = db_attributes.getAttributes(tags=[sample_attribute_tag,within_sample_attribute_tag]).set_index("tag")
+    #     #attribute_values = db_attributes.getAttributeValues(tags=[attribute_value_tag_left,attribute_value_tag_right,within_sample_attribute_value_tag]).set_index("tag", drop=False)
+    #     #attribute = db_attributes.getAttributes(tags=[sample_attribute_tag,within_sample_attribute_tag]).set_index("tag")
         
-        comparison_suffix = get_suffix_from_attributes_and_attribute_tags(sample_attribute_tag,attribute_value_tag_left,attribute_value_tag_right,attributes_db,genotype_db,feature_db,within_attribute_tag=within_attribute_tag,within_attribute_value_tag=within_attribute_value_tag)
 
         
-        stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
-                                     attribute_value_left=attribute_value_tag_left, 
-                                     attribute_value_right=attribute_value_tag_right, suffix = comparison_suffix, 
-                                     impute = impute,
-                                     within_attribute_tag=within_attribute_tag,
-                                     within_attribute_value_tag=within_attribute_value_tag)     
-    proteome_id = [proteome_id for proteome_id in proteome_ids if proteome_id in NETWORKS]
-    if len(proteome_id) == 0: raise HTTPException(status_code=404, detail = "No network found for this organism.")
+    #     stats = Ttest(dataset).get_stats(sample_attribute_tag=sample_attribute_tag, 
+    #                                  attribute_value_left=attribute_value_tag_left, 
+    #                                  attribute_value_right=attribute_value_tag_right, suffix = comparison_suffix, 
+    #                                  impute = impute,
+    #                                  within_attribute_tag=within_attribute_tag,
+    #                                  within_attribute_value_tag=within_attribute_value_tag)     
+    # proteome_id = [proteome_id for proteome_id in proteome_ids if proteome_id in NETWORKS]
+    # if len(proteome_id) == 0: raise HTTPException(status_code=404, detail = "No network found for this organism.")
     
-    network_props = NETWORKS[proteome_ids[0]][network_type]
-    if not stats.empty:
+    # network_props = NETWORKS[proteome_ids[0]][network_type]
+    # if not stats.empty:
        
-        stat_name = f"log2 FC {comparison_suffix}"
-        nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in network_props["nodes"]]
-        network_props["nodes"] = nodes
-        network_props["value_keyName"] = stat_name
-    return network_props
+    #     stat_name = f"log2 FC {comparison_suffix}"
+    #     nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in network_props["nodes"]]
+    #     network_props["nodes"] = nodes
+    #     network_props["value_keyName"] = stat_name
+    # return network_props
         
-    if network_type == "localization":
-        ll = {**loc_pos}
-        if not stats.empty:
+    # if network_type == "localization":
+    #     ll = {**loc_pos}
+    #     if not stats.empty:
             
-            stat_name = f"log2 FC {comparison_suffix}"
-            nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in ll["nodes"]]
-            ll["nodes"] = nodes
-            ll["value_keyName"] = stat_name
-        return ll
-    elif network_type == "pathway": 
-        ll = {**loc_path}
-        if not stats.empty:
+    #         stat_name = f"log2 FC {comparison_suffix}"
+    #         nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in ll["nodes"]]
+    #         ll["nodes"] = nodes
+    #         ll["value_keyName"] = stat_name
+    #     return ll
+    # elif network_type == "pathway": 
+    #     ll = {**loc_path}
+    #     if not stats.empty:
             
-            stat_name = f"log2 FC {comparison_suffix}"
-            nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in ll["nodes"]]
-            ll["nodes"] = nodes
-            ll["value_keyName"] = stat_name
-        return ll
+    #         stat_name = f"log2 FC {comparison_suffix}"
+    #         nodes = [{**node, stat_name : map_nodes(node,stats,stat_name)}for node in ll["nodes"]]
+    #         ll["nodes"] = nodes
+    #         ll["value_keyName"] = stat_name
+    #     return ll
     
 
 #[{"x" : v[0], "y" : v[1], "node_type" : "Pathway" if " " in k else "Feature", "label" : k, "value" : np.random.normal(loc=2,scale=0.2)} for k,v in pos.items()]
-    

@@ -741,11 +741,11 @@ def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestProp
         RunListCreator's create function. 
 
     """
-    db = MCDatabase.getDatabase()
-    attributes = MCAttributes.getAttributeDatabase()
-    attribute_values = attributes.getAttributeValues()
-    attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
-    dataset = get_dataset_from_database(db,submission_label)
+    # db = MCDatabase.getDatabase()
+    # attributes = MCAttributes.getAttributeDatabase()
+    # attribute_values = attributes.getAttributeValues()
+    # attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
+    # dataset = get_dataset_from_database(db,submission_label)
     
     sample_idces, _ = dataset.getSamplesAttributes()
     

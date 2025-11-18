@@ -23,10 +23,7 @@ class Neo4JAttributes(AttributesABC):
         
         
     def _utils_insert_from_file(self, path_to_file : str = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json", *args, **kwargs) -> None:
-        ""    
-        
-        
-        #DB_SETTINGS = get_db_settings()
+        """"""
 
         attributes = read_json(path_to_file)
         
@@ -40,13 +37,11 @@ class Neo4JAttributes(AttributesABC):
         
         min_state_attributes = attribute_df.loc[:,["tag","min_state"]].to_dict(orient="records")
         
-        multi_label_attribute_tags = []# [a.tag for a in attribute_models if a.type is not None]
         
         children = [{"tag" : a.tag, "children" : a.children} for a in attribute_models if isinstance(a.children,list) and len(a.children) > 0]
         #add attribute groups 
 
         requirements = [{"tag" : tag, "r" : rs.split("|")} for tag, rs in attribute_df.loc[:,["tag","requires"]].dropna(subset=["requires"]).values]
-        print(requirements)
 
         unique_attribute_groups = np.unique([attribute_group for attribute_group in attribute_df.loc[:,"attribute_group"].dropna().str.split("|", expand = True).values.flatten() if isinstance(attribute_group,str)])
         attribute_tag_group  = [{'tag' : tag, 'group_tag' : group_tag} for tag, group in attribute_df.loc[:,["tag","attribute_group"]].values if isinstance(group,str) and len(group) > 0 for group_tag in group.split("|")]
@@ -75,29 +70,11 @@ class Neo4JAttributes(AttributesABC):
             "attribute.allow_input = a.allow_input "
         )
         
-        self._driver.execute_query(query, single_label_attributes = [a.model_dump(exclude_none=True) for a  in attribute_models if a.tag not in multi_label_attribute_tags])
-        
-        
-        #add multilabel attributes 
-        query = (
-            "UNWIND $multi_label_attributes as a "
-            "WITH ['Attribute', a.type] as nodeLabels, a "
-            "MERGE (attribute:$(nodeLabels) {tag : a.tag}) "
-            "ON CREATE "
-            "SET attribute.text = a.text, attribute.priority = a.priority, "
-            "attribute.group_tag = a.group_tag, attribute.s = a.s, attribute.created_at = timestamp(), "
-            "attribute.allow_input = a.allow_input "
-            "ON MATCH "
-            "SET attribute.text = a.text, attribute.priority = a.priority, "
-            "attribute.group_tag = a.group_tag, attribute.s = a.s, attribute.modified_at = timestamp(), "
-            "attribute.allow_input = a.allow_input "
-        )
-                
-        self._driver.execute_query(query, multi_label_attributes = [a.model_dump(exclude_none=True) for a  in attribute_models if a.tag in multi_label_attribute_tags and isinstance(a.type, str)])
+        self._driver.execute_query(query, single_label_attributes = [a.model_dump(exclude_none=True) for a  in attribute_models])
+    
         
         
         #add attributes to attributes_group 
-        
         query = (
             "UNWIND $attr_group as attribute_group "
             "MATCH (a:Attribute {tag : attribute_group.tag}) "
@@ -143,8 +120,6 @@ class Neo4JAttributes(AttributesABC):
         r = self._driver.execute_query(query, children = children, routing_="w", traits = [trait.model_dump(exclude_none=True) for trait in trait_models], result_transformer_=Result.value)
         
         print(f"Added {r} traits.")
-        
-        
         
         if requirements is not None and len(requirements) > 0:
             query = (
@@ -286,8 +261,6 @@ class Neo4JAttributes(AttributesABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag)
         return True
-                
-                
                 
     def exists(self, tag: str = None, trait: str = None) -> bool:
         if tag is None and trait is None:
