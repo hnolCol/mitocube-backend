@@ -8,10 +8,7 @@ from lib.database.abstract.Attributes import AttributesABC
 from config.settings.metatexts import MetaTexts
 from config.models.submissions.submissions import MinimalMetadataModel, DatasetSubmissionModel
 from config.models.user import UserModel 
-from config.models.unit import UnitTypeInputModel 
-from config.enums.units import UnitsEnum
 from collections import OrderedDict
-from services.units import extract_user_input
 class Neo4JMetaHandler(MetaABC):
 
     def __init__(self, driver : Driver, attributes : AttributesABC) -> None:
@@ -503,7 +500,7 @@ class Neo4JMetaHandler(MetaABC):
         return [UserModel(**u) for u in r]
 
 
-    def update_dataset_attributes(self, tag : str, dataset_attributes : Dict[str,List[str]], dataset_attribute_input :  Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None) -> Dict:
+    def update_dataset_attributes(self, tag : str, dataset_attributes : Dict[str,List[str]], dataset_attribute_input :  Dict = None) -> Dict:
         """_summary_
 
         Parameters
@@ -565,7 +562,7 @@ class Neo4JMetaHandler(MetaABC):
         if dataset_attribute_input is not None and len(dataset_attribute_input) > 0:
             dataset_attribute_values = [{"attribute_value_tag" : tag, #remove!! att_ is history 
                                      "attribute_tag" : attribute_tag, 
-                                     "trait_value" : extract_user_input(dataset_attribute_input[attribute_tag][tag]) if attribute_tag in dataset_attribute_input and dataset_attribute_input[attribute_tag][tag] else []} 
+                                     "trait_value" : dataset_attribute_input[attribute_tag][tag] if attribute_tag in dataset_attribute_input and dataset_attribute_input[attribute_tag][tag] else []} 
                                     for attribute_tag, tags in dataset_attributes.items() for tag in tags]
         
             dataset_attributes_units = [x for x in dataset_attribute_values if isinstance(x["trait_value"],list) and len(x["trait_value"]) > 0]

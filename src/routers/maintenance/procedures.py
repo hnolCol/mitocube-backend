@@ -44,7 +44,7 @@ def get(procedure_tag : str) -> MaintenanceProcedureResponseModel:
     return DB.maintenance_procedures.get(tag = procedure_tag)
 
 @router.post("/")
-def create_procedure(procedure : Dict, user : UserModel = Depends(is_user_admin)):
+def create_procedure(procedure : Dict, user : UserModel = Depends(is_user_admin)) -> bool:
     
     """Creates a new maintenance procedure."""
 
@@ -52,21 +52,21 @@ def create_procedure(procedure : Dict, user : UserModel = Depends(is_user_admin)
     if DB.maintenance_procedures.exists(tag = procedure["tag"]):
         raise HTTPException(status_code=400, detail="Procedure with this tag already exists.")
     
-    DB.maintenance_procedures.create(procedure)
-    background_tasks.add_task(DB.maintenance_procedures._utils_insert_from_file)
-    
-    return {"message": "Procedure created successfully."}
+    ok = DB.maintenance_procedures.create(procedure)
+    #background_tasks.add_task(DB.maintenance_procedures._utils_insert_from_file)
+
+    return ok
 
 @router.delete("/{procedure_tag}")
-def delete_procedure(procedure_tag : str, user : UserModel = Depends(is_user_admin)):
+def delete_procedure(procedure_tag : str, user : UserModel = Depends(is_user_admin)) -> bool:
     """Deletes a maintenance procedure by its tag."""
     
     if not DB.maintenance_procedures.exists(tag = procedure_tag):
         raise HTTPException(status_code=404, detail="Procedure not found.")
+
+    ok = DB.maintenance_procedures.delete(tag = procedure_tag)
+    return ok
     
-    DB.maintenance_procedures.delete(tag = procedure_tag)
-    
-    return {"message": "Procedure deleted successfully."}
 
 
 

@@ -31,7 +31,6 @@ from config.models.submissions.states import StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.timeline import TimelineInputModel
 from config.models.submissions.runs import RunListRequestPropsModel, RunListResponseModel
-from config.models.unit import UnitTypeInputModel
 from config.enums.units import UnitsEnum
 
 
@@ -628,7 +627,7 @@ def update_submission(background_task : BackgroundTasks,
                       state : SubmissionStatesEnums, 
                       state_change : StateChangeModel,  
                       dataset_attributes : Dict[str,List[str]], # attribute_tag, List[trait_tag] 
-                      dataset_attribute_input : Optional[Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]]] = None,
+                      dataset_attribute_input : Optional[Dict[str,Dict[str,Dict]]] = None,
                       user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Update datas etattribute along with the state if user is at least curator.
@@ -742,11 +741,11 @@ def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestProp
         RunListCreator's create function. 
 
     """
-    db = MCDatabase.getDatabase()
-    attributes = MCAttributes.getAttributeDatabase()
-    attribute_values = attributes.getAttributeValues()
-    attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
-    dataset = get_dataset_from_database(db,submission_label)
+    # db = MCDatabase.getDatabase()
+    # attributes = MCAttributes.getAttributeDatabase()
+    # attribute_values = attributes.getAttributeValues()
+    # attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
+    # dataset = get_dataset_from_database(db,submission_label)
     
     sample_idces, _ = dataset.getSamplesAttributes()
     

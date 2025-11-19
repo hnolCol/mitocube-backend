@@ -15,7 +15,6 @@ from config.models.submissions.runs import RunListModel
 
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel
 from config.models.annotations.feature import FeatureModel
-from config.models.unit import InputModel, UnitTypeInputModel
 from config.models.feature import FeatureNeoModel
 
 from config.settings.metatexts import MetaTexts
@@ -81,7 +80,6 @@ class NewSubmissionModel(BaseModel):
 
     """
     tag : str = Field(...,min_length=10, max_length=12)
-    #created_on : float = Field(..., default_factory= get_time_stamp)
     sample_names : List[str]
     replicates : List[int]
     collaborators : List[str] = Field(...,default_factory=list)
@@ -90,10 +88,6 @@ class NewSubmissionModel(BaseModel):
     samples_attributes : List[List[AttributeTree]]
     dataset_attributes : List[AttributeTree] 
     research_aim : str
-    # sampleNames : List[str]
-    #replicates : List[int]
-     #List of users by their tag. 
-   # attributeTable : List[Dict[str,List[Union[AttributeValueModel,FeatureModel,FeatureNeoModel]]]]
     links : List[SubmissionLink] = None
     # genotypes : Optional[Dict[str,List[int]]] = None
     
@@ -197,11 +191,6 @@ class UpdateDatasetAttributesInSubmission(BaseModel):
     datasetAttributes : List[AttributeModel]
 
 
-class SampleAttributeInput(BaseModel):
-    attribute_value_tag : str 
-    sample_index : Optional[int] = None 
-    input : List[InputModel]
-
 class SampleAttributeFromDB(BaseModel):
     """"""
     name : str
@@ -230,7 +219,6 @@ class DatasetSubmissionModel(BaseModel):
     dataset_attributes : Dict[str,List[str]]
     samples_attributes : Dict[str,Dict[str,List[int]]]
     samples_genotypes : Optional[Dict[str,List[int]]] = Field(...,default_factory=dict)
-    dataset_attribute_input : Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = Field(...,default_factory=dict)
     links : List[SubmissionLink] = []
     timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
     runlist : Optional[RunListModel] = None 

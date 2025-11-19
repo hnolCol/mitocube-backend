@@ -1,11 +1,8 @@
-from pydantic import BaseModel, field_validator, field_serializer
+from pydantic import BaseModel, field_validator
 
 from typing import Any, Optional, List, Union, Literal, ForwardRef, Dict
 import numpy as np 
-from config.models.feature import FeatureNeoModel
 
-from config.enums.units import UnitsEnum
-from config.models.unit import UnitInputResponseModel
 
 
 
@@ -13,11 +10,53 @@ from config.models.unit import UnitInputResponseModel
 AttributeTree = ForwardRef('AttributeTree')
     
 class AttributeTree(BaseModel):
-    """Describes a tree structure of attributes and traits. 
-    This structure is excepted from the frontend when inserting genetic and condition applications.
-    This is used for genetic applications and and condition applications"""
-    
-    tag : str # Attribute or Trait String 
+    """
+    Represents a node in a hierarchical tree of attributes and traits used by the frontend
+    when inserting genetic and condition applications.
+    Each node describes a single attribute or trait and may contain an optional scalar
+    value and zero or more child nodes to form a tree. This model is intended to be used
+    with Pydantic (BaseModel) and serializes cleanly to/from JSON for API traffic.
+    Fields
+    - tag (str): A short identifier or name for the attribute or trait (e.g. "att_organ", "att_cellline").
+        Should be non-empty.
+    - type (Literal["attribute","trait"]): Distinguishes whether the node is an attribute or a trait.
+        Within the tree, the type must be alternating along the children (i.e. an attribute node may only
+        have trait children, and a trait node may only have attribute children).
+    - value (float | int | str | None): Optional scalar value associated with this node. Use None
+        when no value is applicable. Numeric values are typical for magnitudes; strings can be used
+        for categorical values. Values can only be assigned to trait nodes.
+    - children (Optional[List[AttributeTree]]): Optional list of child AttributeTree nodes. Use None
+        or an empty list for leaf nodes.
+    Validation and conventions
+    - tag should be meaningful to the domain and unique among siblings when necessary.
+    - type must be exactly "attribute" or "trait".
+    - If children is provided, each child must itself be a valid AttributeTree instance.
+    - Prefer numeric types for quantitative attributes; use strings for descriptive values.
+    Example (Pydantic)
+    >>> # Construct a small tree representing a genetic attribute with traits
+    >>> root = AttributeTree(
+    ...     tag="growth_rate",
+    ...     type="attribute",
+    ...     value=None,
+    ...     children=[
+    ...         AttributeTree(tag="baseline", type="trait", value=1.0),
+    ...         AttributeTree(tag="temperature_modifier", type="trait", value=0.2)
+    ...     ]
+    ... )
+    >>> # Serialize to dict / JSON for sending to frontend
+    >>> root.dict()
+    {
+            "tag": "growth_rate",
+            "type": "attribute",
+            "value": 1.2,
+            "children": [
+                    {"tag": "baseline", "type": "trait", "value": 1.0, "children": None},
+                    {"tag": "temperature_modifier", "type": "trait", "value": 0.2, "children": None}
+            ]
+    }
+    """
+   
+    tag : str # Attribute or Trait String
     type :  Literal["attribute","trait"]
     value : Optional[float|int|str] = None
     children : Optional[List[AttributeTree]]
@@ -47,52 +86,35 @@ class AttributeBaseModel(BaseModel):
 class AttributeModel(AttributeBaseModel):
 
     """
-    BaseModel for Attributes
-    id : int 
-        The identifier of the attribute
-    tag : str 
-        Attribute tag, is validated to be of style ``att_<text>``
-    text : str
-        Attribute text to be displayed to a user in a ui. 
-    type : str, default None
-        
-    priority : int, default 500 
-        Priority of the attribute 
-    parent_id : int, optional, default None
-        The id of the parent attribute. Use for visualization in the ui.  
-    parent_tag : str, optional, default None
-        Tag tag of the parent attribute. 
-    group_tag : str 
-        Specifying the type of attribute. This is used to visualize the attribute based filtering. 
-    mandatory_for_submission : bool, default False
-        If true, the attribute must be defined upon submission of a new project.
-    mandatory_for_active : bool, default False 
-        If true, the attribute must be defined before the data of the dataset can be explored. 
-    has_feature_value : bool, default False 
-        If true, the attribute_values are the features (proteins) present in the database 
-    has_numeric_input : bool, default False 
-        If true, the attribute can be defined by a simple numeric value (e.g. attribute_value). 
-    min_state : int, default 0
-        The minimal state defined in ``SubmissionStatesEnums`` the submission must be in to allow the attribute
-        to be defined. For example, upon changing the submission to ``MEASURING`` the mass spectrometer should be defined. 
-        But this information is not yet available at submission. 
-    allow_for_qc : bool, default False
-        Allow the attribute for quality control 
-    allow_as_filter : bool, default True
-        If True, the attribute can be used to filter datasets/submissions. 
-    allow_for_dataset : bool, default False 
-        If True, the attribute can be used to define a dataset. 
-    allow_for_user : bool, default False 
-        If true, the attribute can be used to define a user. 
-        
-    has_unit : bool, default False
-        If true, the user can define a unit for the attribute.
-    
-    unit : Literal["mass","concentration", "time","temperature","volume","masstocharge","voltage","flow rate","arbitrary","fraction"], default None
-        The unit type
+    AttributeModel
+    --------------
+
+    Pydantic model describing an attribute and its behaviour within the system.
+    Extends AttributeBaseModel.
+
+    Fields
+    - group_tag (str)           : Tag used to group attributes for UI/filtering.
+    - s (Optional[str])         : Lowercased search string built from searchable fields.
+    - children (Optional[List[str]]):
+                                    List of child attribute tags (e.g. unit attributes required
+                                    when this attribute allows user input).
+    - allow_input (bool)        : If True the user may provide a value for this attribute.
+    - has_features_value (Optional[bool]):
+                                    If True, attribute values represent selectable features
+                                    (for example proteins).
+    - has_numeric_input (Optional[bool]):
+                                    If True the attribute accepts arbitrary numeric input
+                                    (instead of choosing from predefined values).
+    - min_state (int)           : Minimal submission state required to define this attribute.
+                                    (Defaults to 0.)
+
+    Notes
+    - Tag validation is performed by the class-level validator `check_tag` which enforces
+        tags to start with "att_".
+    - The `s` and `children` fields are normalized by validators to provide consistent
+        runtime types (string and list respectively).
     """
     
-    parent_tag : Optional[str] = None  # parent tag
     group_tag : str  # attribute grouping
     s : Optional[str] = None # search string (no caps)
     children : Optional[List[str]] = None# list of strings that are children of this attribute (for example if an attribute has values to be entered by the user, the attribute must have UnitAttributes as children.)
@@ -100,9 +122,8 @@ class AttributeModel(AttributeBaseModel):
     has_features_value : Optional[bool] = False  # if true, features (e.g. proteins) can be selected for this attribute
     has_numeric_input : Optional[bool] = False  # if true, attribute can be defined by the user (numeric input)
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
-   
-    
-    class Config:  
+
+    class Config:
         use_enum_values = True
 
     @field_validator('s', mode="before")
@@ -120,52 +141,6 @@ class AttributeModel(AttributeBaseModel):
         if isinstance(v,str): return v.split("|")
         print(f"Warning: children should be a list of strings, got {type(v)}, input {v}. Converting to empty list.")
         return []
-        
-    
-    # @field_validator('unit', mode="before")
-    # def check_unit(cls, v : str|List[str], field):
-    #     if isinstance(v,str): return v.split(";")
-    #     if isinstance(v,list): return v 
-    #     return None 
-
-    # @field_validator('parent_id', mode="before")
-    # def change_nan_to_none(cls, v, field):  # ToDo: cls or self? @classmethod
-    #     """
-    #     Check input for parent_id as pandas dataframe will transform
-    #     it to a float if there is null/None (e.g. NaN)
-    #     """
-    #     if v is None:
-    #         return None
-        
-    #     if np.isnan(v):
-    #         return None
-
-    #     return int(v)
-
-    # @field_validator('parent_id', mode="before")
-    # @classmethod
-    # def change_nan_to_none(cls, v, field): 
-    #     """
-    #     Check input for parent_id as pandas dataframe will transform
-    #     it to a float if there is null/None (e.g. NaN)
-    #     """
-    #     if v is None:
-    #         return None
-        
-    #     if np.isnan(v):
-    #         return None
-
-    #     return int(v)
-
-    # @field_serializer("parent_id", mode="plain")
-    # def check_parent_id(self, v : int):  # ToDo: Missing self? :: I think, pydantic docs uses cls for validator, self for serilizer
-    #     if v is None:
-    #         return v
-
-    #     if np.isnan(v):
-    #         return None
-
-    #     return v 
 
     @field_validator("tag")  # ToDo, issue with return type?
     @classmethod

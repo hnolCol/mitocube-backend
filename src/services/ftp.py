@@ -4,26 +4,7 @@ import requests
 from typing import List
 
 
-"/pub/databases/uniprot/current_release/knowledgebase/reference_proteomes/"
 
-
-# URL = "https://rest.uniprot.org/uniprotkb/search"
-
-# rr = requests.get(URL,params={"query": "human,cdc7"})
-# rr.raise_for_status()
-# print(rr.headers["Link"])
-# print(rr.json())
-# URL = "https://rest.uniprot.org/proteomes/search"
-# #?compressed=true&fields=upid%2Corganism%2Corganism_id%2Cprotein_count%2Cbusco%2Ccpd%2Cgenome_assembly&format=tsv&query=%28%2A%29&size=500"
-
-
-# rr = requests.get(URL,params={"fields" : "upid,organism,protein_count", "format" : "tsv", "size" : 500, "query" : "Homo sapiens", "compressed" : True})
-# rr.raise_for_status()
-# print(rr.headers)
-# print(rr.json())
-# print(b)
-
-file = "pub/databases/uniprot/current_release/knowledgebase/pan_proteomes/UP000000212.fasta.gz"  
 def downloadFileFromFTP(filePath : str, domain : str = "ftp.uniprot.org", username : str = "", password : str = "", downloadPath = "."):
     """
     

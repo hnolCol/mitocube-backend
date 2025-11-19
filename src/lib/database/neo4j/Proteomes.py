@@ -30,18 +30,50 @@ class Neo4JProteomes(ProteomesABC):
             proteome_info["s"] = f"{proteome_tag} {proteome_info['description']} {proteome_info['name']}"
                 
         query = (
-            "MERGE (proteome:Proteome {tag : $proteome_tag}) "
+            "MERGE (proteome:Proteome:Trait {tag : $proteome_tag}) "
             "ON CREATE "
-            "SET proteome.created_at = timestamp(), proteome.active = true  "
+            "SET proteome.created_at = timestamp(), proteome.active = true "
             "ON MATCH "
             "SET proteome.modified_at = timestamp() "
             "WITH proteome "
             "SET proteome += $proteome_info "
+            "WITH proteome "
+            "MATCH (a:Attribute {tag : 'att_protein'}) "
+            "MERGE (proteome)<-[:HAS_TRAIT]-(a)"
         ) 
         
         self._driver.execute_query(query, proteome_tag = proteome_tag, proteome_info = proteome_info)
+
+        self.set_updating(tag=proteome_tag, updating=True)
         return True
     
+    
+    def set_updating(self, tag : str, updating : bool = True) -> bool:
+        """Sets the updating status of a proteome.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the proteome.
+        updating : bool, optional
+            The updating status to set, by default True
+
+        Returns
+        -------
+        bool
+            Indicates if the operation was successful.
+        """
+        
+        query = (
+            "MATCH (prot:Proteome {tag : $tag}) "
+            "SET prot.updating = $updating, prot.modified_at = timestamp() "
+        )   
+        try:
+            self._driver.execute_query(query_=query, routing_="w", tag=tag, updating=updating)
+            return True
+        except Exception as e:
+            print(e)
+            return False
     
         
     def count(self) -> int:
@@ -52,7 +84,6 @@ class Neo4JProteomes(ProteomesABC):
         r = self._driver.execute_query(query_=query,routing_="r",result_transformer_=Result.value)
         if len(r) == 0: return 0
         return r[0]
-        return r 
     
     def correlate_features(self, tag : str, cutoff : float = 0.5, min_data_points : int = 20, chunk_size : int = 20000):
         "Correlates each feautre."
@@ -124,37 +155,10 @@ class Neo4JProteomes(ProteomesABC):
             "RETURN count(prot) > 0 as exists"
         )
         
-        r = self._driver.execute_query(query=query, routing_="r", result_transformer_=Result.value, tag=tag)
+        r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value, tag=tag)
         
-        return r[0] if r else False
-    
-    def exist(self, tags : str|List[str]) -> bool:
-        """Check if tag/tags exists. If list is given,
-        then it checks if ALL exist. If one is missing, 
-        False will be returned. 
+        return r[0] if len(r) > 0 else False
 
-        Parameters
-        ----------
-        tags : List[str]
-            Proteome tags to check for existence.(Uniprot proteome ids)
-
-        Returns
-        -------
-        bool
-            If all given tags exists
-        """
-        
-        if isinstance(tags,str):
-            tags = [tags]
-        
-        query = ("MATCH (prot:Proteome) "
-                 "WHERE prot.tag in $tags "
-                 "RETURN prot.tag "
-                 )
-        
-        r = self._driver.execute_query(query,routing_="r",result_transformer_= Result.value, tags = tags)
-        
-        return len(r) == len(tags)
     
     def find_features(self, query: str, proteome_tags: str | List[str] = None, limit: int = 10) -> List:
         ""
@@ -191,37 +195,94 @@ class Neo4JProteomes(ProteomesABC):
         return [FeatureNeoModel(**f) for f in r[0]]
                
         
+    def find(self, search_string: str = None, limit: int = None) -> List[str]:
+        """Finds proteome tags that match the search string. 
+        Parameters
+        ----------
+        search_string : str, optional
+            The search string to look for in the proteome tags., by default None
+        limit : int, optional
+            The maximum number of proteome tags to return., by default None
+            
+        Returns
+        -------
+        List[str]
+            A list of matching proteome tags.
+        """
+        
+        query = "MATCH (p:Proteome) "
+
+        if search_string is not None and len(search_string) > 0:
+            query += "WHERE p.s CONTAINS $search_string "
+        query += "RETURN p.tag " 
+        
+        if limit is not None:
+            query += f" LIMIT $limit "
+        
+        r = self._driver.execute_query(query, 
+                                       database_="neo4j", 
+                                       routing_="r", 
+                                       result_transformer_= Result.value,
+                                       query_string = query.lower(),
+                                       limit = limit)
+        return r
     
-    def get(self) -> List[Dict]:
+    def get(self, tag : str) -> Dict:
         ""
         
+        if not self.exists(tag=tag):
+            raise ValueError(f"Proteome with tag {tag} does not exist.")
+        
         query = (
-            "MATCH (a:Attribute {tag : 'att_proteome'})-[:HAS_TRAIT]->(av:Trait) "
-            "RETURN properties(av) "
+            "MATCH (proteome:Proteome {tag : $tag}) "
+            "RETURN properties(proteome) "
         )
         
         r = self._driver.execute_query(query,routing_="r",database_="neo4j", result_transformer_= Result.value)
-        return [ri for ri in r]
+        return r[0] if len(r) > 0 else None
 
-    def get_features(self, tag: str) -> List[FeatureNeoModel]:
-        
+    def get_created_at(self, tag : str) -> float:
+        "Returns the created_at timestamp of a proteome."
         query = (
-            "MATCH (av:AttributeValue {tag : $tag}) "
-            "MATCH (av)-[r:IN_PROTEOME]->(p:Protein) "
-            "RETURN properties(p)"
+            "MATCH (proteome:Proteome {tag : $tag}) "
+            "RETURN proteome.created_at "
+        )
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag=tag)
+        if len(r) == 0: return 0.0
+        return r[0]
+
+
+    def get_text(self, tag : str) -> str:
+        "Returns the text field of a proteome."
+        query = (
+            "MATCH (proteome:Proteome {tag : $tag}) "
+            "RETURN proteome.text "
+        )
+        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag=tag)
+        if len(r) == 0: return ""
+        return r[0]
+        
+
+    def get_protein_count(self, tag : str) -> int:
+        "Returns the number of proteins associated with a proteome."
+        query = (
+            "MATCH (proteome:Proteome {tag : $tag}) "
+            "MATCH (proteome)<-[:IN_PROTEOME]-(p:Protein) "
+            "RETURN count(p) "
         )
         
-        r = self._driver.execute_query(query_=query,routing_="r",tag=tag)
-        return [FeatureNeoModel(**d.data()) for d in r]
-    
+        r = self._driver.execute_query(query_=query,routing_="r",result_transformer_=Result.value, tag=tag)
+        if len(r) == 0: return 0
+        return r[0]
 
-    def get_feature_tags(self, tag : str) -> List[str]:
+    def get_proteins(self, tag : str, limit : int = None) -> List[str]:
+        "Returns the protein tags associated with a proteome."
         query = (
             "MATCH (av:AttributeValue {tag : $tag}) "
             "MATCH (av)<-[r:IN_PROTEOME]-(p:Protein) "
-            "RETURN collect(p.tag) "
+            "RETURN collect(p.tag)[..$limit] "
         )
-        r = self._driver.execute_query(query_=query,routing_="r",tag=tag, result_transformer_=Result.value)
+        r = self._driver.execute_query(query_=query,routing_="r",tag=tag, limit=limit, result_transformer_=Result.value)
         return r[0]
     
     def get_feature_abundance_dist(self, tag : str) -> QuantileModel:
@@ -240,16 +301,46 @@ class Neo4JProteomes(ProteomesABC):
         N = r[0]["N"]
         return QuantileModel(min = qs[0], q25 = qs[1], m = qs[2], q75 = qs[3], max = qs[4], N = N)
 
-    def insert_uniprot_proteome(self, proteome_tags : List[str] = ["UP000005640"], reviewed : bool = True, user_tag : str = None) -> int: #:#"):#"file:///UP000005640.txt"):#
+    def is_updating(self, tag : str) -> bool:
+        """Returns if the proteome is currently updating
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the proteome.
+           
+
+        Returns
+        -------
+        bool
+            Indicates if the proteome is currently updating.
+        """
         
+        query = (
+            "MATCH (prot:Proteome {tag : $tag}) "
+            "RETURN prot.updating as updating"
+        )   
+        
+        r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value, tag=tag)
+        
+        return r[0] if len(r) > 0 else False
+
+    def insert_uniprot_proteome(self, proteome_tags : List[str] = ["UP000005640"], reviewed : bool = True, user_tag : str = None) -> int: #:#"):#"file:///UP000005640.txt"):#
+        "Inserts proteins from a uniort proteome into the database. Returns the number of proteins added."
         settings = UniprotAnnotationSettings()
         uniprotKB_URL = settings.uniprotKBAPI_URL
-        
-        return download_proteome_annotations(uniprotKB_URL,proteome_tags,
-                                             chunc_callback=self.handle_uniprot_chunc, 
-                                             add_proteome_callback=self.add_proteome_details, 
-                                             reviewed = reviewed,
-                                             user_tag = user_tag)
+        N = 0 
+        for proteome_tag in proteome_tags:
+            if self.exists(tag=proteome_tag) and self.is_updating(tag=proteome_tag):
+                raise ValueError(f"The proteome with tag {proteome_tag} is currently updating. Please try again later.")
+            N += download_proteome_annotations(uniprotKB_URL,
+                                                proteome_tags= [proteome_tag],
+                                                chunc_callback=self.handle_uniprot_chunc, 
+                                                add_proteome_callback=self.add_proteome_details, 
+                                                reviewed = reviewed,
+                                                user_tag = user_tag)
+            self.set_updating(tag=proteome_tag, updating=False)
+        return N 
         
     def handle_uniprot_chunc(self,data : pd.DataFrame, proteome_tag : str, user_tag : str = None):
         """Data from the Uniprot API are returned in several pages covering
@@ -309,6 +400,7 @@ class Neo4JProteomes(ProteomesABC):
             "MERGE (protein)-[r:IN_PROTEOME]->(proteome) "
             "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
             "MERGE (protein)-[:HAS_SEQUENCE]-(sequence) "
+            
         )
         self._driver.execute_query(query, 
                                    proteome_attribute_tag = proteome_tag, 

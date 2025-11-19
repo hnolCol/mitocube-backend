@@ -16,7 +16,7 @@ class PermissionBaseModel(BaseModel):
     download : bool = False #if True, the resource can be downloaded 
     upload : bool = False #if True, the resource can be uploaded 
     state_change : bool = False #if True, the state of the resource can be changed (e.g. from measuring to published) 
-    
+    update : bool = False #if True, the resource can be updated with new data
     
     @model_validator(mode="after")
     def validate_state_change(self):

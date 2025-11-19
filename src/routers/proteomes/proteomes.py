@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from typing import List, Literal
+from typing import Dict, List, Literal
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 
@@ -8,13 +8,13 @@ from lib.database.Database import Database
 
 from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel
-from config.enums.states import SubmissionStatesEnums
+from config.enums.users.roles import UserRolesEnum
 from config.models.parameter import APIParamString
 from config.models.calculations.quantile import QuantileModel
 
 from config.settings.general import get_general_settings
 from config.settings.email import get_email_settings
-
+from config.models.permissions import PermissionResponseModel
 
 GENERAL_SETTINGS = get_general_settings()
 EMAIL_SETTINGS = get_email_settings()
@@ -26,11 +26,65 @@ router = APIRouter(
 DB = Database.DB()
 
 
-@router.get("")
-def get_proteomes(user : UserModel = Depends(is_user_admin)):
-    ""
-    return DB.proteomes.get()
+@router.get("/q", response_model=List[str])
+def get_proteomes(search_string : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the proteome tags that match the search string."
+    return DB.proteomes.find(search_string=search_string, limit=limit)
 
+
+@router.get("/count", response_model=int)
+def get_proteome_count(user : UserModel = Depends(get_user_from_token)) -> int:
+    "Returns the number of proteomes in the database."
+    return DB.proteomes.count()
+
+@router.get("/permissions", response_model=PermissionResponseModel)
+def get_proteome_permissions(user : UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
+    "Returns the permissions for all proteomes. Either the user can create/write all proteomes or none."
+    
+    return PermissionResponseModel(
+        user_tag = user.tag, 
+        role = user.role,
+        create=user.role >= UserRolesEnum.CURATOR,
+        update=user.role >= UserRolesEnum.CURATOR
+    )
+
+@router.get("/{proteome_tag}")
+def get_proteome_by_tag(proteome_tag : str, user : UserModel = Depends(get_user_from_token)) -> Dict:
+    "Returns the proteome information for the given proteome tag."
+    if not DB.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found.")
+    return DB.proteomes.get(tag=proteome_tag)
+
+@router.get("/{proteome_tag}/text")
+def get_proteome_by_tag(proteome_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
+    "Returns the proteome information for the given proteome tag."
+    if not DB.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found.")
+    return DB.proteomes.get_text(tag=proteome_tag)
+
+@router.get("/{proteome_tag}/is_updating", response_model=bool)
+def get_proteome_state(proteome_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+    "Returns the proteome state (e.g. is updating or ready) for the given proteome tag."
+    if not DB.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found.")
+    is_updating = DB.proteomes.is_updating(tag=proteome_tag)
+    return is_updating if is_updating is not None else False
+
+
+@router.get("/{proteome_tag}/created_at")
+def get_proteome_created_at(proteome_tag : str, user : UserModel = Depends(get_user_from_token)) -> float|int:
+    "Returns the proteome created_at (e.g. is updating or ready) for the given proteome tag."
+    if not DB.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found.")
+    return DB.proteomes.get_created_at(tag=proteome_tag)
+
+
+@router.get("/{proteome_tag}/proteins/count", response_model=int)
+def get_proteome_protein_count(proteome_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
+    "Returns the number of proteins for the given proteome tag."
+    if not DB.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found.")
+    return DB.proteomes.get_protein_count(tag=proteome_tag)
 
 
 @router.post("")
