@@ -363,9 +363,9 @@ class Neo4JGenotype(GenotypeABC):
             "MATCH (comp:ConditionApplication {tag : application_tag}) "
             "MERGE (gc)-[:HAS_APPLICATION]->(comp) "
 
-            # "WITH gc "
-            # "MATCH (gc)-[oldEff:EFFECTS]->() "
-            # "DELETE oldEff "
+            "WITH gc "
+            "MATCH (gc)-[oldEff:EFFECTS]->() "
+            "DELETE oldEff "
 
             "WITH gc "
             "UNWIND $protein_tags AS protein_tag "
