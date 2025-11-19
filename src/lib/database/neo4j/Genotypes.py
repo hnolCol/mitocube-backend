@@ -335,9 +335,20 @@ class Neo4JGenotype(GenotypeABC):
                              protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
 
-    def edit_genotype( self, tag: str, text: str, application_tags: List[str], protein_tags: List[str], description: str | None, publication: str | None, technical_text: str | None,) -> bool:
+    def edit_genotype( self, tag: str, text: str, application_tags: List[str], protein_tags: List[str], user_tag : str, description: str , publication: str | None, technical_text: str | None) -> bool:
         """Edits the existing genotype.
         """
+        print(protein_tags)
+
+        if len(protein_tags) == 0:
+            raise ValueError("No feature (protein tag) found in the genotype components.")
+
+        if text.strip() == "":
+            raise ValueError("Text cannot be empty.")
+
+        if description.strip() == "":
+            raise ValueError("Description cannot be empty.")
+
 
         query = (
             "MATCH (gc:Genotype {tag : $tag}) "
@@ -352,19 +363,26 @@ class Neo4JGenotype(GenotypeABC):
             "MATCH (comp:ConditionApplication {tag : application_tag}) "
             "MERGE (gc)-[:HAS_APPLICATION]->(comp) "
 
-            "WITH gc "
-            "MATCH (gc)-[oldEff:EFFECTS]->() "
-            "DELETE oldEff "
+            # "WITH gc "
+            # "MATCH (gc)-[oldEff:EFFECTS]->() "
+            # "DELETE oldEff "
 
             "WITH gc "
             "UNWIND $protein_tags AS protein_tag "
             "MATCH (p:Protein {tag : protein_tag}) "
-            "MERGE (gc)-[r_effects:EFFECTS {tag : gc.tag}]->(p) "
+            "MERGE (gc)-[r_effects:EFFECTS]->(p) "
             "SET r_effects.created_at = timestamp() "
+
+            "WITH gc "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MERGE (u)-[:MODIFIED]->(gc) "
         )
 
 
-        self._driver.execute_query(query, tag = tag, text = text, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
+        self._driver.execute_query(query, tag = tag, text = text, application_tags = application_tags, 
+                                   description = description, publication = publication, 
+                                   technical_text = technical_text, user_tag = user_tag, 
+                                   routing_="w", database_="neo4j", protein_tags = protein_tags)
         return True
     
 
@@ -390,17 +408,23 @@ class Neo4JGenotype(GenotypeABC):
             return component.type == "attribute" and component.tag == "att_feature"
 
         def _find_protein_tag(components : List[AttributeTree]) -> str:
-            
+            t = []
             for component in components:
+                print(component, _is_feature(component), len(component.children))
                 if _is_feature(component) and len(component.children) > 0:
                     #the value is actually in the children 
-                    return component.children[0].value
-                if len(component.children) > 0:
-                    return _find_protein_tag(component.children)
+                    t.append(component.children[0].value)
+                if len(component.children) > 0: 
+                    tags = _find_protein_tag(component.children)
+                    if len(tags) > 0:
+                        t.append(tags[0])
+            if len(t) > 0:
+                return t
+            return []
 
-            return None 
-
-        protein_tags = [_find_protein_tag([c]) for c in data.components]
+        ex_protein_tags = [_find_protein_tag([c]) for c in data.components]
+        protein_tags = [tags[0] for tags in ex_protein_tags if len(tags) > 0]
+        print(protein_tags)
         if len(protein_tags) == 0:
             raise ValueError("No feature (protein tag) found in the genotype components.")
         

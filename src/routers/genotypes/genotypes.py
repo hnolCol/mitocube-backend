@@ -162,8 +162,7 @@ def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserM
     genotype : InsertGeneticApplicationModel
         The updated genotype data.
     """
-    
-    print(genotype,tag)
+    print(genotype)
     edit = DB.genotypes.edit(tag = tag, data = genotype, user_tag = user.tag)
 
     if not edit:
