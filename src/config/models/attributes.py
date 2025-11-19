@@ -58,7 +58,7 @@ class AttributeTree(BaseModel):
    
     tag : str # Attribute or Trait String
     type :  Literal["attribute","trait"]
-    value : float|int|str = None
+    value : Optional[float|int|str] = None
     children : Optional[List[AttributeTree]]
     
 class AttributeBaseModel(BaseModel):

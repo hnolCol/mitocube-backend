@@ -89,3 +89,5 @@ class InsertGeneticApplicationModel(BaseModel):
 
 
 
+
+

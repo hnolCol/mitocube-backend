@@ -4,16 +4,37 @@ from typing import Optional, List, Dict
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
 from config.models.parameter import APIParamString
-from config.models.genotype import GenotypeModel, MinimalGenotypeModel, InsertGeneticApplicationModel
+from config.models.genotype import GenotypeModel, MinimalGenotypeModel, InsertGeneticApplicationModel, GeneModificationModel
+from config.models.conditions_applications import ConditionApplicationTreeModel
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 
-from services.users import is_user_admin, get_user_from_token
-
-
+from services.random_generators import get_random_string
 from lib.database.Database import Database
 DB = Database.DB()
 
 
+    
+def transform_for_ui(item : ConditionApplicationTreeModel, r : List = None, ca_id : str = None) -> List[Dict]:
 
+
+    return {"type" : "attribute",
+        "id" : ca_id,
+        "tag" : item.attribute_tag,
+        "children" : [
+            {
+                "type" : "trait",
+                "tag" : item.trait_tag,
+                "value" : item.value,
+                "id" : ca_id,
+                "children" : [transform_for_ui(item = child, ca_id=ca_id) for child in item.children]
+            }
+        ]
+    }
+    
+
+
+
+genotype_not_found = HTTPException(status_code=404, detail="Genotype not associated with tag.")
 
 router = APIRouter(
     prefix="/api",
@@ -21,6 +42,49 @@ router = APIRouter(
 )
 
 
+@router.get("/genotypes/{genotype_tag}/proteins")
+def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the proteins of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = DB.genotypes.get_proteins(tag = genotype_tag)
+
+    return genotype
+
+@router.get("/genotypes/{genotype_tag}/item")
+def get_genotype_item(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the item of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = DB.genotypes.get_item(tag = genotype_tag)
+
+    return genotype
+
+@router.get("/genotypes/{genotype_tag}/description")
+def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the description of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise 
+    genotype = DB.genotypes.get_description(tag = genotype_tag)
+
+    return genotype
+
+@router.get("/genotypes/{genotype_tag}/text")
+def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+    """ 
+    Get the full text information of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = DB.genotypes.get_text(tag = genotype_tag)
+
+    return genotype
 
 @router.get("/genotypes/q")
 def get_genotype_by_query(search_string : str = None, user_tag : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
@@ -88,24 +152,74 @@ def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel =
 
     return True 
 
-@router.delete("/genotypes/{genotype_label}")
-def delete_genotype_by_label(genotype_label : str, user : UserModel = Depends(is_user_admin)): #
-    """_summary_
-
+@router.put("/genotypes/{tag}")
+def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token)):
+    """
     Parameters
     ----------
-    genotype_label : str
-        _description_
-
-    Returns
-    -------
-    bool
-        If the deletion was successful. If genotype_label is unknown, false is returned otherwise true.
+    tag : str
+        The genotype tag.
+    genotype : InsertGeneticApplicationModel
+        The updated genotype data.
     """
-    try:
-        db_genotype = MCGenotypes.getGenotypeDatabase()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    return db_genotype.delete(label=genotype_label)
+    print(genotype)
+    edit = DB.genotypes.edit(tag = tag, data = genotype, user_tag = user.tag)
 
+    if not edit:
+        raise HTTPException(status_code=400, detail="Failed to update genotype.")
+
+    return True
+
+
+@router.get("/genotypes/{genotype_tag}/samples/count")
+def get_genotype_relationship_count(genotype_tag: str,user: UserModel = Depends(get_user_from_token)):
+    """
+    Count how many relationships (e.g., samples) are linked to the given genotype.
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    count = DB.samples.count(genotype_tag=genotype_tag)
+
+    return count
+
+
+@router.get("/genotypes/{genotype_tag}/condition_applications/data")
+def get_ca_tree_for_genotype(genotype_tag : str, user : UserModel = Depends(get_user_from_token)) -> List:
+    """
+    Get the condition application tree data for a given genotype.
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    ca_tags = DB.genotypes.get_condition_applications(tag = genotype_tag)
+
+    return [transform_for_ui(DB.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags]
+
+@router.delete("/genotype/{genotype_tag}")
+def delete_genotype(genotype_tag: str, user: UserModel = Depends(is_user_at_least_curator)):
+    """
+    Delete a genotype by its tag.
+    """
+    deleted = DB.genotypes.delete(genotype_tag)
+
+    if not deleted:
+        raise genotype_not_found
+    
+    return {f"Genotype '{genotype_tag}' deleted."}
+
+
+@router.get("/genotypes/{genotype_tag}/condition_applications")
+def genotype_condition_applications(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+
+    ca = DB.genotypes.get_condition_applications(tag=genotype_tag)
+    return ca
+
+@router.get("/genotypes/{tag}/condition_applications/data")
+def genotype_condition_applications_data(tag: str, user: UserModel = Depends(get_user_from_token)):
+
+    if not DB.genotypes.exists(tag=tag): raise genotype_not_found
+
+    data = DB.genotypes.get_condition_application_data(tag=tag)
+    return data
 

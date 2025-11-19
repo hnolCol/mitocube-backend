@@ -7,7 +7,7 @@ from typing import List
 
 class Network(BaseSettings):
     
-    network_dir : DirectoryPath =  "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/network"  
+    network_dir : DirectoryPath
     
     class Config:
         env_file = ".env"

@@ -14,7 +14,8 @@ class SamplesABC(ABC):
               has_peptide_quantification : bool = False, 
               protein_group_tag : str = None, 
               trait_tag : str = None, 
-              submission_tag : str = None) -> int:
+              submission_tag : str = None,
+              genotype_tag : str = None) -> int:
         
         """Counts the number of samples. The filters are optional. However no combination is supported.
         If protein_group_tag is provided, only samples that have quantified the given protein group are counted, but the 
@@ -127,5 +128,11 @@ class SamplesABC(ABC):
     def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float|None: 
         """Get the quantified data for a given sample and feature.
         A feature may be protein group or peptide. Returns None if no data is found.
+        """
+        pass
+
+    @abstractmethod
+    def get_sample_genotype(self, tag : str) -> str:
+        """Get the genotype for a given sample
         """
         pass

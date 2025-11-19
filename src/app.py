@@ -36,6 +36,7 @@ from routers.features import features
 from routers.features.protein_groups import protein_groups
 from routers.features.proteins import find as protein_find
 from routers.features.proteins import receive as protein_receive
+from routers.genotypes import permissions as genotype_permissions
 from routers.genotypes import genotypes
 from routers.attributes import attributes
 from routers.instruments import instruments
@@ -87,7 +88,8 @@ router_sources = [dataset,
                   info, 
                   #annotations,
                   heatmap, 
-                  volcano, 
+                  volcano,
+                  genotype_permissions, 
                   genotypes, 
                   attributes, 
                   instruments, 
