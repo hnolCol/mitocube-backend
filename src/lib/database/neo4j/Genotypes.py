@@ -4,6 +4,7 @@ from neo4j import Driver, Result
 
 from config.models.genotype import MinimalGenotypeModel, GenotypeModel, InsertGeneticApplicationModel
 from config.models.attributes import AttributeTree
+from config.models.conditions_applications import ConditionApplicationTreeModel
 from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from services.encryption import create_hierarchical_hash
@@ -221,6 +222,18 @@ class Neo4JGenotype(GenotypeABC):
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.data)
         return r[0] if r else None
     
+    def get_condition_applications(self, tag : str) -> List[str]:
+
+        query = (
+            "MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE g.tag = $tag "
+            "RETURN ca.tag AS tag"
+        )
+
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r
+
+
     def get_proteins(self, tag: str) -> list[str] | None:
         """Returns the proteins affected by a genotype.
 
@@ -321,8 +334,111 @@ class Neo4JGenotype(GenotypeABC):
         self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
                              protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
+
+    def edit_genotype( self, tag: str, text: str, application_tags: List[str], protein_tags: List[str], user_tag : str, description: str , publication: str | None, technical_text: str | None) -> bool:
+        """Edits the existing genotype.
+        """
+        print(protein_tags)
+
+        if len(protein_tags) == 0:
+            raise ValueError("No feature (protein tag) found in the genotype components.")
+
+        if text.strip() == "":
+            raise ValueError("Text cannot be empty.")
+
+        if description.strip() == "":
+            raise ValueError("Description cannot be empty.")
+
+
+        query = (
+            "MATCH (gc:Genotype {tag : $tag}) "
+            "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
+
+            "WITH gc "
+            "MATCH (gc)-[oldApp:HAS_APPLICATION]->() "
+            "DELETE oldApp "
+
+            "WITH gc "
+            "UNWIND $application_tags AS application_tag "
+            "MATCH (comp:ConditionApplication {tag : application_tag}) "
+            "MERGE (gc)-[:HAS_APPLICATION]->(comp) "
+
+            "WITH gc "
+            "MATCH (gc)-[oldEff:EFFECTS]->() "
+            "DELETE oldEff "
+
+            "WITH gc "
+            "UNWIND $protein_tags AS protein_tag "
+            "MATCH (p:Protein {tag : protein_tag}) "
+            "MERGE (gc)-[r_effects:EFFECTS]->(p) "
+            "SET r_effects.created_at = timestamp() "
+
+            "WITH gc "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MERGE (u)-[:MODIFIED]->(gc) "
+        )
+
+
+        self._driver.execute_query(query, tag = tag, text = text, application_tags = application_tags, 
+                                   description = description, publication = publication, 
+                                   technical_text = technical_text, user_tag = user_tag, 
+                                   routing_="w", database_="neo4j", protein_tags = protein_tags)
+        return True
     
-    
+
+    def edit(self, tag : str, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+        """Edits an existing genotype in the database.
+
+        Parameters
+        ----------
+        data : InsertGeneticApplicationModel
+            The genotype information to be edited.
+        user_tag : str
+            The user who is editing the genotype.
+        Returns
+        -------
+        bool
+            True if the edit was successful, False otherwise.
+        """
+        genotype_tag = tag
+        if not self.exists(genotype_tag):
+            raise ValueError(f"Genotype with tag {genotype_tag} does not exist.")
+        
+        def _is_feature(component : AttributeTree) -> bool:
+            return component.type == "attribute" and component.tag == "att_feature"
+
+        def _find_protein_tag(components : List[AttributeTree]) -> str:
+            t = []
+            for component in components:
+                print(component, _is_feature(component), len(component.children))
+                if _is_feature(component) and len(component.children) > 0:
+                    #the value is actually in the children 
+                    t.append(component.children[0].value)
+                if len(component.children) > 0: 
+                    tags = _find_protein_tag(component.children)
+                    if len(tags) > 0:
+                        t.append(tags[0])
+            if len(t) > 0:
+                return t
+            return []
+
+        ex_protein_tags = [_find_protein_tag([c]) for c in data.components]
+        protein_tags = [tags[0] for tags in ex_protein_tags if len(tags) > 0]
+        print(protein_tags)
+        if len(protein_tags) == 0:
+            raise ValueError("No feature (protein tag) found in the genotype components.")
+        
+
+        tags = []
+        for attribute_tree in data.components:
+            tag = self._condition_applications.insert(condition_application=attribute_tree) 
+            tags.append(tag)
+
+        self.edit_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
+                             protein_tags=[tag for tag in protein_tags if tag is not None])
+        return True
+        
+
     def find(self, search_string : str = None, limit : int = None, user_tag : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
         Returns the genotype tags that contain the search string.
@@ -341,7 +457,7 @@ class Neo4JGenotype(GenotypeABC):
         r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit)
         return r
     
-    def count(self, tag) -> int:
+    def count_samples(self, tag) -> int:
         """Counts the number of relationships associated with a genotype.
 
         Parameters
@@ -387,3 +503,49 @@ class Neo4JGenotype(GenotypeABC):
         except:
             False
         return True
+    
+    def condition_applications(self, tag : str) -> List[str]:
+        """Gets the condition applications associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[str]
+            A list of condition application tags associated with the genotype.
+        """
+
+        query = (
+            "MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE g.tag = $tag "
+            "RETURN ca.tag AS tag"
+        )
+
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r
+    
+    def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
+        """Gets the condition application data associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[ConditionApplicationTreeModel]
+            A list of condition application tree models associated with the genotype.
+        """
+
+        query = (
+            "MATCH (g:Genotype)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE g.tag = $tag "
+            "RETURN ca"
+        )
+
+        ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]

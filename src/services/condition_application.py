@@ -1,9 +1,9 @@
 
 from typing import List, Dict 
-from config.models.conditions_applications import ConditionApplicationItemModel
+from config.models.conditions_applications import ConditionApplicationItemModel, ConditionApplicationTreeModel
 
 
-def build_condition_application_tree(paths: List[List[ConditionApplicationItemModel]]) -> List[Dict]:
+def build_condition_application_tree(paths: List[List[ConditionApplicationItemModel]]) -> ConditionApplicationTreeModel:
     def insert_node(children: List[Dict], path: List[ConditionApplicationItemModel]):
         if not path:
             return
@@ -17,7 +17,7 @@ def build_condition_application_tree(paths: List[List[ConditionApplicationItemMo
         if not existing:
             existing = {
                 "tag" : node.tag,
-                "trait_tag": trait_tag,
+                "trait_tag": trait_tag, #should be in 1 object which has atribute as children the trait # create genottype and check trait 
                 "attribute_tag": node.attribute_tag,
                 "value": node.value,
                 "children": []
@@ -30,4 +30,4 @@ def build_condition_application_tree(paths: List[List[ConditionApplicationItemMo
     root: List[Dict] = []
     for path in paths:
         insert_node(root, path)
-    return root 
+    return [ConditionApplicationTreeModel(**node) for node in root]

@@ -6,6 +6,7 @@ from config.models.genotype import MinimalGenotypeModel, GenotypeModel , InsertG
 from config.models.attributes import AttributeTree
 from config.models.user import UserModel
 from config.models.permissions import PermissionResponseModel 
+from config.models.conditions_applications import ConditionApplicationTreeModel
 
 
 class GenotypeABC(ABC):
@@ -125,9 +126,66 @@ class GenotypeABC(ABC):
         """
 
     @abstractmethod
+    def edit(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+        """Edits the genotype in the database.
+        """
+
+    @abstractmethod
+    def edit_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+        """Edits the genotype in the database.
+        Parameters
+        ----------
+        tag : str
+            _description_
+        text : str
+            _description_
+        component_tags : List[str]
+            The tags the genotype is connected to. 
+        description : str|None
+            _description_
+        publication : Optional[str], optional
+            _description_, by default None
+        technical_text : Optional[str], optional
+            _description_, by default None
+        """
+
+
+    @abstractmethod
     def count_samples(self, tag : str) -> int:
         "Counts the number of relationships of the genotype"
 
     @abstractmethod
     def delete(self, tag : str) -> bool:
         "Deletes a genotype"
+
+
+    @abstractmethod
+    def condition_applications(self, tag : str) -> List[str]:
+        """Gets the condition applications associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[str]
+            A list of condition application tags associated with the genotype.
+        """
+
+    @abstractmethod
+    def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
+        """Gets the condition application data associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        List[ConditionApplicationTreeModel]
+            A list of condition application data associated with the genotype.
+        """
+
