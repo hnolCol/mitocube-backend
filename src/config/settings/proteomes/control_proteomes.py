@@ -12,7 +12,7 @@ from typing import List
 
 class Proteomes(BaseSettings):
     add_control_proteome : bool = True 
-    control_proteome_file : FilePath = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/features/controls/data.txt"
+    control_proteome_file : FilePath
     
 
     class Config:
