@@ -31,7 +31,7 @@ class SymptomABC(ABC):
         """
 
     @abstractmethod
-    def delete(self, tag : str) -> bool:
+    def delete(self, tag : str, is_active : bool) -> bool:
         """Deletes a symptom by its tag. 
 
         Parameters
@@ -62,7 +62,7 @@ class SymptomABC(ABC):
 
         
     @abstractmethod
-    def find(self, search_string : str = "", limit : int = 20) -> List[str]:
+    def find(self, search_string : str = "", limit : int = 20, is_active : bool = True) -> List[str]:
         """Find symptoms by a search string. 
 
         Parameters
@@ -96,7 +96,7 @@ class SymptomABC(ABC):
         """
     
     @abstractmethod
-    def insert(self, symptom : SymptomInsertModel, user_tag : str) -> bool:
+    def insert(self, symptom : SymptomInsertModel, user_tag : str, is_active : bool = True) -> bool:
         """Inserts a symptom into the database. 
 
         Parameters

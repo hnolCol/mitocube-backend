@@ -71,3 +71,24 @@ def update_symptom(symptom : SymptomInsertModel, user : UserModel = Depends(is_u
         raise HTTPException(status_code=500, detail="Could not update symptom in the database.")
     return ok
     
+@router.delete("/{symptom_tag}", response_model=bool)
+def delete_symptom(symptom_tag : str, user : UserModel = Depends(is_user_admin)) -> bool:
+    """Delete a symptom from the database. Requires admin rights.
+
+    Parameters
+    ----------
+    symptom_tag : str
+        The tag of the symptom to delete.
+
+    Returns
+    -------
+    bool
+        True if the symptom was deleted successfully, False otherwise.
+    """
+    if not DB.symptoms.exists(symptom_tag):
+        raise HTTPException(status_code=404, detail="Symptom not found.")
+    
+    ok = DB.symptoms.delete(tag = symptom_tag)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not delete symptom from the database.")
+    return oks

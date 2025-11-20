@@ -53,7 +53,7 @@ class Neo4jSymptoms(SymptomABC):
         exists = self._driver.execute_query(query, tag = tag, routing_ = "r")    
         return exists[0]
         
-    def find(self, search_string : str = "", limit : int = 20) -> List[str]:
+    def find(self, search_string : str = "", limit : int = 20, is_active: bool = True) -> List[str]:
         """Find symptoms by a search string. 
 
         Parameters
@@ -68,14 +68,16 @@ class Neo4jSymptoms(SymptomABC):
         List[str]
             The symptom tags. 
         """
-        query = "MATCH (s:Symptom) "
+        query = ("MATCH (s:Symptom)" 
+                "WHERE s.is_active = true ")
         if len(search_string) > 0:
             query += "WHERE s.s CONTAINS $search_string "
         query += "RETURN s.tag ORDER BY s.priority LIMIT $limit "
                
         symptoms = self._driver.execute_query(query, 
                                               search_string = search_string.lower(), 
-                                              limit = limit, 
+                                              limit = limit,
+                                              is_active = is_active, 
                                               routing_="r", 
                                               result_transformer_=Result.value)
         
@@ -100,7 +102,7 @@ class Neo4jSymptoms(SymptomABC):
         return SymptomResponseModel(**symptom[0])
     
     
-    def insert(self, symptom :  SymptomInsertModel, user_tag : str) -> bool:
+    def insert(self, symptom :  SymptomInsertModel, user_tag : str, is_active : bool = True) -> bool:
         """Inserts a symptom in the database. 
 
         Parameters
@@ -118,7 +120,7 @@ class Neo4jSymptoms(SymptomABC):
             "MATCH (u:User {tag: $user_tag}) "
             "MERGE (s:Symptom {tag : $tag}) "
             "ON CREATE "
-            "SET s.created_at = timestamp(), s.description = $description, s.priority = $priority, s.s = toLower($text)+' '+toLower($description), s.text = $text "
+            "SET s.is_active = true, s.created_at = timestamp(), s.description = $description, s.priority = $priority, s.s = toLower($text)+' '+toLower($description), s.text = $text "
             "CREATE (u)-[:CREATED {at: timestamp()}]->(s) "
             "ON MATCH "
             "SET s.modified_at = timestamp(), s.description = $description, s.priority = $priority, s.s = toLower($text)+' '+toLower($description), s.text = $text "
@@ -128,6 +130,7 @@ class Neo4jSymptoms(SymptomABC):
         
         ok = self._driver.execute_query(query, 
                                         tag = symptom.tag,
+                                        is_active = is_active,
                                         description = symptom.description,
                                         priority = symptom.priority,
                                         text = symptom.text,
@@ -160,7 +163,7 @@ class Neo4jSymptoms(SymptomABC):
         return self.insert(symptom, user_tag=user_tag)
 
 
-    def delete(self, tag : str) -> bool:
+    def delete(self, tag : str, is_active : bool = False) -> bool:
         """Deletes a symptom from the database.
 
         Parameters
@@ -176,12 +179,14 @@ class Neo4jSymptoms(SymptomABC):
         
         query = (
             "MATCH (s:Symptom {tag : $tag}) "
+            "WHERE s.is_active = false "
             "DETACH DELETE s "
             "RETURN true as ok "
         )
         
         ok = self._driver.execute_query(query, 
                                         tag = tag,
+                                        is_active = is_active,
                                         routing_="w",
                                         result_transformer_= Result.value)
         
