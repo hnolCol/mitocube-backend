@@ -77,7 +77,13 @@ class Neo4jSymptoms(SymptomABC):
         if len(search_string) > 0:
             query += "AND s.s CONTAINS $search_string "
 
-        query += "RETURN s.tag ORDER BY s.priority LIMIT $limit"
+        query += "RETURN s.tag" 
+        
+        if sort:
+            query += "ORDER BY s.priority  "
+
+        if limit is not None:
+            query +=  "LIMIT $limit" 
 
         symptoms = self._driver.execute_query(query,
                                                 search_string=search_string.lower(),
@@ -210,8 +216,8 @@ class Neo4jSymptoms(SymptomABC):
             "              s.s = toLower($text)+' '+toLower($description), "
             "              s.text = $text "
             "WITH u, s "
-            "CREATE (u)-[:CREATED {at: timestamp()}]->(s) "
-            "CREATE (u)-[:MODIFIED {at: timestamp()}]->(s) "
+            "CREATE (u)-[:CREATED {created_at: timestamp()}]->(s) "
+            "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(s) "
             "RETURN true as ok"
 )
         
@@ -256,7 +262,7 @@ class Neo4jSymptoms(SymptomABC):
                 "    s.s = toLower($text) + ' ' + toLower($description)"
                "WITH s "
                 "MATCH (u:User {tag: $user_tag}) "
-                "MERGE (u)-[:MODIFIED {at: timestamp()}]->(s) "
+                "MERGE (u)-[:MODIFIED {modified_at: timestamp()}]->(s) "
                 "RETURN true AS ok"
     )
 
@@ -289,7 +295,6 @@ class Neo4jSymptoms(SymptomABC):
         query = (
             "MATCH (s:Symptom {tag : $tag}) "
             "WHERE s.is_active = false "
-            "DETACH DELETE s "
             "RETURN true as ok "
         )
         

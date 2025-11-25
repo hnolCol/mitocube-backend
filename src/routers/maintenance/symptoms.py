@@ -155,14 +155,3 @@ def delete_symptom(tag : str, user : UserModel = Depends(is_user_admin)) -> bool
         raise HTTPException(status_code=500, detail="Could not delete symptom from the database.")
     return ok
 
-
-
-
-@router.get("/{tag}")
-def get_permissions(user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
-
-    return PermissionResponseModel(user_tag = user.tag, 
-                                   role = user.role, 
-                                   insert = user.role >= UserRolesEnum.STANDARD, 
-                                   delete = user.role >= UserRolesEnum.ADMIN,
-                                   edit = user.role >= UserRolesEnum.ADMIN)
