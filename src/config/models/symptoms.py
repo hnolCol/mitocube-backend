@@ -18,8 +18,10 @@ class SymptomModel(BaseModel):
     
 
 
-class SymptomInsertModel(SymptomModel):
-    pass
+class SymptomInsertModel(BaseModel):
+    text: str
+    description: str
+    priority: int
 
 class SymptomResponseModel(BaseModel):
     tag : str 

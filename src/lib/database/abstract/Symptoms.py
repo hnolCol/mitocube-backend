@@ -96,6 +96,48 @@ class SymptomABC(ABC):
         """
     
     @abstractmethod
+    def get_text(self, tag : str) -> str:
+        """Get symptom texts by its tag. 
+
+        Parameters
+        ----------
+            The symptom tag.
+
+        Returns
+        -------
+        [str]
+            The symptom text.
+        """ 
+    
+    @abstractmethod
+    def get_description(self, tag : str) -> str:
+        """Get symptom descriptions by its tag. 
+
+        Parameters
+        ----------
+          The symptom tag.
+
+        Returns
+        -------
+        str
+            The symptom description.
+        """
+    
+    @abstractmethod
+    def get_priority(self, tag : str) -> int:
+        """Get symptom priorities by its tag. 
+
+        Parameters
+        ----------
+          The symptom tag.
+
+        Returns
+        -------
+        List[int]
+            The symptom priority.
+        """     
+
+    @abstractmethod
     def insert(self, symptom : SymptomInsertModel, user_tag : str, is_active : bool = True) -> bool:
         """Inserts a symptom into the database. 
 
@@ -114,7 +156,7 @@ class SymptomABC(ABC):
          
     
     @abstractmethod 
-    def update(self, symptom : SymptomInsertModel, user_tag : str) -> bool:
+    def update(self, tag: str, symptom : SymptomInsertModel, user_tag : str) -> bool:
         """Updates a symptom in the database. 
 
         Parameters
