@@ -4,7 +4,7 @@ import numpy as np
 from typing import List, Dict 
 
 from config.models.user import UserModel
-from config.models.conditions_applications import ConditionApplicationTreeResponseModel
+from config.models.conditions_applications import ConditionApplicationTreeResponseModel, ConditionApplicationTreeModel
 from lib.database.Database import Database
 
 from services.users import get_user_from_token
@@ -19,7 +19,7 @@ router = APIRouter(
     tags=["Condition Applications"]
     )
 
-def extract_ca_item(item, add_separator = False) -> str:
+def extract_ca_item(item : ConditionApplicationTreeModel, add_separator = False) -> str:
     """Extracts the text representation of a condition application item recursively.
     Parameters
     ----------
@@ -30,18 +30,18 @@ def extract_ca_item(item, add_separator = False) -> str:
         Whether to add a separator after the item, by default False
     """
     t = ""
-    if item['value'] is not None:
-            val = item['value']
+    if item.value is not None:
+            val = item.value
             if isinstance(val, float):
                 # Use general format, strip trailing .0, use scientific notation for small numbers
                 t += f"{val:.6g}"
             else:
                 t += f"{val}"
-    t += f"{DB.attributes.get_trait_text(item['trait_tag'])}"
-    if item["children"] is not None and len(item["children"]) > 0:
+    t += f"{DB.attributes.get_trait_text(item.trait_tag)}"
+    if item.children is not None and len(item.children) > 0:
         t += " ("
-        for n,c in enumerate(item["children"]):
-            t += extract_ca_item(c, add_separator = n < len(item["children"])-1) 
+        for n,c in enumerate(item.children):
+            t += extract_ca_item(c, add_separator = n < len(item.children)-1) 
             t += ", " if add_separator else ""
         t += ")"
     return t
