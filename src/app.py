@@ -56,6 +56,7 @@ from routers.samples import samples
 from routers.maintenance import symptoms
 from routers.maintenance import maintenance 
 from routers.maintenance import procedures
+from routers.maintenance import sparepartpermissions
 from routers.maintenance import spareparts
 from routers.peptides import peptides
 from routers.metatexts import metatexts
@@ -108,6 +109,7 @@ router_sources = [dataset,
                   states,
                   symptoms,
                   procedures,
+                  sparepartpermissions,
                   spareparts, 
                   peptides,
                   samples,
