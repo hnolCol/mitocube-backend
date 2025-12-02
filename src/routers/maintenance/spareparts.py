@@ -19,11 +19,12 @@ router = APIRouter(
 
 
 @router.get("/q")
-def find_spare_parts(search_string : str = "", limit : int = 20) -> List[str]:
+def find_spare_parts(search_string : str = None, limit : int = 20) -> List[str]:
     "Finds spare parts by a search_string and returns the tags. " 
     
-    tag = DB.spareparts.find(search_string = search_string, limit = limit)
-    return tag
+    tags = DB.spareparts.find(search_string = search_string, limit = limit)
+    print(tags)
+    return tags
     
 @router.get("/{tag}", response_model=SparepartResponseModel)
 def get_sparepart_by_tag(tag : str): 
@@ -92,9 +93,10 @@ def get_link(tag : str) -> str:
 
 
 @router.post("/")
-def insert_sparepart(sparepart : SparepartInsertModel, user : UserModel = Depends(is_user_admin)) -> bool:
+def insert_sparepart(sparepart : dict, user : UserModel = Depends(is_user_admin)) -> bool:
     """Adds a new spare part in the database."""
-    
+    print(sparepart)
+    sparepart = SparepartInsertModel(**sparepart)  # Validate input data
     ok = DB.spareparts.insert(sparepart=sparepart, user_tag = user.tag)
     
     if not ok:

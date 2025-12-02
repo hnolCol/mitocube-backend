@@ -280,10 +280,10 @@
             "id": 8
         },
         {
-            "tag": "att_feature",
+            "tag": "att_protein",
             "requires": null,
             "children": null,
-            "text": "Feature",
+            "text": "Protein",
             "abbr": null,
             "priority": 800,
             "allow_input": true,
@@ -1677,7 +1677,7 @@
         {
             "tag": "att_protein_treatment",
             "requires": null,
-            "children": "att_feature",
+            "children": "att_protein",
             "text": "Protein and Hormone Treatment",
             "abbr": null,
             "priority": 500,
@@ -3072,7 +3072,7 @@
         {
             "tag": "att_gene_engineering",
             "requires": null,
-            "children": "att_feature|att_gene_zygosity|att_gene_editing_method|att_promotor",
+            "children": "att_protein|att_gene_zygosity|att_gene_editing_method|att_promotor",
             "text": "Gene engineering",
             "abbr": null,
             "priority": 650,
@@ -3324,7 +3324,7 @@
             "text": "Expression Promotor",
             "abbr": null,
             "priority": 500,
-            "allow_input": true,
+            "allow_input": false,
             "has_features_value": false,
             "group_tag": "genotype",
             "min_state": 0,
@@ -3568,7 +3568,7 @@
         {
             "tag": "att_knockdown_technique",
             "requires": null,
-            "children": "att_duration|att_concentration|att_feature",
+            "children": "att_duration|att_concentration|att_protein",
             "text": "Gene Knockdown Technique",
             "abbr": null,
             "priority": 500,
@@ -16961,50 +16961,6 @@
             "priority": 500.0,
             "ols": null,
             "attribute_id": 8.0
-        },
-        {
-            "value": "protein",
-            "attribute_tag": "att_feature",
-            "tag": "att_feature:protein",
-            "keyword": null,
-            "text": "protein",
-            "description": "Protein feature",
-            "priority": 550.0,
-            "ols": null,
-            "attribute_id": 9.0
-        },
-        {
-            "value": "transcript",
-            "attribute_tag": "att_feature",
-            "tag": "att_feature:transcript",
-            "keyword": null,
-            "text": "transcript",
-            "description": "Transcript",
-            "priority": 660.0,
-            "ols": null,
-            "attribute_id": 9.0
-        },
-        {
-            "value": "metabolite",
-            "attribute_tag": "att_feature",
-            "tag": "att_feature:metabolite",
-            "keyword": null,
-            "text": "metabolite",
-            "description": "A metabolite feature",
-            "priority": 500.0,
-            "ols": null,
-            "attribute_id": 9.0
-        },
-        {
-            "value": "gene",
-            "attribute_tag": "att_feature",
-            "tag": "att_feature:gene",
-            "keyword": null,
-            "text": "gene",
-            "description": "A gene feature",
-            "priority": 500.0,
-            "ols": null,
-            "attribute_id": 9.0
         },
         {
             "value": "kg",

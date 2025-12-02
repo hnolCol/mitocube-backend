@@ -12,10 +12,11 @@ class SparepartBaseModel(BaseModel):
     price : Optional[int|float] = 0  
     link : Optional[AnyUrl] = None
     
-    @field_serializer("link")
-    def serialize_url(self, url: AnyUrl, _info):
-        return str(url)
-    
+    @field_validator('link', mode="before")
+    def check_link(cls, v : AnyUrl, field):
+        if v is None or v == "": return None
+        return v
+
 class SparepartModel(SparepartBaseModel):
     s : Optional[str] = None
 
@@ -33,3 +34,8 @@ class SparepartInsertModel(SparepartBaseModel):
 class SparepartResponseModel(SparepartBaseModel):
     ""
     
+    @field_serializer("link")
+    def serialize_url(self, url: AnyUrl):
+        if url is None:
+            return ""
+        return str(url)

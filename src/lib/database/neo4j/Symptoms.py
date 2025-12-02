@@ -54,7 +54,7 @@ class Neo4jSymptoms(SymptomABC):
         exists = self._driver.execute_query(query, tag = tag, routing_ = "r")    
         return exists[0]
     
-    def find(self, search_string: str = "", limit: int = 20, is_active: bool = True) -> List[str]:
+    def find(self, search_string: str = "", limit: int = 20, is_active: bool = True, sort : bool = True) -> List[str]:
         """Find symptoms by a search string. 
 
         Parameters
@@ -77,7 +77,7 @@ class Neo4jSymptoms(SymptomABC):
         if len(search_string) > 0:
             query += "AND s.s CONTAINS $search_string "
 
-        query += "RETURN s.tag" 
+        query += "RETURN s.tag " 
         
         if sort:
             query += "ORDER BY s.priority  "

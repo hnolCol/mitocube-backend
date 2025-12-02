@@ -56,7 +56,7 @@ class Neo4jSpareParts(SparePartsABC):
         exists = self._driver.execute_query(query, tag = tag, routing_ = "r")    
         return exists[0]
         
-    def find(self, search_string : str = "", limit : int = 20, is_active: bool = True) -> List[str]:
+    def find(self, search_string : str = None, limit : int = 20, is_active: bool = True) -> List[str]:
         """Find spare part by a search string. 
 
         Parameters
