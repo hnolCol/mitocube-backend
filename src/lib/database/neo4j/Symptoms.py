@@ -293,15 +293,15 @@ class Neo4jSymptoms(SymptomABC):
         """
         
         query = (
-            "MATCH (s:Symptom {tag : $tag}) "
-            "WHERE s.is_active = false "
+            "MATCH (s:Symptom {tag: $tag}) "
+            "SET s.is_active = $is_active "
             "RETURN true as ok "
         )
         
-        ok = self._driver.execute_query(query, 
+        result = self._driver.execute_query(query, 
                                         tag = tag,
                                         is_active = is_active,
                                         routing_="w",
                                         result_transformer_= Result.value)
         
-        return ok[0]
+        return True if result is not None else False
