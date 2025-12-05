@@ -53,6 +53,7 @@ from routers.researchgroups import researchgroup
 from routers.phenotypes import phenotypes
 from routers.states import states
 from routers.samples import samples
+from routers.maintenance import symptomspermissions
 from routers.maintenance import symptoms
 from routers.maintenance import maintenance 
 from routers.maintenance import procedurepermissions
@@ -108,6 +109,7 @@ router_sources = [dataset,
                   phenotypes,
                   maintenance,
                   states,
+                  symptomspermissions,
                   symptoms,
                   procedurepermissions,
                   procedures,

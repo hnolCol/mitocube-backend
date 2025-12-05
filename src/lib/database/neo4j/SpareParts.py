@@ -1,12 +1,9 @@
 from neo4j import Driver, Result 
-from typing import List, Literal
+from typing import List
 import pandas as pd 
 
 from lib.database.abstract.SpareParts import SparePartsABC
-
 from config.models.spareparts import SparepartModel, SparepartResponseModel, SparepartInsertModel, SparepartBaseModel
-from config.models.permissions import PermissionResponseModel
-from config.enums.users.roles import UserRolesEnum
 
 class Neo4jSpareParts(SparePartsABC):
     
@@ -408,7 +405,7 @@ class Neo4jSpareParts(SparePartsABC):
         query = (
             "MATCH (s:SparePart {tag: $tag}) "
             "SET s.is_active = $is_active "
-            "RETURN ok as ok"
+            "RETURN true AS ok "
            
         )
 
