@@ -3,7 +3,7 @@ from typing import List, Literal
 import pandas as pd 
 
 from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC
-from config.models.maintenance import MaintenanceBaseModel, MaintenanceInsertModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceProcedureResponseModel, MaintenanceStateResponseModel #,InstrumentMaintenanceModel
+from config.models.maintenance import MaintenanceBaseModel, MaintenanceInsertModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceProcedureResponseModel, MaintenanceStateResponseModel, MiantenanceProcedureInsertModel #,InstrumentMaintenanceModel
 
 REQUIRED_COLUMNS = ["tag","text","description"]
 
@@ -696,17 +696,53 @@ class Neo4JMaintenanceProcedure(MaintenanceProcedureABC):
         r = self._driver.execute_query(query, routing_="r", instrument_tag = instrument_tag, limit = limit, result_transformer_=Result.value)
         
         return r
-                
-    
-    def insert(self, maintenance : MaintenanceInsertModel):
-    
+
+    def insert(self, procedure: MiantenanceProcedureInsertModel, user_tag: str, is_active: bool = True):
+        """Inserts a proccedure in the database. 
+
+        Parameters
+        ----------
+        proccedure : proccedureModel
+            The proccedure to insert.
+
+        Returns
+        -------
+        bool
+            Indicates if the insertion was successful.
+        """
+
         query = (
-            "MERGE (m:MaintenanceProcedure {tag : $maintenance.tag}) "
-            "SET m.description = $maintenance.description, m.text = $maintenance.text, "
-            "m.priority = $maintenance.priority, m.timestamp = timestamp() "
-            )
+            "MATCH (u:User {tag: $user_tag}) "
+            "MERGE (m:MaintenanceProcedure {tag: $tag}) "
+            "ON CREATE SET m.is_active = $is_active, "
+            "              m.created_at = timestamp(), "
+            "              m.description = $description, "
+            "              m.priority = $priority, "
+            "              m.s = toLower($text)+' '+toLower($description), "
+            "              m.text = $text "
+            "ON MATCH SET  m.modified_at = timestamp(), "
+            "              m.description = $description, "
+            "              m.priority = $priority, "
+            "              m.s = toLower($text)+' '+toLower($description), "
+            "              m.text = $text "
+            "WITH u, m "
+            "CREATE (u)-[:CREATED {created_at: timestamp()}]->(m) "
+            "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(m) "
+            "RETURN true as ok"
+)
         
-        self._driver.execute_query(query, routing_="w", maintenace = maintenance)
+        ok = self._driver.execute_query(query, 
+                                        tag = procedure.tag,
+                                        is_active = is_active,
+                                        description = procedure.description,
+                                        priority = procedure.priority,
+                                        text = procedure.text,
+                                        user_tag = user_tag,
+                                        routing_="w",
+                                        result_transformer_= Result.value)
+        
+        return ok[0]
+    
 
     
     def get(self, tag : str = None) -> MaintenanceProcedureResponseModel|None:
@@ -722,23 +758,130 @@ class Neo4JMaintenanceProcedure(MaintenanceProcedureABC):
         
         return MaintenanceProcedureResponseModel(**r[0]) if len(r) > 0 else None
     
-    def find(self, search_string : str, limit : int = 50) -> List[str]:
-        
-        search_string = search_string.lower()
-        query = "MATCH (m:MaintenanceProcedure) "
-        
-        if search_string is not None:
-            query += "WHERE m.s CONTAINS $search_string "          
-            
-            
-        query += "RETURN m.tag ORDER BY m.priority LIMIT $limit "
-        
-    
+    def get_text(self, tag: str) -> str | None:
+        """Return the text of a maintenance procedure."""
+        query = (
+            "MATCH (m:MaintenanceProcedure {tag: $tag}) "
+            "RETURN m.text"
+        )
         r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0] if r else None
+
+
+    def get_description(self, tag: str) -> str | None:
+        """Return the description of a maintenance procedure."""
+        query = (
+            "MATCH (m:MaintenanceProcedure {tag: $tag}) "
+            "RETURN m.description"
+        )
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0] if r else None
+
+
+    def get_priority(self, tag: str) -> int | None:
+        """Return the priority of a maintenance procedure."""
+        query = (
+            "MATCH (m:MaintenanceProcedure {tag: $tag}) "
+            "RETURN m.priority"
+        )
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0] if r else None
+
+
+    def find(self, search_string: str = "", limit: int = 20, is_active: bool = True, sort: bool = True) -> List[str]:
+        query = (
+            "MATCH (m:MaintenanceProcedure) "
+            "WHERE m.is_active = $is_active "
+        )
+
+        # Only filter if non-empty search
+        search_string = search_string.lower().strip()
+        if search_string:
+            query += "AND m.s CONTAINS $search_string "
+
+        query += "RETURN m.tag "
+
+        if sort:
+            query += "ORDER BY m.priority "
+
+        if limit is not None:
+            query += "LIMIT $limit"
+
+        procedures = self._driver.execute_query(
             query,
-            search_string = search_string, 
-            limit = limit, 
-            routing_ = "r",
-            result_transformer_ = Result.value)
-        
-        return r
+            search_string=search_string,
+            limit=limit,
+            is_active=is_active,
+            routing_="r",
+            result_transformer_=Result.value,
+        )
+
+        return procedures
+
+    def update(self, procedure: MaintenanceProcedureResponseModel, user_tag: str) -> bool:
+        """Edits a maintenance procedure in the database.
+
+        Parameters
+        ----------
+        procedure : MiantenanceProcedureInsertModel
+            The procedure to edit.
+
+        Returns
+        -------
+        bool
+            Indicates if the edit was successful.
+        """
+        print("Updating procedure:", procedure)
+        query = (
+            "MATCH (m:MaintenanceProcedure {tag: $tag}) "
+            "SET "
+            "    m.modified_at = timestamp(), "
+            "    m.description = $description, "
+            "    m.priority = $priority, "
+            "    m.s = toLower($text)+' '+toLower($description), "
+            "    m.text = $text "
+            "WITH m "
+            "MATCH (u:User {tag: $user_tag}) "
+            "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(m) "
+            "RETURN true as ok "
+        )
+
+        ok = self._driver.execute_query(
+            query,
+            tag=procedure.tag,
+            description=procedure.description,
+            priority=procedure.priority,
+            text=procedure.text,
+            user_tag=user_tag,
+            routing_="w",
+            result_transformer_=Result.value,
+        )
+
+        return ok[0]
+    
+    def delete(self, tag: str, is_active: bool = False) -> bool:
+        """
+        Deletes a maintenance procedure by tag.
+        """
+
+        query = (
+            "MATCH (m:MaintenanceProcedure {tag: $tag}) "
+            "SET m.is_active = $is_active "
+            "RETURN true as ok "
+        )
+
+        result = self._driver.execute_query(
+            query,
+            tag=tag,
+            is_active=is_active,
+            routing_="w",
+            result_transformer_=Result.value
+        )
+
+        return True if result is not None else False
