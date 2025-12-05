@@ -35,7 +35,7 @@ def get_dataset_pca(submission_tag : str, filter_tag : str = None, scale : bool 
                                         n_components=4,
                                         scale = scale).transform()
 
-    condition_procedures = DB.samples.get_condition_procedures_by_sample_index_for_submission(submission_tag=submission_tag)
+    condition_procedures = DB.samples.get_condition_applications_by_sample_index_for_submission(submission_tag=submission_tag)
     print(condition_procedures)
     
     projected_data = projected_data.join(condition_procedures, how="left")

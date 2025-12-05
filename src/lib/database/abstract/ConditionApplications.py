@@ -65,7 +65,11 @@ class ConditionApplicationABC(ABC):
     @abstractmethod
     def get(self, tag: str) -> Dict:
         "Return the condition application details."
-        
+    
+    @abstractmethod
+    def get_attribute(self, tag: str) -> str:
+        "Return the attribute tag of the condition application. Only the first level attribute is returned."  
+    
     @abstractmethod
     def get_tree(self, tag : str) -> ConditionApplicationTreeModel:
         """Returns a hierarchical tree representation of the condition application.

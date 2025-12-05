@@ -484,6 +484,10 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
             The tag of the spare part.
         """
         
+        N = self.get_sparepart_count(tag = tag, sparepart_tag = sparepart_tag)  #check if spare part exists
+        if N == 0:
+            raise ValueError(f"Spare part with tag {sparepart_tag} not found in maintenance event with tag {tag}.")
+        
         query = (
             "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) ")
         if sparepart_tag is not None:
@@ -494,11 +498,17 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         query += (
             "MATCH (me)-[r:UTILIZED]->(sp) "
             "SET me.modified_at = timestamp() "
-            "DELETE r "
-            "WITH me "
-            "MATCH (me)-[:UTILIZED]->(sp:SparePart) "
-            "RETURN sp.tag "
         )
+        if N > 1:
+            query += (
+                "SET r.count = r.count - 1, r.modified_at = timestamp() "
+                "RETURN true"
+            )
+        elif N == 1:
+            query += (
+                "DELETE r "
+                "RETURN true"
+        )   
         
         r = self._driver.execute_query(query, 
                                 routing_="w", 
@@ -545,9 +555,10 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         
         query = (
             "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
-            "MATCH (ms:MaintenanceState) "
-            "MATCH (me)-[:IN_STATE]->(ms) "
-            "RETURN ms.tag "
+            "MATCH (me)-[r:IN_STATE]->(ms:MaintenanceState) "
+            "WITH ms, r "
+            "ORDER BY r.created_at DESC "
+            "RETURN ms.tag LIMIT 1"
         )
         
         r = self._driver.execute_query(query, routing_="r", maintenance_event_tag = tag, result_transformer_=Result.value)

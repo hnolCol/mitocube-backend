@@ -57,6 +57,18 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         return [[ConditionApplicationItemModel(**rii) for rii in ri] for ri in r[0]] if len(r) > 0 and len(r[0]) > 0 else [[]]
 
 
+    def get_attribute(self, tag: str) -> str:
+        "Return the attribute tag of the condition application. Only the first level attribute is returned."
+        if not self.exists(tag):
+            return None
+        query = (
+            "MATCH (ca:ConditionApplication {tag : $ca_tag})-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "RETURN a.tag "
+        )
+
+        r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+
     def get_tree(self, tag: str) -> List[ConditionApplicationTreeModel]:
         "Return a human-readable text representation of the condition application."
 

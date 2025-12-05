@@ -166,7 +166,8 @@ def remove_sparepart_from_maintenance_event(maintenance_event_tag : str, sparepa
     if not DB.spareparts.exists(tag = sparepart_tag):
         raise HTTPException(status_code=404, detail="Spare part not found.")
     # remove symtom from the maintenance event
-    DB.maintenance_event.remove_sparepart(tag = maintenance_event_tag, sparepart_tag = sparepart_tag)  
+    ok = DB.maintenance_event.remove_sparepart(tag = maintenance_event_tag, sparepart_tag = sparepart_tag)  
+    return ok 
 
 
 @router.post("/{maintenance_event_tag}/spareparts/{sparepart_tag}")
