@@ -105,7 +105,7 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         )
         
         r = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.value)
-        
+        print(r)
         return [InstrumentStateHistoryModel(**ri) for ri in r[0]]
     
     

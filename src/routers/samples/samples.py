@@ -35,7 +35,7 @@ def get_sample(sample_tag : str, user : UserModel = Depends(get_user_from_token)
 @router.get("/{sample_tag}/ca")
 def get_sample_condition_applications(sample_tag: str, group_by_attribute : bool = True, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
     "Return the condition applications for a given sample."
-    return DB.samples.get_condition_procedure(tag = sample_tag, group_by_attribute=group_by_attribute)
+    return DB.samples.get_condition_applications(tag = sample_tag, group_by_attribute=group_by_attribute)
 
 
 @router.get("/{sample_tag}/{genotype_tag}")

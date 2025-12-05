@@ -12,9 +12,8 @@ router = APIRouter(
 
 @router.get("/states/{state_tag}")
 def get_submission_state_count(state_tag : SubmissionStatesEnums, user : UserModel = Depends(get_user_from_token)) -> int:
-    "Return the number of submissions in a given state" 
+    "Return the number of submissions in a given state" #move to states router? 
     return DB.submissions.count(state=state_tag)
-
 
 
 @router.get("/{submission_tag}/protein_groups") 
@@ -33,12 +32,10 @@ def get_peptide_count_for_submission(submission_tag : str, user : UserModel = De
     return DB.peptides.count(submission_tag=submission_tag)
 
 
-
-
-
 @router.get("/{submission_tag}/samples")
 def get_sample_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
     "Return the number of samples for a given submission"
     if DB.submissions.exists(tag=submission_tag) is False:
         raise HTTPException(status_code=404, detail="Submission not found")
     return DB.samples.count(submission_tag=submission_tag)
+

@@ -57,16 +57,6 @@ class Neo4JSubmissions(SubmissionsABC):
             return r[0]
         return 0
 
-    def condition_application_exists(self, tag : str) -> bool:
-        "Check if a condition application exists for the given tag."
-
-        query = (
-            "WITH EXISTS {(ca:ConditionApplication {tag : $tag})} as exists "
-            "RETURN exists"
-        )
-
-        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
-        return r[0]
     
     def delete(self, tag: str) -> bool:
         return super().delete(tag)
