@@ -3,12 +3,15 @@ from services.random_generators import get_random_string
 
 from typing import Optional, List
 
+
+
 class MaintenanceBaseModel(BaseModel):
     "A Maintenance model describing the procedure for the maintenance"
     tag : str 
     text : str 
     description : Optional[str] = None 
     
+
     
     
 # class MaintenanceInsertModel(MaintenanceBaseModel):
@@ -54,9 +57,16 @@ class MaintenanceEventModel(MaintenanceEventBaseModel):
     "Model describing the maintenance that was performed on an instrument on a given date (timestamp)"
     created_at : float 
     
+
 class MaintenanceProcedureResponseModel(MaintenanceBaseModel):
     "The response model for a maintenance procedure"
     priority : int = 500
+
+class MiantenanceProcedureInsertModel(MaintenanceProcedureResponseModel):
+    "The insert model for a maintenance procedure. This is used to insert a new maintenance procedure into the database."
+    tag : str = Field(..., min_length=8, max_length=8, default_factory=lambda : get_random_string(8))
+
+    
     
 class MaintenanceStateResponseModel(BaseModel):
     "The response model for a maintenance state"

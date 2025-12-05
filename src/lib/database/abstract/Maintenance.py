@@ -4,7 +4,7 @@ from abc import abstractmethod, ABC
 from typing import List, Literal
 from deprecated import deprecated
 
-from config.models.maintenance import MaintenanceInsertModel, MaintenanceBaseModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceStateResponseModel #, InstrumentMaintenanceModel
+from config.models.maintenance import MaintenanceInsertModel, MaintenanceBaseModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceStateResponseModel, MaintenanceProcedureResponseModel #, InstrumentMaintenanceModel
 
 
 class MaintenanceEventABC(ABC):
@@ -226,7 +226,48 @@ class MaintenanceProcedureABC(ABC):
         List[InstrumentModel]
             
         """
-        
+    
+    @abstractmethod
+    def get_text(self, tag : str) -> str:
+        """Get maintenance texts by its tag. 
+
+        Parameters
+        ----------
+            The maintenance tag.
+
+        Returns
+        -------
+        [str]
+            The maintenance text.
+        """
+
+    @abstractmethod
+    def get_description(self, tag : str) -> str:
+        """Get maintenance descriptions by its tag. 
+
+        Parameters
+        ----------
+          The maintenance tag.
+
+        Returns
+        -------
+        [str]
+            The maintenance description.
+        """
+    
+    @abstractmethod
+    def get_priority(self, tag : str) -> int:
+        """Get maintenance priorities by its tag. 
+
+        Parameters
+        ----------
+          The maintenance tag.
+
+        Returns
+        -------
+        int
+            The maintenance priority.
+        """ 
         
     @abstractmethod
     def find(self, search_string : str, limit : int = 50) -> List[MaintenanceBaseModel]:
@@ -248,4 +289,39 @@ class MaintenanceProcedureABC(ABC):
         List[str]
             The list of maintenances that are found. 
         """
+
+    @abstractmethod
+    def update(self, procedure :  MaintenanceProcedureResponseModel, user_tag : str) -> bool:
+        """Updates a maintenance procedure in the database.
+
+        Parameters
+        ----------
+        procedure : MaintenanceProcedureResponseModel
+            The procedure to update.
+        user_tag : str
+            The user who updates the procedure.
+
+        Returns
+        -------
+        bool
+            True if the procedure was updated successfully, False otherwise.
+        """
+        
+    @abstractmethod
+    def delete(self, tag : str, user_tag : str) -> bool:
+        """Deletes a maintenance procedure from the database.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the procedure to delete.
+        user_tag : str
+            The user who deletes the procedure.
+
+        Returns
+        -------
+        bool
+            True if the procedure was deleted successfully, False otherwise.
+        """
+        
         

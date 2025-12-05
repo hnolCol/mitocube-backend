@@ -55,6 +55,7 @@ from routers.states import states
 from routers.samples import samples
 from routers.maintenance import symptoms
 from routers.maintenance import maintenance 
+from routers.maintenance import procedurepermissions
 from routers.maintenance import procedures
 from routers.maintenance import sparepartpermissions
 from routers.maintenance import spareparts
@@ -108,6 +109,7 @@ router_sources = [dataset,
                   maintenance,
                   states,
                   symptoms,
+                  procedurepermissions,
                   procedures,
                   sparepartpermissions,
                   spareparts, 
