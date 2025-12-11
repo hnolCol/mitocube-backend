@@ -9,7 +9,7 @@ from typing import List, Dict
 DB = Database.DB()
 
 router = APIRouter(
-    prefix="/api/maintenance/maintenancepermissions",
+    prefix="/api/maintenance/permissions",
     tags=["Permissions"],
 )
 
