@@ -53,12 +53,10 @@ from routers.researchgroups import researchgroup
 from routers.phenotypes import phenotypes
 from routers.states import states
 from routers.samples import samples
-from routers.maintenance import symptomspermissions
 from routers.maintenance import symptoms
 from routers.maintenance import maintenance 
-from routers.maintenance import procedurepermissions
+from routers.maintenance import maintenancepermissions
 from routers.maintenance import procedures
-from routers.maintenance import sparepartpermissions
 from routers.maintenance import spareparts
 from routers.peptides import peptides
 from routers.metatexts import metatexts
@@ -109,11 +107,9 @@ router_sources = [dataset,
                   phenotypes,
                   maintenance,
                   states,
-                  symptomspermissions,
+                  maintenancepermissions,
                   symptoms,
-                  procedurepermissions,
                   procedures,
-                  sparepartpermissions,
                   spareparts, 
                   peptides,
                   samples,
