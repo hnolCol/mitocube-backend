@@ -24,9 +24,9 @@ class Neo4jSymptoms(SymptomABC):
             "UNWIND $symptoms as s_props "
             "MERGE (s:Symptom {tag : s_props.tag}) "
             "ON CREATE "
-            "SET s.created_at = timestamp(), s.description = s_props.description, s.priority = s_props.priority, s.s = s_props.s, s.text = s_props.text "
+            "SET s.created_at = timestamp(), s.description = s_props.description, s.priority = s_props.priority, s.s = s_props.s, s.text = s_props.text, s.is_active = true "
             "ON MATCH "
-            "SET s.modified_at = timestamp(), s.description = s_props.description, s.priority = s_props.priority, s.s = s_props.s, s.text = s_props.text "
+            "SET s.modified_at = timestamp(), s.description = s_props.description, s.priority = s_props.priority, s.s = s_props.s, s.text = s_props.text, s.is_active = true "
             "RETURN count(s) as count"
         )
     

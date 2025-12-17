@@ -74,3 +74,26 @@ class MaintenanceStateResponseModel(BaseModel):
     text : str 
     color : str
     description : Optional[str] = None 
+
+
+
+class ExternalServiceBaseModel(BaseModel):
+    "Base Moddel for external service."
+
+    description : str
+    name: Optional[str]
+    company: Optional[str]
+    email: Optional[str]
+    cost: float | int
+    billing_number: str
+    internal_id: Optional[str]
+
+class ExternalServiceInsertModel(ExternalServiceBaseModel):
+    "Insert model for creating a new external service event"
+
+    tag : str = Field(..., min_length=8, max_length=8, default_factory=lambda : get_random_string(8))
+
+class ExternalServiceModel(ExternalServiceBaseModel):
+    "Complete external service model."
+    
+    tag: str

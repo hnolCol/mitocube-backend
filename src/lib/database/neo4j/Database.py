@@ -67,7 +67,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.samples = Neo4JSamples(driver=self.connection.driver, condition_applications=self.condition_applications)
         self.peptides = Neo4JPeptides(driver = self.connection.driver, samples=self.samples)
         self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
-        self.maintenance_event = Neo4JMaintenanceEvent(driver = self.connection.driver)
+        self.maintenance_events = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
         

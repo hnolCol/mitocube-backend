@@ -14,7 +14,7 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
     
-    def _utils_insert_from_file(self, file_path : str =  "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", *args, **kwargs):
+    def _utils_insert_from_file(self, file_path : str =  "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", *args, **kwargs):
         
         instrument_states = pd.read_csv(file_path, *args, **kwargs)
         if not all(column_name in instrument_states.columns for column_name in ["tag","text","description","color"]):
