@@ -410,15 +410,15 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         """
 
         query = (
-            "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
+            "MATCH (me:MaintenanceEvent {tag: $maintenance_event_tag}) "
             "OPTIONAL MATCH (me)-[r:UTILIZED]->(sp:SparePart) "
-            "WITH me, collect(r.count * sp.price) as sparepart_costs "
+            "WITH me, collect(coalesce(r.count, 0) * coalesce(sp.price, 0.0)) as sparepart_costs "
             "WITH me, reduce(total = 0.0, x IN sparepart_costs | total + x) AS total_sparepart_costs "
             "OPTIONAL MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
-            "WITH total_sparepart_costs, coalesce(sum(es.costs), 0.0) as total_external_service_costs, me "
+            "WITH me, total_sparepart_costs, coalesce(sum(es.costs), 0.0) as total_external_service_costs "
             "SET me.costs = total_sparepart_costs + total_external_service_costs, me.modified_at = timestamp() "
             "RETURN me.costs "
-            )
+        )
         
 
         r = self._driver.execute_query(
