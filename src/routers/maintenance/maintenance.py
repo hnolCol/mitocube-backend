@@ -71,13 +71,13 @@ def get_maintenance_event_state(maintenance_event_tag : str):
     
     return DB.maintenance_events.get_event_state(tag = maintenance_event_tag)
 
-@router.get("/{maintenance_event_tag}/costs")
-def get_maintenance_event_costs(maintenance_event_tag : str):
-    """Returns the costs of a maintenance event by its tag."""
-    if not DB.maintenance_events.exists(tag = maintenance_event_tag):
-        raise HTTPException(status_code=404, detail="Maintenance event not found.")
+# @router.get("/{maintenance_event_tag}/costs")
+# def get_maintenance_event_costs(maintenance_event_tag : str):
+#     """Returns the costs of a maintenance event by its tag."""
+#     if not DB.maintenance_events.exists(tag = maintenance_event_tag):
+#         raise HTTPException(status_code=404, detail="Maintenance event not found.")
     
-    return DB.maintenance_events.get_costs(tag = maintenance_event_tag)
+#     return DB.maintenance_events.get_costs(tag = maintenance_event_tag)
 
 @router.post("/{maintenance_event_tag}/state/{state_tag}")
 def set_maintenance_event_state(maintenance_event_tag : str, state_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
@@ -169,12 +169,13 @@ def remove_sparepart_from_maintenance_event(maintenance_event_tag : str, sparepa
     if not DB.spareparts.exists(tag = sparepart_tag):
         raise HTTPException(status_code=404, detail="Spare part not found.")
     # remove symtom from the maintenance event
-    ok = DB.maintenance_events.remove_sparepart(tag = maintenance_event_tag, sparepart_tag = sparepart_tag)  
+    ok = DB.maintenance_events.remove_sparepart(tag = maintenance_event_tag, sparepart_tag = sparepart_tag) 
+    DB.maintenance_events.update_costs(tag = maintenance_event_tag) 
     return ok 
 
 
 @router.post("/{maintenance_event_tag}/spareparts/{sparepart_tag}")
-def add_symptom_to_maintenance_event_by_tag(maintenance_event_tag : str, sparepart_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
+def add_sparepart_to_maintenance_event_by_tag(maintenance_event_tag : str, sparepart_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
     """Adds a single symptom to a maintenance event. 
     """
     if not DB.maintenance_events.exists(tag = maintenance_event_tag):
@@ -183,8 +184,7 @@ def add_symptom_to_maintenance_event_by_tag(maintenance_event_tag : str, sparepa
         raise HTTPException(status_code=404, detail="Spare part not found..")
     
     DB.maintenance_events.add_sparepart(tag = maintenance_event_tag, sparepart_tag = sparepart_tag)
-
-
+    DB.maintenance_events.update_costs(tag = maintenance_event_tag)
 
 @router.get("/{maintenance_event_tag}/spareparts/{sparepart_tag}/count")
 def get_sparepart_count_in_maintenance_event(maintenance_event_tag : str, sparepart_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
@@ -200,6 +200,42 @@ def get_sparepart_count_in_maintenance_event(maintenance_event_tag : str, sparep
     count = DB.maintenance_events.get_sparepart_count(tag = maintenance_event_tag, sparepart_tag = sparepart_tag)
     return count
 
+@router.post("/{maintenance_event_tag}/externalservice/{tag}")
+def add_external_service_to_maintenance_event(maintenance_event_tag : str, tag : str, user : UserModel = Depends(is_user_at_least_curator)):
+    """Adds an external service to a maintenance event. 
+    If the maintenance event does not exist, it will raise a 404 error.
+    If the external service does not exist, it will raise a 404 error.
+    """
+    if not DB.maintenance_events.exists(tag = maintenance_event_tag):
+        raise HTTPException(status_code=404, detail="Maintenance event not found.")
+    if not DB.external_service.exists(tag = tag):
+        raise HTTPException(status_code=404, detail="External service not found.")
+    
+    DB.maintenance_events.add_external_service(tag = maintenance_event_tag, external_service_tag = tag)
+    DB.maintenance_events.update_costs(tag = maintenance_event_tag) 
+
+@router.delete("/{maintenance_event_tag}/externalservice/{tag}")
+def remove_external_service_from_maintenance_event(maintenance_event_tag : str, tag : str, user : UserModel = Depends(is_user_at_least_curator)):
+    """Removes an external service from a maintenance event. 
+    If the maintenance event does not exist, it will raise a 404 error.
+    If the external service does not exist, it will raise a 404 error.
+    """
+    if not DB.maintenance_events.exists(tag = maintenance_event_tag):
+        raise HTTPException(status_code=404, detail="Maintenance event not found.")
+    if not DB.external_service.exists(tag = tag):
+        raise HTTPException(status_code=404, detail="External service not found.")
+    
+    DB.maintenance_events.remove_external_service(tag = maintenance_event_tag, external_service_tag = tag, user_tag= user.tag)  
+    DB.maintenance_events.update_costs(tag = maintenance_event_tag) 
+
+@router.get("/externalservice/{tag}/costs")
+def get_costs_by_external_service(tag : str, timestamp_min : float = None, timestamp_max : float = None, user : UserModel = Depends(get_user_from_token)):
+    """Returns the total costs for a given external service. 
+    """
+    costs = DB.maintenance_events.costs(external_service_tag = tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max)
+    if costs is None:
+        raise HTTPException(status_code=404, detail="No maintenance events found for this external service.")
+    return costs
 
 #this should be renamed as the instrument tag is not the same as the maintenance tag
 @router.get("/instruments/{instrument_tag}/costs")
@@ -213,13 +249,12 @@ def get_costs_by_instrument(instrument_tag : str, timestamp_min : float = None, 
 
 
 @router.get("/{maintenance_event_tag}/costs")
-def get_cost_per_maintenance_event(maintenance_event_tag: str, user: UserModel = Depends(get_user_from_token)) -> float:
+def get_costs_per_maintenance_event(maintenance_event_tag: str, user: UserModel = Depends(get_user_from_token)) -> float:
     """
     Returns the total cost for a single maintenance event.
     """
     if not DB.maintenance_events.exists(tag=maintenance_event_tag):
         raise HTTPException(status_code=404, detail="Maintenance event not found.")
     
-    cost = DB.maintenance_events.cost(tag=maintenance_event_tag)
+    return DB.maintenance_events.costs(tag=maintenance_event_tag)
 
-    return cost

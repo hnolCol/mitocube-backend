@@ -115,6 +115,7 @@ constraints = [
     ConstraintModel(constrain_label  = "protein_group_tag",node_label = NodeLabelModel(label = "ProteinGroup"), property_name = "tag"),
     ConstraintModel(constrain_label  = "genotype_tag",node_label = NodeLabelModel(label = "Genotype"), property_name = "tag"),
     ConstraintModel(constrain_label  = "condition_value_tag",node_label = NodeLabelModel(label = "ConditionValue"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "external_service_tag",node_label = NodeLabelModel(label = "ExternalService"), property_name = "tag"),
 ]
 
 DB_SETTINGS = get_db_settings()
@@ -167,7 +168,8 @@ class Neo4JConstructor:
         self.factory.create_text_index("protein_tag_search",NodeLabelModel(label = "Protein"),"tag")    
         self.factory.create_text_index("trait_search",NodeLabelModel(label = "Trait"),"s")   
         self.factory.create_text_index("symptom_search",NodeLabelModel(label = "Symptom"),"s") 
-        self.factory.create_text_index("sparepart_search",NodeLabelModel(label = "SparePart"),"s")   
+        self.factory.create_text_index("sparepart_search",NodeLabelModel(label = "SparePart"),"s")  
+        self.factory.create_text_index("externalservice_search",NodeLabelModel(label = "ExternalService"),"s")   
         
         
         

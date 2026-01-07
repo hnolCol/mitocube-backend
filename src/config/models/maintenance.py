@@ -41,6 +41,7 @@ class MaintenanceEventBaseModel(BaseModel):
     instrument_state_tag : str
     maintenance_procedure_tags : Optional[List[str]] = []
     symptom_tags :Optional[List[str]] = []
+    external_service_tag : Optional[List[str]] = []
     instrument_tag : str 
     user_tag : Optional[str] = None
     description : Optional[str] = None 
@@ -79,12 +80,11 @@ class MaintenanceStateResponseModel(BaseModel):
 
 class ExternalServiceBaseModel(BaseModel):
     "Base Moddel for external service."
-
     description : str
     name: Optional[str]
     company: Optional[str]
     email: Optional[str]
-    cost: float | int
+    costs: float | int
     billing_number: str
     internal_id: Optional[str]
 

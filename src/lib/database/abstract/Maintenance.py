@@ -62,9 +62,9 @@ class MaintenanceEventABC(ABC):
         """
 
     @abstractmethod
-    def costs(self, instrument_tag  : str = None, timestamp_min : float = None, timestamp_max : float = None) -> float:
+    def costs(self, tag : str = None, instrument_tag  : str = None, timestamp_min : float = None, timestamp_max : float = None) -> float:
         """Calculate the costs for maintenance event. Either for a specific instrument
-        or the total costs. 
+        or the total costs. TO DO: move instrumnent tag to InstrumentClass ! 
 
         Parameters
         ----------
@@ -132,11 +132,51 @@ class MaintenanceEventABC(ABC):
 
 
     @abstractmethod
-    def get_costs_per_event(self, tag : str) -> float:
+    def add_external_service(self, tag: str, external_service_tag: str, user_tag: str) -> bool:
         """
-        Returns the costs of a maintenance event by its tag.
+        Links an external service to a maintenance event.
+
+        Parameters
+        ----------
+        tag : str
+            The maintenance event tag.
+        external_service_tag : str
+            The external service tag.
+        user_tag : str, optional
+            The user who links the service, by default None
+
+        Returns
+        -------
+        bool
+            True if the linking was successful, otherwise False.
         """
-        
+    
+    @abstractmethod
+    def remove_external_service(self, tag: str, external_service_tag: str, user_tag: str) -> bool:
+        """
+        Removes the link between an external service and a maintenance event.
+
+        Parameters
+        ----------
+        tag : str
+            The maintenance event tag.
+        external_service_tag : str
+            The external service tag.
+        user_tag : str, optional
+            The user who removes the link, by default None
+
+        Returns
+        -------
+        bool
+            True if the removal was successful, otherwise False.
+        """
+
+
+    @abstractmethod
+    def update_costs(self, tag: str) -> float:
+        """
+        Updates and returns total costs of a maintenance event.
+        """
         
 class MaintenanceProcedureABC(ABC):
 
@@ -335,7 +375,7 @@ class ExternalServicesABC(ABC):
     """
     Abstract Base Class for external maintenance services.
 
-    Ann ExternalService represents an third-party company or person that 
+    An ExternalService represents an third-party company or person that 
     performs maintenance on an instrument. 
     """
     
@@ -354,6 +394,23 @@ class ExternalServicesABC(ABC):
         bool
             True if the service exists, otherwise False.
         """
+
+    @abstractmethod
+    def find(self, search_string: str = "", limit: int = 20) -> List[str]:
+        """Find external services by a search string and returns the tags that match. 
+
+        Parameters
+        ----------
+        search_string : str, optional
+            The query string, by default ""
+        limit : int, optional
+            The maximum number of services to be returned., by default 20
+
+        Returns
+        -------
+        List[str]
+            The service tags. 
+        """ 
 
     @abstractmethod
     def get(self, tag: str) -> ExternalServiceModel:
@@ -488,7 +545,7 @@ class ExternalServicesABC(ABC):
         """
 
     @abstractmethod
-    def get_cost(self, tag: str) -> float | int:
+    def get_costs(self, tag: str) -> float | int:
         """
         Get cost of the service
 
