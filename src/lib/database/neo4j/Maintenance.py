@@ -411,11 +411,11 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
 
         query = (
             "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
-            "MATCH (me)-[r:UTILIZED]->(sp:SparePart) "
+            "OPTIONAL MATCH (me)-[r:UTILIZED]->(sp:SparePart) "
             "WITH me, collect(r.count * sp.price) as sparepart_costs "
             "WITH me, reduce(total = 0.0, x IN sparepart_costs | total + x) AS total_sparepart_costs "
-            "MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
-            "WITH total_sparepart_costs, sum(es.costs) as total_external_service_costs, me "
+            "OPTIONAL MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
+            "WITH total_sparepart_costs, coalesce(sum(es.costs), 0.0) as total_external_service_costs, me "
             "SET me.costs = total_sparepart_costs + total_external_service_costs, me.modified_at = timestamp() "
             "RETURN me.costs "
             )

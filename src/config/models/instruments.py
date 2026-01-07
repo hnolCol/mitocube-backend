@@ -18,7 +18,7 @@ class InstrumentsStateResponseModel(BaseModel):
     
 class InstrumentStateHistoryModel(BaseModel):
     "Model for a instrument state history"
-    tag : str #the tag of the history item
+    tag : Optional[str] = None #the tag of the history item
     instrument_tag : str 
     state_tag : str 
     started_at : float 
