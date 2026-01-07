@@ -61,9 +61,6 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         return [InstrumentsStateResponseModel(**ri) for ri in r]
     
     
-    
-    
-    
     def get_state_durations(self, instrument_tag : str = None, state_tag : str = None, timestamp_min : float = None, timestamp_max : float = None, limit : int = None) -> List[InstrumentStateHistoryModel]:
         ""
         query = "MATCH (t:Trait)-[r:IN_STATE]->(state:InstrumentState) "

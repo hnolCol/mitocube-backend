@@ -153,7 +153,7 @@ def get_submission_by_query(state : str|int = None,
 #     metadata = add_timeline_entry_to_metadata(metadata, TimeLineEntryModel(id = 1, user_label=user.label, comment="Metatext updated.", state = metadata["state"]))
 #     metadata["metatext"] = metatext
 #     update_submission = DatasetSubmissionModel(**metadata)
-#     dataset.write_json(update_submission, update = True)
+#     dataset.write_json(update_submission, update = True)/s
 #     return True 
     
 
@@ -653,9 +653,7 @@ def update_submission(background_task : BackgroundTasks,
         raise HTTPException(status_code=400, detail=str(e))
     return True
 
-@router.patch("/submissions/{label}/sampleattributes")
-def update_sample_attributes(user : UserModel = Depends( is_user_at_least_curator)):
-    pass 
+
 
 @router.get("/submissions/{submission_tag}/sampleattributes")
 def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
@@ -663,11 +661,7 @@ def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_u
     sample_attrs, sample_map = DB.meta.get_sample_attributes_and_genotypes(tag = submission_tag) #: Dict[str,Dict[str,List[int]]], pd.DatafRmae
     
     return {"sample_attributes" : sample_attrs, "sample_map" : sample_map }
-    
-    r = DB.meta.get_sample_attributes(tag = submission_tag)
-    
-    print(r)
-    return r 
+
 
 @router.get("/submissions/{submission_tag}/summary")
 def get_submission_summary_string(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
@@ -678,7 +672,7 @@ def get_submission_summary_string(submission_tag : str, user : UserModel = Depen
 
 @router.get("/submissions/{submission_tag}/samples")
 def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
-    "Returns the samples associated with the submission"
+    "Returns the samples tags associated with the submission"
     return DB.submissions.get_samples(tag=submission_tag)
 
 @router.get("/submissions/{submission_tag}/samplelist")

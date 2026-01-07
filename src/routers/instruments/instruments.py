@@ -7,8 +7,9 @@ from services.users import is_user_admin, get_user_from_token
 from config.models.user import UserModel
 from config.models.attributes import AttributeValueModel, TraitModel
 from config.enums.states import SubmissionStatesEnums
-
-from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel
+from config.enums.users.roles import UserRolesEnum
+from config.models.permissions import PermissionResponseModel
+from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel, InstrumentsStateResponseModel
 
 
 from lib.database.Database import Database
@@ -32,6 +33,13 @@ def get_instrument_type_tags(user : UserModel = Depends(get_user_from_token)) ->
     "Instruments are grouped by type."
     return DB.instruments.get_types()
 
+
+@router.get("/permissions") 
+def get_instrument_permissions(user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the instrument tags the user has permission to access."
+    return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.CURATOR, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, edit= user.role >= UserRolesEnum.CURATOR) 
+
+
 @router.get("/states/q")
 def get_instrument_state_by_search_string(search_string : str, limit : int = 20):
     return DB.instrument_states.find(search_string)
@@ -54,6 +62,13 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
 def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
     "Returns the duration of all states for an instrument." 
     return DB.instrument_states.get_state_durations(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+
+@router.get("/{instrument_tag}/states") 
+def get_instrument_states(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentsStateResponseModel]:
+    "Returns the state tags for an instrument." 
+    return DB.instrument_states.get_instrument_state(instrument_tag = instrument_tag, limit = limit)
+    
+    #return DB.instrument_states.get_states(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
 
 
 @router.get("/{instrument_tag}/states/{state_tag}/durations") 

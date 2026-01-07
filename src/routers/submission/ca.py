@@ -32,6 +32,23 @@ def get_submission_condition_application_attributes(submission_tag: str, user: U
 
 
 
+@router.get("/{submission_tag}/samples/ca")
+def get_submission_sample_condition_applications(submission_tag: str, ser: UserModel = Depends(get_user_from_token)) -> List:
+    sample_tags = DB.submissions.get_samples(tag = submission_tag)  #get samples 
+    r = []
+    for sample_tag in sample_tags:
+        ri = {"tag" : sample_tag}
+        ca_tags = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)  #preload condition applications for samples
+        print(ca_tags)
+        for ca_tag in ca_tags:
+            ri[ca_tag.attribute_tag] = ca_tag.condition_application_tags
+
+        r.append(ri)
+    df = pd.DataFrame.from_dict(r)
+    return df.to_dict(orient="records")
+    
+    
+    
 @router.get("/{submission_tag}/samples/ca/attributes")
 def get_submission_sample_condition_application_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     "Return the condition application attributes for samples of a given submission."

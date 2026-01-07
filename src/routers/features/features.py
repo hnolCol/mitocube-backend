@@ -122,14 +122,14 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag)
         di["value"] = quantified_value
         if append_condition_procedure:
-            ca_tags = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)
+            condition_applications = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)
             
-            for ca_tag in ca_tags:
-                attribute_tag = ca_tag.get("attribute_tag")
+            for ca in condition_applications:
+                attribute_tag = ca.attribute_tag
                 if attribute_tag is None:   
                     continue
                 attribute_tags.add(attribute_tag)
-                condition_application_tags = ";".join(ca_tag.get("condition_application_tags", []))
+                condition_application_tags = ";".join(ca.condition_application_tags)
                 di[attribute_tag] = condition_application_tags
                 #else:
         d.append(di)

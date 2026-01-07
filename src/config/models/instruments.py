@@ -14,7 +14,7 @@ class InstrumentStateModel(BaseModel):
 class InstrumentsStateResponseModel(BaseModel):
     tag : str 
     created_at : float 
-    comment : str 
+    comment : Optional[str] = None 
     
 class InstrumentStateHistoryModel(BaseModel):
     "Model for a instrument state history"
