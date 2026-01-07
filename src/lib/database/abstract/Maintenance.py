@@ -4,7 +4,7 @@ from abc import abstractmethod, ABC
 from typing import List, Literal
 from deprecated import deprecated
 
-from config.models.maintenance import MaintenanceInsertModel, MaintenanceBaseModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceStateResponseModel, MaintenanceProcedureResponseModel #, InstrumentMaintenanceModel
+from config.models.maintenance import MaintenanceInsertModel, MaintenanceBaseModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceStateResponseModel, MaintenanceProcedureResponseModel, ExternalServiceInsertModel, ExternalServiceModel #, InstrumentMaintenanceModel
 
 
 class MaintenanceEventABC(ABC):
@@ -62,9 +62,9 @@ class MaintenanceEventABC(ABC):
         """
 
     @abstractmethod
-    def costs(self, instrument_tag  : str = None, timestamp_min : float = None, timestamp_max : float = None) -> float:
+    def costs(self, tag : str = None, instrument_tag  : str = None, timestamp_min : float = None, timestamp_max : float = None) -> float:
         """Calculate the costs for maintenance event. Either for a specific instrument
-        or the total costs. 
+        or the total costs. TO DO: move instrumnent tag to InstrumentClass ! 
 
         Parameters
         ----------
@@ -131,6 +131,52 @@ class MaintenanceEventABC(ABC):
         "Insert a new maintenance event. "
 
 
+    @abstractmethod
+    def add_external_service(self, tag: str, external_service_tag: str, user_tag: str) -> bool:
+        """
+        Links an external service to a maintenance event.
+
+        Parameters
+        ----------
+        tag : str
+            The maintenance event tag.
+        external_service_tag : str
+            The external service tag.
+        user_tag : str, optional
+            The user who links the service, by default None
+
+        Returns
+        -------
+        bool
+            True if the linking was successful, otherwise False.
+        """
+    
+    @abstractmethod
+    def remove_external_service(self, tag: str, external_service_tag: str, user_tag: str) -> bool:
+        """
+        Removes the link between an external service and a maintenance event.
+
+        Parameters
+        ----------
+        tag : str
+            The maintenance event tag.
+        external_service_tag : str
+            The external service tag.
+        user_tag : str, optional
+            The user who removes the link, by default None
+
+        Returns
+        -------
+        bool
+            True if the removal was successful, otherwise False.
+        """
+
+
+    @abstractmethod
+    def update_costs(self, tag: str) -> float:
+        """
+        Updates and returns total costs of a maintenance event.
+        """
         
 class MaintenanceProcedureABC(ABC):
 
@@ -324,4 +370,224 @@ class MaintenanceProcedureABC(ABC):
             True if the procedure was deleted successfully, False otherwise.
         """
         
+
+class ExternalServicesABC(ABC):
+    """
+    Abstract Base Class for external maintenance services.
+
+    An ExternalService represents an third-party company or person that 
+    performs maintenance on an instrument. 
+    """
+    
+    @abstractmethod
+    def exists(self, tag: str) -> bool:
+        """
+        Check if a mainteance service with the given tag exists.
+
+         Parameters
+        ----------
+        tag : str
+            The service tag.
+
+        Returns
+        -------
+        bool
+            True if the service exists, otherwise False.
+        """
+
+    @abstractmethod
+    def find(self, search_string: str = "", limit: int = 20) -> List[str]:
+        """Find external services by a search string and returns the tags that match. 
+
+        Parameters
+        ----------
+        search_string : str, optional
+            The query string, by default ""
+        limit : int, optional
+            The maximum number of services to be returned., by default 20
+
+        Returns
+        -------
+        List[str]
+            The service tags. 
+        """ 
+
+    @abstractmethod
+    def get(self, tag: str) -> ExternalServiceModel:
+        """
+        Get the complete external service model.
+
+        Parameters
+        ----------
+        tag : str
+            The maintenance service tag.
+            The model containing all required fields for creating a maintenance service.
+
+        Returns
+        -------
+       ExternalServiceModel
+            A model containing all maintenance service data.
+        """
+
+    @abstractmethod
+    def insert(self, service: ExternalServiceInsertModel, user_tag : str, is_active : bool = True) -> bool:
+        """
+        Inserts a new external maintenance service. 
+
+        Parameters
+        ----------
+        service : ExternalServiceInsertModel
+                        The model containing all required fields for creating a external service.
+
+         Returns
+        -------
+        bool
+            True if the insertion was successful, otherwise False.
+        """
+    
+    @abstractmethod
+    def delete(self, tag : str, is_active : bool = False) -> bool:
+        """
+        Delete a external service from the database.
+
+        Parameters
+        ----------
+        tag : str
+           The service tag.
+
+        Returns
+        -------
+        bool
+           True if the deletion was successful, otherwise False.
+        """
+    
+    @abstractmethod
+    def update(self, service: ExternalServiceModel, user_tag: str = None) -> bool:
+        """
+        Update an existing external service in the database.
+
+        Parameters
+        ----------
+        tag : str
+            The service tag to be updated.
+        service: ExternalServiceModel
+            Model containing updated field values.
+
+        Returns
+        -------
+        bool
+            True if the update was successful.
+        """
+
+
+    @abstractmethod
+    def get_description(self, tag: str) -> str:
+        """
+        Get the description of the service by its tag. 
+
+        Parameters
+        ----------
+        tag : str
+            The service tag.
+
+        Returns
+        -------
+        str
+            The description of the external service.
+        """
+
+    @abstractmethod
+    def get_name(self, tag: str) -> str:
+        """
+        Get the name of the person that provided the service by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The servicce tag.
+
+        Returns
+        -------
+        str
+            The person's name.
+        """
+
+    @abstractmethod
+    def get_company(self, tag: str) -> str:
+        """
+        Get the company name providing the service.
+
+        Parameters
+        ----------
+        tag : str
+            The service tag.
+
+        Returns
+        -------
+        str
+            The company name.
+        """
+
+    @abstractmethod
+    def get_email(self, tag: str) -> str:
+        """
+        Get the contact person's email address. 
+
+        Parameters
+        ----------
+        tag : str
+           The service tag. 
+
+        Returns
+        -------
+        str
+            Email address.
+        """
+
+    @abstractmethod
+    def get_costs(self, tag: str) -> float | int:
+        """
+        Get cost of the service
+
+        Parameters
+        ----------
+        tag : str
+           The service tag. 
+
+        Returns
+        -------
+        float | int
+            Cost of the service
+        """
+
+    @abstractmethod
+    def get_billing_number(self, tag: str) -> str:
+        """
+        Get the billing or invoice number. 
+
+        Parameters
+        ----------
+        tag : str
+           The service tag. 
+
+        Returns
+        -------
+        str
+           The billing or invoice number
+        """
+
+    @abstractmethod
+    def get_internal_id(self, tag: str) -> str:
+        """
+        Get Internal ID for the service. 
         
+        Parameters
+        ----------
+        tag : str
+            The service tag. 
+
+        Returns
+        -------
+        str
+           Internal ID 
+        """

@@ -40,3 +40,12 @@ def get_symptoms_permissions(user: UserModel = Depends(get_user_from_token)) -> 
                                    insert = user.role >= UserRolesEnum.STANDARD, 
                                    delete = user.role >= UserRolesEnum.CURATOR,
                                    edit = user.role >= UserRolesEnum.CURATOR)
+
+@router.get("/externalservice")
+def get_external_service_permissions(user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
+
+    return PermissionResponseModel(user_tag = user.tag, 
+                                   role = user.role, 
+                                   insert = user.role >= UserRolesEnum.STANDARD, 
+                                   delete = user.role >= UserRolesEnum.CURATOR,
+                                   edit = user.role >= UserRolesEnum.CURATOR)   

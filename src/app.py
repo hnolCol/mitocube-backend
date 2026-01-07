@@ -58,6 +58,7 @@ from routers.maintenance import maintenance
 from routers.maintenance import maintenancepermissions
 from routers.maintenance import procedures
 from routers.maintenance import spareparts
+from routers.maintenance import externalservice
 from routers.peptides import peptides
 from routers.metatexts import metatexts
 from routers.condition_applications import condition_applications
@@ -110,7 +111,8 @@ router_sources = [dataset,
                   maintenancepermissions,
                   symptoms,
                   procedures,
-                  spareparts, 
+                  spareparts,
+                  externalservice,
                   peptides,
                   samples,
                   condition_applications,
@@ -130,8 +132,8 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 DB = Database.DB()
 
 #DB.attributes._utils_insert_from_file()
-
-                     
+DB.instrument_states._utils_insert_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
+DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t")        
                                      
 #check for users, essentially, create admin user if no users exists with the defined admin email.
 DB.users.check()
@@ -143,7 +145,8 @@ if CTRL_PROTEOME_SETTINGS.add_control_proteome:
     DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
     DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
     DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
-    
+
+
 
 origins = [
     "http://localhost:5000",

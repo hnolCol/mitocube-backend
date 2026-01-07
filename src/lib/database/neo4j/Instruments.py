@@ -14,7 +14,7 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
     
-    def _utils_insert_from_file(self, file_path : str =  "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", *args, **kwargs):
+    def _utils_insert_from_file(self, file_path : str =  "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", *args, **kwargs):
         
         instrument_states = pd.read_csv(file_path, *args, **kwargs)
         if not all(column_name in instrument_states.columns for column_name in ["tag","text","description","color"]):
@@ -231,3 +231,33 @@ class Neo4JInstruments(InstrumentsABC):
         r = self._driver.execute_query(query, routing_="r",result_transformer_=Result.data, tags = tags, attribute_tags = attribute_tags)
         
         return r 
+    
+    def costs(self, instrument_tag  : str = None, timestamp_min : float = None, timestamp_max : float = None) -> float:
+        """ Returns sum costs of maintenance events for a specific instrument"""
+
+        query = "MATCH (me:MaintenanceEvent)<-[r:HAS_EVENT]-(t:Trait) "
+        if any([instrument_tag is not None, timestamp_min is not None, timestamp_max is not None]):
+            query += "WHERE "
+            
+            if instrument_tag  is not None:
+                query += " t.tag = $instrument_tag  AND EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a:Attribute)-[:HAS_TRAIT]->(t) WHERE ag.tag = 'instrument'} "
+            
+            if timestamp_min is not None:
+                if instrument_tag is not None:
+                    query += "AND "
+                query += "me.created_at >= $timestamp_min "
+            if timestamp_max is not None:
+                if instrument_tag is not None or timestamp_min is not None:
+                    query += "AND "
+                query += "me.created_at <= $timestamp_max "
+        
+        query += "RETURN sum(me.costs)"
+        
+        r = self._driver.execute_query(query, 
+                                       instrument_tag  = instrument_tag , 
+                                       timestamp_max = timestamp_max,
+                                       timestamp_min = timestamp_min,
+                                       routing_= "r", 
+                                       result_transformer_ = Result.value)
+        if len(r) == 0: return None # No maintenance events found for instrument tag.
+        return r[0]

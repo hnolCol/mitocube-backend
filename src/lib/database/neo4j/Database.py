@@ -22,7 +22,7 @@ from lib.database.neo4j.Timeline import Neo4JTimeline
 from lib.database.neo4j.ResearchGroup import Neo4JResearchGroup
 from lib.database.neo4j.Phenotypes import Neo4JPhenotypes
 from lib.database.neo4j.Samples import Neo4JSamples
-from lib.database.neo4j.Maintenance import Neo4JMaintenanceProcedure, Neo4JMaintenanceEvent
+from lib.database.neo4j.Maintenance import Neo4JMaintenanceProcedure, Neo4JMaintenanceEvent, Neo4JExternalServices
 from lib.database.neo4j.Symptoms import Neo4jSymptoms
 from lib.database.neo4j.SpareParts import Neo4jSpareParts
 from lib.database.neo4j.ConditionApplications import Neo4JConditionApplications
@@ -67,7 +67,8 @@ class MCNeo4JDatabase(DatabaseABC):
         self.samples = Neo4JSamples(driver=self.connection.driver, condition_applications=self.condition_applications)
         self.peptides = Neo4JPeptides(driver = self.connection.driver, samples=self.samples)
         self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
-        self.maintenance_event = Neo4JMaintenanceEvent(driver = self.connection.driver)
+        self.maintenance_events = Neo4JMaintenanceEvent(driver = self.connection.driver)
+        self.external_service = Neo4JExternalServices(driver=self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
         

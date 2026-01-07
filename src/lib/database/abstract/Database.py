@@ -23,7 +23,7 @@ from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesAB
 from lib.database.abstract.Timeline import TimelineABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from lib.database.abstract.Phenotypes import PhenotypeABC
-from lib.database.abstract.Maintenance import MaintenanceProcedureABC 
+from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC, ExternalServicesABC
 from lib.database.abstract.SpareParts import SparePartsABC
 from lib.database.abstract.Symptoms import SymptomABC
 from lib.database.abstract.Samples import SamplesABC
@@ -82,6 +82,8 @@ class DatabaseABC(ABC):
     research_groups : ResearchGroupABC = None
     phenotypes: PhenotypeABC = None
     maintenance_procedures : MaintenanceProcedureABC  = None 
+    maintenance_events : MaintenanceEventABC = None
+    external_service : ExternalServicesABC = None
     spareparts : SparePartsABC = None
     symptoms : SymptomABC = None
     samples : SamplesABC = None

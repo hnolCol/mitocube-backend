@@ -2,8 +2,8 @@ from neo4j import Driver, Result
 from typing import List, Literal
 import pandas as pd 
 
-from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC
-from config.models.maintenance import MaintenanceBaseModel, MaintenanceInsertModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceProcedureResponseModel, MaintenanceStateResponseModel, MiantenanceProcedureInsertModel #,InstrumentMaintenanceModel
+from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC, ExternalServicesABC
+from config.models.maintenance import  MaintenanceInsertModel, MaintenanceEventInsertModel, MaintenanceEventModel, MaintenanceProcedureResponseModel, MaintenanceStateResponseModel, MiantenanceProcedureInsertModel, ExternalServiceInsertModel, ExternalServiceModel #,InstrumentMaintenanceModel
 
 REQUIRED_COLUMNS = ["tag","text","description"]
 
@@ -172,8 +172,11 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         query += ("OPTIONAL MATCH (me)-[:UTILIZED]->(sp:SparePart) "
                   "WITH collect(sp.tag) as sparepart_tags, symptom_tags, me, u, t, maintenance_tags, instrument_state_tag ")
         
+        query += ("OPTIONAL MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
+                  "WITH collect(es.tag) as external_service_tag, sparepart_tags, symptom_tags, me, u, t, maintenance_tags, instrument_state_tag ")
+
         query += ("RETURN {tag : me.tag, created_at : me.created_at, user_tag : u.tag, instrument_tag : t.tag, description : me.description, sparepart_tags : sparepart_tags, "
-                "costs : me.costs, maintenance_procedure_tags : maintenance_tags, symptom_tags : symptom_tags, instrument_state_tag : instrument_state_tag} ORDER BY me.created_at DESC ")
+                "costs : me.costs, maintenance_procedure_tags : maintenance_tags, symptom_tags : symptom_tags, instrument_state_tag : instrument_state_tag, external_service_tag : external_service_tag} ORDER BY me.created_at DESC ")
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag) 
         print(r)
@@ -188,38 +191,16 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
             return [MaintenanceEventModel(**ri) for ri in r]
         
     
-    def costs(self, instrument_tag  : str = None, timestamp_min : float = None, timestamp_max : float = None) -> float:
-        """
-        Sum of costs in total or by instrument. 
-        If no instrument tag is provided, the total costs are returned in the given time stamp range. 
-        If no time stamp range is provided, the total costs are returned for all maintenance events."""
+    def costs(self, tag : str = None ) -> float:
+        """Returns sum costs of a specific maintenance event"""
         
-        query = "MATCH (me:MaintenanceEvent)<-[r:HAS_EVENT]-(t:Trait) "
-        if any([instrument_tag is not None, timestamp_min is not None, timestamp_max is not None]):
-            query += "WHERE "
-            
-            if instrument_tag  is not None:
-                query += " t.tag = $instrument_tag  AND EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a:Attribute)-[:HAS_TRAIT]->(t) WHERE ag.tag = 'instrument'} "
-            
-            if timestamp_min is not None:
-                if instrument_tag is not None:
-                    query += "AND "
-                query += "me.created_at >= $timestamp_min "
-            if timestamp_max is not None:
-                if instrument_tag is not None or timestamp_min is not None:
-                    query += "AND "
-                query += "me.created_at <= $timestamp_max "
         
-        query += "RETURN sum(me.costs)"
+        query = "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) RETURN me.costs "
         
-        r = self._driver.execute_query(query, 
-                                       instrument_tag  = instrument_tag , 
-                                       timestamp_max = timestamp_max,
-                                       timestamp_min = timestamp_min,
-                                       routing_= "r", 
-                                       result_transformer_ = Result.value)
-        if len(r) == 0: return None # No maintenance events found for instrument tag.
+        r = self._driver.execute_query(query, routing_="r", maintenance_event_tag = tag, result_transformer_=Result.value)
+        if len(r) == 0: return None # No maintenance event found for tag.
         return r[0]
+
         
     def delete(self, tag : str) -> None:
         """
@@ -385,14 +366,20 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
             
         query += (
             "MATCH (me)-[r:PERFORMED]->(m) "
-            "SET m.modified_at = timestamp() "
-            "CASE WHEN r.count > 1 THEN "
-            "SET r.count = r.count - 1 "
-            "ELSE "     
+            "SET me.modified_at = timestamp() "
             "DELETE r "
             "WITH me "
             "MATCH (me)-[:PERFORMED]->(m:MaintenanceProcedure) "
             "RETURN m.tag "
+            # "MATCH (me)-[r:PERFORMED]->(m) "
+            # # "SET m.modified_at = timestamp() "
+            # # "CASE WHEN r.count > 1 THEN "
+            # # "SET r.count = r.count - 1 "
+            # # "ELSE "     
+            # "DELETE r RETURN true "
+            # "WITH me "
+            # "MATCH (me)-[:PERFORMED]->(m:MaintenanceProcedure) "
+            # "RETURN m.tag "
         )
         
         r = self._driver.execute_query(query, 
@@ -402,6 +389,48 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
                                 result_transformer_=Result.value)
         return r 
     
+
+   
+    #     query = (
+    #         "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
+    #         "MATCH (me)-[r:UTILIZED]->(sp:SparePart) "
+    #         "WITH me, collect(r.count * sp.price) as total_sparepart_costs "
+    #         "MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
+    #         "WITH me, total_sparepart_costs, sum(es.costs) as total_external_service_costs "
+    #         "SET me.costs = total_sparepart_costs + total_external_service_costs, "
+    #         "me.modified_at = timestamp() "
+    #         "RETURN me.costs "
+    #         )
+        
+
+
+    def update_costs(self, tag: str) -> float:
+        """
+        Updates the costs of a maintenance event.
+        """
+
+        query = (
+            "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
+            "MATCH (me)-[r:UTILIZED]->(sp:SparePart) "
+            "WITH me, collect(r.count * sp.price) as sparepart_costs "
+            "WITH me, reduce(total = 0.0, x IN sparepart_costs | total + x) AS total_sparepart_costs "
+            "MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
+            "WITH total_sparepart_costs, sum(es.costs) as total_external_service_costs, me "
+            "SET me.costs = total_sparepart_costs + total_external_service_costs, me.modified_at = timestamp() "
+            "RETURN me.costs "
+            )
+        
+
+        r = self._driver.execute_query(
+            query,
+            maintenance_event_tag=tag,
+            routing_="w",
+            result_transformer_=Result.value
+        )
+
+        return r[0] if r else 0.0
+
+
     def add_sparepart(self, tag : str, sparepart_tag : str = None) -> List[str]:
         """
         Removes a spare part from a maintenance event. 
@@ -415,7 +444,7 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         """
         
         query = (
-            "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
+            "MATCH (me:MaintenanceEvent {tag: $maintenance_event_tag}) "
             "MATCH (sp:SparePart {tag : $sparepart_tag}) ")
     
         query += (
@@ -507,7 +536,7 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         elif N == 1:
             query += (
                 "DELETE r "
-                "RETURN true"
+                "RETURN true "
         )   
         
         r = self._driver.execute_query(query, 
@@ -591,8 +620,8 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         """
         
         query = (
-            "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
-            "MATCH (ms:MaintenanceState {tag : $state_tag}) "
+            "MATCH (me:MaintenanceEvent {tag: $maintenance_event_tag}) "
+            "MATCH (ms:MaintenanceState {tag: $state_tag}) "
             "CREATE (me)-[r:IN_STATE]->(ms) "
             "SET r.tag = randomUUID(), r.created_at = timestamp(), r.maintenance_event_tag = $maintenance_event_tag, r.user_tag = $user_tag, "
             "r.description = $description "
@@ -609,7 +638,70 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         if len(r) == 0:
             raise ValueError(f"No maintenance event found with tag {tag} or no maintenance state found with tag {state_tag}.")  
         return r[0] if isinstance(r[0], str) else None  # Return the tag of the state that was set.
+
+    def add_external_service(self, tag : str, external_service_tag : str, user_tag : str = None) -> List[str]:
+        """
+        Adds an external service to a maintenance event.
         
+        Parameters
+        ----------
+        maintenance_event_tag : str
+            The tag of the maintenance event.
+        external_service_tag : str
+            The tag of the external service.
+        user_tag : str
+            The tag of the user adding the external service.
+        
+        Returns
+        -------
+        List[str]
+            A list of external service tags associated with the maintenance event.
+        """
+        
+        query = (
+            "MATCH (me:MaintenanceEvent {tag: $maintenance_event_tag}) "
+            "MATCH (es:ExternalService {tag: $external_service_tag}) "
+            "MERGE (me)-[r:HAS_EXTERNAL_SERVICE]->(es) "
+            "SET r.created_at = timestamp(), r.user_tag = $user_tag "
+            "WITH me "
+            "MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
+            "RETURN es.tag "
+        )
+        
+        r = self._driver.execute_query(query, 
+                                   routing_="w", 
+                                   maintenance_event_tag = tag, 
+                                   external_service_tag = external_service_tag,
+                                   user_tag = user_tag,
+                                   result_transformer_=Result.value)
+        return r
+    
+    def remove_external_service(self, tag, external_service_tag, user_tag):
+        """
+        Removes an external service from a maintenance event.
+        
+        Parameters
+        ----------
+        maintenance_event_tag : str
+            The tag of the maintenance event.
+        external_service_tag : str
+            The tag of the external service.
+        user_tag : str
+            The tag of the user removing the external service.
+        """
+        
+        query = (
+            "MATCH (me:MaintenanceEvent {tag: $maintenance_event_tag}) "
+            "MATCH (es:ExternalService {tag: $external_service_tag}) "
+            "MATCH (me)-[r:HAS_EXTERNAL_SERVICE]->(es) "
+            "DELETE r "
+        )
+        
+        self._driver.execute_query(query, 
+                                   routing_="w", 
+                                   maintenance_event_tag = tag, 
+                                   external_service_tag = external_service_tag,
+                                   user_tag = user_tag)
 
 class Neo4JMaintenanceProcedure(MaintenanceProcedureABC):
     ""
@@ -632,10 +724,10 @@ class Neo4JMaintenanceProcedure(MaintenanceProcedureABC):
             "MERGE (m:MaintenanceProcedure {tag : m_prop.tag}) "
             "ON CREATE " 
             "SET m.description = m_prop.description, m.text = m_prop.text, m.s = m_prop.s, "
-            "m.priority = m_prop.priority, m.created_at = timestamp() "
+            "m.priority = m_prop.priority, m.created_at = timestamp(), m.is_active = true "
             "ON MATCH "
             "SET m.description = m_prop.description, m.text = m_prop.text, m.s = m_prop.s, "
-            "m.priority = m_prop.priority, m.modified_at = timestamp() "
+            "m.priority = m_prop.priority, m.modified_at = timestamp(), m.is_active = true "
             "RETURN count(m)"
             ) 
         
@@ -896,3 +988,283 @@ class Neo4JMaintenanceProcedure(MaintenanceProcedureABC):
         )
 
         return True if result is not None else False
+
+
+
+class Neo4JExternalServices(ExternalServicesABC):
+
+    def __init__(self, driver : Driver) -> None:
+        
+        self._driver = driver 
+
+    def exists(self, tag: str) -> bool:
+        """
+        Checks if a mainteance service with the given tag exists.
+        """
+
+        query = (
+            "WITH EXISTS {(es:ExternalService {tag: $tag})} as es_exists "
+            "RETURN es_exists "
+        )
+
+        exists = self._driver.execute_query(query, tag = tag, routing_ = "r")    
+        return exists[0]
+    
+    def find(self, search_string: str = "", limit: int = 20, is_active: bool = True, sort: bool = True) -> List[str]:
+        """
+        Find external services by a search string.
+        """
+
+        query = (
+            "MATCH (es:ExternalService) "
+            "WHERE es.is_active = $is_active "
+        )
+
+        # Only filter if non-empty search
+        search_string = search_string.lower().strip()
+        if search_string:
+            query += "AND es.s CONTAINS $search_string "
+
+        query += "RETURN es.tag "
+
+        if sort:
+            query += "ORDER BY es.name "
+
+        if limit is not None:
+            query += "LIMIT $limit"
+
+        services = self._driver.execute_query(
+            query,
+            search_string=search_string,
+            limit=limit,
+            is_active=is_active,
+            routing_="r",
+            result_transformer_=Result.value,
+        )
+
+        return services
+
+    def get(self, tag: str) -> ExternalServiceModel:
+        "Get the complete external service model."
+
+        if not self.exists(tag):
+            raise ValueError("Tag not associated with an external service.")
+        
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN properties(es) "
+        )
+
+        service = self._driver.execute_query(query, tag=tag, routing= "r", result_transformer_= Result.value)
+
+        if len(service) == 0:
+            raise ValueError("Tag exists, but database returns None.")
+        
+        return ExternalServiceModel(**service[0])
+
+    def insert(self, service: ExternalServiceInsertModel, user_tag : str, is_active : bool = True) -> bool:
+        """
+        Inserts a new external service in the database. 
+        """
+
+        query = (
+            "MATCH (u:User {tag: $user_tag}) "
+            "MERGE (es:ExternalService {tag: $tag}) "
+            "ON CREATE SET es.is_active = $is_active, "
+            "              es.created_at = timestamp(), "
+            "              es.description = $description, "
+            "              es.name = $name, "
+            "              es.company = $company, "
+            "              es.email = $email, "
+            "              es.costs  = $costs, "
+            "              es.billing_number = $billing_number, "
+            "              es.s = toLower($description), "
+            "              es.internal_id = $internal_id "
+            "WITH u, es "
+            "CREATE (u)-[:CREATED {created_at: timestamp()}]->(es) "
+            "RETURN true AS ok "
+        )
+
+        ok = self._driver.execute_query(query,
+                                        tag=service.tag,
+                                        user_tag=user_tag,
+                                        is_active=is_active,
+                                        description=service.description,
+                                        name=service.name,
+                                        company=service.company, 
+                                        email=service.email,
+                                        costs=service.costs,
+                                        billing_number=service.billing_number,
+                                        internal_id=service.internal_id,
+                                        routing_="w",
+                                        result_transformer_=Result.value
+        )
+
+        return ok[0]
+    
+   
+    def delete(self, tag : str, is_active : bool = False) -> bool:
+        "Delete a service event from the database."
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "SET es.is_active = $is_active "
+            "RETURN true as OK "
+        )
+
+        result = self._driver.execute_query(query,
+                                            tag=tag,
+                                            is_active=is_active,
+                                            routing_="w",
+                                            result_transformer_=Result.value
+        )
+
+        return True if result is not None else False
+
+
+    def update(self, service: ExternalServiceModel, user_tag: str = None) -> bool:
+        "Update an existing service."
+
+        if not self.exists(service.tag):
+            raise ValueError("External Service does not exist.")
+        
+        query = (
+                "MATCH (es:ExternalService {tag: $tag}) "
+                "SET "
+                "   es.description = $description, "
+                "   es.name = $name, "
+                "   es.company = $company, "
+                "   es.email = $email, "
+                "   es.costs = $costs, "
+                "   es.billing_number = $billing_number, "
+                "   es.internal_id = $internal_id, "
+                "   es.modified_at = timestamp() "
+                "WITH es "
+                "MATCH (u:User {tag: $user_tag}) "
+                "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(es) "
+                "RETURN true as ok "
+
+        )
+
+        ok = self._driver.execute_query(query,
+                                        tag=service.tag,
+                                        user_tag=user_tag,
+                                        description=service.description,
+                                        name=service.name,
+                                        company=service.company, 
+                                        email=service.email,
+                                        costs=service.costs,
+                                        billing_number=service.billing_number,
+                                        internal_id=service.internal_id,
+                                        routing_="w",
+                                        result_transformer_=Result.value
+        )
+
+        return ok[0]
+    
+    def get_description(self, tag: str) -> str:
+        """
+        Get the description of the external service by its tag. 
+        """
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.description as description "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]
+    
+    def get_name(self, tag: str) -> str:
+        """
+        Get the name of the person that provided the service by its tag.
+        """
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.name as name "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]
+    
+    def get_company(self, tag: str) -> str:
+        """
+        Get the company name providing the service.
+        """
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.company as company "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]
+
+    def get_email(self, tag: str) -> str:
+        """
+        Get the contact person's email address. 
+        """
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.email as email "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]
+
+    def get_costs(self, tag: str) -> float | int:
+        """
+        Get costs of the service
+        """
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.costs as costs "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]
+    
+
+
+    def get_billing_number(self, tag: str) -> str:
+        """
+        Get the billing or invoice number. 
+        """
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.billing_number as billing_number "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]
+
+
+    def get_internal_id(self, tag: str) -> str:
+        """
+        Get Internal ID for the service. 
+        """
+
+        query = (
+            "MATCH (es:ExternalService {tag: $tag}) "
+            "RETURN es.internal_id as internal_id "
+        )
+
+        r = self._driver.execute_query(
+            query, tag=tag, routing_="r", result_transformer_=Result.value
+        )
+        return r[0]

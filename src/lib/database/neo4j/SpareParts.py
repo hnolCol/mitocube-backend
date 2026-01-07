@@ -22,9 +22,9 @@ class Neo4jSpareParts(SparePartsABC):
             "MERGE (s:SparePart {tag : sp_props.tag}) "
             "ON CREATE "
             "SET s.created_at = timestamp(), s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.company = sp_props.company, "
-            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link "
+            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link, s.is_active = true "
             "ON MATCH "
-            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link "
+            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link, s.is_active = true"
             "RETURN count(s) as count"
         )
     
@@ -369,7 +369,7 @@ class Neo4jSpareParts(SparePartsABC):
                 "WITH s "
                 "MATCH (u:User {tag: $user_tag}) "
                 "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(s) "
-                "RETURN true AS ok"
+                "RETURN true AS ok "
         )
 
         ok = self._driver.execute_query(query,
