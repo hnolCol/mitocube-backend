@@ -246,7 +246,7 @@ class Neo4JSamples(SamplesABC):
             query += "RETURN collect(condition.tag) "
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.values if group_by_attribute else Result.value)
         if group_by_attribute:
-            return [{"attribute_tag" : ri[0], "condition_application_tags" : ri[1]} for ri in r]
+            return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
         return r[0] if len(r) > 0 else []
         
     

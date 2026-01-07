@@ -19,27 +19,6 @@ class ConditionApplicationTreeModel(BaseModel):
     children : List[ConditionApplicationTreeModel] = []
     
 
-# ca = ConditionApplicationTreeModel()
-# def transform_for_ui(item : ConditionApplicationTreeModel, r : List = None) -> List[Dict]:
-#     if r is None:
-#         r = []
-    
-#     r.append({
-#         "type" : "attribute",
-#         "tag" : item.attribute_tag,
-#         "children" : [
-#             {
-#                 "type" : "trait",
-#                 "tag" : item.trait_tag,
-#                 "value" : item.value,
-#                 "children" : [transform_for_ui(r = [], item = child) for child in item.children]
-#             }
-#         ]
-#     })
-#     return r
-
-
-
 
 class ConditionApplicationTreeResponseModel(ConditionApplicationTreeModel):
     ""

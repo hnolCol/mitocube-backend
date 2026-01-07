@@ -104,6 +104,7 @@ class SamplesABC(ABC):
         List[str]|str
             A list of condition procedure tags. If only a single tag is found, a single string is returned.
             If no tag is found, an empty list is returned.
+            If group_by_attribute is True, a list of ConditionApplicationAttributeModel is returned.
         """
         
     @abstractmethod
