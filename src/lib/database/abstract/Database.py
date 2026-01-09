@@ -36,6 +36,7 @@ from lib.database.abstract.ProteinGroups import ProteinGroupsABC
 from lib.database.abstract.Proteins import ProteinsABC
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
+from lib.database.abstract.Annotations import AnnotationsABC, AnnotationGroupsABC
 
 
 
@@ -93,6 +94,8 @@ class DatabaseABC(ABC):
     openai : OpenAIClient  = None #not checked for existence, since it is not mandatory
     cache : CacheABC = None 
     proteins :  ProteinsABC = None
+    annotations : AnnotationsABC = None
+    annotation_groups : AnnotationGroupsABC = None
 
     def __init__(self):
         """The abstract database class that defines
