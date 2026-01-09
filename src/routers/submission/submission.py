@@ -171,6 +171,12 @@ def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_use
         return tag_not_found
     return DB.submissions.get_title(tag = submission_tag)
 
+@router.get("/submissions/{submission_tag}/attributes")
+def get_submission_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the submission attributes by its tag."
+    if not DB.submissions.exists(tag = submission_tag):
+        return tag_not_found
+    return DB.submissions.get_attributes(tag = submission_tag)
 
 @router.patch("/submissions/{submission_tag}/title")
 def update_submission_title(submission_tag : str, title : str, user : UserModel = Depends(is_creator_of_submission_or_curator)) -> bool:

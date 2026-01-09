@@ -390,19 +390,6 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         return r 
     
 
-   
-    #     query = (
-    #         "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) "
-    #         "MATCH (me)-[r:UTILIZED]->(sp:SparePart) "
-    #         "WITH me, collect(r.count * sp.price) as total_sparepart_costs "
-    #         "MATCH (me)-[:HAS_EXTERNAL_SERVICE]->(es:ExternalService) "
-    #         "WITH me, total_sparepart_costs, sum(es.costs) as total_external_service_costs "
-    #         "SET me.costs = total_sparepart_costs + total_external_service_costs, "
-    #         "me.modified_at = timestamp() "
-    #         "RETURN me.costs "
-    #         )
-        
-
 
     def update_costs(self, tag: str) -> float:
         """

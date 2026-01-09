@@ -178,6 +178,8 @@ for rs in router_sources:
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
+# print("starting up mitocube backend...")
+# r = DB.openai.generate_protein_phenotype_relationships("AFG3L2")
 
 
 @app.get("/", include_in_schema=False)

@@ -15,6 +15,7 @@ class SamplesABC(ABC):
               protein_group_tag : str = None, 
               trait_tag : str = None, 
               submission_tag : str = None,
+              instrument_tag : str = None,
               genotype_tag : str = None) -> int:
         
         """Counts the number of samples. The filters are optional. However no combination is supported.
@@ -33,7 +34,8 @@ class SamplesABC(ABC):
             If provided, only counts samples that are part of the given submission.
         trait_tag : str, optional
             If provided, only counts samples that have the given trait. 
-            
+        instrument_tag : str, optional
+            If provided, only counts samples that were measured by the given instrument.
         Returns 
         -------
         int

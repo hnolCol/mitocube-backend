@@ -40,6 +40,7 @@ class Neo4JSamples(SamplesABC):
               protein_group_tag : str = None, 
               submission_tag : str = None, 
               trait_tag : str = None,
+              instrument_tag : str =None,
               genotype_tag : str = None) -> int:
 
         "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
@@ -49,7 +50,7 @@ class Neo4JSamples(SamplesABC):
             )
         elif trait_tag is not None:
             query = (
-                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(trait:Trait) "
+                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission)-[:HAS_]->(trait:Trait) " ## TO DO: This is not correct, need to traverse the condition application tree
                 "WHERE trait.tag = $trait_tag "
             )
         elif submission_tag is not None:
@@ -59,6 +60,10 @@ class Neo4JSamples(SamplesABC):
         elif genotype_tag is not None:
             query = (
                 "MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype {tag : $genotype_tag})"
+            )
+        elif instrument_tag is not None:
+            query = (
+                "MATCH (s:Sample)<-[:MEASURED]-(t:Trait {tag : $instrument_tag}) "
             )
         else:
             query = (
