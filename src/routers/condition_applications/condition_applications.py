@@ -53,7 +53,7 @@ def query_condition_applications(samples_only : bool = True, submission_tag : st
     Parameters
     ----------
     samples_only : bool, optional
-        If True, only return condition applications that are associated with samples, by default False
+        If True, only return condition applications that are associated with samples, by default True
     trait_tag : str, optional
         If provided, only return condition applications that are associated with the given trait tag, by default None
     attribute_tag : str, optional

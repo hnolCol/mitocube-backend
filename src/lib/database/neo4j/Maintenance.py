@@ -140,7 +140,6 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
             query += "LIMIT $limit"
         
         r = self._driver.execute_query(query, routing_="r", instrument_tag = instrument_tag, user_tag = user_tag, limit = limit, result_transformer_=Result.value)
-        print(r)
         return r
         
         
@@ -191,14 +190,17 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
             return [MaintenanceEventModel(**ri) for ri in r]
         
     
-    def costs(self, tag : str = None ) -> float:
+    def costs(self, tag : str = None, update : bool = False) -> float:
         """Returns sum costs of a specific maintenance event"""
         
+        if update:
+            #recalculate costs
+            self.update_costs(tag)
         
         query = "MATCH (me:MaintenanceEvent {tag : $maintenance_event_tag}) RETURN me.costs "
         
         r = self._driver.execute_query(query, routing_="r", maintenance_event_tag = tag, result_transformer_=Result.value)
-        if len(r) == 0: return None # No maintenance event found for tag.
+        if len(r) == 0: return None
         return r[0]
 
         
@@ -218,8 +220,7 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         
     def insert(self, maintenance_event : MaintenanceEventInsertModel):
         "Inserts a maintenance event"
-        print(maintenance_event)
-        print(maintenance_event.model_dump(exclude_none=True))
+
         query = (
             "MERGE (me:MaintenanceEvent {tag : $maintenance_event.tag}) "
             "SET me.created_at = timestamp(), me.costs = $maintenance_event.costs,  "

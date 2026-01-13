@@ -71,13 +71,6 @@ def get_maintenance_event_state(maintenance_event_tag : str):
     
     return DB.maintenance_events.get_event_state(tag = maintenance_event_tag)
 
-# @router.get("/{maintenance_event_tag}/costs")
-# def get_maintenance_event_costs(maintenance_event_tag : str):
-#     """Returns the costs of a maintenance event by its tag."""
-#     if not DB.maintenance_events.exists(tag = maintenance_event_tag):
-#         raise HTTPException(status_code=404, detail="Maintenance event not found.")
-    
-#     return DB.maintenance_events.get_costs(tag = maintenance_event_tag)
 
 @router.post("/{maintenance_event_tag}/state/{state_tag}")
 def set_maintenance_event_state(maintenance_event_tag : str, state_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
@@ -232,7 +225,7 @@ def remove_external_service_from_maintenance_event(maintenance_event_tag : str, 
 def get_costs_by_external_service(tag : str, timestamp_min : float = None, timestamp_max : float = None, user : UserModel = Depends(get_user_from_token)):
     """Returns the total costs for a given external service. 
     """
-    costs = DB.maintenance_events.costs(external_service_tag = tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max)
+    costs = DB.external_service.get_costs(tag = tag)
     if costs is None:
         raise HTTPException(status_code=404, detail="No maintenance events found for this external service.")
     return costs
@@ -242,7 +235,7 @@ def get_costs_by_external_service(tag : str, timestamp_min : float = None, times
 def get_costs_by_instrument(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, user : UserModel = Depends(get_user_from_token)):
     """Returns the total costs for a given instrument. 
     """
-    costs = DB.maintenance_events.costs(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max)
+    costs = DB.instruments.costs(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max)
     if costs is None:
         raise HTTPException(status_code=404, detail="No maintenance events found for this instrument.")
     return costs 

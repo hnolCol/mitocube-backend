@@ -102,7 +102,7 @@ class Neo4JSamples(SamplesABC):
         print(query)
             
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag, instrument_tag = instrument_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
 
