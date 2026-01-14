@@ -187,24 +187,30 @@ class Neo4JDataset(DatasetABC):
         
         
     
-    def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
+    def get_datatable(self, tag : str, sample_tags : List[str] = None, annotation_tag : str = None) -> pd.DataFrame:
         ""
 
-        if filter_tag is None:
+        if annotation_tag is None:
             query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:ProteinGroup) "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup)"
                 )
         else:
             query = (
-                "MATCH (f:Filter) "
-                "WHERE f.tag = $filter_tag "
-                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:ProteinGroup)-[:PART_OF]->(f) "
+                "MATCH (a:Annotation) "
+                "WHERE a.tag = $annotation_tag "
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
+                "WHERE EXISTS {(a)-[:ANNOTATES]->(p)} "
             )
+        if sample_tags is not None and len(sample_tags) > 0:
+            if annotation_tag is None:
+                query += "WHERE sample.tag IN $sample_tags " 
+            else:   
+                query += "AND sample.tag IN $sample_tags "
             
         
         query += "RETURN p.tag as tag, collect(r.value) as qs, collect(sample.sample_index) as idx"
         
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df, sample_tags = sample_tags, annotation_tag = annotation_tag)
         datatable = r.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
         return datatable
         

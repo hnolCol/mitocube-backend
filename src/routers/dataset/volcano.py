@@ -35,12 +35,6 @@ def get_dataset_volcano(dataset_tag : str, attribute_value_tag_left : str, attri
     
     data_exist = DB.submission_has_dataset(tag = dataset_tag)
     if not data_exist: return no_data_found_http_exception
-
-    
-    # db = MCDatabase.getDatabase()
-    # attributes_db = MCAttributes.getAttributeDatabase()
-    # feature_db = PandaFeatureDatabase()
-    # genotype_db = MCGenotypes.getGenotypeDatabase()
     
     within_attribute_tag = APIParamString(param=within_attribute_tag).param 
     within_attribute_value_tag = APIParamString(param=within_attribute_value_tag).param 

@@ -110,13 +110,19 @@ class SamplesABC(ABC):
         """
         
     @abstractmethod
-    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str) -> pd.DataFrame:
+    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True) -> pd.DataFrame:
         """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
         Parameters
         ----------
         submission_tag : str
             The submission tag to get the condition procedures for.
+        join : str, optional
+            The string to join multiple condition procedure tags, by default ";"
+        pivot : bool, optional
+            If True, the results are pivoted to have attributes as columns, by default True
+        sort_ca_tags : bool, optional
+            If True, the condition application tags for each attribute are sorted alphabetically before joining., by default True   
         
         Returns
         -------

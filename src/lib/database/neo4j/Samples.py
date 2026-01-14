@@ -291,7 +291,7 @@ class Neo4JSamples(SamplesABC):
         print(r)
         return  r[0] if len(r) > 0 else None
 
-    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True) -> pd.DataFrame:
+    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True) -> pd.DataFrame:
         """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
         Parameters
@@ -302,13 +302,16 @@ class Neo4JSamples(SamplesABC):
             If provided, multiple condition procedure tags will be joined into a single string using this separator.
         pivot : bool, optional
             If True, the result will be pivoted to have attributes as columns.
+        sort_ca_tags : bool, optional
+            If True, the condition application tags will be sorted alphabetically before joining.
         Returns
         -------
         pd.DataFrame
             A DataFrame with sample indices as index and condition procedures as columns.
             The columns names represent the instance attribute (e.g. att_environment).
             The values are the condition procedure tags. 
-            Multiple tags are separated by a semicolon, if join is provided.
+            Multiple tags are separated by a semicolon, if join is provided. The tags are sorted alphabetically if sort_ca_tags is True.
+            Pivot is applied if pivot is True, leading to attribute_tags as column names. 
             
         """
         
@@ -320,7 +323,10 @@ class Neo4JSamples(SamplesABC):
         df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag)
         df.set_index("sample_index", inplace=True)
         if join is not None:
-            df["condition_tags"] = df["condition_tags"].apply(lambda x: ";".join(x))
+            if sort_ca_tags:
+                df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(sorted(x)))
+            else:
+                df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(x))
             if pivot:
                 df = df.pivot_table(index=df.index, columns="attribute_tag", values="condition_tags", aggfunc='first')
         return df
