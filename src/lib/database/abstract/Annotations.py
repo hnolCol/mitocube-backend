@@ -1,11 +1,10 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import List, Optional, Tuple
+from typing import List, Optional
 import pandas as pd
 
-from config.models.annotations.annotations import ( AnnotationModel, AnnotationGroupModel)
+from config.models.annotations.annotations import ( AnnotationsModel, AnnotationGroupsModel)
 
-class AnnotationGroupABC(ABC):
+class AnnotationGroupsABC(ABC):
     """
     Abstract class for annotation group.
     Annotation groups organize annotation datasets.
@@ -29,13 +28,13 @@ class AnnotationGroupABC(ABC):
         
 
     @abstractmethod
-    def insert(self, annotationgroup: AnnotationGroupModel) -> bool:
+    def insert(self, annotationgroup: AnnotationGroupsModel) -> bool:
         """
         Create a new annotation group.
 
         Parameters
         ----------
-        annotationgroup : AnnotationGroupModel
+        annotationgroup : AnnotationGroupsModel
             Annotation group data.
 
         Returns
@@ -46,7 +45,7 @@ class AnnotationGroupABC(ABC):
         
 
     @abstractmethod
-    def get(self, tag: str) -> AnnotationGroupModel:
+    def get(self, tag: str) -> AnnotationGroupsModel:
         """
         Gets the annotation group by tag.
 
@@ -57,20 +56,20 @@ class AnnotationGroupABC(ABC):
 
         Returns
         -------
-        AnnotationGroupModel
+        AnnotationGroupsModel
             The annotation group model.
         """
         
 
     @abstractmethod
-    def find(self) -> List[AnnotationGroupModel]:
+    def find(self, search_string: Optional[str] = None, protein_tag: Optional[str] = None) -> List[str]:
         """
         Finds all annotation groups.
 
         Returns
         -------
-        List[AnnotationGroupModel]
-            All annotation groups.
+        List[str]
+            Annotation group tags.
         """
         
 
@@ -91,7 +90,7 @@ class AnnotationGroupABC(ABC):
         """
         
 
-class AnnotationABC(ABC):
+class AnnotationsABC(ABC):
     """
     Abstract class for annotation datasets.
     Each annotation represents a dataset/list of features/Proteins.
@@ -115,13 +114,13 @@ class AnnotationABC(ABC):
         
 
     @abstractmethod
-    def add( self, annotation: AnnotationModel) ->bool:
+    def insert(self, annotation: AnnotationsModel) -> bool:
         """
         Create a new annotation dataset and link protein identifiers.
 
         Parameters
         ----------
-        annotation : AnnotationModel
+        annotation : AnnotationsModel
             Annotation data.
 
         Returns
@@ -132,7 +131,7 @@ class AnnotationABC(ABC):
         
 
     @abstractmethod
-    def get(self, tag: str) -> AnnotationModel:
+    def get(self, tag: str) -> AnnotationsModel:
         """
         Gets annotation data by its tag.
 
@@ -143,13 +142,13 @@ class AnnotationABC(ABC):
 
         Returns
         -------
-        AnnotationModel
+        AnnotationsModel
             Annotation data.
         """
         
 
     @abstractmethod
-    def find(self, group_tag: Optional[str] = None, protein_id: Optional[str] = None) -> List[str]:
+    def find(self, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, search_string: Optional[str] = None,) -> List[str]:
         """
         Find annotations.
 
@@ -221,3 +220,4 @@ class AnnotationABC(ABC):
             If the tag does not exists, and empty Series will be returned
         """
         
+    

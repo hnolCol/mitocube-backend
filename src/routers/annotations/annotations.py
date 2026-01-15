@@ -1,49 +1,96 @@
 from fastapi import APIRouter, Depends, HTTPException
-from collections import OrderedDict
-from typing import List 
+from typing import List, Optional
 
 from lib.database.Database import Database
 
-from config.models.annotations.annotations import ( AnnotationGroupModel, AnnotationModel)
+from config.models.annotations.annotations import ( AnnotationGroupsModel, AnnotationsModel)
+from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroups,  Neo4JAnnotations)
 
-from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroup,  Neo4JAnnotation)
-from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from config.models.user import UserModel
-from config.models.parameter import APIParamString
 from services.users import get_user_from_token, is_user_admin
 
 DB = Database.DB()
 
 router = APIRouter(
-    prefix="api/annotationgroups/annotations",
+    prefix="/api/annotations",
     tags=["Annotations"],
 )
 
-@router.get("/q")
-def find_annotations_in_group( annotation_group_tag : str, tag : str) -> List[str]:
-    """Finds annotations in an annotation group."""
-
-    tags = DB.annotation_groups.get_annotations(annotation_group_tag= annotation_group_tag, tag= tag)
+@router.get("/q", response_model=List[str])
+def find_annotations( tag, search_string: Optional[str] = None, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, user: UserModel = Depends(get_user_from_token),):
+    
+    tags = DB.annotations.find(tag= tag, search_string=search_string, group_tag=group_tag, protein_tag=protein_tag)
     return tags
 
-@router.get("/{annotation_group_tag}/annotations/{tag}")
-def get_annotation_in_group( annotation_group_tag : str, tag : str) -> AnnotationModel:
-    """Get annotation by its tag."""
-
-    if not DB.annotation_groups.exists(annotation_group_tag):
-        raise HTTPException(status_code=404, details="Annotation group not found.")
+@router.get("/{tag}", response_model=AnnotationsModel)
+def get_annotation(tag: str):
     
-    annotation= DB.annotations.get(annotation_group_tag= annotation_group_tag, tag= tag)
+    if not DB.annotations.exists(tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    
+    annotation= DB.annotations.get(tag= tag)
     return annotation
 
-@router.post("/{annotation_group_tag}/annotations")
-def insert_annotation(annotation_group_tag : str, annotation : AnnotationModel, user: UserModel = Depends(is_user_admin)) -> bool:
-    """Inserts a new annotation in an annotation group."""
+@router.post("/", response_model=bool)
+def insert_annotation( annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
 
-    if not DB.annotation_groups.exists(annotation_group_tag):
-        raise HTTPException(status_code=404, details="Annotation group not found.")
-    
-    ok = DB.annotations.insert(nnotation_group_tag= annotation_group_tag, annotation= annotation)
+    ok = DB.annotations.insert(annotation = annotation)
     if not ok:
-        raise HTTPException(status_code=500, details="Failed to insert annotation.")
+        raise HTTPException(status_code=500, detail="Could not insert annotation.")
+    
     return ok
+
+
+@router.get("/groups/q", response_model=List[str])
+def find_annotation_groups(search_string: Optional[str] = None, protein_tag: Optional[str] = None):
+    return DB.annotation_groups.find(
+        search_string=search_string,
+        protein_tag=protein_tag,
+    )
+
+
+@router.get("/groups/{tag}", response_model=AnnotationGroupsModel)
+def get_annotation_group(tag: str, user: UserModel = Depends(get_user_from_token)):
+    if not DB.annotation_groups.exists(tag):
+        raise HTTPException(status_code=404, detail="Annotation group not found")
+
+    return DB.annotation_groups.get(tag=tag)
+
+@router.get("/groups/{tag}/annotations", response_model=List[str])
+def get_annotations_in_group(tag: str, user: UserModel = Depends(get_user_from_token)):
+    
+    if not DB.annotation_groups.exists(tag):
+        raise HTTPException(status_code=404, detail="Annotation group not found")
+
+    return DB.annotation_groups.get_annotations(tag)
+
+@router.post("/groups/", response_model=bool)
+def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(is_user_admin)):
+    print(DB.annotation_groups.insert(annotation_group))
+    ok = DB.annotation_groups.insert(annotation_group)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to insert annotation group")
+
+    return ok
+
+# @router.get("{group_tag}/{annotation_tag}/proteins", response_model=List[str])
+
+
+# @router.put("{group_tag}/{annotation_tag}", response_model=bool)
+# def update_annotation( group_tag: str, annotation_tag: str, annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
+    
+#     if not DB.annotations.exists(annotation_tag):
+#         raise HTTPException(status_code=404, detail="Annotation not found")
+    
+#     ok = DB.annotations.update(
+#         group_tag=group_tag,
+#         annotation_tag=annotation_tag,
+#         annotation=annotation,
+#     )
+#     if not ok:
+#         raise HTTPException(status_code=500, detail="Could not update annotation.")
+    
+#     return ok
+
+
+# @router.put("{group_tag}/{annotation_tag}/proteins", response_model=bool)
