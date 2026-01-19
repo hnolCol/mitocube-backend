@@ -91,24 +91,6 @@ def get_annotation_in_group_count( group_tag: str, user: UserModel = Depends(get
     return DB.annotation_groups.count_annotations(group_tag)
 
 
-
-# @router.put("{group_tag}/{annotation_tag}", response_model=bool)
-# def update_annotation( group_tag: str, annotation_tag: str, annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
-    
-#     if not DB.annotations.exists(annotation_tag):
-#         raise HTTPException(status_code=404, detail="Annotation not found")
-    
-#     ok = DB.annotations.update(
-#         group_tag=group_tag,
-#         annotation_tag=annotation_tag,
-#         annotation=annotation,
-#     )
-#     if not ok:
-#         raise HTTPException(status_code=500, detail="Could not update annotation.")
-    
-#     return ok
-
-
 @router.put("/groups/{group_tag}/annotations/{tag}", response_model=bool)
 def update_annotation( group_tag: str, tag: str, annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
     
