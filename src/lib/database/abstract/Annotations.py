@@ -25,7 +25,6 @@ class AnnotationGroupsABC(ABC):
         bool
             True if the group exists.
         """
-        
 
     @abstractmethod
     def insert(self, annotationgroup: AnnotationGroupsModel) -> bool:
@@ -42,7 +41,7 @@ class AnnotationGroupsABC(ABC):
         bool
             True if insert was successful
         """
-        
+
 
     @abstractmethod
     def get(self, tag: str) -> AnnotationGroupsModel:
@@ -90,6 +89,24 @@ class AnnotationGroupsABC(ABC):
         """
         
 
+    @abstractmethod
+    def count_annotations(self, group_tag: str) -> int:
+        """
+        Count annotations in a group.
+
+        Parameters
+        ----------
+        group_tag : str
+            Annotation group tag.
+
+        Returns
+        -------
+        int
+            Number of annotations.
+        """
+        
+
+
 class AnnotationsABC(ABC):
     """
     Abstract class for annotation datasets.
@@ -126,7 +143,7 @@ class AnnotationsABC(ABC):
         Returns
         -------
         bool
-           True if insert was successful.
+            True if insert was successful.
         """
         
 
@@ -148,7 +165,7 @@ class AnnotationsABC(ABC):
         
 
     @abstractmethod
-    def find(self, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, search_string: Optional[str] = None,) -> List[str]:
+    def find(self, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, search_string: Optional[str] = None) -> List[str]:
         """
         Find annotations.
 
@@ -201,7 +218,7 @@ class AnnotationsABC(ABC):
         
 
     @abstractmethod
-    def isin(self, tag: str,  protein_ids: List[str]) -> pd.Series:
+    def isin(self, tag: str, protein_ids: List[str]) -> pd.Series:
         """
         Checks if the give protein_ids are in the annotation by its tag.
 
@@ -215,9 +232,44 @@ class AnnotationsABC(ABC):
         Returns
         -------
         pd.Series
-            pandas Series with bools to indicate
-            if the given protein_ids are present. 
-            If the tag does not exists, and empty Series will be returned
+            pandas Series with bools to indicate if the given protein_ids
+            are present. If the tag does not exists, and empty Series
+            will be returned
         """
         
-    
+
+    @abstractmethod
+    def count_proteins(self, tag: str) -> int:
+        """
+        Count proteins in an annotation.
+
+        Parameters
+        ----------
+        tag : str
+            Annotation tag.
+
+        Returns
+        -------
+        int
+            Number of proteins.
+        """
+        
+    @abstractmethod
+    def update_annotation(self, group_tag: str, tag: str, annotation: AnnotationsModel) -> bool:
+        """
+        Update an existing annotation.
+
+        Parameters
+        ----------
+        group_tag : str
+            Annotation group tag.
+        tag : str
+            Annotation tag.
+        annotation : AnnotationsModel
+            Updated annotation data.
+
+        Returns
+        -------
+        bool
+            True if update was successful.
+        """
