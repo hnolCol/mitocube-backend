@@ -14,9 +14,9 @@ headers = {
 
 
 
-annotatiion_file = "/Users/PParsa/Downloads/Human.MitoCarta3.0-2.xls"
+annotatiion_file = "path_to_your/MitoCarta3.0.xlsx"  # Replace with the actual path to your MitoCarta3.0.xlsx file
 sheet_name = "A Human MitoCarta3.0"
-group_tag = "bgsLD"
+group_tag = "enter_your_group_tag_here"  # Replace with your actual group tag
 
 df = pd.read_excel(annotatiion_file, sheet_name=sheet_name)
 
