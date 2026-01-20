@@ -1,15 +1,24 @@
+import os
 import pandas as pd
 import requests
+from collections import defaultdict
 
-Base_URL = "http://localhost:5002/api/annotations"
 
-Token =  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0YWciOiJXWDlyNXpRSiIsInZlcmlmaWVkIjp0cnVlLCJ2ZXJpZmllZF9hdCI6MTc2ODQ3NjkxMDk3NS45MTQsImV4cCI6MTc2ODY0OTcxMH0.0MeUtEgr29e_KqO7gi3eWDrmnOSXFqodYXuBNW7Jtpg"
+base_url = "http://localhost:5002/api/annotations/"
+Token = "your_Token_here"  # Replace with your actual Token
 
-Headers = {"Authorization": f"Bearer {Token}"}
+headers = {
+    "Authorization": f"Bearer {Token}",
+    "Content-Type": "application/json"
+}
 
-Annotation_file = "/Users/PParsa/Downloads/Human.MitoCarta3.0-2.xls"
 
-df = pd.read_excel( Annotation_file, sheet_name="A Human MitoCarta3.0")
+
+annotatiion_file = "/Users/PParsa/Downloads/Human.MitoCarta3.0-2.xls"
+sheet_name = "A Human MitoCarta3.0"
+group_tag = "bgsLD"
+
+df = pd.read_excel(annotatiion_file, sheet_name=sheet_name)
 
 
 def explode(value):
@@ -18,28 +27,32 @@ def explode(value):
     return [v.strip() for v in str(value).split("|") if v.strip()]
 
 
-annotations = requests.get(Base_URL, headers=Headers).json()
-
-
+pathway_to_proteins = defaultdict(list)
 
 for i, row in df.iterrows():
-    # if i > 1:   
-    #     break
+    if i >= 50: 
+        break       
 
     uniprot = row["UniProt"]
     if pd.isna(uniprot):
         continue
 
     for pathway in explode(row["MitoCarta3.0_MitoPathways"]):
-        r = requests.post(
-            Base_URL,
-            headers=Headers,
-            json={
-                "text": pathway,
-                "description": pathway,
-                "group_tag": "bgsLD",
-                "protein_tags": [str(uniprot).strip()]
-            }
-        )
+        pathway_to_proteins[pathway].append(str(uniprot).strip())
 
 
+for pathway, proteins in pathway_to_proteins.items():
+    print(f"Uploading {pathway} ({len(proteins)} proteins)")
+
+    r = requests.post(
+        base_url,
+        headers=headers,
+        json={
+            "text": pathway,
+            "description": pathway,
+            "group_tag": group_tag,
+            "protein_tags": proteins
+        }
+    )
+
+    print("Status:", r.status_code)

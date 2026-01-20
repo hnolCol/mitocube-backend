@@ -201,7 +201,7 @@ class AnnotationsABC(ABC):
         
 
     @abstractmethod
-    def get_protein_ids(self, tag: str) -> List[str]:
+    def get_protein_tags(self, tag: str) -> List[str]:
         """
         Get protein identifiers belonging to an annotation.
 
@@ -218,21 +218,21 @@ class AnnotationsABC(ABC):
         
 
     @abstractmethod
-    def isin(self, tag: str, protein_ids: List[str]) -> pd.Series:
+    def isin(self, tag: str, protein_tags: List[str]) -> pd.Series:
         """
-        Checks if the give protein_ids are in the annotation by its tag.
+        Checks if the give protein_tags are in the annotation by its tag.
 
         Parameters
         ----------
         tag : str
             Annotation tag.
-        protein_ids : List[str]
+        protein_tags : List[str]
             Protein identifiers to check.
 
         Returns
         -------
         pd.Series
-            pandas Series with bools to indicate if the given protein_ids
+            pandas Series with bools to indicate if the given protein_tags
             are present. If the tag does not exists, and empty Series
             will be returned
         """

@@ -79,7 +79,9 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         if search_string:
             query += (
                 "WHERE toLower(a.description) CONTAINS toLower($search_string) "
+                "OR toLower(a.text) CONTAINS toLower($search_string) "
             )
+
         query += "RETURN ag.tag"
 
         r = self._driver.execute_query( query,
@@ -249,7 +251,7 @@ class Neo4JAnnotations(AnnotationsABC):
 
         return r[0] if r else 0
 
-    def get_protein_ids(self, tag: str) -> List[str]:
+    def get_protein_tags(self, tag: str) -> List[str]:
 
         query = (
             "MATCH (:Annotation {tag: $tag})-[:ANNOTATES]->(p:Protein) "
@@ -264,16 +266,16 @@ class Neo4JAnnotations(AnnotationsABC):
         
         return r
 
-    def isin(self, tag: str, protein_ids: List[str]) -> pd.Series:
+    def isin(self, tag: str, protein_tags: List[str]) -> pd.Series:
 
         query = (
             "MATCH (p:Protein) "
-            "WHERE p.tag IN $protein_ids "
+            "WHERE p.tag IN $protein_tags "
             "RETURN p.tag AS tag, "
             "EXISTS {(:Annotation {tag: $tag})-[:ANNOTATES]->(p)} AS isin"
         )
         r = self._driver.execute_query( query,
-                                        protein_ids=protein_ids,
+                                        protein_tags=protein_tags,
                                         tag=tag,
                                         routing_="r",
                                         result_transformer_=Result.to_df,
