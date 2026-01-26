@@ -32,6 +32,7 @@ from lib.database.neo4j.ProteinGroups import Neo4JProteinGroups
 from lib.database.neo4j.Proteins import Neo4JProteins
 from lib.database.neo4j.OpenAI import Neo4JOpenAI
 from config.models.submissions.submissions import DatasetSubmissionModel
+from lib.database.neo4j.Annotations import Neo4JAnnotations, Neo4JAnnotationGroups
 
 import pandas as pd 
 class MCNeo4JDatabase(DatabaseABC):
@@ -71,6 +72,8 @@ class MCNeo4JDatabase(DatabaseABC):
         self.external_service = Neo4JExternalServices(driver=self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
+        self.annotations = Neo4JAnnotations(driver=self.connection.driver)
+        self.annotation_groups = Neo4JAnnotationGroups(driver=self.connection.driver)
         
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
         self.proteins = Neo4JProteins(driver = self.connection.driver)
