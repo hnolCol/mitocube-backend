@@ -22,7 +22,7 @@ router = APIRouter(
 @router.get("/{submission_tag}/pca",
             tags=["Dimensional reduction","PCA"])
 
-def get_dataset_pca(submission_tag : str, filter_tag : str = None, scale : bool = True, user : UserModel = Depends(get_user_from_token)):
+def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : bool = True, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the result of a Principal component analysis (PCA).
     """
@@ -30,12 +30,12 @@ def get_dataset_pca(submission_tag : str, filter_tag : str = None, scale : bool 
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
 
 
-    data_table = DB.get_datatable(tag = submission_tag, filter_tag = filter_tag) #the data columns are the sample indices 
+    data_table = DB.datasets.get_datatable(tag = submission_tag, annotation_tag = annotation_tag) #the data columns are the sample indices 
     projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
                                         n_components=4,
                                         scale = scale).transform()
 
-    condition_procedures = DB.samples.get_condition_applications_by_sample_index_for_submission(submission_tag=submission_tag)
+    condition_procedures = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag)
     print(condition_procedures)
     
     projected_data = projected_data.join(condition_procedures, how="left")

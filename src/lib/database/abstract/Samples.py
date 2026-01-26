@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC 
-from typing import List 
+from typing import List, Dict
 import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleModel
@@ -40,6 +40,22 @@ class SamplesABC(ABC):
         -------
         int
             The number of samples matching the criteria.
+        """
+    @abstractmethod
+    def count_quantified_protein_groups(self, tag : str, submission_tag : str) -> List[Dict]:
+        """Counts the number of quantified protein groups for a given sample.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the sample.
+        submission_tag : str
+            The tag of the submission.
+
+        Returns
+        -------
+        int
+            The number of quantified protein groups for the given sample.
         """
         
     @abstractmethod
@@ -110,7 +126,7 @@ class SamplesABC(ABC):
         """
         
     @abstractmethod
-    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True) -> pd.DataFrame:
+    def get_condition_applications_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
         """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
         Parameters
@@ -123,7 +139,8 @@ class SamplesABC(ABC):
             If True, the results are pivoted to have attributes as columns, by default True
         sort_ca_tags : bool, optional
             If True, the condition application tags for each attribute are sorted alphabetically before joining., by default True   
-        
+        return_sample_index : bool, optional
+            If True, the DataFrame will be indexed by sample index. If False, it will be indexed by sample tag.
         Returns
         -------
         pd.DataFrame

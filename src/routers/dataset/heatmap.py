@@ -23,7 +23,7 @@ router = APIRouter(
             tags=["Heatmap"])
 def get_dataset_heatmap(dataset_label : str, 
                         n_clusters : int = 8, 
-                        filter_tag : str = None,
+                        annotation_tag : str = None,
                         user : UserModel = Depends(get_user_from_token)):
     """
     Returns data to feed into a heatmap for visualization.
@@ -36,11 +36,14 @@ def get_dataset_heatmap(dataset_label : str,
     data_exist = DB.submission_has_dataset(tag=dataset_label)
     if not data_exist: return no_data_found_http_exception
     
-    if filter_tag is not None:
-        if not DB.filters.exists(tag = filter_tag):
-            raise filter_tag_does_not_exist_exception
+    # if filter_tag is not None:
+    #     if not DB.filters.exists(tag = filter_tag):
+    #         raise filter_tag_does_not_exist_exception
+    #TO DO add annotation check
     
-    datatable = DB.datasets.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
+    datatable = DB.datasets.get_datatable(tag = dataset_tag, annotation_tag = annotation_tag)
+    print(datatable)
+    
     _, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)  
     
     try:

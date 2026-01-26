@@ -98,13 +98,34 @@ class Neo4JSamples(SamplesABC):
         query += (
             "RETURN count(s) as count "
         )
-        
-        print(query)
             
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag, instrument_tag = instrument_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
+
+    def count_quantified_protein_groups(self, tag : str, submission_tag : str) -> int:
+        """Counts the number of quantified protein groups for a given sample.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The tag of the submission.
+
+        Returns
+        -------
+        List[Dict]
+            A list of dictionaries, each containing the sample tag and the count of quantified protein groups.
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "MATCH (s)-[:QUANTIFIED]->(pg:ProteinGroup) "
+            "RETURN count(DISTINCT pg) as count "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data, submission_tag=submission_tag)
+        return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
 
     def exists(self, tag : str) -> bool:
@@ -291,7 +312,7 @@ class Neo4JSamples(SamplesABC):
         print(r)
         return  r[0] if len(r) > 0 else None
 
-    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True) -> pd.DataFrame:
+    def get_condition_applications_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
         """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
         Parameters
@@ -304,6 +325,8 @@ class Neo4JSamples(SamplesABC):
             If True, the result will be pivoted to have attributes as columns.
         sort_ca_tags : bool, optional
             If True, the condition application tags will be sorted alphabetically before joining.
+        return_sample_index : bool, optional
+            If True, the DataFrame will be indexed by sample index. If False, it will be indexed by sample tag.
         Returns
         -------
         pd.DataFrame
@@ -317,11 +340,14 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
-            "RETURN s.sample_index as sample_index, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
+            "RETURN s.sample_index as sample_index, s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
         df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag)
-        df.set_index("sample_index", inplace=True)
+        if return_sample_index:
+            df.set_index("sample_index", inplace=True)
+        else:
+            df.set_index("sample_tag", inplace=True)
         if join is not None:
             if sort_ca_tags:
                 df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(sorted(x)))

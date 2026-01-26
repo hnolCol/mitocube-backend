@@ -59,7 +59,7 @@ class AttributeTree(BaseModel):
     tag : str # Attribute or Trait String
     type :  Literal["attribute","trait"]
     value : Optional[float|int|str] = None
-    children : Optional[List[AttributeTree]]
+    children : Optional[List[AttributeTree]] = []
     
 class AttributeBaseModel(BaseModel):
     """Base model for all attributes.

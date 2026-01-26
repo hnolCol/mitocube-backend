@@ -16,7 +16,7 @@ from config.models.submissions.submissions import AttributeTree, DatasetSubmissi
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 from config.models.conditions_applications import ConditionApplicationAttributeModel 
-
+from config.models.submissions.metatexts import MetaTextInsertModel
 from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
 
@@ -353,8 +353,7 @@ class Neo4JSubmissions(SubmissionsABC):
         if not self.exists(tag):  
             raise ValueError("Submission with this tag does not exist. Please create the submission first.")
         for attribute_tree in traits:
-            self.insert_condition_application(tag = tag,
-                                        data = attribute_tree) 
+            self.insert_condition_application(tag = tag, attribute_tree = attribute_tree) 
     
     def insert_condition_application(self, tag : str, attribute_tree : AttributeTree):
         """ Inserts a condition procedure into the database connect to a submission This indicates that all samples
@@ -395,6 +394,7 @@ class Neo4JSubmissions(SubmissionsABC):
             print(e)
             return False 
         
+   
     
     def get_comments(self, tag : str) -> List[SubmissionCommentModel]:
         "Returns the available comments for a given submission tag."

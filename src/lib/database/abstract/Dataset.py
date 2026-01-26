@@ -38,7 +38,7 @@ class DatasetABC(ABC):
     
     
     @abstractmethod
-    def get_datatable(self, tag : str, sample_tags : List[str] = None, annotation_tag : str = None) -> pd.DataFrame:
+    def get_datatable(self, tag : str, sample_tags : List[str] = None, annotation_tag : str = None, use_sample_tags: bool = False, level : Literal["protein","precursor"] = "protein") -> pd.DataFrame:
         """Returns the database of a submission 
 
         Parameters
@@ -49,13 +49,16 @@ class DatasetABC(ABC):
             The sample tags to include in the datatable. If None, all samples are included, by default None
         annotation_tag : str, optional
             The annotation tag to apply to the datatable, by default None
-
+        use_sample_tags : bool, optional
+            If True, the columns will be sample tags instead of sample indices, by default False
+        level : Literal["protein","precursor"], optional
+            The level of quantification to retrieve. Either "protein" or "precursor", by default "protein"
         Returns
         -------
         pd.DataFrame
             The quantitative matrix of data. 
                 - 'index' must be the uniprot id 
-                - the columns names must be the index of the sample. (0,1,2,3,4,...). If sample_tags are provided, only those samples are included.
+                - the columns names will bethe index of the sample. (0,1,2,3,4,...) or sample tags (use_sample_tags = True). If sample_tags are provided, only those samples are included.
         """
     
     

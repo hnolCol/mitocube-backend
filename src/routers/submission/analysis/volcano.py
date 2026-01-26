@@ -1,41 +1,37 @@
-from fastapi import APIRouter, Depends, HTTPException
-from collections import OrderedDict
-from config.enums.users.roles import UserRolesEnum
+
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
+from lib.database.Database import Database
 from config.models.user import UserModel
-
-from config.models.parameter import APIParamString
-
+from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
-import pandas as pd 
-
-from lib.database.Database import Database 
-
+from config.exceptions.HTTPExceptions import submission_tag_not_found, no_data_found_http_exception
 
 from lib.data.statistic.Ttest import Ttest
 from scipy.stats import ttest_ind, false_discovery_control
-import numpy as np
-
-from config.exceptions.HTTPExceptions import no_data_found_http_exception
-
-
+from config.models.dataset.pca import DatasetPCAResponse
+import pandas as pd 
+import numpy as np 
 DB = Database.DB()
 
 router = APIRouter(
-    prefix="/api",
-    tags=["Heatmap"]
-)
+    prefix="/api/submissions/analysis",
+    tags=["Submission"],
+    )
 
 
-#volcano plot
-@router.get("/datasets/{submission_tag}/volcano")
+
+#pca endpoints
+@router.get("/{submission_tag}/volcano",
+            tags=["Dimensional reduction","Volcano"])
 def get_dataset_volcano(submission_tag : str, 
-                        attribute_tag : str,
+                        # attribute_tag : str,
                         ca_tag_left : str, 
                         ca_tag_right : str,
                       #  attribute_value_tag_left : str, attribute_value_tag_right : str, sample_attribute_tag : str, within_attribute_tag : str = None,
                         within_trait_tag : str = None, impute : bool = True,
                         annotation_tag : str = None, 
                         equal_variance : bool = True,
+                        fdr : float = 0.05,
                         user : UserModel = Depends(get_user_from_token)
                   ):# ):#) #
     """
@@ -62,42 +58,54 @@ def get_dataset_volcano(submission_tag : str,
     
     
     data_exist = DB.submission_has_dataset(tag = submission_tag)
-    if not data_exist: return no_data_found_http_exception
+    if not data_exist:  return no_data_found_http_exception
         
     if ca_tag_left == ca_tag_right:
         raise HTTPException(status_code=400, detail="Left and right condition application tags must be different.")
     
-    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True)  #preload condition applications
-    
+    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+    attribute_tag = DB.condition_applications.get_attribute(ca_tag_left)
+    print(attribute_tag)
     if attribute_tag not in condition_applications.columns:
         raise HTTPException(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
-    
-    if within_trait_tag is not None:
-        sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index 
-        sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
+    print()
+   # if within_trait_tag is not None:
+    sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index
+    sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
 
-    sample_tags = pd.concat([sample_tags_left, sample_tags_right]).to_list()
-    
-    print(sample_tags_left, sample_tags_right)
+    sample_tags = sample_tags_left.to_list() + sample_tags_right.to_list()
     suffix = f"{ca_tag_left} vs. {ca_tag_right} ({within_trait_tag}) ({annotation_tag})"
 
-    dt = DB.datasets.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags)
+    print(sample_tags_left, sample_tags_right)
+    
+    dt = DB.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
     if dt.empty:
         raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.") 
+    
+    
     X = dt.loc[:,sample_tags_left]
     Y = dt.loc[:,sample_tags_right]
     T,p = ttest_ind(X, Y, nan_policy="omit", axis=1, equal_var=equal_variance)
-    p_value_name = f"p-value {suffix}"
+    p_value_name = f"p-value"
         
-    stats = pd.DataFrame({f"t-value {suffix}" : T, p_value_name : p}, 
-                             columns=[f"t-value {suffix}",p_value_name], 
-                             index=dt.index)
-    stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
-    stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
-    stats.loc[:,f"Significant {suffix}"] = stats.loc[:,f"fdr {suffix}"] <= fdr
-    stats.loc[:,f"log2 FC {suffix}"] = X.mean(axis=1) - Y.mean(axis=1)
-    print(dt) 
-    return 0 
+    #create data frame with the t-test statistics 
+    stats = pd.DataFrame(
+            {f"t-value" : T, p_value_name : p, "tag" : dt.index}, 
+            columns=[f"t-value",p_value_name,"tag"]
+            )
+    stats.loc[:,f"-log10 p-value"] = -np.log10(stats.loc[:,p_value_name])
+    stats.loc[:,f"fdr"] = false_discovery_control(stats[p_value_name].values)
+    stats.loc[:,f"Significant"] = stats.loc[:,f"fdr"] <= fdr
+    stats.loc[:,f"log2 FC"] = X.mean(axis=1) - Y.mean(axis=1)
+    
+    
+    return {"stats" : stats.to_dict(orient="records"), 
+            "suffix" : suffix, 
+            "ca_tag_left": ca_tag_left, 
+            "ca_tag_right": ca_tag_right, 
+            "attribute_tag": attribute_tag, 
+            "impute" : impute,
+            "annotation_tag" : annotation_tag}
     
     # within_attribute_tag = APIParamString(param=within_attribute_tag).param 
     # within_attribute_value_tag = APIParamString(param=within_attribute_value_tag).param 
@@ -120,3 +128,4 @@ def get_dataset_volcano(submission_tag : str,
     print(stats_and_feature_data.to_dict(orient="records")[0])
     return {"stats" : stats_and_feature_data.to_dict(orient="records"), "suffix" : comparison_suffix}
     
+

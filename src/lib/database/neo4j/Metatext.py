@@ -21,7 +21,7 @@ class Neo4JMetaText(MetaTextABC):
         return r[0] if len(r) > 0 else False
     
     def insert(self, title : str, text : str, submission_tag : str, user_tag : str) -> bool:
-        
+        "Inserts a new meta text for the given submission. The tag is generated based on the title, submission tag and text." 
         
         metatext_tag = create_hierarchical_hash([title,submission_tag,text])
         if self.exists(tag = metatext_tag):

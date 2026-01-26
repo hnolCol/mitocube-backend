@@ -26,9 +26,9 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 #from migration.load_data import MigrateScripts 
 
 ### import routers
-from routers.dataset import dataset, heatmap, volcano, correlation
+from routers.dataset import dataset, heatmap, correlation # volcano
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim
-from routers.submission.analysis import pca
+from routers.submission.analysis import pca, volcano
 from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
 from routers.info import info
