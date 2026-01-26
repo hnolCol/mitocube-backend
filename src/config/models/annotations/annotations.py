@@ -17,6 +17,8 @@ class AnnotationGroupsModel(BaseModel):
     description: Optional[str] = None
     source: Optional[str] = None
     url: Optional[str] = None
+    created_at: datetime = Field(default_factory= datetime.now)
+    created_by: Optional[str] = None # user tag
 
     class Config:
         from_attributes = True

@@ -23,21 +23,24 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         return r[0]
 
 
-    def insert(self, annotationgroup: AnnotationGroupsModel) -> bool:
+    def insert(self, annotationgroup: AnnotationGroupsModel, user_tag: str ) -> bool:
         """Creates a new annnotation group."""
 
         query = (
+           "MATCH (u:User {tag: $user_tag}) "
            "MERGE (ag:AnnotationGroup {tag: $tag}) "
             "ON CREATE "
             "SET ag.text = $text, "
             "    ag.description = $description, "
             "    ag.source = $source, "
             "    ag.url = $url, "
-            "    ag.created_at = timestamp() "
+            "    ag.created_at = timestamp(), "
+            "    ag.created_by = u.email "
             "RETURN TRUE"
         )
 
         r = self._driver.execute_query( query,
+                                        user_tag=user_tag,
                                         tag=annotationgroup.tag,
                                         text=annotationgroup.text,
                                         description=annotationgroup.description,

@@ -27,7 +27,7 @@ class AnnotationGroupsABC(ABC):
         """
 
     @abstractmethod
-    def insert(self, annotationgroup: AnnotationGroupsModel) -> bool:
+    def insert(self, annotationgroup: AnnotationGroupsModel, user_tag: str) -> bool:
         """
         Create a new annotation group.
 

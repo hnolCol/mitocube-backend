@@ -76,9 +76,9 @@ def get_annotations_in_group(group_tag: str, user: UserModel = Depends(get_user_
     return DB.annotation_groups.get_annotations(group_tag)
 
 @router.post("/groups/", response_model=bool)
-def insert_annotation_group( annotation_group: AnnotationGroupsModel):
-    print(DB.annotation_groups.insert(annotation_group))
-    ok = DB.annotation_groups.insert(annotation_group)
+def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(is_user_admin)):
+    print(DB.annotation_groups.insert(annotation_group, user_tag=user.tag))
+    ok = DB.annotation_groups.insert(annotation_group, user_tag=user.tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to insert annotation group")
 
