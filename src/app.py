@@ -42,6 +42,7 @@ from routers.attributes import attributes
 from routers.instruments import instruments
 from routers.network import network
 from routers.filter import filter
+from routers.annotations import permissions as annotation_permissions
 from routers.annotations import annotations
 from routers.rc import rc
 from routers.proteomes import proteomes
@@ -98,6 +99,7 @@ router_sources = [dataset,
                   instruments, 
                   network, 
                   filter,
+                  annotation_permissions,
                   annotations, 
                   rc, 
                   proteomes, 

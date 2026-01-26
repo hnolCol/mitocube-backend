@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 from services.random_generators import get_random_string
+from datetime import datetime
 
 
 
@@ -14,6 +15,8 @@ class AnnotationGroupsModel(BaseModel):
     tag : str = Field(..., min_length=5, max_length=5, default_factory=lambda : get_random_string(5))
     text: str 
     description: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -31,6 +34,7 @@ class AnnotationsModel(BaseModel):
     description: str
     publication: Optional[str] = None
     pubmed_id: Optional[str] = None
+    source:  Optional[str] = None
     protein_tags: Optional[List[str]] = []
     group_tag: str
 

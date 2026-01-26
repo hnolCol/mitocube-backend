@@ -22,28 +22,35 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         r = self._driver.execute_query(query, group_tag=tag, result_transformer_=Result.value)
         return r[0]
 
+
     def insert(self, annotationgroup: AnnotationGroupsModel) -> bool:
         """Creates a new annnotation group."""
 
         query = (
-            "MERGE (ag:AnnotationGroup {tag: $tag}) "
+           "MERGE (ag:AnnotationGroup {tag: $tag}) "
             "ON CREATE "
             "SET ag.text = $text, "
-            " ag.description = $description, "
-            " ag.created_at = timestamp() "
+            "    ag.description = $description, "
+            "    ag.source = $source, "
+            "    ag.url = $url, "
+            "    ag.created_at = timestamp() "
             "RETURN TRUE"
         )
+
         r = self._driver.execute_query( query,
                                         tag=annotationgroup.tag,
                                         text=annotationgroup.text,
                                         description=annotationgroup.description,
+                                        source=annotationgroup.source,
+                                        url=annotationgroup.url,
                                         routing_="w",
                                         result_transformer_=Result.value,
                                     )
-        return r[0] if r else False
-
-    def get(self, tag: str) -> AnnotationGroupsModel:
         
+        return r[0] if r else False
+    
+    def get(self, tag: str) -> AnnotationGroupsModel:
+       
         query = (
             "MATCH (ag:AnnotationGroup {tag: $tag}) "
             "RETURN properties(ag)"
@@ -54,22 +61,11 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
                                         routing_="r",
                                         result_transformer_=Result.value,
                                     )
-        
+
         return AnnotationGroupsModel(**r[0])
 
     
     def find( self, search_string: Optional[str] = None,  protein_tag: Optional[str] = None,) -> List[str]:
-        
-        # query = (
-        #     "MATCH (ag:AnnotationGroup) "
-        #     "RETURN properties(ag)"
-        # )
-        # r = self._driver.execute_query(
-        #     query,
-        #     routing_="r",
-        #     result_transformer_=Result.value,
-        # )
-        # return [AnnotationGroupsModel(**g) for g in r]
 
         query = "MATCH (ag:AnnotationGroup) "
         
@@ -121,6 +117,39 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
                                     )
 
         return r[0] if r else 0
+    
+    # def update(self, annotationgroup: AnnotationGroupsModel, user_tag: str) -> bool:
+    #     """Updates an existing annotation group."""
+
+    #     query = (
+    #         "MATCH (ag:AnnotationGroup {tag: $tag}) "
+    #         "SET "
+    #         " ag.text = $text, "
+    #         " ag.description = $description, "
+    #         " ag.species = $species, "
+    #         " ag.source = $source, "
+    #         " ag.url = $url, "
+    #         " ag.modified_at = timestamp() "
+    #         "WITH ag "
+    #         "MATCH (u:User {tag: $user_tag}) "
+    #         "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(ag) "
+    #         "RETURN TRUE "
+    #     )
+
+    #     r = self._driver.execute_query( query,
+    #                                     tag=annotationgroup.tag,
+    #                                     text=annotationgroup.text,
+    #                                     description=annotationgroup.description,
+    #                                     species=annotationgroup.species,
+    #                                     source=annotationgroup.source,
+    #                                     url=annotationgroup.url,
+    #                                     user_tag=user_tag,
+    #                                     routing_="w",
+    #                                     result_transformer_=Result.value,
+    #                                 )
+        
+    #     return r[0] if r else False
+
 
 
 class Neo4JAnnotations(AnnotationsABC):
@@ -155,6 +184,7 @@ class Neo4JAnnotations(AnnotationsABC):
             " text: $text, "
             " description: $description, "
             " publication: $publication, "
+            " source: $source, "
             " pubmed_id: $pubmed_id, "
             " s: toLower($text)+' '+toLower(coalesce($description,'')), "
             " created_at: timestamp() "
@@ -173,6 +203,7 @@ class Neo4JAnnotations(AnnotationsABC):
                                         description=annotation.description,
                                         publication=annotation.publication,
                                         pubmed_id=annotation.pubmed_id,
+                                        source=annotation.source,
                                         protein_tags=annotation.protein_tags,
                                         group_tag=annotation.group_tag,
                                         routing_="w",
@@ -186,7 +217,11 @@ class Neo4JAnnotations(AnnotationsABC):
 
         query = (
             "MATCH (ag:AnnotationGroup)-[:HAS_ANNOTATION]->(a:Annotation {tag: $tag}) "
-            "RETURN properties(a) AS a_props, ag.tag AS group_tag"
+            "OPTIONAL MATCH (a)-[:ANNOTATES]->(p:Protein) "
+            "RETURN "
+            " properties(a) AS a_props, "
+            " ag.tag AS group_tag, "
+            " collect(p.tag) AS protein_tags "
         )
         
         r = self._driver.execute_query( query,
@@ -200,6 +235,7 @@ class Neo4JAnnotations(AnnotationsABC):
         
         data = r[0]["a_props"]
         data["group_tag"] = r[0]["group_tag"]
+        data["protein_tags"] = r[0]["protein_tags"]
         
         return AnnotationsModel(**data)
 
@@ -265,6 +301,22 @@ class Neo4JAnnotations(AnnotationsABC):
                                     )
         
         return r
+    
+    def get_text(self, group_tag: str, text: str) -> bool:
+        query = (
+            "MATCH (a:Annotation {group_tag: $group_tag}) "
+            "WHERE toLower(a.text) = toLower($text) "
+            "RETURN count(a) > 0 AS exists"
+        )
+
+        result = self._driver.execute_query(
+                query,
+                group_tag=group_tag,
+                text=text,
+                result_transformer_=lambda r: r.single()["exists"],
+            )
+
+        return bool(result)
 
     def isin(self, tag: str, protein_tags: List[str]) -> pd.Series:
 
@@ -303,34 +355,55 @@ class Neo4JAnnotations(AnnotationsABC):
         
         return r[0] if r else 0
 
-    def update_annotation(self, group_tag: str, tag: str, annotation: AnnotationsModel) -> bool:    
+    def update_annotation(self, annotation: AnnotationsModel, user_tag: str) -> bool:    
     
         query = (
             "MATCH (a:Annotation {tag: $annotation_tag}) "
-            "SET a.text = $text, "
+            "SET "
             " a.description = $description, "
             " a.publication = $publication, "
             " a.pubmed_id = $pubmed_id, "
+            " a.source = $source, "
+            " a.text = $text, "
+            " a.group_tag = $group_tag, "
+            " a.protein_tags = $protein_tags, "
+            " a.modified_at = timestamp(), "
             " a.s = toLower($text)+' '+toLower(coalesce($description,'')) "
             "WITH a "
-            "OPTIONAL MATCH (a)-[r:ANNOTATES]->(p:Protein) "
-            "DELETE r "
-            "WITH a "
-            "UNWIND $protein_tags AS protein_tag "
-            "MATCH (p:Protein {tag: protein_tag}) "
-            "MERGE (a)-[:ANNOTATES]->(p) "
-            "RETURN TRUE"
+            "MATCH (u:User {tag: $user_tag}) "
+            "CREATE (u)-[:MODIFIED_ANNOTATION {modified_at: timestamp()}]->(a) "
+            "RETURN TRUE "
         )
 
         r = self._driver.execute_query( query,
-                                        annotation_tag=tag,
+                                        annotation_tag=annotation.tag,
                                         text=annotation.text,
                                         description=annotation.description,
                                         publication=annotation.publication,
                                         pubmed_id=annotation.pubmed_id,
+                                        source=annotation.source,
                                         protein_tags=annotation.protein_tags,
+                                        group_tag=annotation.group_tag,
+                                        user_tag=user_tag,
                                         routing_="w",
                                         result_transformer_=Result.value,
                                     )
         
         return r[0] if r else False
+    
+
+    def delete_annotation(self, tag: str, is_active: bool = False) -> bool:
+        
+        query = (
+            "MATCH (a:Annotation {tag: $tag}) "
+            "DETACH DELETE a "
+        )
+
+        r = self._driver.execute_query( query,
+                                        tag=tag,
+                                        is_active=is_active,
+                                        routing_="w",
+                                        result_transformer_=Result.value,
+                                    )
+        
+        return True if r is not None else False

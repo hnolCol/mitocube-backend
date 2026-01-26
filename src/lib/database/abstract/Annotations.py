@@ -58,7 +58,7 @@ class AnnotationGroupsABC(ABC):
         AnnotationGroupsModel
             The annotation group model.
         """
-        
+
 
     @abstractmethod
     def find(self, search_string: Optional[str] = None, protein_tag: Optional[str] = None) -> List[str]:
@@ -163,7 +163,23 @@ class AnnotationsABC(ABC):
             Annotation data.
         """
         
+    @abstractmethod
+    def get_text(self, group_tag: str, text: str) -> bool:
+        """
+        Check if an annotation with the given text exists in the group.
 
+        Parameters
+        ----------
+        group_tag : str
+            Annotation group tag.
+        text : str
+            Annotation text.
+
+        Returns
+        -------
+        bool
+            True if an annotation with the given text exists in the group.
+        """
     @abstractmethod
     def find(self, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, search_string: Optional[str] = None) -> List[str]:
         """
@@ -255,7 +271,7 @@ class AnnotationsABC(ABC):
         """
         
     @abstractmethod
-    def update_annotation(self, group_tag: str, tag: str, annotation: AnnotationsModel) -> bool:
+    def update_annotation(self, annotation: AnnotationsModel) -> bool:
         """
         Update an existing annotation.
 
@@ -272,4 +288,20 @@ class AnnotationsABC(ABC):
         -------
         bool
             True if update was successful.
+        """
+
+    @abstractmethod
+    def delete_annotation(self, tag: str) -> bool:
+        """
+        Delete an annotation by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            Annotation tag.
+
+        Returns
+        -------
+        bool
+            True if deletion was successful.
         """
