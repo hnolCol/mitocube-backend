@@ -68,20 +68,33 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         return AnnotationGroupsModel(**r[0])
 
     
-    def find( self, search_string: Optional[str] = None,  protein_tag: Optional[str] = None,) -> List[str]:
+    def find( self, search_string: Optional[str] = None,  protein_tag: Optional[str] = None, search_in_annotations : bool = False, return_annotations : bool = False, limit : int = None) -> List[str]:
 
         query = "MATCH (ag:AnnotationGroup) "
         
         if protein_tag:
-            query += "MATCH (a)-[:ANNOTATES]->(:Protein {tag: $protein_tag}) "
+            query += "MATCH (ag)-[:HAS_ANNOTATION]->(a:Annotation)-[:ANNOTATES]->(:Protein {tag: $protein_tag}) "
         
         if search_string:
-            query += (
-                "WHERE toLower(a.description) CONTAINS toLower($search_string) "
-                "OR toLower(a.text) CONTAINS toLower($search_string) "
-            )
+            
+            if not search_in_annotations:
+                query += "WHERE toLower(ag.text) CONTAINS toLower($search_string) "
+            else:
+            
+                query += (
+                    "MATCH (ag)-[:HAS_ANNOTATION]->(a:Annotation) "
+                    "WHERE (toLower(a.description) CONTAINS toLower($search_string) "
+                    "OR toLower(a.text) CONTAINS toLower($search_string)) OR (toLower(ag.text) CONTAINS toLower($search_string) OR toLower(ag.description) CONTAINS toLower($search_string)) "
+                    "WITH collect(a.tag) as annotation_tags, ag "
+                )
+
+        if return_annotations:
+            query += "RETURN {group_tag : ag.tag, annotation_tags : annotation_tags}"
 
         query += "RETURN ag.tag"
+        
+        if limit is not None:
+            query += " LIMIT $limit"
 
         r = self._driver.execute_query( query,
                                         search_string=search_string,
@@ -242,37 +255,56 @@ class Neo4JAnnotations(AnnotationsABC):
         
         return AnnotationsModel(**data)
 
-    def find(  self, group_tag: Optional[str] = None,  protein_tag: Optional[str] = None, search_string: Optional[str] = None) -> List[str]:
+    def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:
 
-        if group_tag is not None:
-            query = (
-                "MATCH (:AnnotationGroup {tag: $group_tag})-[:HAS_ANNOTATION]->(a:Annotation) "
+        
+        query = (
+                "MATCH (ag:AnnotationGroup)-[:HAS_ANNOTATION]->(a:Annotation) "
             )
-        else:
-            query = "MATCH (a:Annotation) "
-
-        if protein_tag is not None:
+        if group_tags is not None:
+            query += "WHERE ag.tag IN $group_tags "
+                
+        if protein_tags is not None:
+            
+            if group_tags is not None:
+                query += "AND "
+            else:
+                query += "WHERE "
+            
             query = (
-                "WHERE EXISTS {(a)-[:ANNOTATES]->(p:Protein {tag: $protein_tag})} "
+                "EXISTS {(a)-[:ANNOTATES]->(p:Protein) WHERE p.tag in $protein_tags} "
             )
 
-        if search_string is not None:
-            if protein_tag is not None:
+        if search_string is not None and search_string != "":
+            if protein_tags is not None or group_tags is not None:
                 query += "AND "
             else:
                 query += "WHERE "
             query += "a.s CONTAINS $search_string "
-
-        query += "RETURN a.tag"
-
-        r = self._driver.execute_query( query,
-                                        group_tag=group_tag,
-                                        protein_tag=protein_tag,
-                                        search_string=search_string.lower() if search_string else None,
-                                        routing_="r",
-                                        result_transformer_=Result.value,
-                                    )
+            
+        if group_by_group:
+            query += "RETURN ag.tag, a.tag "
+        else: 
+            query += "RETURN a.tag "
         
+        if limit is not None:
+            query += "LIMIT $limit"
+        
+        r = self._driver.execute_query( query,
+                                        group_tags=group_tags,
+                                        protein_tags=protein_tags,
+                                        limit=limit,
+                                        search_string=search_string.strip().lower() if search_string else None,
+                                        routing_="r",
+                                        result_transformer_=Result.values,
+                                    )
+        if group_by_group:
+            grouped = {}
+            for group_tag, annotation_tag in r:
+                if group_tag not in grouped:
+                    grouped[group_tag] = []
+                grouped[group_tag].append(annotation_tag)
+            return [ {"group_tag": k, "annotation_tags": i} for k,i in grouped.items()]
         return r
 
     def count_proteins(self, tag: str) -> int:
