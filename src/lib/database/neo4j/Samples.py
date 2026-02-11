@@ -347,3 +347,44 @@ class Neo4JSamples(SamplesABC):
 
         genotype = self._driver.execute_query(query, tag=tag, routing_="r")
         return genotype
+    
+
+
+    def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):
+        """Insert proteins quantified in a given sample of a submission.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag associated with the sample.
+        sample_name : str
+            The name of the sample.
+        protein_tags : List[str]
+            A list of protein tags to insert as quantified in the sample.
+
+        Raises
+        ------
+        ValueError
+            If the sample does not exist.
+        """
+        
+        sample_tag = self._get_sample_tag(sample_name, submission_tag)
+
+        if not self.exists(tag=sample_tag):
+            raise ValueError("Sample does not exist.")
+
+        query = (
+            "MATCH (submission:Submission {tag: $submission_tag})"
+            "-[:HAS_SAMPLE]->(s:Sample {tag: $sample_tag}) "
+            "UNWIND $protein_tags AS ptag "
+            "MERGE (p:Protein {tag: ptag}) "
+            "MERGE (s)-[:QUANTIFIED]->(p)"
+        )
+
+        self._driver.execute_query(
+            query,
+            routing_="w",
+            submission_tag=submission_tag,
+            sample_tag=sample_tag,
+            protein_tags=protein_tags
+        )

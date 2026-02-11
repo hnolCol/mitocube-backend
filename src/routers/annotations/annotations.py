@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List, Optional, Dict, Set
+from scipy.stats import fisher_exact
 
 from lib.database.Database import Database
 
@@ -135,3 +136,58 @@ def update_annotation_group_from_url(group_tag: str, user: UserModel = Depends(i
     update_annotations_from_group_url(group=group,annotations_db=DB.annotations)
 
     return True
+
+
+
+@router.get("/analysis/fisher", response_model=List[Dict])
+def fisher_annotation_analysis(
+    submission_tag: str = Query(..., description="Submission tag to analyze"),
+    target_proteins: List[str] = Query(..., description="List of target protein tags"),
+    group_tag: str = Query(..., description="Annotation group tag to analyze"),
+) -> List[Dict]:
+    
+    # Get all proteins in submission
+    all_proteins = set(DB.submissions.get_proteins_in_submission(submission_tag))
+    
+    if not all_proteins:
+        raise HTTPException(status_code=404, detail="No proteins in submission.")
+    
+    # Split into target and general
+    target = set(target_proteins) & all_proteins
+    general = all_proteins - target
+    
+    if not target:
+        raise HTTPException(status_code=400, detail="No valid target proteins.")
+    
+    # Get annotations filtered by submission
+    annotation_to_proteins = DB.annotations.get_proteins_by_annotation_group(
+        group_tag=group_tag,
+        submission_tag=submission_tag
+    )
+
+    results = []
+    
+    for annotation_tag, annotated_proteins in annotation_to_proteins.items():
+        annotated_set = set(annotated_proteins)
+    
+
+        # Build 2x2 table
+        a = len(target & annotated_set)
+        b = len(target) - a
+        c = len(general & annotated_set)
+        d = len(general) - c
+        
+        odds_ratio, p_value = fisher_exact([[a, b], [c, d]], alternative="greater")
+        
+        results.append({
+            "annotation_tag": annotation_tag,
+            "target_with_annotation": a,
+            "target_total": len(target),
+            "general_with_annotation": c,
+            "general_total": len(general),
+            "odds_ratio": float(odds_ratio),
+            "p_value": float(p_value),
+        })
+    
+    results.sort(key=lambda x: x["p_value"])
+    return results

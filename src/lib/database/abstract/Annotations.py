@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional
+from typing import List, Optional, Dict
 import pandas as pd
 
 from config.models.annotations.annotations import ( AnnotationsModel, AnnotationGroupsModel)
@@ -304,4 +304,11 @@ class AnnotationsABC(ABC):
         -------
         bool
             True if deletion was successful.
+        """
+
+
+    def get_proteins_by_annotation_group(self, group_tag: str, submission_tag: str) -> Dict[str, List[str]]:
+        """
+        Get all proteins for each annotation in a group, filtered by submission.
+        Returns: {annotation_tag: [list of protein_tags]}
         """
