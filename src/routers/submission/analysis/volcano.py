@@ -28,7 +28,8 @@ def get_dataset_volcano(submission_tag : str,
                         ca_tag_left : str, 
                         ca_tag_right : str,
                       #  attribute_value_tag_left : str, attribute_value_tag_right : str, sample_attribute_tag : str, within_attribute_tag : str = None,
-                        within_trait_tag : str = None, impute : bool = True,
+                        within_trait_tag : str = None, 
+                        impute : bool = True,
                         annotation_tag : str = None, 
                         equal_variance : bool = True,
                         fdr : float = 0.05,
@@ -65,10 +66,8 @@ def get_dataset_volcano(submission_tag : str,
     
     condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
     attribute_tag = DB.condition_applications.get_attribute(ca_tag_left)
-    print(attribute_tag)
     if attribute_tag not in condition_applications.columns:
         raise HTTPException(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
-    print()
    # if within_trait_tag is not None:
     sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index
     sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
@@ -81,22 +80,30 @@ def get_dataset_volcano(submission_tag : str,
     dt = DB.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
     if dt.empty:
         raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.") 
-    
+    if sample_tags_left.size < 2 or sample_tags_right.size < 2:
+        raise HTTPException(status_code=400, detail="At least two samples are required in each group for t-test.")
     
     X = dt.loc[:,sample_tags_left]
     Y = dt.loc[:,sample_tags_right]
+
     T,p = ttest_ind(X, Y, nan_policy="omit", axis=1, equal_var=equal_variance)
     p_value_name = f"p-value"
         
     #create data frame with the t-test statistics 
     stats = pd.DataFrame(
-            {f"t-value" : T, p_value_name : p, "tag" : dt.index}, 
-            columns=[f"t-value",p_value_name,"tag"]
-            )
+            {f"t-value" : T, 
+             p_value_name : p, 
+             "tag" : dt.index,
+             "log2FC" : X.mean(axis=1) - Y.mean(axis=1)
+            }, 
+            columns=[f"t-value",p_value_name,"tag", "log2FC"]
+            ).dropna(subset=[p_value_name])
+    print(stats)
     stats.loc[:,f"-log10 p-value"] = -np.log10(stats.loc[:,p_value_name])
     stats.loc[:,f"fdr"] = false_discovery_control(stats[p_value_name].values)
     stats.loc[:,f"Significant"] = stats.loc[:,f"fdr"] <= fdr
-    stats.loc[:,f"log2 FC"] = X.mean(axis=1) - Y.mean(axis=1)
+    # stats.loc[:,f"log2 FC"] = X.mean(axis=1) - Y.mean(axis=1)
+    
     
     
     return {"stats" : stats.to_dict(orient="records"), 

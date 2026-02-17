@@ -246,31 +246,36 @@ class Neo4JSamples(SamplesABC):
         
         
         
-    def get_condition_applications(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
-        """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
-        You may also sort the results by the most frequent condition procedures.
-        If only one tag is found, a single string is returned. If no tag is found, an empty list is returned. 
+    def get_condition_applications(self, tag: str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+        """Get all condition procedures for a given sample. 
         
         Parameters
         ----------
         tag : str
             The tag of the sample to get the condition procedures for.
+        attribute_tags: List[str], optional
+            If provided, only condition applications linked to these attribute tags will be returned.
         group_by_attribute : bool, optional
             If True, the results are grouped by attribute and returned as a list of ConditionApplicationAttribute
             
         Returns
         -------
-        List[str]|str
-            A list of condition procedure tags. If only a single tag is found, a single string is returned.
-            If no tag is found, an empty list is returned.
+        List[str]|List[ConditionApplicationAttributeModel]
+            A list of condition procedure tags. 
+            If group_by_attribute is True, a list of ConditionApplicationAttributeModel is returned.
         """
             
-        query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication)" 
+        query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) " 
         if group_by_attribute:
-            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) RETURN a.tag, collect(condition.tag) "
+            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            if attribute_tags is not None and len(attribute_tags) > 0:
+                query += "WHERE a.tag IN $attribute_tags "
+            query += "RETURN a.tag as attribute_tag, collect(condition.tag) as condition_application_tags "
         else:
+            if attribute_tags is not None and len(attribute_tags) > 0:
+                query += "WHERE EXISTS {(condition)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE a.tag IN $attribute_tags} "
             query += "RETURN collect(condition.tag) "
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.values if group_by_attribute else Result.value)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags=attribute_tags, result_transformer_=Result.values if group_by_attribute else Result.value)
         if group_by_attribute:
             return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
         return r[0] if len(r) > 0 else []

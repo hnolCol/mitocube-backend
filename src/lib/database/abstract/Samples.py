@@ -105,10 +105,8 @@ class SamplesABC(ABC):
         "Returns a sample an its trait as well genotype annotation."
         
     @abstractmethod
-    def get_condition_applications(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
-        """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
-        You may also sort the results by the most frequent condition procedures.
-        If only one tag is found, a single string is returned. If no tag is found, an empty list is returned. 
+    def get_condition_applications(self, tag: str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+        """Get all condition procedures for a given sample. 
         
         Parameters
         ----------
@@ -119,9 +117,8 @@ class SamplesABC(ABC):
             
         Returns
         -------
-        List[str]|str
-            A list of condition procedure tags. If only a single tag is found, a single string is returned.
-            If no tag is found, an empty list is returned.
+        List[str]|List[ConditionApplicationAttributeModel]
+            A list of condition procedure tags.
             If group_by_attribute is True, a list of ConditionApplicationAttributeModel is returned.
         """
         
