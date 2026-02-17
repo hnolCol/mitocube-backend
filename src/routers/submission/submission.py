@@ -678,6 +678,32 @@ def get_submission_summary_string(submission_tag : str, user : UserModel = Depen
     
     return "\n".join(summary_strings)
 
+@router.post("/submissions/{submission_tag}/samples")
+def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(get_user_from_token)) -> bool:
+    "Adds samples to a submission. The sample names are added to the existing samples. Returns true if the samples were added successfully."
+    
+    if not DB.submissions.exists(tag = submission_tag): raise tag_not_found
+    
+    existing_samples = DB.submissions.get_samples(tag=submission_tag)
+    
+    sample_names = [sample_name for sample_name in sample_names if sample_name not in existing_samples]
+    
+    for idx, sample_name in enumerate(sample_names):
+        DB.samples.insert(submission_tag = submission_tag, sample_name = sample_name, sample_index = len(existing_samples) + idx)
+    
+    return True
+
+@router.post("/submissions/{submission_tag}/samples/{sample_name}/proteins")
+def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags: List[str],user: UserModel = Depends(get_user_from_token)):
+    
+    DB.samples.insert_proteins(
+        submission_tag=submission_tag,
+        sample_name=sample_name,
+        protein_tags=protein_tags
+    )
+    return True
+
+
 @router.get("/submissions/{submission_tag}/samples")
 def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     "Returns the samples tags associated with the submission"

@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Optional,List
+from typing import Optional,List, Dict
 
 from neo4j import Driver, Result
 
@@ -442,3 +442,27 @@ class Neo4JAnnotations(AnnotationsABC):
                                     )
         
         return True if r is not None else False
+    
+
+
+    def get_proteins_by_annotation_group(self, group_tag: str, submission_tag: str) -> Dict[str, List[str]]:
+
+        query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(p:Protein) "
+            "MATCH (ag:AnnotationGroup {tag: $group_tag})-[:HAS_ANNOTATION]->(a:Annotation)-[:ANNOTATES]->(p) "
+            "RETURN a.tag AS annotation_tag, "
+            "collect(DISTINCT p.tag) AS protein_tags"
+        )
+
+        r = self._driver.execute_query(
+            query,
+            group_tag=group_tag,
+            submission_tag=submission_tag,
+            routing_="r",
+            result_transformer_=Result.data,
+        )
+
+        return {
+            row["annotation_tag"]: row["protein_tags"]
+            for row in r
+        }

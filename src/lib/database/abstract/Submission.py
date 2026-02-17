@@ -361,6 +361,23 @@ class SubmissionsABC(ABC):
         """Checks if samples have quantification data for a given submission."""
         pass 
 
+    @abstractmethod
+    def get_proteins_in_submission(self, tag: str) -> List[str]:
+        """
+        Returns all protein tags that are quantified in a submission.
+        
+        Parameters
+        ----------
+        tag : str
+            The submission tag
+            
+        Returns
+        -------
+        List[str]
+            List of protein tags
+        """
+
+        
 class SubmissionFilterABC(ABC):
     
     

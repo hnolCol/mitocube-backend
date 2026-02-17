@@ -530,6 +530,15 @@ class Neo4JSubmissions(SubmissionsABC):
             )
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+    
+    def get_proteins_in_submission(self, tag: str) -> List[str]:
+        """Returns a list of all protein tags that are quantified in the submission."""
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:Protein) "
+            "RETURN DISTINCT p.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver) -> None:
