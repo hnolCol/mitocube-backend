@@ -12,6 +12,28 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         
         self._driver = driver
 
+
+    def _has_values(self, tag : str) -> bool:
+        """Check if a condition application has values associated with it.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the condition application.
+
+        Returns
+        -------
+        bool
+            True if the condition application has values, False otherwise.
+        """
+        query = (
+            "MATCH (ca:ConditionApplication {tag : $ca_tag})-[:HAS_VALUE*0..]->(cv:ConditionValue) "
+            "RETURN COUNT(cv) > 0 AS has_values "
+        )
+        r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False 
+    
+
     def exists(self, tag : str) -> bool: 
         """If a submission tag is associated with a condition application. 
         Condition applications are always associated with submissions, but such submissions that 
@@ -36,24 +58,34 @@ class Neo4JConditionApplications(ConditionApplicationABC):
     def get(self, tag: str) -> List[List[ConditionApplicationItemModel]]:
         "Return the condition application details. Returns None if not found."
 
-        query = (
-            "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
-            "MATCH p = ((ca)-[:HAS_VALUE*0..]->(cv:ConditionValue)) "
-            "WITH ca, collect(nodes(p)) AS paths "
-            "RETURN [path IN paths | "
-            "            [n IN path | "
-            "                { "
-        "                       label: labels(n)[0], " #label of the node 
-            "                   tag : n.tag, "
-            "                    trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
-            "                    attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0], "
-            "                    value : n.value      "           
-            "                    } "
-            "            ] "
-            "    ] AS children "
-        )
+        if not self._has_values(tag):
+            query = (
+                "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
+                "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
+                "RETURN [[{ label : labels(ca)[0], tag : ca.tag, attribute_tag : a.tag, trait_tag : t.tag, value : null}]] AS children "
+            )
+        else:
+
+            query = (
+                "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
+                "OPTIONAL MATCH p = ((ca)-[:HAS_VALUE*0..]->(cv:ConditionValue)) "
+                "WITH ca, collect(nodes(p)) AS paths "
+                "RETURN [path IN paths | "
+                "            [n IN path | "
+                "                { "
+            "                       label: labels(n)[0], " #label of the node 
+                "                   tag : n.tag, "
+                "                    trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
+                "                    attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0], "
+                "                    value : n.value      "           
+                "                    } "
+                "            ] "
+                "    ] AS children "
+            )
 
         r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
+        print(r)
         return [[ConditionApplicationItemModel(**rii) for rii in ri] for ri in r[0]] if len(r) > 0 and len(r[0]) > 0 else [[]]
 
 

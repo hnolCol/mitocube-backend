@@ -8,6 +8,7 @@ from neo4j import Result, Driver
 open_ai_settings = get_open_ai_settings()
 from abc import abstractmethod, ABC
 from typing import List, Dict
+from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publications
 class OpenAIClient(ABC):
     def __init__(self):
         
@@ -23,6 +24,31 @@ class OpenAIClient(ABC):
         Executes a database query and returns the results.
         """
         
+    
+    def generate_protein_phenotype_relationships(self, protein_name : str) -> str:
+        """
+        Generates a chat completion using the OpenAI API.
+        """
+        pubmed_search_result = get_pubmed_ids_by_query(query=protein_name, limit=50)
+        print(pubmed_search_result)
+        pubmed_ids = pubmed_search_result.get("esearchresult", {}).get("idlist", [])
+        pubmed_publication_abstracts = get_pubmed_publications(pubmedids=pubmed_ids)
+        
+        print(pubmed_publication_abstracts)
+        
+        response = self.client.chat.completions.create(
+            model=self.ai_model,
+            messages=[{
+                "role" : "system", 
+                "content" : open_ai_settings.phenotype_relationship_system_message},
+                {
+            "role": "user",
+            "content": f"Please extract protein-phenotype relationships for the protein: {protein_name}. Here are the PubMed article abstracts related to the protein:\n{pubmed_publication_abstracts}. This is the list of PubMed IDs you got the abstracts from: {', '.join(pubmed_ids)}. Please provide the output in a markdown table inside a ```markdown ... ``` block as specified in the system message."}
+            ]
+        )
+        return str(response.choices[0].message.content)
+    
+        
         
     def summarize_pubmed_publications(self, prompt) -> str:
         """
@@ -35,7 +61,7 @@ class OpenAIClient(ABC):
                 "content" : """You are a literature summarizer. The prompt will be a list of pubmed publication's title, authors and abstract. 
                         Please summarize the findings and implications of the provided papers. You can also add other information that you find in the internet, 
                     but you must clearly state what the source for this statement is. You should return your results as markdown to enhance structure and readability.
-                    Please linke the pubmed IDs using the format [pubmedid](https://pubmed.ncbi.nlm.nih.gov/{pubmedid})
+                    Please link the pubmed IDs using the format [pubmedid](https://pubmed.ncbi.nlm.nih.gov/{pubmedid})
                     Please be concise and do not add unnecessary information."""},
                     {
                 "role": "user", 

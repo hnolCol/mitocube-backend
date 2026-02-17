@@ -1,5 +1,5 @@
 
-from typing import Tuple, List, Dict 
+from typing import Tuple, List, Dict, Literal
 from collections import OrderedDict
 from neo4j import Driver, Result
 import numpy as np 
@@ -28,8 +28,8 @@ class Neo4JDataset(DatasetABC):
     def exists(self, tag : str) -> bool:
         "Checks if the submission has data (e.g. quantified proteins). This is not meant to check if a submission exists."
         query = (
-            "WITH EXISTS {(submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(p:Protein)} as submission_exists "
-            "RETURN submission_exists "
+            "WITH EXISTS {(submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup)} as submission_has_quant_data "
+            "RETURN submission_has_quant_data "
         )    
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return r[0]
@@ -187,25 +187,73 @@ class Neo4JDataset(DatasetABC):
         
         
     
-    def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
-        ""
-
-        if filter_tag is None:
+    
+    
+    def get_precursor_datatable(self, tag : str, sample_tags : List[str] = None, annotation_tag : str = None, use_sample_tags : bool = False) -> pd.DataFrame:
+        #TODO refine this... 
+        if annotation_tag is None:
             query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:ProteinGroup) "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:Peptide) "
                 )
         else:
             query = (
-                "MATCH (f:Filter) "
-                "WHERE f.tag = $filter_tag "
-                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:ProteinGroup)-[:PART_OF]->(f) "
+                "MATCH (a:Annotation) "
+                "WHERE a.tag = $annotation_tag "
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(p:Peptide) "
+                "WHERE EXISTS {(a)-[:ANNOTATES]->(p)} "
             )
             
+            
+        if sample_tags is not None and len(sample_tags) > 0:
+            if annotation_tag is None:
+                query += "WHERE sample.tag IN $sample_tags " 
+            else:   
+                query += "AND sample.tag IN $sample_tags "
+            
         
-        query += "RETURN p.tag as tag, collect(r.value) as qs, collect(sample.sample_index) as idx"
+        query += "RETURN p.tag as tag, collect(r.value) as qs, collect(sample.sample_index) as idx, collect(sample.tag) as sample_tags "
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df, sample_tags = sample_tags, annotation_tag = annotation_tag)
         
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df)
-        datatable = r.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
+        if use_sample_tags:
+            datatable = r.explode(["qs","sample_tags"]).pivot(index="tag",columns="sample_tags",values="qs").astype(float)
+        else:
+            datatable = r.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
+        return datatable
+    
+        
+    
+    
+    def get_datatable(self, tag : str, sample_tags : List[str] = None, annotation_tag : str = None, use_sample_tags : bool = False, level : Literal["protein","precursor"] = "protein") -> pd.DataFrame:
+        "Returns a table sample indexes as columns and protein tags as index."
+
+        
+        if annotation_tag is None:
+            query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup) "
+                )
+        else:
+            query = (
+                "MATCH (a:Annotation) "
+                "WHERE a.tag = $annotation_tag "
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
+                "WHERE EXISTS {(a)-[:ANNOTATES]->(p)} "
+            )
+            
+            
+        if sample_tags is not None and len(sample_tags) > 0:
+            if annotation_tag is None:
+                query += "WHERE sample.tag IN $sample_tags " 
+            else:   
+                query += "AND sample.tag IN $sample_tags "
+            
+        
+        query += "RETURN pg.tag as tag, collect(r.value) as qs, collect(sample.sample_index) as idx, collect(sample.tag) as sample_tags "
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df, sample_tags = sample_tags, annotation_tag = annotation_tag)
+        
+        if use_sample_tags:
+            datatable = r.explode(["qs","sample_tags"]).pivot(index="tag",columns="sample_tags",values="qs").astype(float)
+        else:
+            datatable = r.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
         return datatable
         
         

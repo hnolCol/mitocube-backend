@@ -44,13 +44,13 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return InstrumentStateModel(**r[0])
         
-    def get_instrument_state(self, instrument_tag : str, limit : int = 1) -> List[InstrumentsStateResponseModel]:
+    def get_instrument_state(self, instrument_tag : str, limit : int = 1) -> List[str]:
         "Returns the state "
             
         query = (
             "MATCH (instrument:Trait {tag : $instrument_tag})<-[:HAS_TRAIT]-(a:Attribute) WHERE EXISTS {(a)-[:PART_OF]->(ag:AttributeGroup {tag : 'instrument'})} "
             "MATCH (instrument)-[r:IN_STATE]-(is:InstrumentState) "
-            "RETURN {tag : is.tag, comment : r.comment, created_at : r.created_at} ORDER BY r.created_at DESC "
+            "RETURN is.tag ORDER BY r.created_at DESC "
         )
         
         if limit is not None:
@@ -58,7 +58,7 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
             
         r = self._driver.execute_query(query,instrument_tag = instrument_tag, result_transformer_=Result.value, limit = limit)
 
-        return [InstrumentsStateResponseModel(**ri) for ri in r]
+        return r
     
     
     def get_state_durations(self, instrument_tag : str = None, state_tag : str = None, timestamp_min : float = None, timestamp_max : float = None, limit : int = None) -> List[InstrumentStateHistoryModel]:
@@ -102,7 +102,6 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         )
         
         r = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.value)
-        print(r)
         return [InstrumentStateHistoryModel(**ri) for ri in r[0]]
     
     

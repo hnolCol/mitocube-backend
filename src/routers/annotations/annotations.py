@@ -11,6 +11,7 @@ from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_admin
 
 from setup_utils.update_annotation_group import update_annotations_from_group_url
+from config.models.parameter import APIParamString
 
 DB = Database.DB()
 
@@ -19,10 +20,16 @@ router = APIRouter(
     tags=["Annotations"],
 )
 
-@router.get("/q", response_model=List[str])
-def find_annotations(search_string: Optional[str] = None, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, user: UserModel = Depends(get_user_from_token),):
+@router.get("/q", response_model=List[str]|List[Dict])
+def find_annotations(search_string: Optional[str] = None, group_tags: Optional[str] = None, protein_tags: Optional[str] = None, limit : int = None, group_by_group: bool = False, user: UserModel = Depends(get_user_from_token)):
+    "Finds annotations matching the search criteria."
     
-    tags = DB.annotations.find(search_string=search_string, group_tag=group_tag, protein_tag=protein_tag)
+    tags = DB.annotations.find(search_string=search_string, 
+                               group_tags=APIParamString(param = group_tags).param,  #transforms string with semicolon into list
+                               protein_tags=APIParamString(param = protein_tags).param,  #transforms string with semicolon into list
+                               limit=limit, 
+                               group_by_group=group_by_group)
+    
     return tags
 
 

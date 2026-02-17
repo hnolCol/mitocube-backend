@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC 
-from typing import List 
+from typing import List, Dict
 import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleModel
@@ -15,6 +15,7 @@ class SamplesABC(ABC):
               protein_group_tag : str = None, 
               trait_tag : str = None, 
               submission_tag : str = None,
+              instrument_tag : str = None,
               genotype_tag : str = None) -> int:
         
         """Counts the number of samples. The filters are optional. However no combination is supported.
@@ -33,11 +34,28 @@ class SamplesABC(ABC):
             If provided, only counts samples that are part of the given submission.
         trait_tag : str, optional
             If provided, only counts samples that have the given trait. 
-            
+        instrument_tag : str, optional
+            If provided, only counts samples that were measured by the given instrument.
         Returns 
         -------
         int
             The number of samples matching the criteria.
+        """
+    @abstractmethod
+    def count_quantified_protein_groups(self, tag : str, submission_tag : str) -> List[Dict]:
+        """Counts the number of quantified protein groups for a given sample.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the sample.
+        submission_tag : str
+            The tag of the submission.
+
+        Returns
+        -------
+        int
+            The number of quantified protein groups for the given sample.
         """
         
     @abstractmethod
@@ -87,10 +105,8 @@ class SamplesABC(ABC):
         "Returns a sample an its trait as well genotype annotation."
         
     @abstractmethod
-    def get_condition_applications(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
-        """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
-        You may also sort the results by the most frequent condition procedures.
-        If only one tag is found, a single string is returned. If no tag is found, an empty list is returned. 
+    def get_condition_applications(self, tag: str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+        """Get all condition procedures for a given sample. 
         
         Parameters
         ----------
@@ -101,21 +117,27 @@ class SamplesABC(ABC):
             
         Returns
         -------
-        List[str]|str
-            A list of condition procedure tags. If only a single tag is found, a single string is returned.
-            If no tag is found, an empty list is returned.
+        List[str]|List[ConditionApplicationAttributeModel]
+            A list of condition procedure tags.
             If group_by_attribute is True, a list of ConditionApplicationAttributeModel is returned.
         """
         
     @abstractmethod
-    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str) -> pd.DataFrame:
+    def get_condition_applications_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
         """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
         Parameters
         ----------
         submission_tag : str
             The submission tag to get the condition procedures for.
-        
+        join : str, optional
+            The string to join multiple condition procedure tags, by default ";"
+        pivot : bool, optional
+            If True, the results are pivoted to have attributes as columns, by default True
+        sort_ca_tags : bool, optional
+            If True, the condition application tags for each attribute are sorted alphabetically before joining., by default True   
+        return_sample_index : bool, optional
+            If True, the DataFrame will be indexed by sample index. If False, it will be indexed by sample tag.
         Returns
         -------
         pd.DataFrame

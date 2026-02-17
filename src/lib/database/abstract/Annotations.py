@@ -61,14 +61,28 @@ class AnnotationGroupsABC(ABC):
 
 
     @abstractmethod
-    def find(self, search_string: Optional[str] = None, protein_tag: Optional[str] = None) -> List[str]:
+    def find(self, search_string: Optional[str] = None, protein_tag: Optional[str] = None, search_in_annotations : bool = False, return_annotations : bool = False, limit : int = None) -> List[str]:
         """
         Finds all annotation groups.
 
+        Parameters
+        ----------
+        search_string : Optional[str]
+            Search string to filter annotation groups.
+        protein_tag : Optional[str]
+            Protein tag to filter annotation groups.    
+        search_in_annotations : bool
+            If True, search also in annotations linked to the groups.
+        return_annotations : bool
+            If True, return annotations linked to the groups. Will be returned. This is useful to get annotation groups along with their annotations. (e.g. searching for all)
+        limit : int
+            Limit the number of results.
+
         Returns
         -------
-        List[str]
+        List[str] | List[Dict]
             Annotation group tags.
+            If return_annotations is True, a list of dicts with keys 'tag' and 'annotation_tags' is returned.
         """
         
 
@@ -181,21 +195,25 @@ class AnnotationsABC(ABC):
             True if an annotation with the given text exists in the group.
         """
     @abstractmethod
-    def find(self, group_tag: Optional[str] = None, protein_tag: Optional[str] = None, search_string: Optional[str] = None) -> List[str]:
-        """
+    def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:        """
         Find annotations.
 
         Parameters
         ----------
-        group_tag : Optional[str]
-            Search within a specific annotationn group
-        protein_id : Optional[str]
-            Search to annotations containing this protein.
-
+        search_string : Optional[str]
+            Search string to filter annotation tags.
+        group_tags : Optional[List[str]]
+            Search within specific annotation groups
+        protein_tags : Optional[List[str]]
+            Search to annotations containing these proteins.
+        limit : Optional[int]
+            Limit the number of results.
+        group_by_group : bool
+            If True, group results by their annotation group.
         Returns
         -------
-        List[str]
-            Matching annotation tags.
+        List[str]|List[dict]    
+            Matching annotation tags. If group_by_group is True, a list of dicts with keys 'group_tag' and 'annotation_tags' is returned.
         """
         
 

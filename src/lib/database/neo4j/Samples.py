@@ -40,6 +40,7 @@ class Neo4JSamples(SamplesABC):
               protein_group_tag : str = None, 
               submission_tag : str = None, 
               trait_tag : str = None,
+              instrument_tag : str =None,
               genotype_tag : str = None) -> int:
 
         "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
@@ -49,7 +50,7 @@ class Neo4JSamples(SamplesABC):
             )
         elif trait_tag is not None:
             query = (
-                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(trait:Trait) "
+                "MATCH (s:Sample)<-[:HAS_SAMPLE]-(submission:Submission)-[:HAS_]->(trait:Trait) " ## TO DO: This is not correct, need to traverse the condition application tree
                 "WHERE trait.tag = $trait_tag "
             )
         elif submission_tag is not None:
@@ -59,6 +60,10 @@ class Neo4JSamples(SamplesABC):
         elif genotype_tag is not None:
             query = (
                 "MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype {tag : $genotype_tag})"
+            )
+        elif instrument_tag is not None:
+            query = (
+                "MATCH (s:Sample)<-[:MEASURED]-(t:Trait {tag : $instrument_tag}) "
             )
         else:
             query = (
@@ -93,13 +98,34 @@ class Neo4JSamples(SamplesABC):
         query += (
             "RETURN count(s) as count "
         )
-        
-        print(query)
             
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag, instrument_tag = instrument_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
+
+    def count_quantified_protein_groups(self, tag : str, submission_tag : str) -> int:
+        """Counts the number of quantified protein groups for a given sample.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The tag of the submission.
+
+        Returns
+        -------
+        List[Dict]
+            A list of dictionaries, each containing the sample tag and the count of quantified protein groups.
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "MATCH (s)-[:QUANTIFIED]->(pg:ProteinGroup) "
+            "RETURN count(DISTINCT pg) as count "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data, submission_tag=submission_tag)
+        return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
 
     def exists(self, tag : str) -> bool:
@@ -220,31 +246,36 @@ class Neo4JSamples(SamplesABC):
         
         
         
-    def get_condition_applications(self, tag: str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
-        """Get all condition procedures for a given sample. If no sample tag is provided, all condition procedures are returned.
-        You may also sort the results by the most frequent condition procedures.
-        If only one tag is found, a single string is returned. If no tag is found, an empty list is returned. 
+    def get_condition_applications(self, tag: str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+        """Get all condition procedures for a given sample. 
         
         Parameters
         ----------
         tag : str
             The tag of the sample to get the condition procedures for.
+        attribute_tags: List[str], optional
+            If provided, only condition applications linked to these attribute tags will be returned.
         group_by_attribute : bool, optional
             If True, the results are grouped by attribute and returned as a list of ConditionApplicationAttribute
             
         Returns
         -------
-        List[str]|str
-            A list of condition procedure tags. If only a single tag is found, a single string is returned.
-            If no tag is found, an empty list is returned.
+        List[str]|List[ConditionApplicationAttributeModel]
+            A list of condition procedure tags. 
+            If group_by_attribute is True, a list of ConditionApplicationAttributeModel is returned.
         """
             
-        query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication)" 
+        query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) " 
         if group_by_attribute:
-            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) RETURN a.tag, collect(condition.tag) "
+            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            if attribute_tags is not None and len(attribute_tags) > 0:
+                query += "WHERE a.tag IN $attribute_tags "
+            query += "RETURN a.tag as attribute_tag, collect(condition.tag) as condition_application_tags "
         else:
+            if attribute_tags is not None and len(attribute_tags) > 0:
+                query += "WHERE EXISTS {(condition)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE a.tag IN $attribute_tags} "
             query += "RETURN collect(condition.tag) "
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.values if group_by_attribute else Result.value)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags=attribute_tags, result_transformer_=Result.values if group_by_attribute else Result.value)
         if group_by_attribute:
             return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
         return r[0] if len(r) > 0 else []
@@ -286,7 +317,7 @@ class Neo4JSamples(SamplesABC):
         print(r)
         return  r[0] if len(r) > 0 else None
 
-    def get_condition_applications_by_sample_index_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True) -> pd.DataFrame:
+    def get_condition_applications_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
         """Get all condition procedures for all samples in a submission, indexed by sample index. 
         
         Parameters
@@ -297,25 +328,36 @@ class Neo4JSamples(SamplesABC):
             If provided, multiple condition procedure tags will be joined into a single string using this separator.
         pivot : bool, optional
             If True, the result will be pivoted to have attributes as columns.
+        sort_ca_tags : bool, optional
+            If True, the condition application tags will be sorted alphabetically before joining.
+        return_sample_index : bool, optional
+            If True, the DataFrame will be indexed by sample index. If False, it will be indexed by sample tag.
         Returns
         -------
         pd.DataFrame
             A DataFrame with sample indices as index and condition procedures as columns.
             The columns names represent the instance attribute (e.g. att_environment).
             The values are the condition procedure tags. 
-            Multiple tags are separated by a semicolon, if join is provided.
+            Multiple tags are separated by a semicolon, if join is provided. The tags are sorted alphabetically if sort_ca_tags is True.
+            Pivot is applied if pivot is True, leading to attribute_tags as column names. 
             
         """
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
-            "RETURN s.sample_index as sample_index, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
+            "RETURN s.sample_index as sample_index, s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
         df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag)
-        df.set_index("sample_index", inplace=True)
+        if return_sample_index:
+            df.set_index("sample_index", inplace=True)
+        else:
+            df.set_index("sample_tag", inplace=True)
         if join is not None:
-            df["condition_tags"] = df["condition_tags"].apply(lambda x: ";".join(x))
+            if sort_ca_tags:
+                df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(sorted(x)))
+            else:
+                df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(x))
             if pivot:
                 df = df.pivot_table(index=df.index, columns="attribute_tag", values="condition_tags", aggfunc='first')
         return df

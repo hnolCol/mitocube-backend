@@ -76,7 +76,7 @@ class AttributesABC(ABC):
     
         
     @abstractmethod 
-    def exists(self, tag : str = None, value : str = None) -> bool:
+    def exists(self, tag : str = None, trait : str = None) -> bool:
         """Checks if an attribute or attribute value exists by its tag. 
 
         Parameters

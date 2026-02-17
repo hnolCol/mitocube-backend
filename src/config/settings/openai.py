@@ -11,7 +11,7 @@ class OpenAI(BaseSettings):
 
     open_ai_api_key : str
     chat_ai_base_url : str
-    chat_model : str = "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"#"qwen3-235b-a22b"#"llama-3.1-sauerkrautlm-70b-instruct"# openai-gpt-oss-120b"# "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"# "llama-3.1-sauerkrautlm-70b-instruct" #"codestral-22b"#"openai-gpt-oss-120b"#"codestral-22b"#"meta-llama-3.1-8b-instruct"#"gpt-4o-mini"
+    chat_model : str = "openai-gpt-oss-120b"# "qwen3-235b-a22b"#" #"qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"#"qwen3-235b-a22b"#"llama-3.1-sauerkrautlm-70b-instruct"# openai-gpt-oss-120b"# "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"# "llama-3.1-sauerkrautlm-70b-instruct" #"codestral-22b"#"openai-gpt-oss-120b"#"codestral-22b"#"meta-llama-3.1-8b-instruct"#"gpt-4o-mini"
     system_information : str = """You are a bioinformatic assistant.
                         IMPORTANT INFO: 
                         I want to get just the cypher query, not more to be able to directly inject it into the database query. 
@@ -489,6 +489,45 @@ class OpenAI(BaseSettings):
                         Never create queries that would need the user to input something or to change something. 
                         The query must be ready to run as is.
                         """
+    phenotype_relationship_system_message : str = """
+                            System message — Protein–Phenotype Evidence Extraction (PubMed article abstracts received from Pubmed search):
+                            Your task is to extract and summarize experimental evidence linking specific proteins to phenotypes from provided PubMed article abstracts.
+                            I will provide you with a long string of PubMed article abstracts related to a specific protein. New articles always starts with the a number like this 1. and title. Articles end with DOI. <DOI> and PMID : <PubMed ID> and a conflict of interest statement.
+                            
+                            Criteria for inclusion:
+                            - Focus on direct experimental evidence (e.g., gene knockouts, overexpression studies, biochemical assays) that demonstrate a causal or functional relationship between the protein and the phenotype.
+                            - Include only peer-reviewed articles with clear experimental methods and results.
+                            - Exclude purely correlative studies, reviews, meta-analyses, or articles lacking direct experimental data.
+                            
+                            
+                            Output a table with columns:
+                            - Biological Level (Molecular / Cellular / Tissue-Organ / Organismal-Clinical)
+                            - Phenotype in a format of (Protein)-[]->(Phenotype) where [] is the type of relationship such as "causes", "leads to", "results in", "promotes", "inhibits" etc.
+                            - Description of the Phenotype (concise description)
+                            - Title of the Paper
+                            - Year of the Publication
+                            - Protein → Phenotype (concise causal/functional description)
+                            - Supporting PubMed ID(s) (comma separated)
+                            - Last author (surname)
+                            - Cell type(s) (as reported in the paper; e.g., HEK293T, MEF, cardiomyocyte)
+                            - Organism (human, mouse, porcine, fly, yeast, or "in vitro")
+                            - Strength (Strong / Moderate / Weak)
+                            - Evidence (one-sentence direct extract or paraphrase from the paper; include exact experimental context)
+                            - Put the table in a markdown format and put in to a ```markdown ... ``` block.
+                            
+                            Rules:
+                            - Only report PUBMED IDS that you really find. Do NOT make up PubMed IDs.
+                            - Use **Strong** only when there is direct causal evidence (human pathogenic mutation with phenotype; in vivo KO/KI with phenotype; functional rescue; multiple orthogonal models).
+                            - Use **Moderate** where there is solid experimental evidence (cell knockdown/KO with phenotype, proteomics or biochemical mechanism) but lacking human genetic confirmation or rescue.
+                            - Use **Weak** for associative or single/correlative observations (expression correlations, single-cohort biomarker studies).
+                            - Do NOT infer causality from correlation. If evidence is ambiguous or indirect, mark it “Weak/Uncertain” and add a short caution in Evidence.
+                            - Add the **last author surname** for each PubMed record (pulled from PubMed metadata).
+                            - Add the **cell type(s)** used in the main experiments and the **organism**.
+                            - At the end, output:
+                            1) Full list of PubMed IDs used (up to 50).
+                            2) PubMed IDs you found but **excluded** (with short reason why excluded).
+                            - Be conservative and transparent: if you are unsure about an interpretation, flag it and prefer to downgrade strength.
+                            """
     # """
     #                     System Message (Concise Version)
     #                     IMPORTANT:

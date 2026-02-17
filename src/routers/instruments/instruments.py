@@ -9,6 +9,7 @@ from config.models.attributes import AttributeValueModel, TraitModel
 from config.enums.states import SubmissionStatesEnums
 from config.enums.users.roles import UserRolesEnum
 from config.models.permissions import PermissionResponseModel
+
 from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel, InstrumentsStateResponseModel
 
 
@@ -47,7 +48,6 @@ def get_instrument_state_by_search_string(search_string : str, limit : int = 20)
 
 @router.get("/states/{state_tag}")
 def get_instrument_state_by_tag(state_tag : str) -> InstrumentStateModel:
-    print(DB.instrument_states.get(tag = state_tag),"STATE")
     return DB.instrument_states.get(tag = state_tag)
 
 
@@ -57,6 +57,13 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
     if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
     instrument = DB.attributes.trait(trait_tag = instrument_tag)
     return instrument
+
+@router.get("/{instrument_tag}/states")
+def get_instrument_state(instrument_tag : str, limit : int = 1, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the states of an instrument. The states are always ordered by the creation time, with the most recent state first."
+    if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
+    return DB.instrument_states.get_instrument_state(instrument_tag = instrument_tag , limit = limit)
+
 
 @router.get("/{instrument_tag}/states/durations") 
 def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
@@ -85,7 +92,8 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
 @router.get("/{instrument_tag}/samples/count")
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
     "Return the number of samples the instrument measured."
-    return 12 
+    return DB.samples.count(instrument_tag = instrument_tag)
+    return 12 #DB.samples.count(instrument_tag = instrument_tag)
 
 
 

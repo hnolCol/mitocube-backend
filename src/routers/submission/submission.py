@@ -171,6 +171,12 @@ def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_use
         return tag_not_found
     return DB.submissions.get_title(tag = submission_tag)
 
+@router.get("/submissions/{submission_tag}/attributes")
+def get_submission_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    "Returns the submission attributes by its tag."
+    if not DB.submissions.exists(tag = submission_tag):
+        return tag_not_found
+    return DB.submissions.get_attributes(tag = submission_tag)
 
 @router.patch("/submissions/{submission_tag}/title")
 def update_submission_title(submission_tag : str, title : str, user : UserModel = Depends(is_creator_of_submission_or_curator)) -> bool:
@@ -472,16 +478,18 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     #set the state to submitted
     DB.submissions.set_state(tag = submission.tag, state = SubmissionStatesEnums.SUBMITTED, user_tag = user.tag) 
     DB.submissions.insert_attributes(tag = submission.tag, traits = submission.dataset_attributes) 
-    #insert sampples and sample conditions (attributes/traits)
+    #insert samples and sample conditions (attributes/traits)
     for idx,sample_name in enumerate(submission.sample_names):
             sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
             sample_attributes = submission.samples_attributes[idx] 
             DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
     ## add meta text 
     DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
-
+    for title, text in submission.metatext.items():
+        DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
     return 
     
+
 
 
     # mandatory_attributes = DB.attributes.get_mandatory_attributes()

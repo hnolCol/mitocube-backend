@@ -304,7 +304,12 @@ class DatabaseABC(ABC):
             TODO: Define model on how the data should be returned ! 
         """
         
-    def get_datatable(self, tag : str, filter_tag : str = None) -> pd.DataFrame:
+    def get_datatable(self, 
+                      tag : str, 
+                      annotation_tag : str = None, 
+                      sample_tags : List[str] = None,
+                      use_sample_tags: bool = False, 
+                      level : Literal["protein","precursor"] = "protein") -> pd.DataFrame:
         """Returns the quantitative matrix containing the 
         features as tags (index) an the quant values in wide format
         columns indicate sample indices and rows features. Values in
@@ -314,20 +319,27 @@ class DatabaseABC(ABC):
         ----------
         tag : str
             The submission tag.
-        filter_tag : str
+        annotation_tag : str
             If a tag is given and exists, then the datatable will 
             be filtered by the filter (list of feature tags). 
-        
+        sample_tags : List[str], optional
+            If a list of sample tags is given, only those samples
+            will be included in the datatable, by default None
+        use_sample_tags : bool, optional
+            If True, the columns will be sample tags instead of sample indices, by default False
+        level : Literal["protein","precursor"], optional
+            The level of quantification to retrieve. Either "protein" or "precursor", by default "protein"
         Returns
         -------
         pd.DataFrame
             _description_
         """
     
-        cache_key = self.cache.calculate_key([tag,filter_tag if filter_tag is not None else ""])
+        cache_key = self.cache.calculate_key([tag,annotation_tag if annotation_tag is not None else "", ",".join(sample_tags) if sample_tags is not None and len(sample_tags) > 0 else "", str(use_sample_tags), level])
         if self.cache.exists(cache_key):
+            print("FROM CACHE??")
             return self.cache.get(cache_key)
-        datatable = self.datasets.get_datatable(tag = tag, filter_tag = filter_tag)
+        datatable = self.datasets.get_datatable(tag = tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=use_sample_tags, level=level)
         self.cache.insert(cache_key, datatable)
         return datatable 
         
