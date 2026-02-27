@@ -203,7 +203,7 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
     "" 
     protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False) 
     if len(protein) == 0: raise protein_not_found
-    filters = DB.filters.get(feature_tag=feature_tag)
+    filters = DB.filters.get(tag=feature_tag)
     #DB.features.get_quant_stats(tags = [feature_tag])
 
     return {

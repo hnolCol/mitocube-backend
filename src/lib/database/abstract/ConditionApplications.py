@@ -79,8 +79,9 @@ class ConditionApplicationABC(ABC):
     # def transform_for_ui(self, tag : str) -> ConditionApplicationTreeModel:
     #     """Transforms a dictionary representation of a condition application into a hierarchical tree structure.
     #     """
-
-
+    @abstractmethod
+    def get_text(self, tag : str) -> str:
+        "Return a human-readable text representation of the condition application."
 
     @abstractmethod
     def insert(self, condition_application : AttributeTree) -> bool:

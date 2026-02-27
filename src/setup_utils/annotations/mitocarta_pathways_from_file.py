@@ -56,3 +56,4 @@ for pathway, proteins in pathway_to_proteins.items():
     )
 
     print("Status:", r.status_code)
+    

@@ -29,7 +29,7 @@ class HierarchicalClustering(DatasetClustering):
         Z_row = sch.dendrogram(row_linkage, orientation='left', color_threshold=max_distance, 
                                  leaf_rotation=90, ax = None, no_plot=True)
         #use the maximum number of clusters and find them
-        clusters = sch.fcluster(row_linkage,n_clusters,'maxclust')
+        clusters = sch.fcluster(row_linkage, n_clusters, 'maxclust')
         ##get indices for clusters
         
         return pd.DataFrame(data = clusters, 

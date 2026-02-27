@@ -6,11 +6,15 @@ from services.encryption import create_hierarchical_hash
 from typing import Dict, List 
 from neo4j import Driver, Result 
 
+
+
+
 class Neo4JConditionApplications(ConditionApplicationABC):
     
-    def __init__(self, driver : Driver, *args, **kwargs) -> None:
+    def __init__(self, driver : Driver, attributes, *args, **kwargs) -> None:
         
         self._driver = driver
+        self._attributes = attributes
 
 
     def _has_values(self, tag : str) -> bool:
@@ -106,6 +110,44 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
         ca = self.get(tag)
         return build_condition_application_tree(ca)
+
+
+
+    def extract_ca_item(self, item : ConditionApplicationTreeModel, add_separator = False) -> str:
+        """Extracts the text representation of a condition application item recursively.
+        Parameters
+        ----------
+        item : Dict
+            The condition application item. The keys must include 'value', 'trait_tag', 'attribute_tag', and 'children'.
+            If no children are present, 'children' should be an empty list.
+        add_separator : bool, optional
+            Whether to add a separator after the item, by default False
+        """
+        t = ""
+        if item.value is not None:
+                val = item.value
+                if isinstance(val, float):
+                    # Use general format, strip trailing .0, use scientific notation for small numbers
+                    t += f"{val:.6g}"
+                else:
+                    t += f"{val}"
+        t += f"{self._attributes.get_trait_text(item.trait_tag)}"
+        if item.children is not None and len(item.children) > 0:
+            t += " ("
+            for n,c in enumerate(item.children):
+                t += self.extract_ca_item(c, add_separator = n < len(item.children)-1) 
+                t += ", " if add_separator else ""
+            t += ")"
+        return t
+
+    def get_text(self, tag : str) -> str:
+        "Return a human-readable text representation of the condition application."
+
+        ca_tree = self.get_tree(tag)
+        if ca_tree is not None and len(ca_tree) > 0:
+            return self.extract_ca_item(ca_tree[0])
+        else:
+            return ""
 
 
     def _handle_children(self, trait_node : dict, parent_tag : str):

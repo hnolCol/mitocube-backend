@@ -24,7 +24,6 @@ router = APIRouter(
 
 
 
-##rather use /q here? 
 @router.get("/q")
 def get_attributes(
     search_string: Optional[str] = None,

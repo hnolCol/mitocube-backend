@@ -68,14 +68,18 @@ def get_dataset_volcano(submission_tag : str,
     attribute_tag = DB.condition_applications.get_attribute(ca_tag_left)
     if attribute_tag not in condition_applications.columns:
         raise HTTPException(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
-   # if within_trait_tag is not None:
+    
+    # if within_trait_tag is not None:
     sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index
     sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
 
-    sample_tags = sample_tags_left.to_list() + sample_tags_right.to_list()
-    suffix = f"{ca_tag_left} vs. {ca_tag_right} ({within_trait_tag}) ({annotation_tag})"
+    ca_left_text = DB.condition_applications.get_text(ca_tag_left)
+    ca_right_text = DB.condition_applications.get_text(ca_tag_right)
 
-    print(sample_tags_left, sample_tags_right)
+    sample_tags = sample_tags_left.to_list() + sample_tags_right.to_list()
+    suffix = f"{ca_left_text} vs. {ca_right_text}" 
+    if annotation_tag is not None:
+        suffix += f" ({annotation_tag})" # ({annotation_tag})
     
     dt = DB.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
     if dt.empty:
@@ -91,17 +95,16 @@ def get_dataset_volcano(submission_tag : str,
         
     #create data frame with the t-test statistics 
     stats = pd.DataFrame(
-            {f"t-value" : T, 
+            {f"t-value {suffix}" : T, 
              p_value_name : p, 
              "tag" : dt.index,
-             "log2FC" : X.mean(axis=1) - Y.mean(axis=1)
+             f"log2FC {suffix}" : X.mean(axis=1) - Y.mean(axis=1)
             }, 
-            columns=[f"t-value",p_value_name,"tag", "log2FC"]
+            columns=[f"t-value {suffix}",p_value_name,"tag", f"log2FC {suffix}"]
             ).dropna(subset=[p_value_name])
-    print(stats)
-    stats.loc[:,f"-log10 p-value"] = -np.log10(stats.loc[:,p_value_name])
-    stats.loc[:,f"fdr"] = false_discovery_control(stats[p_value_name].values)
-    stats.loc[:,f"Significant"] = stats.loc[:,f"fdr"] <= fdr
+    stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
+    stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
+    stats.loc[:,f"Significant {suffix}"] = stats.loc[:,f"fdr {suffix}"] <= fdr
     # stats.loc[:,f"log2 FC"] = X.mean(axis=1) - Y.mean(axis=1)
     
     

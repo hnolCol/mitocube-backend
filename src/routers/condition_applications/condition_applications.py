@@ -118,14 +118,7 @@ def get_ca_name_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_to
     """
     
     if not DB.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
-    ca_tree = DB.condition_applications.get_tree(tag = ca_tag)
-
-
-
-    t = ""
-    for c in ca_tree: 
-        t+= extract_ca_item(c)
-    return t
+    return DB.condition_applications.get_text(tag = ca_tag)    
 
 
 @router.get("/{tag}/tree_for_ui")
