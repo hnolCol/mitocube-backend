@@ -405,7 +405,7 @@ class Neo4JGenotype(GenotypeABC):
             raise ValueError(f"Genotype with tag {genotype_tag} does not exist.")
         
         def _is_feature(component : AttributeTree) -> bool:
-            return component.type == "attribute" and component.tag == "att_feature"
+            return component.type == "attribute" and component.tag == "att_protein"
 
         def _find_protein_tag(components : List[AttributeTree]) -> str:
             t = []
