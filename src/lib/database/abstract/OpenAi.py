@@ -9,6 +9,9 @@ open_ai_settings = get_open_ai_settings()
 from abc import abstractmethod, ABC
 from typing import List, Dict
 from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publications
+import time 
+import pandas as pd 
+from io import StringIO
 class OpenAIClient(ABC):
     def __init__(self):
         
@@ -49,6 +52,64 @@ class OpenAIClient(ABC):
         return str(response.choices[0].message.content)
     
         
+        
+    def generate_functional_classification(self, protein_names : List[str], ai_model : str = None) -> str:
+        """
+        Generates a chat completion using the OpenAI API.
+        """
+        
+        print("FUNCTIONAL CLASSIFICATION FOR PROTEINS: ", protein_names)
+        r = dict()
+        classes = ""
+        df_out = pd.DataFrame(columns=["Protein Name", "Functional Category", "Pathway", "PubmedIDs"])
+        for protein_name in protein_names:
+            print(protein_name)
+
+            pubmed_search_result = get_pubmed_ids_by_query(query=protein_name, limit=15, sort = "relevance")
+            pubmed_search_result_pub_data = get_pubmed_ids_by_query(query=protein_name, limit=5, sort = "pub_date")
+            
+            
+            pubmed_ids = pubmed_search_result.get("esearchresult", {}).get("idlist", [])
+            pubmed_ids_pub_date = pubmed_search_result_pub_data.get("esearchresult", {}).get("idlist", [])
+            print(list(set(pubmed_ids + pubmed_ids_pub_date)))
+            pubmed_publication_abstracts = get_pubmed_publications(pubmedids=list(set(pubmed_ids + pubmed_ids_pub_date)))
+            r[protein_name] = {
+                "pubmed_ids" : pubmed_ids,
+                "abstracts" : pubmed_publication_abstracts
+            }
+        
+    
+            response = self.client.chat.completions.create(
+                model=self.ai_model if ai_model is None else ai_model,
+                messages=[{
+                "role" : "system", 
+                "content" : open_ai_settings.functional_classification_system_message},
+                {
+                "role": "user",
+                "content": f"Please classify the following proteins based on your defined system role. Here are the abstracts I downloaded with the associated protein_name. {pubmed_publication_abstracts} and the matching pubmedids {pubmed_ids}.  Please provide the output in a text tab delimited with the headers Protein Name, Functional Category, Pathway, PubmedIDs (headers). Add the pubmed id for references. The pathway should be something like 'OXPHOS assembly' or 'Mitochondrial Import Regulation' 'Mitochondrial Import Component'. Please focus on mitochondrial pathways. The table must only contain the following protein names: {protein_names} IF there are no pubmed ids available, pease classify the protein as Unknown. So far the classification of other proteins is this : '{classes}'. You may align the functional categories and pathways retrospective with the ones you have already defined for other proteins to build relativ general (please dont overgeneralize it, some specificity should remain) and larger groups. Please be concise in the description of the functional category and pathway, as I want to use them in a network analysis. As an example: 'Mitochondrial ribosomes' or 'OXPHOS' or 'OXPHOS assembly' could reprents functional groups. You can also add multiple rows per table if you think the protein is involved in two pathways or has multiple functionns. IF the title contains the gene name, you shall prioritize this pubmed entry. Ideally, sort the classification/pathway by relevance/number of pubmed ids. Dont add any other protein to the list. Do not add any information about expression data such as 'allele specific expression' I am only interested in general pathways. The table will increase with consecutive queries. Make sure to provide TAB deliminted data!! The output table from the protein name must not contain any other protein that you find in the abstract."}
+                ]
+            )
+            time.sleep(1) # to avoid hitting rate limits
+            
+           # classes += str(response.choices[0].message.content) + "\n"
+            
+            df = pd.read_csv(StringIO(response.choices[0].message.content), sep="\t")
+            df.columns = ["Protein Name", "Functional Category", "Pathway", "PubmedIDs"]
+            if "Functional Category" in df.columns:
+            
+                boolIdx = df.loc[:,"Functional Category"] == "Unknown"
+                df = df.loc[~boolIdx] # remove unknowns, we will add them later, but we do not want to feed them back into the model.
+            
+            print(df)
+            df.dropna(subset=["PubmedIDs"], inplace=True) # we want to make sure that there is at least a pubmed id for the classification, otherwise we do not want to feed it back into the model.
+            
+            df_out = pd.concat([df_out, df], ignore_index=True).drop_duplicates(keep="first") # we want to keep the first classification, as it is more likely to be correct, but we do not want duplicates in the output.
+
+            classes = df_out.to_dict(orient="records")
+            print(df_out)
+        print(df_out)
+        df_out.to_csv("functional_classification_output.csv", index=False, sep="\t")
+        return classes
         
     def summarize_pubmed_publications(self, prompt) -> str:
         """

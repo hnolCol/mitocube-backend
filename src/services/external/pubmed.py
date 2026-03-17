@@ -1,7 +1,7 @@
 import requests
-from typing import List 
+from typing import List, Literal
 
-def get_pubmed_ids_by_query(query, limit=5, field: str = "title_abstract", sort : str = "pub_date"):
+def get_pubmed_ids_by_query(query, limit=5, field: str = "title_abstract", sort : Literal["pub_date", "relevance", "author"] = "pub_date"):
     params = {
         "retmode": "json",
         "sort": sort,

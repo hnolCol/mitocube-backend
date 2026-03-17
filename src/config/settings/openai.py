@@ -11,7 +11,8 @@ class OpenAI(BaseSettings):
 
     open_ai_api_key : str
     chat_ai_base_url : str
-    chat_model : str = "openai-gpt-oss-120b"# "qwen3-235b-a22b"#" #"qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"#"qwen3-235b-a22b"#"llama-3.1-sauerkrautlm-70b-instruct"# openai-gpt-oss-120b"# "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"# "llama-3.1-sauerkrautlm-70b-instruct" #"codestral-22b"#"openai-gpt-oss-120b"#"codestral-22b"#"meta-llama-3.1-8b-instruct"#"gpt-4o-mini"
+    chat_model : str =  "openai-gpt-oss-120b" #"apertus-70b-instruct-2509" # "qwen3-235b-a22b" #"openai-gpt-oss-120b"# "qwen3-235b-a22b"#" #"qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"#"qwen3-235b-a22b"#"llama-3.1-sauerkrautlm-70b-instruct"# openai-gpt-oss-120b"# "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"# "llama-3.1-sauerkrautlm-70b-instruct" #"codestral-22b"#"openai-gpt-oss-120b"#"codestral-22b"#"meta-llama-3.1-8b-instruct"#"gpt-4o-mini"
+    functional_classification_system_message : str = """You are a bioinformatics assistant that classifies proteins into functional categories based on their known functions and characteristics. You will be provided with abstracts and pbumedids. Do not add anything beyond these abstracts. All functional annotations must be based on the abstracts. Please first check the abstracts and create reasonable functional classes and pathways the protein is involved in. Please add one column with a description of the function and the functional classes as well as the pathways, these pathways should be a maximum of 2-3 words. I want to use them in a network analysis. As an example: 'Mitochondrial ribosomes' or 'OXPHOS' or 'OXPHOS assembly' could reprent functioanl groups. Please provide the output in a text tab delimted with Protein Name Functional Category (headers) Please add the pubmed id for references."""
     system_information : str = """You are a bioinformatic assistant.
                         IMPORTANT INFO: 
                         I want to get just the cypher query, not more to be able to directly inject it into the database query. 
@@ -65,6 +66,21 @@ class OpenAI(BaseSettings):
                        - APOC and GDS plugins are installed and can be used.
 
 
+                        Protein Sequence
+                        Protein nodes are connected to a Sequence node which contains the protein amino acid sequence in the param .content. 
+                        For example: 
+                        MATCH (p:Protein)-[:HAS_SEQUENCE]->(s:Sequence) RETURN s.content as amino_acid_sequence
+                        
+                        Each protein has in addition a length param indicating the length of the amino acid sequence. This can be accessed to find out if something is related to the size of the protein. 
+                        Since ProteinGroups are quantified and not proteins itself, the maximum length of the proteins in a ProteinGroup should be considered. 
+                        
+                        As an example:
+                        
+                        MATCH (pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein)
+                        WITH max(p.length) as max_length, pg 
+                        RETURN pg.tag, max_length 
+                        
+                        
                         Database Structure Details:
                         
                         Submission nodes are connected to Sample nodes. Submissions are the projected that contains the title, the unique tag, the user who created the submission as param submission.user_tag. In addition it has

@@ -26,7 +26,8 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 #from migration.load_data import MigrateScripts 
 
 ### import routers
-from routers.dataset import dataset, correlation # volcano
+from routers.dataset import dataset
+from routers.dataset import correlation as submission_correlation # volcano
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim
 from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap
 from routers.submission import permissions as submissions_permissions
@@ -36,6 +37,7 @@ from routers.features import features
 from routers.features.protein_groups import protein_groups
 from routers.features.proteins import find as protein_find
 from routers.features.proteins import receive as protein_receive
+from routers.features import correlations as feature_correlation
 from routers.genotypes import permissions as genotype_permissions
 from routers.genotypes import genotypes
 from routers.attributes import attributes
@@ -107,7 +109,8 @@ router_sources = [dataset,
                   news, 
                   performance, 
                   timelines,
-                  correlation,
+                  submission_correlation,
+                  feature_correlation,
                   researchgroup,
                   phenotypes,
                   maintenance,
@@ -185,7 +188,7 @@ for rs in router_sources:
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
 # print("starting up mitocube backend...")
-# r = DB.openai.generate_protein_phenotype_relationships("AFG3L2")
+#r = DB.openai.generate_functional_classification(protein_names = ["OXA1L","TIMMDC1","NDUFAF5","DELE1","DNAJC15", "COQ10B", "TMEM65","SLC25A39","SLC30A9","SLC25A36", "OCIAD1","GHITM","COQ4","GPX4","NIT1","PAM16", "NSUN2","ACADVL"])
 
 
 @app.get("/", include_in_schema=False)

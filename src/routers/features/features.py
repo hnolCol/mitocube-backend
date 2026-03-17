@@ -165,15 +165,15 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
     
 
     
-@router.get("/pairwise_quant")
-def get_pairwise_quantification(feature_tag_x : str, feature_tag_y : str): 
+@router.get("/{tag_x}/{tag_y}/pairwise_quant")
+def get_pairwise_quantification(tag_x : str, tag_y : str, user : UserModel = Depends(get_user_from_token)): 
     "Returns all the quantification values for two features. For example to visualize a correlation."
-    tag_not_exists = [tag for tag in [feature_tag_x,feature_tag_y] if not DB.features.exists(tag = tag)] 
+    tag_not_exists = [tag for tag in [tag_x,tag_y] if not DB.features.exists(tag = tag)] 
     if len(tag_not_exists) > 0:
         raise HTTPException(status_code=404, detail=f"The tag(s) do(es) not exits: {tag_not_exists} in the database.")
 
-    df = DB.features.get_pairwise_feature_quant(feature_tag_x=feature_tag_x,
-                                           feature_tag_y=feature_tag_y)
+    df = DB.features.get_pairwise_feature_quant(feature_tag_x=tag_x, feature_tag_y=tag_y)
+                        
     return df.to_dict(orient="records")
 
 
@@ -215,6 +215,19 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
 @router.get("/{feature_tag}/abundance") 
 def get_feature_abundance(feature_tag : str, attribute_tag : str = None) -> QuantileModel|List[QuantileModel]:
     return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag)
+
+
+@router.get("/{feature_tag}/abundance/samples")
+def get_feature_sample_abundance(feature_tag : str):
+    if not DB.features.exists(tag=feature_tag):
+        raise HTTPException(status_code=404, detail=f"The feature tag does not exist: {feature_tag} in the database.")
+    df =  DB.features.get_quantification_per_sample(tag = feature_tag)
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"No quantification data found for feature tag: {feature_tag} in the database.")
+    df.loc[:,"value"] = df["value"].astype(float)
+    print(df)
+    return df.to_dict(orient="records")
+
 
 
 @router.get("/{feature_tag}/data",

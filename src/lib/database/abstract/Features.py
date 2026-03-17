@@ -76,6 +76,17 @@ class FeaturesABC(ABC):
                 - submissions (List[str]) : Submission tags in which the protein has been quantified. 
         """
         
+    @abstractmethod
+    def get_correlated_features(self, 
+                            tag : str,
+                            annotation_tags :  List[str] = None,  
+                            direction : Literal["positive","negative","both"] = "both", 
+                            limit : int = None, 
+                            min_data_points : int = 20) -> pd.DataFrame:
+        
+        """Correlates a feature to all other features
+        by its feature_tag in the submissions given by 'tags' .""" 
+        
         
     @abstractmethod
     def exists(self, tag : str) -> bool:
@@ -183,7 +194,27 @@ class FeaturesABC(ABC):
     @abstractmethod
     def get_pairwise_feature_quant(self, feature_tag_x : str, feature_tag_y : str) -> pd.DataFrame:
         ""
-    
+        
+    @abstractmethod
+    def get_quantification_per_sample(self, tag : str, submission_tags : List[str] = None) -> pd.DataFrame:
+        """Returns the quantification values for a feature per sample. 
+
+        Parameters
+        ----------
+        tag : str
+            The feature tag 
+        submission_tags : List[str], optional
+            Submission tags that should be considered (e.g. if a filtering is applied). If None
+            all datasets will be considered, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The quantification values per sample as a pandas data frame with the following columns:
+                - value (float) : The quantification value
+                - sample_index(int): The sample index
+                - submission_tag(str) : The submission tag in which the feature has been quantified.
+        """
     @abstractmethod
     def get_f_value(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
         """Parameters

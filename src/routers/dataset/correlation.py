@@ -16,7 +16,7 @@ DB = Database.DB()
 
 router = APIRouter(
     prefix="/api/datasets",
-    tags=["Dataset","Correlation"]
+    tags=["Dataset","Submission","Correlation"]
     )
 
 
@@ -24,7 +24,7 @@ router = APIRouter(
 @router.get("/{submission_tag}/correlation/{feature_tag}")
 def get_correlation(submission_tag : str,
                     feature_tag : str, 
-                    filter_tag : str = None, 
+                    annotation_tag : str = None, 
                     direction : Literal["positive","negative","both"] = "both", 
                     r_threshold : float = 0.6,
                     limit : int = 40, 
@@ -33,11 +33,11 @@ def get_correlation(submission_tag : str,
     "Returns the correlated features within the given submission tag."
     
     if not DB.submission_has_dataset(tag = submission_tag): no_data_found_http_exception 
-    if filter_tag is not None:
-        if not DB.filters.exists(tag = filter_tag): raise HTTPException(status_code=404, detail=f"Filter tag {filter_tag} not found.")
-    correlated_features = DB.submissions.get_correlated_features(tags = [submission_tag],
-                                           feature_tag = feature_tag,
-                                           filter_tag = filter_tag,
+    if annotation_tag is not None:
+        if not DB.annotations.exists(tag = annotation_tag): raise HTTPException(status_code=404, detail=f"Annotation tag {annotation_tag} not found.")
+    correlated_features = DB.features.get_correlated_features(tag= feature_tag,
+                                           annotation_tag = filter_tag,
+                                           submission_tags = [submission_tag],
                                            direction = direction,
                                            limit = limit,
                                            min_data_points = min_data_points)

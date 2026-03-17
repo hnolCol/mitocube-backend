@@ -43,15 +43,15 @@ router = APIRouter(
 
 
 @router.get("/genotypes/{genotype_tag}/proteins")
-def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     """ 
     Get the proteins of a genotype by its tag. 
     """
 
     if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    genotype = DB.genotypes.get_proteins(tag = genotype_tag)
+    protein_tags = DB.genotypes.get_proteins(tag = genotype_tag)
 
-    return genotype
+    return protein_tags
 
 @router.get("/genotypes/{genotype_tag}/item")
 def get_genotype_item(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
@@ -65,26 +65,26 @@ def get_genotype_item(genotype_tag: str, user: UserModel = Depends(get_user_from
     return genotype
 
 @router.get("/genotypes/{genotype_tag}/description")
-def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> str:
     """ 
     Get the description of a genotype by its tag. 
     """
 
     if not DB.genotypes.exists(tag=genotype_tag): raise 
-    genotype = DB.genotypes.get_description(tag = genotype_tag)
+    genotype_description = DB.genotypes.get_description(tag = genotype_tag)
 
-    return genotype
+    return genotype_description
 
-@router.get("/genotypes/{genotype_tag}/text")
-def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+@router.get("/genotypes/{genotype_tag}/text") 
+def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> str:
     """ 
     Get the full text information of a genotype by its tag. 
     """
 
     if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    genotype = DB.genotypes.get_text(tag = genotype_tag)
+    genotype_text = DB.genotypes.get_text(tag = genotype_tag)
 
-    return genotype
+    return genotype_text
 
 @router.get("/genotypes/q")
 def get_genotype_by_query(search_string : str = None, user_tag : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:

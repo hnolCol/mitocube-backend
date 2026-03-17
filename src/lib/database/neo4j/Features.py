@@ -1,5 +1,5 @@
 from neo4j import Driver, Result 
-from typing import List, Dict
+from typing import List, Dict, Literal
 import pandas as pd 
 
 from lib.database.abstract.Features import FeaturesABC 
@@ -47,6 +47,85 @@ class Neo4JFeatures(FeaturesABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         if len(r): raise ValueError("Tag does not exist in the database.")
         return FeatureNeoModel(**r[0])
+    
+       
+    def get_correlated_features(self, 
+                                tag : str,
+                                annotation_tags : List[str] = None,  
+                                submission_tags : List[str] = None,
+                                direction : Literal["positive","negative","both"] = "both", 
+                                limit : int = None, 
+                                feature_type : Literal["protein_group", "peptide"] = "protein_group",
+                                min_data_points : int = 20) -> pd.DataFrame:
+        """Correlates a feature to all other features 
+        by its feature_tag in the submissions given by 'tags' . 
+
+        Parameters
+        ----------
+        tags : List[stt] - List of submissions 
+        feature_tag : str
+            the feature tag. 
+
+        Returns
+        -------
+        pd.DataFrame
+            Correlation analysis with the following columns
+                - tag (str) - feature_tag that the given tag was correlated to 
+                - pearson (float) - the pearson correlation coefficient 
+                - N (int) - The number of data points used to calculate the statistics 
+                - t (float) - The t-value
+        """
+        ## extend to multiple submission tags ? MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags 
+        
+        annotation_tags_exists = annotation_tags is not None and len(annotation_tags) > 0
+        submission_tags_exists = submission_tags is not None and len(submission_tags) > 0
+        if feature_type == "protein_group":   
+            query = "MATCH (p_target:ProteinGroup {tag : $tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:ProteinGroup) "
+        elif feature_type == "peptide":
+            query = "MATCH (p_target:Peptide {tag : $tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:Peptide) "
+        
+        if submission_tags_exists or annotation_tags_exists:
+            query += "WHERE "
+        
+        if annotation_tags_exists:
+            if feature_type == "protein_group":
+                query += "EXISTS {(p)-[:HAS_PROTEINS]->(protein:Protein)<-[:ANNOTATES]-(annotation:Annotation) WHERE annotation.tag in $annotation_tags} "
+        
+        if submission_tags_exists:
+            if annotation_tags_exists:
+                query += " AND "    
+            query += " EXISTS {(s)<-[:HAS_SAMPLE]-(submission:Submission) WHERE submission.tag in $submission_tags} "
+        
+        query += (
+            "WITH collect(rp2.value) as x, collect(rp1.value) as y, p "
+            "WITH apoc.coll.zip(x, y) AS pairs, apoc.coll.avg(x) AS meanX, apoc.coll.avg(y) AS meanY, x ,y, p "
+            "WHERE size(x) > $min_data_points - 1 AND size(y) > $min_data_points - 1 "
+            "WITH "
+            "   [p IN pairs | (p[0] - meanX) * (p[1] - meanY)] AS products, "
+            "   [v IN x | (v - meanX)^2] AS xSquaredDiffs, "
+            "   [v IN y | (v - meanY)^2] AS ySquaredDiffs, p, size(pairs) as N "
+            "WITH "
+            "    apoc.coll.sum(products) / "
+            "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
+            "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
+        )
+        if limit is not None:
+            if direction == "both": 
+                query += "ORDER BY abs(pearson) DESC LIMIT $limit "
+            elif direction == "negative":
+                query += "ORDER BY pearson ASC LIMIT $limit "
+            elif direction == "positive":
+                query += "ORDER BY pearson DESC LIMIT $limit "    
+        print(query)
+        r = self._driver.execute_query(query, 
+                                       routing_="r", 
+                                       result_transformer_=Result.to_df, 
+                                       min_data_points = min_data_points, 
+                                       annotation_tags = annotation_tags, 
+                                       submission_tags = submission_tags,
+                                       limit = limit, 
+                                       tag = tag)
+        return r 
     
     
     def count_samples_quantifying_protein(self, tags : List[str]) -> pd.DataFrame:
@@ -331,6 +410,36 @@ class Neo4JFeatures(FeaturesABC):
         
         return r 
     
+    def get_quantification_per_sample(self, tag : str, submission_tags : List[str] = None) -> pd.DataFrame:
+        """Returns the quantification values for a feature per sample. 
+
+        Parameters
+        ----------
+        tag : str
+            The feature tag 
+        submission_tags : List[str], optional
+            Submission tags that should be considered (e.g. if a filtering is applied). If None
+            all datasets will be considered, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The quantification values per sample as a pandas data frame with the following columns:
+                - value (float) : The quantification value
+                - sample_index(int): The sample index
+                - submission_tag(str) : The submission tag in which the feature has been quantified.
+                - sample_tag(str) : The tag of the sample
+                - tag(str) : The tag of the feature
+        """
+        query = (
+            "MATCH (f:ProteinGroup|Peptide {tag : $tag})<-[r:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
+        )
+        if submission_tags is not None and len(submission_tags) > 0:
+            query += "WHERE submission.tag in $submission_tags "
+        query += "RETURN r.value as value, s.sample_index as sample_index, submission.tag as submission_tag, s.tag as sample_tag, f.tag as tag "
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag, submission_tags = submission_tags)
+        return r
+    
     
     def get_f_value(self, tags: List[str], submission_tags: List[str] = None) -> pd.DataFrame:
         "Neo4J Implementation"
@@ -370,7 +479,7 @@ class Neo4JFeatures(FeaturesABC):
         "Returns the the quantitifacation of two features from the same sample. Intended to be used for showing correlations. "
 
         query = (
-            "MATCH (p_x:Protein {tag : $feature_tag_x}), (p_y:Protein {tag : $feature_tag_y}) "
+            "MATCH (p_x:ProteinGroup|Peptide {tag : $feature_tag_x}), (p_y:ProteinGroup|Peptide {tag : $feature_tag_y}) "
             "MATCH (p_x)<-[r_x:QUANTIFIED]-(s:Sample)-[r_y:QUANTIFIED]->(p_y) "
             "RETURN r_x.value as x, r_y.value as y, s.tag as sample_tag "
         )

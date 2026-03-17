@@ -306,7 +306,7 @@ class Neo4JGenotype(GenotypeABC):
             True if the insertion was successful, False otherwise.
         """
         def _is_feature(component : AttributeTree) -> bool:
-            return component.type == "attribute" and component.tag == "att_feature"
+            return component.type == "attribute" and component.tag == "att_protein"
 
         def _find_protein_tag(components : List[AttributeTree]) -> str:
             
@@ -338,7 +338,7 @@ class Neo4JGenotype(GenotypeABC):
     def edit_genotype( self, tag: str, text: str, application_tags: List[str], protein_tags: List[str], user_tag : str, description: str , publication: str | None, technical_text: str | None) -> bool:
         """Edits the existing genotype.
         """
-        print(protein_tags)
+    
 
         if len(protein_tags) == 0:
             raise ValueError("No feature (protein tag) found in the genotype components.")
@@ -439,7 +439,7 @@ class Neo4JGenotype(GenotypeABC):
         return True
         
 
-    def find(self, search_string : str = None, limit : int = None, user_tag : str = None) -> List[str]:
+    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, user_tag : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
         Returns the genotype tags that contain the search string.
         """ 
@@ -447,14 +447,16 @@ class Neo4JGenotype(GenotypeABC):
         if user_tag is not None:
             query = "MATCH (u:User {tag : $user_tag})-[:CREATED]->(g:Genotype)-[:EFFECTS]->(p:Protein)  "
         else:
-            query = "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) " 
+            query = "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
+        if proteome_tags is not None:
+            query += "WHERE EXISTS {(p)<-[:IN_PROTEOME]-(proteome:Proteome) WHERE proteome.tag in proteome_tags}" 
         if search_string is not None and search_string != "":
             query += "WHERE g.s CONTAINS $query_string OR p.s CONTAINS $query_string "
         query += "RETURN DISTINCT g.tag as tag " 
         if limit is not None:
             query += " LIMIT $limit"
 
-        r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit)
+        r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit, proteome_tags = proteome_tags)
         return r
     
     def count_samples(self, tag) -> int:

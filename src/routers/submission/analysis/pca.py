@@ -13,7 +13,7 @@ DB = Database.DB()
 
 router = APIRouter(
     prefix="/api/submissions/analysis",
-    tags=["Submission"],
+    tags=["Submission","Analysis"],
     )
 
 

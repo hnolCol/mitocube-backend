@@ -450,66 +450,66 @@ class Neo4JSubmissions(SubmissionsABC):
         return self.update_state(tag=tag, new_state=state, user_tag=user_tag)
     
     
-    def get_correlated_features(self, tags : List[str], 
-                                feature_tag : str, 
-                                filter_tag : str = None,  
-                                direction : Literal["positive","negative","both"] = "both", 
-                                limit : int = 20, 
-                                min_data_points : int = 20):
-        """Correlates a feature to all other features 
-        by its feature_tag in the submissions given by 'tags' . 
+    # def get_correlated_features(self, tags : List[str], 
+    #                             feature_tag : str, 
+    #                             filter_tag : str = None,  
+    #                             direction : Literal["positive","negative","both"] = "both", 
+    #                             limit : int = 20, 
+    #                             min_data_points : int = 20):
+    #     """Correlates a feature to all other features 
+    #     by its feature_tag in the submissions given by 'tags' . 
 
-        Parameters
-        ----------
-        tags : List[stt] - List of submissions 
-        feature_tag : str
-            the feature tag. 
+    #     Parameters
+    #     ----------
+    #     tags : List[stt] - List of submissions 
+    #     feature_tag : str
+    #         the feature tag. 
 
-        Returns
-        -------
-        pd.DataFrame
-            Correlation analysis with the following columns
-                - tag (str) - feature_tag that the given tag was correlated to 
-                - pearson (float) - the pearson correlation coefficient 
-                - N (int) - The number of data points used to calculate the statistics 
-                - t (float) - The t-value
-        """
-        ## extend to multiple submission tags ? MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags 
-        query = (
-            "MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags "
-            "MATCH (p_target:Protein {tag : $feature_tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:Protein) "
-        )
-        if filter_tag is not None:
-            query += "WHERE EXISTS {(p)-[:PART_OF]->(f:Filter {tag : $filter_tag})} "
-        query += (
-            "WITH collect(rp2.value) as x, collect(rp1.value) as y, p "
-            "WITH apoc.coll.zip(x, y) AS pairs, apoc.coll.avg(x) AS meanX, apoc.coll.avg(y) AS meanY, x ,y, p "
-            "WHERE size(x) > $min_data_points AND size(y) > $min_data_points "
-            "WITH "
-            "   [p IN pairs | (p[0] - meanX) * (p[1] - meanY)] AS products, "
-            "   [v IN x | (v - meanX)^2] AS xSquaredDiffs, "
-            "   [v IN y | (v - meanY)^2] AS ySquaredDiffs, p, size(pairs) as N "
-            "WITH "
-            "    apoc.coll.sum(products) / "
-            "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
-            "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
-        )
-        if direction == "both": 
-            query += "ORDER BY abs(pearson) DESC LIMIT $limit "
-        elif direction == "negative":
-            query += "ORDER BY pearson ASC LIMIT $limit "
-        elif direction == "positive":
-            query += "ORDER BY pearson DESC LIMIT $limit "    
+    #     Returns
+    #     -------
+    #     pd.DataFrame
+    #         Correlation analysis with the following columns
+    #             - tag (str) - feature_tag that the given tag was correlated to 
+    #             - pearson (float) - the pearson correlation coefficient 
+    #             - N (int) - The number of data points used to calculate the statistics 
+    #             - t (float) - The t-value
+    #     """
+    #     ## extend to multiple submission tags ? MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags 
+    #     query = (
+    #         "MATCH (submission:Submission )-[:HAS_SAMPLE]-(s:Sample) WHERE submission.tag in $submission_tags "
+    #         "MATCH (p_target:Protein {tag : $feature_tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:Protein) "
+    #     )
+    #     if filter_tag is not None:
+    #         query += "WHERE EXISTS {(p)-[:PART_OF]->(f:Filter {tag : $filter_tag})} "
+    #     query += (
+    #         "WITH collect(rp2.value) as x, collect(rp1.value) as y, p "
+    #         "WITH apoc.coll.zip(x, y) AS pairs, apoc.coll.avg(x) AS meanX, apoc.coll.avg(y) AS meanY, x ,y, p "
+    #         "WHERE size(x) > $min_data_points AND size(y) > $min_data_points "
+    #         "WITH "
+    #         "   [p IN pairs | (p[0] - meanX) * (p[1] - meanY)] AS products, "
+    #         "   [v IN x | (v - meanX)^2] AS xSquaredDiffs, "
+    #         "   [v IN y | (v - meanY)^2] AS ySquaredDiffs, p, size(pairs) as N "
+    #         "WITH "
+    #         "    apoc.coll.sum(products) / "
+    #         "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
+    #         "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
+    #     )
+    #     if direction == "both": 
+    #         query += "ORDER BY abs(pearson) DESC LIMIT $limit "
+    #     elif direction == "negative":
+    #         query += "ORDER BY pearson ASC LIMIT $limit "
+    #     elif direction == "positive":
+    #         query += "ORDER BY pearson DESC LIMIT $limit "    
                 
-        r = self._driver.execute_query(query, 
-                                       routing_="r", 
-                                       result_transformer_=Result.to_df, 
-                                       min_data_points = min_data_points, 
-                                       filter_tag = filter_tag, 
-                                       limit = limit, 
-                                       feature_tag = feature_tag, 
-                                       submission_tags = tags)
-        return r 
+    #     r = self._driver.execute_query(query, 
+    #                                    routing_="r", 
+    #                                    result_transformer_=Result.to_df, 
+    #                                    min_data_points = min_data_points, 
+    #                                    filter_tag = filter_tag, 
+    #                                    limit = limit, 
+    #                                    feature_tag = feature_tag, 
+    #                                    submission_tags = tags)
+    #     return r 
     
     def quantification_exists(self, tag : str, type : Literal["proteins","protein_groups","precursors","any"]) -> bool:
         """Checks if samples have quantification data for a given submission."""
