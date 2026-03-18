@@ -254,8 +254,30 @@ class Neo4JGenotype(GenotypeABC):
         )
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
         return r if r else None
+
+    def get_proteome(self, tag: str) -> str | None:     
+        """Returns the proteome affected by a genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The unique genotype tag.
+
+        Returns
+        -------
+        str | None
+            The affected proteome tag, if any exists.
+        """
+        query = (
+            "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein)-[:IN_PROTEOME]->(pr:Proteome) "
+            "WHERE g.tag = $tag "
+            "RETURN pr.tag"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if r else None
     
-    def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None) -> bool:
+
+    def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, is_active : bool = True) -> bool:
         """Inserts a new genotype into the database.
         Parameters
         ----------
@@ -270,7 +292,7 @@ class Neo4JGenotype(GenotypeABC):
         query = (
             "MERGE (gc:Genotype {tag : $tag}) "
             "ON CREATE "
-            "SET gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
+            "SET gc.is_active = true, gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
             "ON MATCH "
             "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
             "WITH gc "
@@ -287,7 +309,7 @@ class Neo4JGenotype(GenotypeABC):
             "SET r_effects.created_at = timestamp() "
         )
 
-        self._driver.execute_query(query, tag = tag, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
+        self._driver.execute_query(query, tag = tag, is_active=is_active, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
         return True
     
 
@@ -439,15 +461,26 @@ class Neo4JGenotype(GenotypeABC):
         return True
         
 
-    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, user_tag : str = None) -> List[str]:
+    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, is_active : bool = True, user_tag : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
         Returns the genotype tags that contain the search string.
         """ 
-        
+        query = (
+            "MATCH (g:Genotype) "
+            "WHERE g.is_active = $is_active " 
+
+        )
+
         if user_tag is not None:
-            query = "MATCH (u:User {tag : $user_tag})-[:CREATED]->(g:Genotype)-[:EFFECTS]->(p:Protein)  "
+            query = (
+                "MATCH (u:User {tag : $user_tag})-[:CREATED]->(g:Genotype)-[:EFFECTS]->(p:Protein)  "
+                "WHERE g.is_active = true "     
+                     )
         else:
-            query = "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
+            query = (
+                "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
+                "WHERE g.is_active = true "     
+                     )
         if proteome_tags is not None:
             query += "WHERE EXISTS {(p)<-[:IN_PROTEOME]-(proteome:Proteome) WHERE proteome.tag in proteome_tags}" 
         if search_string is not None and search_string != "":
@@ -456,7 +489,7 @@ class Neo4JGenotype(GenotypeABC):
         if limit is not None:
             query += " LIMIT $limit"
 
-        r = self._driver.execute_query(query, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit, proteome_tags = proteome_tags)
+        r = self._driver.execute_query(query, is_active=is_active, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit, proteome_tags = proteome_tags)
         return r
     
     def count_samples(self, tag) -> int:
@@ -481,30 +514,48 @@ class Neo4JGenotype(GenotypeABC):
         return r if r else None
 
 
-    def delete(self, tag) -> bool:
-        """Detach and delete a genotype by its tag.
+    # def delete(self, tag) -> bool:
+    #     """Detach and delete a genotype by its tag.
 
-        Parameters
-        ----------
-        tag : str
-            The genotype tag to delete.
+    #     Parameters
+    #     ----------
+    #     tag : str
+    #         The genotype tag to delete.
 
-        Returns
-        -------
-        bool
-            True if deleted successfully, False otherwise.
-        """
-        if not self.exists(tag): False
+    #     Returns
+    #     -------
+    #     bool
+    #         True if deleted successfully, False otherwise.
+    #     """
+    #     if not self.exists(tag): False
 
+    #     query = (
+    #         "MATCH (g:Genotype) WHERE g.tag = $tag "
+    #         "DETACH DELETE g "
+    #     )
+    #     try:
+    #         r = self._driver.execute_query(query, routing_="w", tag = tag)
+    #     except:
+    #         False
+    #     return True
+    
+    def delete(self, tag : str, is_active : bool = False) -> bool:
+        """ Deletes a genotype by its tag. If is_active is True, the genotype will be marked as deleted but not removed from the database. If is_active is False, the genotype will be permanently deleted from the database."""
+        
         query = (
-            "MATCH (g:Genotype) WHERE g.tag = $tag "
-            "DETACH DELETE g "
-        )
-        try:
-            r = self._driver.execute_query(query, routing_="w", tag = tag)
-        except:
-            False
-        return True
+                "MATCH (g:Genotype {tag: $tag}) "
+                "SET g.is_active = $is_active "
+                "RETURN true as ok "
+            )
+            
+        result = self._driver.execute_query(query, 
+                                        tag = tag,
+                                        is_active = is_active,
+                                        routing_="w",
+                                        result_transformer_= Result.value)
+        
+        return True if result is not None else False
+
     
     def condition_applications(self, tag : str) -> List[str]:
         """Gets the condition applications associated with the genotype.

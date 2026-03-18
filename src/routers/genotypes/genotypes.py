@@ -41,6 +41,17 @@ router = APIRouter(
     tags=["Genotypes"]
 )
 
+@router.get("/genotypes/{genotype_tag}/proteome")
+def get_genotype_proteome(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> Optional[str]:
+    """ 
+    Get the proteome of a genotype by its tag. 
+    """
+
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    proteome_tag = DB.genotypes.get_proteome(tag = genotype_tag)
+
+    return proteome_tag 
+
 
 @router.get("/genotypes/{genotype_tag}/proteins")
 def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
@@ -194,18 +205,26 @@ def get_ca_tree_for_genotype(genotype_tag : str, user : UserModel = Depends(get_
 
     return [transform_for_ui(DB.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags]
 
-@router.delete("/genotype/{genotype_tag}")
-def delete_genotype(genotype_tag: str, user: UserModel = Depends(is_user_at_least_curator)):
+@router.delete("/genotypes/{genotype_tag}", response_model=bool)
+def delete_genotype(genotype_tag: str,  user : UserModel = Depends(is_user_admin)) -> bool:
     """
     Delete a genotype by its tag.
     """
-    deleted = DB.genotypes.delete(genotype_tag)
+    # deleted = DB.genotypes.delete(genotype_tag)
 
-    if not deleted:
-        raise genotype_not_found
+    # if not deleted:
+    #     raise genotype_not_found
     
-    return {f"Genotype '{genotype_tag}' deleted."}
+    # return {f"Genotype '{genotype_tag}' deleted."}
 
+    if not DB.genotypes.exists(tag=genotype_tag):
+        raise HTTPException(status_code=404, detail="Genotype not found.")
+    
+    print(f"Deleting genotype with tag: {genotype_tag}")
+    ok = DB.genotypes.delete(tag = genotype_tag)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not delete genotype from the database.")
+    return ok
 
 @router.get("/genotypes/{genotype_tag}/condition_applications")
 def genotype_condition_applications(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
