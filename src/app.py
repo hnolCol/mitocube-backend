@@ -140,7 +140,7 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
 
-#DB.attributes._utils_insert_from_file()
+DB.attributes._utils_insert_from_file()
 #DB.instrument_states._utils_insert_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
 #DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t")        
                                      

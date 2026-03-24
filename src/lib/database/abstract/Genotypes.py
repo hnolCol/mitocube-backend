@@ -72,7 +72,11 @@ class GenotypeABC(ABC):
     def get_proteins(self, tag : str) -> List[str]:
         "Gets the proteins affetced by the genotype"
 
+    @abstractmethod
+    def get_proteome(self, tag : str) -> str:
+        "Gets the proteome affected by the genotype"
 
+        
     @abstractmethod
     def find(self, search_string : str = None, user_tag : str = None, limit : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
@@ -156,7 +160,7 @@ class GenotypeABC(ABC):
 
     @abstractmethod
     def delete(self, tag : str) -> bool:
-        "Deletes a genotype"
+        "Deletes a genotype by its tag. If is_active is True, the genotype will be marked as inactive instead of being deleted from the database."
 
 
     @abstractmethod

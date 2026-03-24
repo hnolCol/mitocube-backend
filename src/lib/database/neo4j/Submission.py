@@ -30,6 +30,39 @@ class Neo4JSubmissions(SubmissionsABC):
         self._proteomes = proteomes
         self._condition_applications = condition_applications
 
+
+    def _m_insert_timeline(self, tag :str, timeline : List[Dict]):
+        """_summary_
+
+        Parameters
+        ----------
+        tag : str
+            _description_
+        timeline : List[Dict]
+            {
+                "state" : state_tag,
+                "timestamp" : timestamp,
+                'user_tag' : user_tag
+            }
+        """
+        if self.exists(tag) is False:
+            raise ValueError("Submission with this tag does not exist. Please create the submission first.")
+
+
+        # query = (   
+        #     "MATCH (submission:Submission {tag : $tag}) "   
+        #     "UNWIND $timeline as entry "
+        #     "MATCH (s:State {tag : entry.state}) "
+        #     "MERGE (submission)-[r:IN_STATE]->(s) "
+        #     "SET r.created_at = entry.timestamp "
+        # )
+
+        # self._driver.execute_query(query, routing_="w", tag = tag, timeline = timeline)
+
+        # return True
+
+
+    
     def count(self, state : SubmissionStatesEnums = None) -> int:
         """Counts the total number of submissions in the database
 
@@ -304,35 +337,68 @@ class Neo4JSubmissions(SubmissionsABC):
         self._driver.execute_query(query, routing_="w", tag=tag, research_aim=research_aim, user_tag=user_tag)
         return True
     
-    def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinGroupQuantificationModel]) -> int:   
+    # def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinGroupQuantificationModel]) -> int:   
+    #     """
+    #     Inserts protein quantifications for a given submission.
+
+    #     Parameters
+    #     ----------
+    #     tag : str
+    #         The tag of the submission.
+    #     quantifications : List[Dict]
+    #         List of protein quantifications to insert.
+
+    #     Returns
+    #     -------
+    #     int
+    #         Number of inserted protein quantifications.
+    #     """
+    #     query = (
+    #         "MATCH (submission:Submission {tag : $tag}) "
+    #         "UNWIND $quantifications as quantification "
+    #         "MATCH (pg:ProteinGroup {tag : quantification.tag}) "
+    #         "MATCH (sample:Sample {tag : quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
+    #         "MERGE (sample)-[q:QUANTIFIED]->(pg) "
+    #         "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
+    #         "RETURN count(q) "
+    #     )
+    #     r = self._driver.execute_query(query, routing_="w", tag=tag, quantifications=quantifications, result_transformer_=Result.value)
+    #     print(r[0] if len(r) > 0 else 0)
+    #     return r[0] if len(r) > 0 else 0
+    
+    def insert_protein_quantifications(self, tag: str, quantifications: List[ProteinGroupQuantificationModel]) -> int:
         """
         Inserts protein quantifications for a given submission.
-
-        Parameters
-        ----------
-        tag : str
-            The tag of the submission.
-        quantifications : List[Dict]
-            List of protein quantifications to insert.
-
-        Returns
-        -------
-        int
-            Number of inserted protein quantifications.
+        Removes existing quantifications for the submission before inserting new ones.
         """
+
         query = (
-            "MATCH (submission:Submission {tag : $tag}) "
+            "MATCH (submission:Submission {tag: $tag}) "
             "UNWIND $quantifications as quantification "
-            "MATCH (pg:ProteinGroup {tag : quantification.tag}) "
-            "MATCH (sample:Sample {tag : quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
-            "MERGE (sample)-[q:QUANTIFIED]->(pg) "
+
+            "MATCH (pg:ProteinGroup {tag: quantification.tag}) "
+            "MATCH (sample:Sample {tag: quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
+            
+            # Delete any existing QUANTIFIED relationship for this submission between this sample and protein group
+            "OPTIONAL MATCH (sample)-[existing_q:QUANTIFIED {submission_tag: $tag}]->(pg) "
+            "DELETE existing_q "
+
+            "CREATE (sample)-[q:QUANTIFIED]->(pg) "
             "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
             "RETURN count(q) "
         )
-        r = self._driver.execute_query(query, routing_="w", tag=tag, quantifications=quantifications, result_transformer_=Result.value)
+
+        print("Deleting existing quantifications for submission:", tag)
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            tag=tag,
+            quantifications=quantifications,
+            result_transformer_=Result.value
+        )
         print(r[0] if len(r) > 0 else 0)
         return r[0] if len(r) > 0 else 0
-    
+
     def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
         ""
         print("not implemented yet")
@@ -990,4 +1056,3 @@ class Neo4JSubmissionSummary(SubmissionSummaryABC):
                             base_strings.append(f"{attribute.text}{sep_string}{attribute_value.text}")
         base_strings.append(sample_map.to_csv(sep=sep_string))
         return base_strings
-        

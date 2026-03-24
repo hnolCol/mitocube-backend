@@ -14,12 +14,12 @@ router = APIRouter(
 )
 
 # permission for genotype for user, only curator can edit and delete, but everyone can create 
-@router.get("/{genotype_tag}/permissions")
-def get_permissions(genotype_tag : str, user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
+@router.get("/permissions")
+def get_permissions( user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
 
     return PermissionResponseModel(user_tag = user.tag, 
                                    role = user.role, 
                                    insert = user.role >= UserRolesEnum.STANDARD, 
                                    delete = user.role >= UserRolesEnum.CURATOR,
-                                   edit = user.role >= UserRolesEnum.CURATOR)
+                                   edit = user.role >= UserRolesEnum.CURATOR)   
 

@@ -483,6 +483,16 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
             sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
             sample_attributes = submission.samples_attributes[idx] 
             DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
+            
+            if submission.genotypes and idx < len(submission.genotypes):
+                genotype_tags = submission.genotypes[idx] 
+                if isinstance(genotype_tags, list):
+                    for genotype_tag in genotype_tags: 
+                        if genotype_tag:  
+                            DB.samples.insert_genotype(
+                                sample_tags=[sample_tag],
+                                genotype_tag=genotype_tag
+                            )
     ## add meta text 
     DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
     for title, text in submission.metatext.items():
