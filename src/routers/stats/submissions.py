@@ -42,11 +42,12 @@ def get_submission_durations(
     """
     Returns the duration statistics for submissions. The durations are calculated as the difference between the timestamps of two states.
     The unit is in milliseconds.
-    If aggregate is 'dist', returns a DistResponseModel with min, q1, median, q3, max.
+    If aggregate is 'dist', returns a DistResponseModel with min, q1, median, q3, max. 
+    The results are transformed to days. 
     """
     durations = DB.submissions.get_durations_between_states(state_01=state_01, state_02=state_02)
     df = pd.DataFrame(columns=["submission_tag", "duration"]).from_dict(durations)
-
+    df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
     if aggregate == "dist":
         desc = df["duration"].describe(percentiles=[0.25, 0.5, 0.75])
         print(desc)

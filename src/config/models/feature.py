@@ -41,3 +41,20 @@ class FeatureGeneModel(BaseModel):
 class FeatureSequenceResponseModel(BaseModel):
     feature_tag : str 
     sequence : str 
+    
+    
+    
+class ProteinGroupSubmissionStatisticsModel(BaseModel):
+    attribute_tag : str 
+    submission_tag : str
+    p_value : float
+    F : float
+    eta_squared : float
+    cohen_f : float
+    max_fc : float
+    std_means : float
+    missingness : float
+    n_groups : int
+    score : float
+    exclusively : bool
+    

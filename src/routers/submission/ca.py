@@ -35,7 +35,7 @@ def get_submission_condition_application_attributes(submission_tag: str, user: U
 
 @router.get("/{submission_tag}/samples/ca")
 def get_submission_sample_condition_applications(submission_tag: str, attribute_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List:
-    print(attribute_tags)
+
     sample_tags = DB.submissions.get_samples(tag = submission_tag)  #get samples 
     r = []
     

@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Dict, List, Optional, Union, Any
 from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.feature import FeatureNeoModel
+
 class FeatureModel(BaseModel):
     """Base Model for a Feature"""
     key : str 
@@ -11,6 +12,7 @@ class FeatureModel(BaseModel):
     organism : str
     aa_length : int
     reviewed : Optional[bool] = True 
+    
 class FeatureDataResponseModel(BaseModel):
     """
     Response model for feature data.

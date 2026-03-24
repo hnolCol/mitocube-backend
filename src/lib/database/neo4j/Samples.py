@@ -46,7 +46,7 @@ class Neo4JSamples(SamplesABC):
         "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
         if protein_group_tag is not None:
             query = (
-                "MATCH (s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup {tag : $protein_group_tag})-[:HAS_PROTEINS]->(p:Protein)-[:IN_PROTEOME]-(proteome:Proteome) "
+                "MATCH (s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup {tag : $protein_group_tag}) "
             )
         elif trait_tag is not None:
             query = (
@@ -83,7 +83,7 @@ class Neo4JSamples(SamplesABC):
         if has_protein_quantification:
             if protein_group_tag is not None: 
                 query += (
-                " EXISTS {(s)-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(:Protein)-[:IN_PROTEOME]-(proteome)} "
+                " EXISTS {(s)-[:QUANTIFIED]->(pg:ProteinGroup)} "
             )
             else:
                 query += (
@@ -99,6 +99,7 @@ class Neo4JSamples(SamplesABC):
             "RETURN count(s) as count "
         )
             
+        print(query)
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag, instrument_tag = instrument_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
@@ -306,7 +307,7 @@ class Neo4JSamples(SamplesABC):
 
 
     def get_sample_tag_by_index_and_submission(self, sample_index : int, submission_tag : str) -> List[str]:
-        "Returns a sample an its trait as well genotype annotation."
+        "Returns a sample tags."
         
         query = (
             "MATCH (s:Sample {sample_index : $sample_index})<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag}) " 
@@ -389,7 +390,6 @@ class Neo4JSamples(SamplesABC):
 
         genotype = self._driver.execute_query(query, tag=tag, routing_="r")
         return genotype
-    
 
 
     def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):
@@ -430,3 +430,4 @@ class Neo4JSamples(SamplesABC):
             sample_tag=sample_tag,
             protein_tags=protein_tags
         )
+

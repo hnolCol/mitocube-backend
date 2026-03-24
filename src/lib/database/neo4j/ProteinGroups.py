@@ -1,11 +1,11 @@
-from typing import Optional,List
+from typing import Optional,List, Dict
 
 from neo4j import Driver, Result
 
 from lib.database.abstract.ProteinGroups import ProteinGroupsABC
 
 from config.models.filter import FilterModel
-from config.models.annotations.feature import FeatureModel
+from config.models.feature import ProteinGroupSubmissionStatisticsModel 
 
 import pandas as pd 
 
@@ -130,3 +130,23 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag)
         return True
+    
+    
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[ProteinGroupSubmissionStatisticsModel]:
+        ""
+        if not self.exists(tag): raise ValueError(f"Protein group with tag {tag} does not exist.")
+        
+        query = (
+            "MATCH (pg:ProteinGroup {tag : $tag})<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "WHERE a.tag IN $attribute_tags OR $attribute_tags IS NULL "
+            "MATCH (stats)<-[:HAS_STATS]-(submission:Submission) "
+            "RETURN a.tag as attribute_tag, stats.F as F, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.exclusively as exclusively, submission.tag as submission_tag "
+            "ORDER BY stats.score DESC "
+        )
+        if limit is not None:
+            query += "LIMIT $limit"
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, limit=limit, result_transformer_=Result.data)
+        return [ProteinGroupSubmissionStatisticsModel(**ri) for ri in r]
+    
+    

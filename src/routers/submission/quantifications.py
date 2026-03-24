@@ -19,6 +19,29 @@ class ProteinGroupQuantificationListModel(BaseModel):
     quantifications: List[ProteinGroupQuantificationModel]
     
     
+class ProteinGroupQuantificationCountModel(BaseModel):
+    submission_tag: str
+    count: int
+    user_tag : str
+    created_at : float
+    
+@router.get("/quantifications/protein_groups/count", summary="Get the number of protein group quantifications for a given submission.")
+def get_protein_group_quantification_count(user : UserModel = Depends(get_user_from_token)) -> List[ProteinGroupQuantificationCountModel]:
+    """
+    Get the number of protein group quantifications for a given submission.
+
+    Parameters
+    ----------
+    user : UserModel, optional
+        The user that is extracted by the token, by default Depends(get_user_from_token)
+    Returns
+    -------
+    List[ProteinGroupQuantificationCountModel]
+        A list of ProteinGroupQuantificationCountModel objects, each containing the submission tag, the number of protein group quantifications, and the user tag of the creator of the submission.
+    """
+
+    return [ProteinGroupQuantificationCountModel(**record) for record in DB.submissions.get_protein_group_quantification_count().to_dict(orient="records")]
+    
     
 @router.get("/{submission_tag}/quantifications/exists", summary="Checks if quantification data for this submission exists.")
 def get_submission_quant_exists(submission_tag : str, quantification_type :  Literal["proteins","protein_groups","precursors","any"], user : UserModel = Depends(get_user_from_token)) -> bool:
@@ -41,6 +64,13 @@ def get_submission_quant_exists(submission_tag : str, quantification_type :  Lit
         raise submission_tag_not_found
 
     return DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type)
+
+
+
+
+
+
+
 
 @router.post("/{submission_tag}/quantifications/proteins", summary="Insert protein quantifications for a given submission. Requires curator rights.")
 def insert_protein_quantifications(
@@ -65,16 +95,16 @@ def insert_protein_quantifications(
         Number of inserted protein quantifications.
     """
 
-    print(quantifications)
     if DB.submissions.exists(tag=submission_tag) is False:
         raise HTTPException(status_code=404, detail="Submission not found")
 
     ##first check if all proteins exist
-    print(quantifications)
     N = DB.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
-    print(f"N: {N} protein groups added.")
-    print(quantifications.model_dump().get("quantifications", []))
-    return DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=quantifications.model_dump().get("quantifications", []))
+    num_quantifications = DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=quantifications.model_dump().get("quantifications", []))
+    if num_quantifications != len(quantifications.quantifications):
+        DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
+        
+    return num_quantifications
 
 
 

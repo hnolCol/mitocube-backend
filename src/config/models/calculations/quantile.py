@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class QuantileModel(BaseModel):
-    text : Optional[str] = None
+    tag : Optional[str] = None
     min : float 
     q25: float 
     m: float 

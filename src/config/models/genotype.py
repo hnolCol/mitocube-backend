@@ -70,13 +70,13 @@ class GenotypeModel(BaseModel):
     gene_modifications : List[GeneModificationModel]
     
     
-GeneticApplicationTreeModel = ForwardRef('GeneticApplicationTreeModel')
+# GeneticApplicationTreeModel = ForwardRef('GeneticApplicationTreeModel')
 
-class GeneticApplicationTreeModel(BaseModel):
-    trait_tag : str 
-    attribute_tag : str 
-    value : Optional[str|float|int] = None
-    children : List[GeneticApplicationTreeModel] = []
+# class GeneticApplicationTreeModel(BaseModel):
+#     trait_tag : str 
+#     attribute_tag : str 
+#     value : Optional[str|float|int] = None
+#     children : List[GeneticApplicationTreeModel] = []
 
 
 

@@ -20,6 +20,8 @@ from config.models.submissions.metatexts import MetaTextInsertModel
 from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
 
+from lib.data.ranking.FeatureRanking import FeatureRanking
+
 class Neo4JSubmissions(SubmissionsABC):
 
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC, condition_applications : ConditionApplicationABC) -> None:
@@ -539,6 +541,79 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
+    
+    
+    
+    def get_protein_group_quantification_count(self) -> pd.DataFrame:
+        """Returns the number of protein group quantifications for each submission. 
+        Neo4J implementation.  
+
+        Returns
+        -------
+        pd.DataFrame
+             A data frame with the following columns:
+            ```
+                - 'submission_tag' (str) : The submission tag
+                - 'protein_group_quantification_count' (int) : The number of protein group quantifications for the submission
+                - 'user_tag' (str) : The user tag of the creator of the submission
+                - 'created_at' (float) : The creation date of the submission
+            ```
+            A dictionary with submission tags as keys and the number of protein group quantifications as values.
+        """
+        query = (
+            "MATCH (u:User)-[:CREATED]->(submission:Submission)-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+            "RETURN submission.tag as submission_tag, count(DISTINCT p) as count, u.tag as user_tag, submission.created_at as created_at "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df)
+
+        return r
+    
+    def calculate_multiple_comparison_metrices(self, tag : str, batch_size : int = 300) -> bool:
+        
+        
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+            "MATCH (s)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "WITH p, q, a, collect(ca.tag) as ca_tags, s "
+            "RETURN p.tag as protein_group_tag, q.value as value, a.tag as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
+            
+        )
+        
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+        
+        df = FeatureRanking().compute_metrics(df = r)
+        rows = df.to_dict("records")
+        for i in range(0, len(rows), batch_size):
+            batch = rows[i:i+batch_size]
+            query = (
+                "UNWIND $batch as row "
+                "MATCH (p:ProteinGroup {tag : row.protein_group_tag}) "
+                "MATCH (submission:Submission {tag : $tag}) "
+                "MATCH (a:Attribute {tag : row.attribute_tag}) "
+                "MERGE (submission)-[:HAS_STATS]->(stats:Statistics {tag : 'stats_' + row.protein_group_tag + '_' + row.attribute_tag + '_' + $tag})-[:FOR_PROTEIN_GROUP]->(p) "
+                "WITH p, row, a, stats "
+                "MERGE (stats)-[:OF_ATTRIBUTE]->(a) "
+                "SET stats.F = row.F,"
+                "stats.p_value = row.p_value,"
+                "stats.eta_squared = row.eta_squared,"
+                "stats.cohen_f = row.cohen_f,"
+                "stats.max_fc = row.max_fc,"
+                "stats.std_means = row.std_means,"
+                "stats.missingness = row.missingness,"
+                "stats.n_groups = row.n_groups,"
+                "stats.score = row.score, "
+                "stats.exclusively = row.exclusively "
+            )
+            r = self._driver.execute_query(query, routing_="w", batch = batch, tag = tag)
+        
+        
+        return True
+        
+    
+    
+    
+    
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver) -> None:
