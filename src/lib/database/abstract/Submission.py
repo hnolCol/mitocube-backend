@@ -232,6 +232,24 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def get_views(self, tag : str) -> int:
         "Returns the number of views for a submission."
+        
+        
+    @abstractmethod
+    def get_protein_group_quantification_count(self) -> pd.DataFrame:
+        """Returns the number of protein group quantifications for each submission. 
+
+        Returns
+        -------
+        pd.DataFrame
+             A data frame with the following columns:
+            ```
+                - 'submission_tag' (str) : The submission tag
+                - 'protein_group_quantification_count' (int) : The number of protein group quantifications for the submission
+                - 'user_tag' (str) : The user tag of the creator of the submission
+                - 'created_at' (float) : The created at timestamp of the submission
+            ```
+            A dictionary with submission tags as keys and the number of protein group quantifications as values.
+        """
     
     @abstractmethod
     def insert(self, submission : DatasetSubmissionModel) -> bool:

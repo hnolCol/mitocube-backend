@@ -119,3 +119,23 @@ class ProteinGroupsABC(ABC):
     def insert_bulk(self, protein_groups : List[str]) -> int:
         """Inserts multiple protein groups into the database. If they do not exist yet. 
         Each protein group is connected to its proteins. Returns the number of protein groups added."""
+        
+        
+    @abstractmethod
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[Dict]:
+        """Returns the statistical ranking for a given protein group.
+
+        Parameters
+        ----------
+        tag : str
+            The protein group tag
+        attribute_tags : List[str], optional
+            A list of attribute tags to filter the statistics, by default None
+        limit : int, optional
+            The maximum number of results to return, by default 20
+
+        Returns
+        -------
+        List[Dict]
+            A list of dictionaries containing the statistical ranking information.
+        """

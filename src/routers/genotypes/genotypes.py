@@ -155,11 +155,11 @@ def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel =
     """
     print(genotype)
     
-
-
+    
+    
     ok = DB.genotypes.insert(genotype, user_tag = user.tag)
     if not ok:
-        raise HTTPException(status_code=400, detail="Genotype already exists in the database.")
+        raise HTTPException(status_code=400, detail="Genotype already exists in the database or another error occurred.")
 
     return True 
 

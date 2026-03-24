@@ -497,6 +497,8 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
     for title, text in submission.metatext.items():
         DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
+        
+        
     return 
     
 
@@ -811,16 +813,16 @@ def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestProp
     
     
     
-@router.get("/submissions/{submission_label}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
-def get_submission_runlist(submission_label : str, user : UserModel = Depends(get_user_from_token)) -> RunListResponseModel:
-    db = MCDatabase.getDatabase()
-    try: dataset = db.getDataset(label = submission_label) 
-    except: raise tag_not_found
-    metadata = dataset.getMetaJson()
-    runlist = metadata.runlist
-    if runlist is not None: 
-        user_label = runlist.user_label 
-        user_exists, user = UserDB.get_user_by_label(user_label)
-        if user_exists:
-            return RunListResponseModel(**metadata.runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
-    raise HTTPException(status_code = 404, detail = "No runlist found.")
+# @router.get("/submissions/{submission_label}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
+# def get_submission_runlist(submission_label : str, user : UserModel = Depends(get_user_from_token)) -> RunListResponseModel:
+#     db = MCDatabase.getDatabase()
+#     try: dataset = db.getDataset(label = submission_label) 
+#     except: raise tag_not_found
+#     metadata = dataset.getMetaJson()
+#     runlist = metadata.runlist
+#     if runlist is not None: 
+#         user_label = runlist.user_label 
+#         user_exists, user = UserDB.get_user_by_label(user_label)
+#         if user_exists:
+#             return RunListResponseModel(**metadata.runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
+#     raise HTTPException(status_code = 404, detail = "No runlist found.")

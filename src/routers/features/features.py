@@ -137,32 +137,6 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
     return {"data" : d, "attribute_tags" : list(attribute_tags), "feature_tag" : feature_tag, "submission_tag" : submission_tag}
     
     
-    
-    
-    
-# @router.get("")
-# def get_features_by_query(query : str, proteome_tags : str = None, limit : int = 30)->List[FeatureNeoModel]:
-#     """Finds query by feautre 
-
-#     Parameters
-#     ----------
-#     query : str
-#         The query string 
-#     proteome_ids : str, optional
-#         The list of proteomes to query the feature in. If None, alle available features will be searched for
-#         If multiple proteomes should be provided, separate them by a ';'. 
-#     limit : int, optional
-#         The maximum number of features to be returned.
-#     user : UserModel, optional
-#         _description_, by default Depends(get_user_from_token)
-
-#     Returns
-#     -------
-#     _type_
-#         _description_
-#     """
-#     return DB.features.find(search_string = query, proteome_tags = APIParamString(param=proteome_tags).param, limit = limit)
-    
 
     
 @router.get("/{tag_x}/{tag_y}/pairwise_quant")
@@ -190,12 +164,6 @@ def get_feature_by_tag(feature_tag : str, user : UserModel = Depends(get_user_fr
         return DB.peptides.get(tag = feature_tag)
     
     raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
-
-    # if not DB.features.exists(tag = feature_tag):
-    #     raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
-    # feature = DB.features.get_protein_by_tags(tags=[feature_tag], as_data_frame=False)
-    # if len(feature) == 1:
-    #     return feature[0]
     
 
 @router.get("/{feature_tag}/i")
@@ -213,19 +181,18 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
     
     
 @router.get("/{feature_tag}/abundance") 
-def get_feature_abundance(feature_tag : str, attribute_tag : str = None) -> QuantileModel|List[QuantileModel]:
+def get_feature_abundance(feature_tag : str, attribute_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]:
     return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag)
 
 
 @router.get("/{feature_tag}/abundance/samples")
-def get_feature_sample_abundance(feature_tag : str):
+def get_feature_sample_abundance(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
     if not DB.features.exists(tag=feature_tag):
         raise HTTPException(status_code=404, detail=f"The feature tag does not exist: {feature_tag} in the database.")
     df =  DB.features.get_quantification_per_sample(tag = feature_tag)
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No quantification data found for feature tag: {feature_tag} in the database.")
     df.loc[:,"value"] = df["value"].astype(float)
-    print(df)
     return df.to_dict(orient="records")
 
 

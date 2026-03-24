@@ -155,8 +155,6 @@ if CTRL_PROTEOME_SETTINGS.add_control_proteome:
     DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
     DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
 
-
-
 origins = [
     "http://localhost:5000",
     "http://localhost:3000",

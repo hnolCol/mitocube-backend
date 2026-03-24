@@ -7,6 +7,8 @@ from config.models.parameter import APIParamString
 from lib.database.Database import Database
 
 from services.statistics.t import t_to_p
+from scipy.stats import false_discovery_control
+
 DB = Database.DB()
 
 
@@ -15,7 +17,7 @@ router = APIRouter(
     tags=["Proteins","Correlations"]
     )
 @router.get("/{tag}/correlations")
-def get_protein_correlations(tag: str, annotation_tags : str = None, min_data_points : int = 2, limit : int = None, direction : Literal["both", "positive", "negative"] = "both", user: UserModel = Depends(get_user_from_token)):
+def get_protein_correlations(tag: str, annotation_tags : str = None, min_data_points : int = 2, limit : int = None, direction : Literal["both", "positive", "negative"] = "both", fdr : float = 0.05, user: UserModel = Depends(get_user_from_token)):
     """
     Returns the correlation of a given protein tag with all other proteins across all samples. 
     The correlation is computed using Pearson correlation and includes the p-value for the correlation.
@@ -38,7 +40,11 @@ def get_protein_correlations(tag: str, annotation_tags : str = None, min_data_po
         raise HTTPException(status_code=400, detail=f"min_data_points cannot be greater than the number of samples with protein quantification ({DB.samples.count(has_protein_quantification=True)})")
     r = DB.features.get_correlated_features(tag = tag, annotation_tags=annotation_tags, direction=direction, min_data_points=min_data_points, limit=limit)
     r["index"] = range(len(r.index))
+    r = r.dropna(subset=["t","N"])
     #add p-values
+    #subsetting and calculating FDR
     r["p-value"] = t_to_p(ts=r["t"].values, ns = r["N"].values)
-    
+    r.loc[:,"fdr"] = false_discovery_control(r["p-value"].values)
+    r = r.loc[r["fdr"] < fdr,:]
+
     return r.to_dict(orient="records")

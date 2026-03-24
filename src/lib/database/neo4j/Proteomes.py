@@ -38,8 +38,8 @@ class Neo4JProteomes(ProteomesABC):
             "WITH proteome "
             "SET proteome += $proteome_info "
             "WITH proteome "
-            "MATCH (a:Attribute {tag : 'att_protein'}) "
-            "MERGE (proteome)<-[:HAS_TRAIT]-(a)"
+            "MATCH (a:Attribute {tag : 'att_proteome'}) "
+            "MERGE (proteome)<-[:HAS_TRAIT]-(a) "
         ) 
         
         self._driver.execute_query(query, proteome_tag = proteome_tag, proteome_info = proteome_info)
@@ -278,8 +278,8 @@ class Neo4JProteomes(ProteomesABC):
     def get_proteins(self, tag : str, limit : int = None) -> List[str]:
         "Returns the protein tags associated with a proteome."
         query = (
-            "MATCH (av:AttributeValue {tag : $tag}) "
-            "MATCH (av)<-[r:IN_PROTEOME]-(p:Protein) "
+            "MATCH (t:Trait|Proteome {tag : $tag}) "
+            "MATCH (t)<-[r:IN_PROTEOME]-(p:Protein) "
             "RETURN collect(p.tag)[..$limit] "
         )
         r = self._driver.execute_query(query_=query,routing_="r",tag=tag, limit=limit, result_transformer_=Result.value)

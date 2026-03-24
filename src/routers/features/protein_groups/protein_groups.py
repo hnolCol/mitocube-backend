@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
-from typing import List, Literal
+from typing import List, Literal, Dict
 
 # 
 from lib.database.Database import Database
@@ -11,7 +11,7 @@ from config.models.news.news import  NewsModel, NewsInsertModel
 from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 from config.enums.states import SubmissionStatesEnums 
-from config.models.plots.stats import DistResponseModel
+from config.models.feature import ProteinGroupSubmissionStatisticsModel
 DB = Database.DB()
 
 
@@ -19,6 +19,22 @@ router = APIRouter(
     prefix="/api/features/protein_groups",
     tags=["Features", "Protein Groups"]
     )
+
+
+
+@router.get("/{protein_group_tag}/stats", summary="Returns the statistics for a given protein group.")
+def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None, user : UserModel = Depends(get_user_from_token), limit : int = None) -> List[ProteinGroupSubmissionStatisticsModel]:
+    
+    if not DB.protein_groups.exists(tag = protein_group_tag): #check if protein group exists, otherwise raise 404
+        raise HTTPException(status_code=404, detail="Protein group not found")
+    
+    r = DB.protein_groups.get_statistical_ranking(tag = protein_group_tag, attribute_tags = APIParamString(param=attribute_tags).param, limit = limit)
+    
+    return r
+    
+    
+    
+    
 
 
 @router.get("/{protein_group_tag}/text}", summary="Get the protein group text.")
@@ -37,5 +53,5 @@ def get_protein_group_text(protein_group_tag : str, user: UserModel = Depends(ge
     """
     protein_tags = DB.protein_groups.get_proteins(tag = protein_group_tag)
     t = ", ".join([DB.proteins.get(tag = pt).gene_name for pt in protein_tags])
-    
+    return t 
     

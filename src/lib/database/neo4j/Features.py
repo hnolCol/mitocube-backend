@@ -107,16 +107,25 @@ class Neo4JFeatures(FeaturesABC):
             "WITH "
             "    apoc.coll.sum(products) / "
             "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
-            "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
         )
+        if direction == "negative":
+            
+            query += "WHERE pearson < 0 "
+        
+        elif direction == "positive":
+            
+            query += "WHERE pearson > 0 "
+        
+        query +=  "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
         if limit is not None:
             if direction == "both": 
                 query += "ORDER BY abs(pearson) DESC LIMIT $limit "
+            
             elif direction == "negative":
                 query += "ORDER BY pearson ASC LIMIT $limit "
             elif direction == "positive":
                 query += "ORDER BY pearson DESC LIMIT $limit "    
-        print(query)
+                
         r = self._driver.execute_query(query, 
                                        routing_="r", 
                                        result_transformer_=Result.to_df, 
@@ -361,30 +370,36 @@ class Neo4JFeatures(FeaturesABC):
              
              query = (
                 #match first the sample attributes and then the dataset attributes.
-            "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
+            "MATCH (p:ProteinGroup|Peptide)<-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
+            "OPTIONAL MATCH (protein:Protein)<-[:HAS_PROTEINS]-(p)"
             "MATCH (a:Attribute) WHERE a.tag = $attribute_tag "
-            "OPTIONAL MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a) "
-            "OPTIONAL MATCH (sample)<-[:HAS_SAMPLE]-(:Submission)-[:HAS_ATTRIBUTE_VALUE]->(avDataset:AttributeValue)<-[:HAS_VALUE]-(a) "
-            "WHERE (av IS NOT NULL AND avDataset IS NULL) OR (av IS NULL AND avDataset IS NOT NULL) "
-            "WITH r, COALESCE(av, avDataset) AS avFinal "
-            "WHERE avFinal IS NOT NULL "
-            "RETURN avFinal.text as text, apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N "
+            "MATCH (sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a) "
+            "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
+            
+            
+            # "OPTIONAL MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a) "
+            # "OPTIONAL MATCH (sample)<-[:HAS_SAMPLE]-(:Submission)-[:HAS_ATTRIBUTE_VALUE]->(avDataset:AttributeValue)<-[:HAS_VALUE]-(a) "
+            # "WHERE (av IS NOT NULL AND avDataset IS NULL) OR (av IS NULL AND avDataset IS NOT NULL) "
+            # "WITH r, COALESCE(av, avDataset) AS avFinal "
+            # "WHERE avFinal IS NOT NULL "
+            "RETURN ca.tag as ca_tag, t.tag as trait_tag, a.tag as attribute_tag, apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N, p.tag as tag "
              
              )
              
         else:
             query = (
-                "MATCH (p:Protein)-[r:QUANTIFIED]-(sample:Sample)"
-                "WHERE p.tag = $tag "
-                "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N, p.gene_name as text"
+                "MATCH (p:ProteinGroup|Peptide)<-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
+                "RETURN apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N, p.tag as tag"
             )
         
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tag = tag, attribute_tag = attribute_tag)
+        
+        print(r)
         if not isinstance(r,list): return []
         
         return [QuantileModel(
-            text = ri["text"],
+            tag = ri["tag"],
             min = ri["quantiles"][0], 
             q25 = ri["quantiles"][1], 
             m = ri["quantiles"][2],
@@ -490,7 +505,6 @@ class Neo4JFeatures(FeaturesABC):
                                        feature_tag_x = feature_tag_x, 
                                        feature_tag_y = feature_tag_y
                                        )
-        print(r)
         return r 
    
     def get_protein_tags(self, proteome_tags : str|List[str] = "UP000005640", is_quantified : bool = True) -> List[str]:
