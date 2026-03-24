@@ -5,10 +5,12 @@ from lib.database.abstract.Samples import SamplesABC
 from services.encryption import create_hierarchical_hash
 from config.models.submissions.submissions import AttributeTree
 from config.models.conditions_applications import ConditionApplicationAttributeModel
+from config.models.genotype import InsertGeneticApplicationModel
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from config.models.samples import SampleModel
 import pandas as pd
 import uuid
+
 class Neo4JSamples(SamplesABC):
     """
     Neo4J implementation of the SamplesABC interface.
@@ -382,15 +384,19 @@ class Neo4JSamples(SamplesABC):
         """
 
         query = (
-            "MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype)"
-            "RETURN g.tag"
+        "MATCH (s:Sample {tag: $tag})-[:HAS_GENOTYPE]->(g:Genotype) "
+        "RETURN g.tag AS genotype_tag"
         )
 
 
-        genotype = self._driver.execute_query(query, tag=tag, routing_="r")
-        return genotype
-    
 
+        r = self._driver.execute_query( query,
+                                        routing_="r",
+                                        result_transformer_=Result.value,
+                                        tag=tag
+                                    )
+
+        return r[0] if len(r) > 0 else None
 
     def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):
         """Insert proteins quantified in a given sample of a submission.
@@ -430,3 +436,84 @@ class Neo4JSamples(SamplesABC):
             sample_tag=sample_tag,
             protein_tags=protein_tags
         )
+
+    def update( self, tag: str, text: str = None, genotype_tag: str = None, condition_applications: List[AttributeTree] = None) -> bool:
+        """Update the sample information for a given sample tag.    
+        """
+
+        if not self.exists(tag):
+            raise ValueError("Sample does not exist.")
+
+
+        if text is not None:
+            query = (
+                "MATCH (s:Sample {tag: $tag}) "
+                "SET s.text = $text "
+            )
+            self._driver.execute_query(query, routing_="w", tag=tag, text=text)
+
+        if genotype_tag is not None:
+            query = (
+                "MATCH (s:Sample {tag: $tag}) "
+                "OPTIONAL MATCH (s)-[r:HAS_GENOTYPE]->(:Genotype) "
+                "DELETE r "
+                "WITH s "
+                "MATCH (g:Genotype {tag: $genotype_tag}) "
+                "MERGE (s)-[:HAS_GENOTYPE]->(g)"
+            )
+            self._driver.execute_query(
+                query,
+                routing_="w",
+                tag=tag,
+                genotype_tag=genotype_tag
+            )
+
+        if condition_applications is not None:
+
+            delete_query = (
+                "MATCH (s:Sample {tag: $tag})-[r:HAS_APPLICATION]->(:ConditionApplication) "
+                "DELETE r"
+            )
+
+            self._driver.execute_query(delete_query, routing_="w", tag=tag)
+
+            self.insert_condition_application(
+                sample_tag=tag,
+                sample_data=condition_applications
+            )
+
+        return True
+
+
+    def insert_genotype(self, sample_tags: List[str], genotype_tag: str) -> bool:
+        """Set the genotype for a given sample.
+
+        Parameters
+        ----------
+        sample_tags : List[str]
+            The tags of the samples to set the genotype for.
+        genotype_tag : str
+            The tag of the genotype to set for the samples.
+
+        Returns
+        -------
+        bool
+            True if the update was successful, False otherwise.
+        """
+
+        query = (
+            "UNWIND $sample_tags AS sample_tag "
+            "MATCH (s:Sample {tag: sample_tag}) "
+            "WITH s "
+            "MATCH (g:Genotype {tag: $genotype_tag}) "
+            "MERGE (s)-[:HAS_GENOTYPE]->(g)"
+        )
+
+        self._driver.execute_query(
+            query,
+            routing_="w",
+            sample_tags=sample_tags,
+            genotype_tag=genotype_tag
+        )
+
+        return True

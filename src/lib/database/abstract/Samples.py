@@ -3,6 +3,7 @@ from typing import List, Dict
 import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleModel
+from config.models.attributes import AttributeTree
 
 class SamplesABC(ABC):
     def __init__(self) -> None:
@@ -178,3 +179,27 @@ class SamplesABC(ABC):
         bool
             True if the insertion was successful, False otherwise.
         """
+
+    @abstractmethod
+    def update( self, tag: str, text: str = None, genotype_tag: str = None, condition_applications: List[AttributeTree] = None) -> bool:
+        """Update the sample information for a given sample tag.    
+        """
+
+
+    @abstractmethod
+    def insert_genotype(self, sample_tags: List[str], genotype_tag: str) -> bool:
+        """Set the genotype for a given sample.
+
+        Parameters
+        ----------
+        sample_tags : List[str]
+            The tags of the samples to set the genotype for.
+        genotype_tag : str
+            The tag of the genotype to set for the samples.
+
+        Returns
+        -------
+        bool
+            True if the update was successful, False otherwise.
+        """
+
