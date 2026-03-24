@@ -50,7 +50,6 @@ def get_submission_durations(
     df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
     if aggregate == "dist":
         desc = df["duration"].describe(percentiles=[0.25, 0.5, 0.75])
-        print(desc)
         return DistResponseModel(
             min=desc["min"],
             q1=desc["25%"],
@@ -64,3 +63,7 @@ def get_submission_durations(
     else:
         agg_metric = df["duration"].agg(func=aggregate, skipna=True)
         return agg_metric
+    
+    
+
+

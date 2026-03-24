@@ -79,6 +79,7 @@ class UserInsertModel(BaseModel):
     allow_login : bool = True 
     role : UserRolesEnum = UserRolesEnum.STANDARD
     is_lead_admin : bool = False
+    created_at : Optional[float] = None
     #salt : str = None 
     
     

@@ -156,7 +156,7 @@ class Neo4JUser(UserABC):
                             template_name=EMAIL_SETTINGS.mail_account_generated_template,
                             include_setting_cc=True))                    
             
-    def insert(self, user : UserInsertModel) -> bool:
+    def insert(self, user : UserInsertModel, use_create_at_from_model : bool = False) -> bool:
         "" 
         
         if self.exists(user.tag):
@@ -167,10 +167,14 @@ class Neo4JUser(UserABC):
         
         query = (
             "CREATE (u:User {tag : $tag}) "
-            "SET u.firstname = $firstname, u.lastname = $lastname, u.email = $email, u.allow_login = $allow_login, u.created_at = timestamp(), u.role = $role, u.is_lead_admin = $is_lead_admin, u.password = $password, u.s = toLower($firstname + ' ' + $lastname + ' ' + $email) "
+            "SET u.firstname = $firstname, u.lastname = $lastname, u.email = $email, u.allow_login = $allow_login, u.role = $role, u.is_lead_admin = $is_lead_admin, u.password = $password, u.s = toLower($firstname + ' ' + $lastname + ' ' + $email) "
         )
+        if use_create_at_from_model:
+            query += ", u.created_at = $created_at "
+        else:
+            query += ", u.created_at = timestamp() "
         try:
-            
+        
             self._driver.execute_query(query, 
                                        routing_="w", 
                                        firstname=user.firstname, 
@@ -180,7 +184,8 @@ class Neo4JUser(UserABC):
                                        allow_login=user.allow_login, 
                                        role=user.role, 
                                        is_lead_admin=user.is_lead_admin, 
-                                       password=user.password.get_secret_value())
+                                       password=user.password.get_secret_value(),
+                                       created_at=user.created_at if use_create_at_from_model else None)
             
         except Exception as e:
             print("Query inserting resulted in an error " + str(e))

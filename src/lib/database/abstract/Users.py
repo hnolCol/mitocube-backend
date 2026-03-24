@@ -6,10 +6,47 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 
-from config.models.user import UserModel, UserModelForRegistration
+from config.models.user import UserModel, UserModelForRegistration, UserInsertModel
+from services.json import read_json
 
 
 class UserABC(ABC):
+    
+    
+    def _utils_migrate(self, path_to_user_data : str) -> None:
+        "Migrate the database to the latest version. This method is called when the database is initialized. It should check if the database is up to date, and if not, it should perform the necessary migrations. This method should be idempotent, meaning that it can be called multiple times without causing any issues."
+    
+    
+        users = read_json(path_to_user_data)
+        N = 0
+        for u in users:
+            if self.exists(u["label"]):
+                print(f"User with tag {u['label']} already exists. Skipping migration for this user.")
+                continue
+            user_model = UserInsertModel(
+                tag = u["label"], 
+                      firstname=u["firstname"], 
+                      lastname=u["lastname"], 
+                      institute=u["institute"], 
+                      research_group=u["research_group"], 
+                      agreed_to_terms=False,
+                      created_at=u["created_on"], 
+                      email=u["email"], 
+                      password=u["password"], 
+                      allow_login=u["allow_login"], 
+                      role=u["role"])
+            try:
+                ok = self.insert(user = user_model, use_create_at_from_model=True)
+                if ok:
+                    N += 1
+            except Exception as e:
+                print(f"Error migrating user {u['label']}: {e}")
+        
+        print(f"Migration of users completed. {N} users have been migrated.")                 
+            
+            
+        
+        
     
     @abstractmethod
     def check(self) -> None:
@@ -120,7 +157,9 @@ class UserABC(ABC):
     @abstractmethod
     def delete_user(self, tag : str) -> bool:
         "" 
-    
+    @abstractmethod
+    def insert(self, user : UserInsertModel, use_create_at_from_model : bool = False) -> bool:
+        "" 
     
     @abstractmethod 
     def is_user(self, tag : str) -> bool:
