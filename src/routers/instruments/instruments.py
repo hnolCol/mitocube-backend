@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
-from services.users import is_user_admin, get_user_from_token
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 
 
 
@@ -65,10 +65,26 @@ def get_instrument_state(instrument_tag : str, limit : int = 1, user : UserModel
     return DB.instrument_states.get_instrument_state(instrument_tag = instrument_tag , limit = limit)
 
 
+@router.post("/{instrument_tag}/states/{state_tag}")
+def set_instrument_state(instrument_tag : str, state_tag : str, user : UserModel = Depends(is_user_at_least_curator)): 
+    "Sets the state of an instrument. The state is added to the history of the instrument. The state is not overwritten, but added as a new entry in the history. The duration of the previous state is calculated and stored in the database."
+    if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
+    if not DB.instrument_states.exists(tag = state_tag): raise HTTPException(status_code=404, detail="State not found.")
+    DB.instrument_states.set_state(tag = state_tag, instrument_tag = instrument_tag)
+
+
 @router.get("/{instrument_tag}/states/durations") 
 def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
     "Returns the duration of all states for an instrument." 
     return DB.instrument_states.get_state_durations(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+
+
+@router.get("/{instrument_tag}/states/durations/fraction")
+def get_fractional_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[dict]:
+    "Returns the duration of all states for an instrument as a fraction of the total time." 
+    fractions = DB.instrument_states.get_fractional_state_durations(instrument_tag=instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+    print(fractions)
+    return fractions
 
 @router.get("/{instrument_tag}/states") 
 def get_instrument_states(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentsStateResponseModel]:

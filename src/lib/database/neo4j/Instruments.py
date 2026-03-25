@@ -7,7 +7,7 @@ from config.models.instruments import InstrumentStateModel, InstrumentsStateResp
 from lib.database.abstract.Instruments import InstrumentsABC
 from lib.database.abstract.Instruments import InstrumentStatesABC
 
-
+import itertools
 
 class Neo4JInstrumentStates(InstrumentStatesABC):
     
@@ -33,6 +33,13 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         
         r = self._driver.execute_query(query,routing_="w", states = [i_state.model_dump() for i_state in instrument_state_models])
         print(r,"Instrument States created.")
+        
+        
+    def exists(self, tag : str) -> bool:
+        ""
+        query = "MATCH (is:InstrumentState {tag : $tag}) RETURN count(is) > 0"
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r[0] if isinstance(r[0], bool) else False
         
     def get(self, tag = None) -> InstrumentStateModel:
         ""
@@ -66,6 +73,8 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         query = "MATCH (t:Trait)-[r:IN_STATE]->(state:InstrumentState) "
         if instrument_tag is not None:
             query += "WHERE t.tag = $instrument_tag "
+            if timestamp_max is not None or timestamp_min is not None or state_tag is not None:
+                query += "AND "
         elif timestamp_max is not None or timestamp_min is not None:
             query += "WHERE "
         elif state_tag is not None:
@@ -104,6 +113,137 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         r = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.value)
         return [InstrumentStateHistoryModel(**ri) for ri in r[0]]
     
+    
+    def get_fractional_state_durations(self, instrument_tag : str = None, state_tag : str = None, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, end_time : pd.Timestamp = None, time_period : str = 'M') -> pd.DataFrame:
+        
+        "" 
+        
+        query = "MATCH (t:Trait)-[r:IN_STATE]->(state:InstrumentState) "
+        if instrument_tag is not None:
+            query += "WHERE t.tag = $instrument_tag "
+            if timestamp_max is not None or timestamp_min is not None or state_tag is not None:
+                query += "AND "
+        elif timestamp_max is not None or timestamp_min is not None:
+            query += "WHERE "
+        elif state_tag is not None:
+            query += "WHERE state.tag = $state_tag "
+                
+        if timestamp_min is not None and timestamp_max is not None:
+            query += (      
+                "r.created_at >= $timestamp_min AND r.created_at <= $timestamp_max ")
+        elif timestamp_min is not None:
+            query += (      
+            "r.created_at >= $timestamp_min ")
+        elif timestamp_max is not None:
+            query += (      
+            "r.created_at <= $timestamp_max ")
+            
+        query += "RETURN t.tag AS instrument_tag, state.tag AS state_tag,  apoc.date.format(r.created_at, 'ms', 'yyyy-MM-dd HH:mm:ss') AS created_at ORDER BY instrument_tag, created_at "
+        if limit is not None:
+            query += " LIMIT $limit "
+        df = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.to_df)
+        df = df.sort_values(["instrument_tag", "created_at"])
+
+        # Use now if not provided
+        if end_time is None:
+            end_time = pd.Timestamp.utcnow().tz_convert('UTC')
+            
+        df['created_at'] = pd.to_datetime(df['created_at'], utc=True)
+
+        # Sort
+        df = df.sort_values(['instrument_tag', 'created_at'])
+
+        # Compute next timestamp per instrument
+        df['next_time'] = df.groupby('instrument_tag')['created_at'].shift(-1)
+
+        # Fill last state (or single-state instruments) with current UTC time
+        df['next_time'] = df['next_time'].fillna(end_time)
+
+        # Compute duration in seconds
+        df['duration'] = (df['next_time'] - df['created_at']).dt.total_seconds()
+
+        # Remove invalid zero-length durations
+        df = df[df['duration'] > 0]
+
+        # -----------------------------
+        # 4️⃣ Expand durations into monthly buckets
+        # -----------------------------
+        rows = []
+
+        for _, row in df.iterrows():
+            start = row['created_at']
+            end = row['next_time']
+            current = start
+
+            while current < end:
+                # first moment of next month
+                month_end = (current.to_period(time_period) + 1).to_timestamp().tz_localize('UTC')
+                slice_end = min(end, month_end)
+                seconds = (slice_end - current).total_seconds()
+
+                rows.append({
+                    'instrument_tag': row['instrument_tag'],
+                    'state': row['state_tag'],
+                    'year': current.year,
+                    'month': current.month,
+                    'seconds': seconds
+                })
+
+                current = slice_end
+
+        expanded = pd.DataFrame(rows)
+
+        if expanded.empty:
+            print("No data after expansion")
+            exit()
+
+        # Aggregate per instrument × month × state
+        agg = expanded.groupby(['instrument_tag', 'year', 'month', 'state'], as_index=False)['seconds'].sum()
+
+        
+        expanded['period'] = pd.PeriodIndex(year=expanded['year'], month=expanded['month'], freq=time_period)
+
+        agg['period'] = pd.PeriodIndex(year=agg['year'], month=agg['month'], freq=time_period)
+
+
+
+        # -----------------------------
+        # Fill missing months and states
+        # -----------------------------
+        all_months = pd.period_range(expanded['period'].min(), expanded['period'].max(), freq=time_period)
+        instruments = expanded['instrument_tag'].unique()
+        states = expanded['state'].unique()
+
+        # Build full grid
+        full_index = pd.MultiIndex.from_tuples(
+            list(itertools.product(instruments, all_months, states)),
+            names=['instrument_tag', 'period', 'state']
+        )
+        full_df = pd.DataFrame(index=full_index).reset_index()
+
+        # Merge with actual data
+        merged = full_df.merge(agg, how='left', 
+                            on=['instrument_tag', 'period', 'state'])
+
+        merged['seconds'] = merged['seconds'].fillna(0)
+
+        # -----------------------------
+        # Compute fractions per instrument × month
+        # -----------------------------
+        merged['fraction'] = merged.groupby(['instrument_tag', 'period'])['seconds'].transform(lambda x: x / x.sum())
+
+        # Optional: split period into year/month columns
+        merged['year'] = merged['period'].dt.year
+        merged['month'] = merged['period'].dt.month
+        merged['day'] = merged['period'].dt.day
+        merged = merged.drop(columns='period')
+        
+        print(merged)
+        return merged
+                
+
+                
+
     
     def find(self, search_string = None, limit : int = None) -> List[str]:
         

@@ -83,6 +83,8 @@ def set_maintenance_event_state(maintenance_event_tag : str, state_tag : str, us
     
     DB.maintenance_events.set_state(tag = maintenance_event_tag, state_tag = state_tag, user_tag = user.tag, description = "State changed by user {}".format(user.firstname))
 
+
+
 @router.post("/{maintenance_event_tag}/symptoms")
 def add_symptom_to_maintenance_event(maintenance_event_tag : str, symptom_tags : List[str], user : UserModel = Depends(is_user_at_least_curator)):
     """Adds symptoms to a maintenance event. This will replace any existing symptoms for the event.

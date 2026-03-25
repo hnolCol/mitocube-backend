@@ -3,11 +3,15 @@ from abc import abstractmethod, ABC
 
 from typing import List, Dict, Optional, Tuple
 from deprecated import deprecated
-
+import pandas as pd 
 from config.models.instruments import InstrumentStateHistoryModel, InstrumentsStateResponseModel, InstrumentStateModel
 
 class InstrumentStatesABC(ABC):
     
+    
+    @abstractmethod
+    def exists(self, tag : str) -> bool:
+        ""
     
     @abstractmethod
     def get(self, tag : str = None) -> InstrumentStateModel:
@@ -19,6 +23,10 @@ class InstrumentStatesABC(ABC):
     @abstractmethod
     def get_state_durations(self, instrument_tag : str, limit : int = None) -> List[InstrumentStateHistoryModel]:
         "Returns the history of states for a given instrument"
+
+    @abstractmethod
+    def get_fractional_state_durations(self, instrument_tag : str = None, state_tag : str = None, timestamp_min : float = None, timestamp_max : float = None, limit : int = None) -> pd.DataFrame:
+        "Returns the history of states for a given instrument as a fraction of the total time."
         
     @abstractmethod
     def find(self, search_string : str = None) -> List[str]:

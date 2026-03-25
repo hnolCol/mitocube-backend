@@ -464,12 +464,7 @@ class Neo4JGenotype(GenotypeABC):
     def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, is_active : bool = True, user_tag : str = None) -> List[str]:
         """Finds genotype tags that match the search string. 
         Returns the genotype tags that contain the search string.
-        """ 
-        query = (
-            "MATCH (g:Genotype) "
-            "WHERE g.is_active = $is_active " 
-
-        )
+        """
 
         if user_tag is not None:
             query = (
@@ -481,10 +476,11 @@ class Neo4JGenotype(GenotypeABC):
                 "MATCH (g:Genotype)-[:EFFECTS]->(p:Protein) "
                 "WHERE g.is_active = true "     
                      )
+            
         if proteome_tags is not None:
-            query += "WHERE EXISTS {(p)<-[:IN_PROTEOME]-(proteome:Proteome) WHERE proteome.tag in proteome_tags}" 
+            query += "AND EXISTS {(p)<-[:IN_PROTEOME]-(proteome:Proteome) WHERE proteome.tag in proteome_tags}" 
         if search_string is not None and search_string != "":
-            query += "WHERE g.s CONTAINS $query_string OR p.s CONTAINS $query_string "
+            query += "AND (g.s CONTAINS $query_string OR p.s CONTAINS $query_string) "
         query += "RETURN DISTINCT g.tag as tag " 
         if limit is not None:
             query += " LIMIT $limit"
