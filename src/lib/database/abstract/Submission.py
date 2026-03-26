@@ -12,7 +12,7 @@ from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel, AttributeTree
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
-from config.models.conditions_applications import ConditionApplicationAttributeModel 
+from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
 from config.enums.states import SubmissionStatesEnums
 
 
@@ -114,6 +114,23 @@ class SubmissionsABC(ABC):
             ```
             If group_by_attribute is False, a list of condition application tags (str) is returned.
         """
+
+    @abstractmethod
+    def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
+        """Gets the condition application data associated with the submission.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        List[ConditionApplicationTreeModel]
+            A list of condition application data associated with the submission.
+        """
+
+
         
     @abstractmethod
     def get_created_at(self, tag : str) -> float:
@@ -395,6 +412,13 @@ class SubmissionsABC(ABC):
             List of protein tags
         """
 
+
+    @abstractmethod
+    def edit_condition_applications(self, tag: str, attribute_trees: List[AttributeTree]) -> bool:
+
+        """Edits a condition application that is connected to the submission.
+        Replaces the existing CA relationship with a new one, without deleting the CA node itself.
+        """
         
 class SubmissionFilterABC(ABC):
     

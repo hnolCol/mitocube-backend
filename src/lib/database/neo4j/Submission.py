@@ -15,7 +15,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import AttributeTree, DatasetSubmissionModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.exceptions.Proteome import ProteomeNotFoundError
-from config.models.conditions_applications import ConditionApplicationAttributeModel 
+from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
 from config.models.submissions.metatexts import MetaTextInsertModel
 from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
@@ -222,6 +222,32 @@ class Neo4JSubmissions(SubmissionsABC):
         if group_by_attribute:
             return [{"attribute_tag" : ri[0], "condition_application_tags" : ri[1]} for ri in r]
         return r[0] if len(r) > 0 else []
+
+
+
+
+    def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
+        """Gets the condition application data associated with the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        List[ConditionApplicationTreeModel]
+            A list of condition application tree models associated with the submission.
+        """
+
+        query = (
+            "MATCH (s:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "WHERE s.tag = $tag "
+            "RETURN ca"
+        )
+
+        ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]
 
     def get_users(self, tag : str) -> List[str]: 
         """Returns the users that are associated with the submission.
@@ -443,6 +469,15 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         self._driver.execute_query(query, submission_tag = submission_tag, tag = tag)
 
+    def edit_condition_applications(self, tag: str, attribute_trees: List[AttributeTree]) -> bool:
+        query = (
+            "MATCH (submission:Submission {tag: $tag})-[r:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "DELETE r"
+        )
+        self._driver.execute_query(query, routing_="w", tag=tag)
+        for attribute_tree in attribute_trees:
+            self.insert_condition_application(tag=tag, attribute_tree=attribute_tree)
+        return True
 
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):
         ""         

@@ -30,8 +30,6 @@ def explode(value):
 pathway_to_proteins = defaultdict(list)
 
 for i, row in df.iterrows():
-    if i >= 50: 
-        break       
 
     uniprot = row["UniProt"]
     if pd.isna(uniprot):
