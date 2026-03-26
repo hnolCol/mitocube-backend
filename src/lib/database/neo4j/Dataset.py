@@ -76,8 +76,8 @@ class Neo4JDataset(DatasetABC):
             r = self._driver.execute_query(query, tag = tag, 
                                            sample_index = sample_index,
                                            quant_values = sample_data[["p_tag","value"]].to_dict(orient="records"))
-            print(r)
-            print(sample_data.index)
+            
+            
             
     @staticmethod
     def _add_dt(tx, data_table: pd.DataFrame, tag  : str, F : pd.Series):

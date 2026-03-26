@@ -19,35 +19,9 @@ router = APIRouter(
     tags=["Condition Applications"]
     )
 
-def extract_ca_item(item : ConditionApplicationTreeModel, add_separator = False) -> str:
-    """Extracts the text representation of a condition application item recursively.
-    Parameters
-    ----------
-    item : Dict
-        The condition application item. The keys must include 'value', 'trait_tag', 'attribute_tag', and 'children'.
-        If no children are present, 'children' should be an empty list.
-    add_separator : bool, optional
-        Whether to add a separator after the item, by default False
-    """
-    t = ""
-    if item.value is not None:
-            val = item.value
-            if isinstance(val, float):
-                # Use general format, strip trailing .0, use scientific notation for small numbers
-                t += f"{val:.6g}"
-            else:
-                t += f"{val}"
-    t += f"{DB.attributes.get_trait_text(item.trait_tag)}"
-    if item.children is not None and len(item.children) > 0:
-        t += " ("
-        for n,c in enumerate(item.children):
-            t += extract_ca_item(c, add_separator = n < len(item.children)-1) 
-            t += ", " if add_separator else ""
-        t += ")"
-    return t
 
 @router.get("/q")
-def query_condition_applications(samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None, user : UserModel = Depends(get_user_from_token)):
+def query_condition_applications(search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None, user : UserModel = Depends(get_user_from_token)):
     """Query condition applications based on different criteria.
     
     Parameters
@@ -73,7 +47,7 @@ def query_condition_applications(samples_only : bool = True, submission_tag : st
         
     """
 
-    ca_tags = DB.condition_applications.find(samples_only = samples_only, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
+    ca_tags = DB.condition_applications.find(search_string = search_string, samples_only = samples_only, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
 
     return ca_tags
 

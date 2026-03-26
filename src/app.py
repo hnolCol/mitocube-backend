@@ -151,7 +151,9 @@ DB.users._utils_migrate(path_to_user_data="/Users/hnolte/Documents/GitHub/mitocu
 
 
 
-
+d = DB.features.get_abundance_distribution(tag = "A3KN83", attribute_tag="att_subcellular_compartment", value = "z_score_sample")
+print(d)
+print("done transformation" ) 
 
 
 

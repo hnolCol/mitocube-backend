@@ -306,6 +306,23 @@ class SubmissionsABC(ABC):
         int
             Number of inserted precursor quantifications.
         """
+        
+    
+    @abstractmethod
+    def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given sample in a submission to z-scores.
+        """
+        
+
+    @abstractmethod
+    def transform_quantification_to_zscore_along_protein_groups(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given submission to z-scores.
+        """
+        
+
+        
     @abstractmethod  
     def insert_research_aim(self, tag : str, research_aim : str, user_tag : str) -> bool:
         """Inserts a research aim for a given submission.

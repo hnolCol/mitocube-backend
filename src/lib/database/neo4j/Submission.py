@@ -399,6 +399,54 @@ class Neo4JSubmissions(SubmissionsABC):
         print(r[0] if len(r) > 0 else 0)
         return r[0] if len(r) > 0 else 0
 
+
+    def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given sample in a submission to z-scores.
+        """
+        
+        
+        query = (
+            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "WITH sample, collect(q.value) AS values "
+            "WITH sample, apoc.coll.avg(values) AS mean, apoc.coll.stdev(values) AS stdev "
+            "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "SET q.z_score_sample = (q.value - mean) / stdev "
+            "RETURN count(q) "
+        )
+
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            tag=tag,
+            result_transformer_=Result.value
+        )
+        return r[0] if len(r) > 0 else 0
+
+
+    def transform_quantification_to_zscore_along_protein_groups(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given submission to z-scores.
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "WITH pg, collect(q.value) AS values "
+            "WITH pg, apoc.coll.avg(values) AS mean, apoc.coll.stdev(values) AS stdev WHERE stdev > 0 " #to avoid division by zero, if stdev is zero, z-score will be set to zero as well.
+            "MATCH (sample)-[q:QUANTIFIED]->(pg) "
+            "SET q.z_score_protein_group = (q.value - mean) / stdev "
+            "RETURN count(q) "
+        )   
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            tag=tag,
+            result_transformer_=Result.value
+        )
+        return r[0] if len(r) > 0 else 0
+
+
+
     def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
         ""
         print("not implemented yet")
@@ -868,7 +916,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         query = self._add_limit(query,limit)
 
         r = self._driver.execute_query(query, user_tags=user_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-        print(r)
+  
         return r
     
     def filter_by_quantified_protein(self, protein_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
@@ -913,7 +961,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
         r = self._driver.execute_query(query, states = states, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-        print(r)
         return r
     
     def filter_by_search_string(self, search_string : str, limit : int, ordered : bool = True) -> List[str]:

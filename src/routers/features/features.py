@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
@@ -181,8 +181,9 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
     
     
 @router.get("/{feature_tag}/abundance") 
-def get_feature_abundance(feature_tag : str, attribute_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]:
-    return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag)
+def get_feature_abundance(feature_tag : str, attribute_tag : str = None, value : Literal["raw","z_score_sample","z_score_protein_group"] = "raw", user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]|Dict[str,QuantileModel]:
+    
+    return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag, value = value)
 
 
 @router.get("/{feature_tag}/abundance/samples")

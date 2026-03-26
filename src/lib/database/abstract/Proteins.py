@@ -72,3 +72,18 @@ class ProteinsABC(ABC):
         FeatureNeoModel
             The protein model.
         """
+        
+    @abstractmethod
+    def get_gene_name(self, tag : str) -> str:
+        """Retrieves the gene name of a protein by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the protein to retrieve the gene name for.
+
+        Returns
+        -------
+        str
+            The gene name of the protein
+        """

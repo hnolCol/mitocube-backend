@@ -12,6 +12,7 @@ from services.mail import send_email_in_background
 from services.enums import get_enum_as_dict
 
 from config.settings.general import get_general_settings
+from config.models.news.news import NewsInsertModel
 from lib.database.Database import Database
 DB = Database.DB()
 EMAIL_SETTINGS = get_email_settings()
@@ -54,6 +55,8 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Use
                                  "url" : GENERAL_SETTINGS.url
                              },
                              template_name=EMAIL_SETTINGS.mail_account_generated_template)
+    
+    DB.news.insert(NewsInsertModel(content=f"{user_props.firstname} {user_props.lastname} joined the MitoCube. Welcome!.", title="New user", user_tag=tag))
 
 
 
