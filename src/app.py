@@ -139,8 +139,7 @@ ROOT_PATH = get_absolute_path_to_dir(__file__)
 CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
-DB.instrument_states.get_fractional_state_durations()
-print("ABC")
+#DB.instrument_states.get_fractional_state_durations()
 #DB.attributes._utils_insert_from_file()
 #DB.instrument_states._utils_insert_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
 #DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t")        
@@ -189,9 +188,6 @@ for rs in router_sources:
 
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
-
-# print("starting up mitocube backend...")
-#r = DB.openai.generate_functional_classification(protein_names = ["OXA1L","TIMMDC1","NDUFAF5","DELE1","DNAJC15", "COQ10B", "TMEM65","SLC25A39","SLC30A9","SLC25A36", "OCIAD1","GHITM","COQ4","GPX4","NIT1","PAM16", "NSUN2","ACADVL"])
 
 
 @app.get("/", include_in_schema=False)

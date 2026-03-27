@@ -80,6 +80,7 @@ class NewSubmissionModel(BaseModel):
 
     """
     tag : str = Field(...,min_length=10, max_length=12)
+    user_tag : Optional[str] = None 
     sample_names : List[str]
     replicates : List[int]
     collaborators : List[str] = Field(...,default_factory=list)

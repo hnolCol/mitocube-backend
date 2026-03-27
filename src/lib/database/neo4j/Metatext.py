@@ -3,7 +3,7 @@
 from neo4j import Driver, Result
 from typing import List 
 from lib.database.abstract.Metatext import MetaTextABC
-
+from config.settings.metatexts import MetaTexts 
 from services.encryption import create_hierarchical_hash
 
 
@@ -23,6 +23,9 @@ class Neo4JMetaText(MetaTextABC):
     def insert(self, title : str, text : str, submission_tag : str, user_tag : str) -> bool:
         "Inserts a new meta text for the given submission. The tag is generated based on the title, submission tag and text." 
         print(title, text, submission_tag, user_tag)
+        if title in  MetaTexts().names:
+            title = MetaTexts().names[title] 
+            
         metatext_tag = create_hierarchical_hash([title,submission_tag,text])
         if self.exists(tag = metatext_tag):
             raise ValueError("Tag is already in the database.")
