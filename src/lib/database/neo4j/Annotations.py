@@ -105,15 +105,17 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         
         return r
     
-    def get_annotations(self, group_tag: str) -> List[str]:
+    def get_annotations(self, group_tag: str, limit: int = 20) -> List[str]:
 
         query = (
             "MATCH (:AnnotationGroup {tag: $tag})-[:HAS_ANNOTATION]->(a:Annotation) "
-            "RETURN a.tag"
+            "RETURN a.tag "
+            "LIMIT $limit "
         )
 
         r = self._driver.execute_query( query,
                                         tag=group_tag,
+                                        limit=limit,
                                         routing_="r",
                                         result_transformer_=Result.value,
                                     )
