@@ -10,7 +10,7 @@ from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroups,  Neo4JAnnota
 from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_admin
 
-from setup_utils.update_annotation_group import update_annotations_from_group_url
+from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
 
 DB = Database.DB()
