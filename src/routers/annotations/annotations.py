@@ -10,7 +10,7 @@ from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroups,  Neo4JAnnota
 from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_admin
 
-from setup_utils.update_annotation_group import update_annotations_from_group_url
+from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
 import numpy as np
 DB = Database.DB()
@@ -99,13 +99,14 @@ def get_annotation_group(group_tag: str, user: UserModel = Depends(get_user_from
 
     return DB.annotation_groups.get(tag=group_tag)
 
+
 @router.get("/groups/{group_tag}/annotations", response_model=List[str])
-def get_annotations_in_group(group_tag: str, user: UserModel = Depends(get_user_from_token)):
+def get_annotations_in_group(group_tag: str, limit: int = 20, user: UserModel = Depends(get_user_from_token)):
     
     if not DB.annotation_groups.exists(group_tag):
         raise HTTPException(status_code=404, detail="Annotation group not found")
 
-    return DB.annotation_groups.get_annotations(group_tag)
+    return DB.annotation_groups.get_annotations(group_tag, limit=limit)
 
 @router.post("/groups/", response_model=bool)
 def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(is_user_admin)):
