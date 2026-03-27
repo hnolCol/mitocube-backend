@@ -19,7 +19,7 @@ from config.settings.email import get_email_settings
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
 from config.models.searches import FulltextSearchResult
-from config.models.news.news import NewsModel
+from config.models.news.news import NewsModel, NewsInsertModel
 
 from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
@@ -500,13 +500,14 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     for title, text in submission.metatext.items():
         DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
     
-    
+    try:
     #get features of genotypes ? 
-    DB.news.insert(NewsModel(user_tag=user.tag,
-                             title="New Submission!",
-                             content = f"New submission created: {submission.title} by {user.firstname}.", 
-                             submission_tags=[submission.tag])) 
-    
+        DB.news.insert(NewsInsertModel(user_tag=user.tag,
+                                title="New Submission!",
+                                content = f"New submission created: {submission.title} by {user.firstname}.", 
+                                submission_tags=[submission.tag])) 
+    except Exception as e:
+        print("Error when inserting news: ", e)
     return True
     
     # #save_json(metadata.model_dump(),"MODEL.json")

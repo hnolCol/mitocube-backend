@@ -14,14 +14,14 @@ router = APIRouter(
     )
 
 @router.get("/views")
-def get_last_views(type : Literal["submissions"], user_tag: str = None, limit : int = 20, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
+def get_last_views(type : Literal["submissions"], user_tag: str = None, limit : int = 20, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     
     """
     Return the last views of the user.
     Parameters
     ----------  
-    type : Literal["submissions","proteins","peptides"]
-        The type of views to return. Can be "submissions", "proteins" or "peptides". #,"add :: proteins","peptides"
+    type : Literal["submissions","features"]
+        The type of views to return. Can be "submissions" or "features".
     user_tag : str, optional
         The tag of the user. If None, the tag of the user from the token is used, by default None
     limit : int, optional
@@ -32,5 +32,4 @@ def get_last_views(type : Literal["submissions"], user_tag: str = None, limit : 
     user_tag = user.tag if user_tag is None else user_tag
     if type == "submissions":
         return DB.users.get_user_submission_views(tag = user_tag, limit = limit)
-    
-    
+    return []
