@@ -121,6 +121,10 @@ class ProteomesABC(ABC):
         Dict
             _description_
         """
+    @abstractmethod
+    def get_proteome_by_protein_tag(self, protein_tag : str) -> str:
+        "Returns the proteome tag associated with a given protein tag."
+        
         
     @abstractmethod
     def get_text(self, tag : str) -> str:

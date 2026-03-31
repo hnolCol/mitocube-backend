@@ -30,7 +30,7 @@ class MetaTextABC(ABC):
     
     
     @abstractmethod
-    def insert(self, title : str, text : str, submission_tag : str, user_tag : str) -> bool:
+    def insert(self, title : str, text : str, submission_tag : str, user_tag : str, ignore_exists_error : bool = False, connect_if_exists : bool = False) -> bool:
         """Adds a metatext to the metatext pool.
 
         Parameters
@@ -43,6 +43,10 @@ class MetaTextABC(ABC):
             The submission tag the metatext is associated with
         user_tag : str
             The user tag of the user creating the metatext
+        ignore_exists_error : bool, optional
+            If True, does not raise an error if the metatext already exists and returns False. If False, raises an error if the metatext already exists. By default False.
+        connect_if_exists : bool, optional
+            If True and ignore_exists_error is True, connects the existing metatext to the submission if it is not already connected. Ignored if ignore_exists_error is False.
 
         Returns
         -------
@@ -51,7 +55,7 @@ class MetaTextABC(ABC):
 
         Exceptions
         ----------
-        
+        Raises a KeyError if the metatext already exists and ignore_exists_error is False.
         """
 
     @abstractmethod

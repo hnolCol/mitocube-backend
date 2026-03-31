@@ -241,6 +241,15 @@ class Neo4JProteomes(ProteomesABC):
         r = self._driver.execute_query(query,routing_="r",database_="neo4j", result_transformer_= Result.value)
         return r[0] if len(r) > 0 else None
 
+    def get_proteome_by_protein_tag(self, protein_tag : str) -> str:
+        "Returns the proteome tag associated with a given protein tag."
+        query = (
+            "MATCH (p:Protein {tag : $protein_tag})-[:IN_PROTEOME]->(proteome:Proteome) "
+            "RETURN proteome.tag as proteome_tag "
+        )
+        r = self._driver.execute_query(query,routing_="r",database_="neo4j", result_transformer_= Result.value, protein_tag=protein_tag)
+        return r[0] if len(r) > 0 else None
+
     def get_created_at(self, tag : str) -> float:
         "Returns the created_at timestamp of a proteome."
         query = (

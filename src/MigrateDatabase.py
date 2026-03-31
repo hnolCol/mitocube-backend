@@ -17,7 +17,15 @@ from config.settings.metatexts import MetaTexts
 print(MetaTexts().names)
 
 fall_back_user = "x7rk6lRY"
+proteom_mapper = {
+    "att_organism:UP000005640" : "att_proteome:UP000005640",
+    "att_organism:controls" : "att_proteome:ctrl"
+}
 
+protein_tag_mapper = {
+    "att_organism:UP000005640" : "UP000005640",
+    "att_organism:controls" : "ctrl"
+}
 DB = Database.DB()
 
 
@@ -26,16 +34,25 @@ attr_update = {
 }
 
 
+def handle_knockdown(tags : List[str]):
+    "" 
+    r = [] 
+    protein_tag = tags.split(":")[1]
+    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tag)
+    r = build_tree(attribute_tag = "att_knockdown_technique", trait_tags=["att_knockdown_technique:esirna"]) 
+    r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = protein_tag))
+    return r 
+
 
 genotype_mapping = { 
             
         } #genotype tags have changed, since the tag is not generate based on the data inserted. 
 
 
-def build_tree(attribute_tag, trait_tags : List[str]):
+def build_tree(attribute_tag, trait_tags : List[str], value = None):
         if attribute_tag in attr_update:
             attribute_tag = attr_update[attribute_tag]
-        return {"type" : "attribute", "tag" : attribute_tag, "children" : [{"type" : "trait", "tag" : trait_tag} for trait_tag in trait_tags]}
+        return {"type" : "attribute", "tag" : attribute_tag, "children" : [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value} for trait_tag in trait_tags]}
 
 def get_tags_by_sample(samples_attrs : dict): 
     
@@ -57,8 +74,12 @@ def build_sample_attributes(sample_attrs_input : dict):
                 
         tags_by_sample_idcs = [(sample_idx, [sample_attribute for sample_attribute, idcs in sample_attrs.items() if sample_idx in idcs]) for sample_idx in samples_idcs]
         for sampleIdx, sample_attribute_tags in tags_by_sample_idcs:
-            t = build_tree(attribute_tag=attribute_tag, trait_tags=sample_attribute_tags)
-            r[sampleIdx].append(t)
+            if attribute_tag == "att_knockdown":
+                for tag in sample_attribute_tags:
+                    r[sampleIdx].append(handle_knockdown(tag)) 
+            else: 
+                t = build_tree(attribute_tag=attribute_tag, trait_tags=sample_attribute_tags)
+                r[sampleIdx].append(t)
     
 
     return list(r.values())
@@ -83,7 +104,7 @@ class MigrateData:
         
 
         PATH_TO_SUBMISSION_FOLDER = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data"
-        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l))]
+        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "LOGtC9tNC13b"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
 
         print(dirList)
 
@@ -134,19 +155,20 @@ class MigrateData:
                         title = MetaTexts().names[tag]
                     else:
                         title = tag
-                    ok = DB.metatexts.insert(submission_tag= submission_insert_model.tag, title = title, text = text, user_tag = submission_insert_model.user_tag)
-                    print(ok, "data inserted")
+                    
+                    ok = DB.metatexts.insert(submission_tag= submission_insert_model.tag, title = title, text = text, user_tag = submission_insert_model.user_tag, ignore_exists_error=True)
              
                 DB.submissions.set_state(tag = submission_insert_model.tag, state = jsonFile["state"], user_tag = submission_insert_model.user_tag) 
                 DB.submissions.insert_state_history(tag = submission_insert_model.tag, state_history=timeline_to_insert)
                 
                 for idx,sample_name in enumerate(submission_insert_model.sample_names):
                  
-                    sample_tag = DB.samples.insert(submission_tag = submission_insert_model.tag, sample_name = sample_name, sample_index = idx, return_tag_if_exists=True)
-                    sample_attributes = submission_insert_model.samples_attributes[idx] 
-                    DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
+                    sample_tag = DB.samples.insert(submission_tag = submission_insert_model.tag, sample_name = sample_name, sample_index = idx, return_tag_if_exists=True, connect_if_exists=True)
+                    if idx < len(submission_insert_model.samples_attributes):
+                        sample_attributes = submission_insert_model.samples_attributes[idx] 
+                        DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
                     
-                print(submission_tag,b)
+          
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
         # class DatasetSubmissionModel(BaseModel):
