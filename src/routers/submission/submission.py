@@ -699,7 +699,9 @@ def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags
 @router.get("/submissions/{submission_tag}/samples")
 def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     "Returns the samples tags associated with the submission"
-    return DB.submissions.get_samples(tag=submission_tag)
+    sample_tags = DB.submissions.get_samples(tag=submission_tag)
+    sample = DB.samples.get(tag=sample_tags[0])
+    return sample_tags
 
 @router.get("/submissions/{submission_tag}/samplelist")
 def get_sample_list_as_tsv(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
@@ -809,3 +811,33 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
 
 
 
+@router.get("/submissions/{submission_tag}/samples/full")
+def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(get_user_from_token)):
+    "Returns full sample details including traits and genotypes."
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+    
+    sample_tags = DB.submissions.get_samples(tag=submission_tag)
+    result = []
+    
+    for sample_tag in sample_tags:
+        sample = DB.samples.get(tag=sample_tag)
+        genotype = DB.samples.get_sample_genotype(tag=sample_tag)
+        condition_apps = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)
+        
+        attributes = {}
+        for ca in condition_apps:
+            trait_tags = []
+            for ca_tag in ca.condition_application_tags:
+                tree = DB.condition_applications.get_tree(tag=ca_tag)
+                trait_tags.extend([node.trait_tag for node in tree])
+            attributes[ca.attribute_tag] = trait_tags
+        
+        result.append({
+            "tag": sample_tag,
+            "index": sample.get("index") if sample else None,
+            "genotype": genotype,
+            "attributes": attributes,
+            "replicate": sample.get("replicate") if sample else None,
+        })
+    
+    return result

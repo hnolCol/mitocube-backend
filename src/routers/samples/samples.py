@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.Database import Database
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel
-from config.models.samples import SampleResponseModel
+from config.models.samples import SampleResponseModel, SampleUpdateModel
 from services.users import get_user_from_token
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 DB = Database.DB()
 
@@ -38,8 +38,19 @@ def get_sample_condition_applications(sample_tag: str, group_by_attribute : bool
     return DB.samples.get_condition_applications(tag = sample_tag, group_by_attribute=group_by_attribute)
 
 
-@router.get("/{sample_tag}/{genotype_tag}")
-def get_sample_genotype(sample_tag : str, user: UserModel = Depends(get_user_from_token)) -> str:
+@router.get("/{sample_tag}/genotype")
+def get_sample_genotype(sample_tag : str, user: UserModel = Depends(get_user_from_token)) -> Optional[str]:
     "Return the genotype for the given sample."
     return DB.samples.get_sample_genotype(tag = sample_tag)
 
+@router.put("/{sample_tag}")
+def update_sample(sample_tag: str, data: SampleUpdateModel, user: UserModel = Depends(get_user_from_token)) -> bool:
+    "Update the sample genotype and condition applications."
+    if not DB.samples.exists(tag=sample_tag):
+        raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+    DB.samples.update(
+        tag=sample_tag,
+        genotype_tag=data.genotype_tag,
+        condition_applications=data.condition_applications
+    )
+    return True

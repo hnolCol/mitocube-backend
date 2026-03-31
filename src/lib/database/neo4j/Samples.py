@@ -397,8 +397,8 @@ class Neo4JSamples(SamplesABC):
         )
 
 
-        genotype = self._driver.execute_query(query, tag=tag, routing_="r")
-        return genotype
+    #     genotype = self._driver.execute_query(query, tag=tag, routing_="r")
+    #     return genotype
 
         r = self._driver.execute_query( query,
                                         routing_="r",
