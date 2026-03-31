@@ -172,12 +172,20 @@ class Neo4JSamples(SamplesABC):
         return r[0] if len(r) > 0 else None
     
         
-    def insert(self, submission_tag : str, sample_name : str, sample_index : int, return_tag_if_exists : bool = False) -> str:
+    def insert(self, submission_tag : str, sample_name : str, sample_index : int, return_tag_if_exists : bool = False, connect_if_exists : bool = False) -> str:
         "Insert a new sample to a given submission" 
         #if self.exists(tag = tag): raise ValueError("Sample tag exists already. ")
         sample_tag = self._get_sample_tag(sample_name, submission_tag)
         if self.exists(tag = sample_tag):
             if return_tag_if_exists:
+                if connect_if_exists:
+                    query = (
+                        "MATCH (s:Submission {tag : $submission_tag}) "
+                        "MATCH (sample:Sample {tag : $sample_tag}) "
+                        "MERGE (s)-[:HAS_SAMPLE]->(sample) "
+                        "RETURN sample.tag "
+                    )
+                    r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value, sample_tag=sample_tag, submission_tag=submission_tag)
                 return sample_tag
             else:
                 raise ValueError("Sample tag exists already. ")
