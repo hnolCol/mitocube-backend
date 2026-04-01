@@ -485,7 +485,9 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
             sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
             sample_attributes = submission.samples_attributes[idx] 
             DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
-            
+            if submission.replicates and idx < len(submission.replicates):
+                DB.samples.set_replicate(tag=sample_tag, replicate=submission.replicates[idx])
+    
             if submission.genotypes and idx < len(submission.genotypes):
                 genotype_tags = submission.genotypes[idx] 
                 if isinstance(genotype_tags, list):
@@ -837,7 +839,7 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
             "index": sample.get("index") if sample else None,
             "genotype": genotype,
             "attributes": attributes,
-            "replicate": sample.get("replicate") if sample else None,
+            "replicate": DB.samples.get_replicate(tag=sample_tag),
         })
     
     return result

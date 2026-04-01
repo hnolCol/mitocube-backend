@@ -14,5 +14,7 @@ class SampleResponseModel(SampleModel):
 
 
 class SampleUpdateModel(BaseModel):
+    text: Optional[str] = None
     genotype_tag: Optional[str] = None
     condition_applications: Optional[List[AttributeTree]] = None
+    replicate: Optional[int] = None

@@ -7,7 +7,7 @@ from config.models.submissions.submissions import AttributeTree
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.genotype import InsertGeneticApplicationModel
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
-from config.models.samples import SampleModel
+from config.models.samples import SampleModel, SampleUpdateModel
 import pandas as pd
 import uuid
 
@@ -172,7 +172,8 @@ class Neo4JSamples(SamplesABC):
         return r[0] if len(r) > 0 else None
     
         
-    def insert(self, submission_tag : str, sample_name : str, sample_index : int, return_tag_if_exists : bool = False, connect_if_exists : bool = False) -> str:
+
+    def insert(self, submission_tag : str, sample_name : str, sample_index : int, replicate: int = None, return_tag_if_exists : bool = False, connect_if_exists : bool = False) -> str:
         "Insert a new sample to a given submission" 
         #if self.exists(tag = tag): raise ValueError("Sample tag exists already. ")
         sample_tag = self._get_sample_tag(sample_name, submission_tag)
@@ -192,14 +193,14 @@ class Neo4JSamples(SamplesABC):
         query = (
             "MATCH (s:Submission {tag : $submission_tag}) "
             "MERGE (sample:Sample {tag : $sample_tag, text : $sample_name, sample_index : $sample_index, created_at : timestamp()}) "
+            "ON CREATE SET sample.replicate = $replicate "
             "MERGE (s)-[:HAS_SAMPLE]->(sample) "
             "RETURN sample.tag "
         )
 
         r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value, sample_tag=sample_tag,
-                                   submission_tag=submission_tag, sample_name=sample_name, sample_index=sample_index)
+                                   submission_tag=submission_tag, sample_name=sample_name, sample_index=sample_index, replicate=replicate)
         return r[0] if len(r) > 0 else None
-     
     
     def insert_condition_application(self, sample_tag : str, sample_data : List[AttributeTree]):
         """Insert a condition application for a given sample.
@@ -455,22 +456,59 @@ class Neo4JSamples(SamplesABC):
             protein_tags=protein_tags
         )
 
-    def update( self, tag: str, text: str = None, genotype_tag: str = None, condition_applications: List[AttributeTree] = None) -> bool:
-        """Update the sample information for a given sample tag.    
-        """
+    # def update(self, tag: str, text: str = None, genotype_tag: str = None, condition_applications: List[AttributeTree] = None, replicate: int = None) -> bool:
+    #     """Update the sample information for a given sample tag."""
+    #     if not self.exists(tag):
+    #         raise ValueError("Sample does not exist.")
 
+    #     if text is not None:
+    #         query = (
+    #             "MATCH (s:Sample {tag: $tag}) "
+    #             "SET s.text = $text "
+    #         )
+    #         self._driver.execute_query(query, routing_="w", tag=tag, text=text)
+
+    #     if genotype_tag is not None:
+    #         query = (
+    #             "MATCH (s:Sample {tag: $tag}) "
+    #             "OPTIONAL MATCH (s)-[r:HAS_GENOTYPE]->(:Genotype) "
+    #             "DELETE r "
+    #             "WITH s "
+    #             "MATCH (g:Genotype {tag: $genotype_tag}) "
+    #             "MERGE (s)-[:HAS_GENOTYPE]->(g)"
+    #         )
+    #         self._driver.execute_query(query, routing_="w", tag=tag, genotype_tag=genotype_tag)
+
+    #     if condition_applications is not None:
+    #         delete_query = (
+    #             "MATCH (s:Sample {tag: $tag})-[r:HAS_APPLICATION]->(:ConditionApplication) "
+    #             "DELETE r"
+    #         )
+    #         self._driver.execute_query(delete_query, routing_="w", tag=tag)
+    #         self.insert_condition_application(sample_tag=tag, sample_data=condition_applications)
+
+    #     if replicate is not None:
+    #         query = (
+    #             "MATCH (s:Sample {tag: $tag}) "
+    #             "SET s.replicate = $replicate "
+    #         )
+    #         self._driver.execute_query(query, routing_="w", tag=tag, replicate=replicate)
+
+    #     return True
+
+    def update(self, tag: str, data: SampleUpdateModel) -> bool:
+        """Update the sample information for a given sample tag."""
         if not self.exists(tag):
             raise ValueError("Sample does not exist.")
 
-
-        if text is not None:
+        if data.text is not None:
             query = (
                 "MATCH (s:Sample {tag: $tag}) "
                 "SET s.text = $text "
             )
-            self._driver.execute_query(query, routing_="w", tag=tag, text=text)
+            self._driver.execute_query(query, routing_="w", tag=tag, text=data.text)
 
-        if genotype_tag is not None:
+        if data.genotype_tag is not None:
             query = (
                 "MATCH (s:Sample {tag: $tag}) "
                 "OPTIONAL MATCH (s)-[r:HAS_GENOTYPE]->(:Genotype) "
@@ -479,26 +517,22 @@ class Neo4JSamples(SamplesABC):
                 "MATCH (g:Genotype {tag: $genotype_tag}) "
                 "MERGE (s)-[:HAS_GENOTYPE]->(g)"
             )
-            self._driver.execute_query(
-                query,
-                routing_="w",
-                tag=tag,
-                genotype_tag=genotype_tag
-            )
+            self._driver.execute_query(query, routing_="w", tag=tag, genotype_tag=data.genotype_tag)
 
-        if condition_applications is not None:
-
+        if data.condition_applications is not None:
             delete_query = (
                 "MATCH (s:Sample {tag: $tag})-[r:HAS_APPLICATION]->(:ConditionApplication) "
                 "DELETE r"
             )
-
             self._driver.execute_query(delete_query, routing_="w", tag=tag)
+            self.insert_condition_application(sample_tag=tag, sample_data=data.condition_applications)
 
-            self.insert_condition_application(
-                sample_tag=tag,
-                sample_data=condition_applications
+        if data.replicate is not None:
+            query = (
+                "MATCH (s:Sample {tag: $tag}) "
+                "SET s.replicate = $replicate "
             )
+            self._driver.execute_query(query, routing_="w", tag=tag, replicate=data.replicate)
 
         return True
 
@@ -534,4 +568,23 @@ class Neo4JSamples(SamplesABC):
             genotype_tag=genotype_tag
         )
 
+        return True
+
+
+
+    def get_replicate(self, tag: str) -> int:
+        query = (
+            "MATCH (s:Sample {tag: $tag}) "
+            "RETURN s.replicate as replicate"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+
+    def set_replicate(self, tag: str, replicate: int) -> bool:
+        query = (
+            "MATCH (s:Sample {tag: $tag}) "
+            "SET s.replicate = $replicate "
+            "RETURN s.replicate"
+        )
+        self._driver.execute_query(query, tag=tag, replicate=replicate, routing_="w")
         return True

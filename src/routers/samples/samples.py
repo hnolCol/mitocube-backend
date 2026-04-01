@@ -43,14 +43,24 @@ def get_sample_genotype(sample_tag : str, user: UserModel = Depends(get_user_fro
     "Return the genotype for the given sample."
     return DB.samples.get_sample_genotype(tag = sample_tag)
 
+
+# @router.put("/{sample_tag}")
+# def update_sample(sample_tag: str, data: SampleUpdateModel, user: UserModel = Depends(get_user_from_token)) -> bool:
+#     if not DB.samples.exists(tag=sample_tag):
+#         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+#     DB.samples.update(
+#         tag=sample_tag,
+#         genotype_tag=data.genotype_tag,
+#         condition_applications=data.condition_applications
+#     )
+#     if data.replicate is not None:
+#         DB.samples.set_replicate(tag=sample_tag, replicate=data.replicate)
+#     return True
+
+
 @router.put("/{sample_tag}")
 def update_sample(sample_tag: str, data: SampleUpdateModel, user: UserModel = Depends(get_user_from_token)) -> bool:
-    "Update the sample genotype and condition applications."
     if not DB.samples.exists(tag=sample_tag):
         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
-    DB.samples.update(
-        tag=sample_tag,
-        genotype_tag=data.genotype_tag,
-        condition_applications=data.condition_applications
-    )
+    DB.samples.update(tag=sample_tag, data=data)
     return True
