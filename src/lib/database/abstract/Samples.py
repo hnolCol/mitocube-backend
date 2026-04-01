@@ -203,3 +203,34 @@ class SamplesABC(ABC):
             True if the update was successful, False otherwise.
         """
 
+    @abstractmethod
+    def get_replicate(self, tag: str) -> int:
+        """Get the replicate number for a given sample.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the sample to get the replicate number for.
+
+        Returns
+        -------
+        int
+            The replicate number for the given sample.
+        """        
+
+    @abstractmethod
+    def set_replicate(self, tag: str, replicate: int) -> bool:
+        """Set the replicate number for a given sample.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the sample to set the replicate number for.
+        replicate : int
+            The replicate number to set for the sample.
+
+        Returns
+        -------
+        bool
+            True if the update was successful, False otherwise.
+        """
