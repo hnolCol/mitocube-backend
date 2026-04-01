@@ -14,7 +14,7 @@ from config.settings.metatexts import MetaTexts
 
 
 
-print(MetaTexts().names)
+
 
 fall_back_user = "x7rk6lRY"
 proteom_mapper = {
@@ -58,7 +58,7 @@ def get_tags_by_sample(samples_attrs : dict):
     
    
     samples_idcs = np.sort(np.unique(np.concatenate([np.array(indices) for indices in samples_attrs.values()])))
-    return [[genotype_tag for genotype_tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
+    return [[tag for tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
    
    
    
@@ -167,7 +167,9 @@ class MigrateData:
                     if idx < len(submission_insert_model.samples_attributes):
                         sample_attributes = submission_insert_model.samples_attributes[idx] 
                         DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
-                    
+            
+            
+                ### upoad quantification data. 
           
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
