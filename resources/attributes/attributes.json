@@ -3009,7 +3009,7 @@
         },
         {
             "tag": "att_protein_untargeted_mutation",
-            "requires": "att_gene_engineering:knockout",
+            "requires": "att_gene_engineering:knockout|att_gene_editing_method:crispr",
             "children": "att_protein_position",
             "text": "Untargeted Protein Mutation",
             "abbr": null,
