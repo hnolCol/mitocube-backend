@@ -177,7 +177,19 @@ class Neo4JSamples(SamplesABC):
         "Insert a new sample to a given submission" 
         #if self.exists(tag = tag): raise ValueError("Sample tag exists already. ")
         sample_tag = self._get_sample_tag(sample_name, submission_tag)
-        if self.exists(tag = sample_tag): raise ValueError("Sample tag exists already. ")
+        if self.exists(tag = sample_tag):
+            if return_tag_if_exists:
+                if connect_if_exists:
+                    query = (
+                        "MATCH (s:Submission {tag : $submission_tag}) "
+                        "MATCH (sample:Sample {tag : $sample_tag}) "
+                        "MERGE (s)-[:HAS_SAMPLE]->(sample) "
+                        "RETURN sample.tag "
+                    )
+                    r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value, sample_tag=sample_tag, submission_tag=submission_tag)
+                return sample_tag
+            else:
+                raise ValueError("Sample tag exists already. ")
         query = (
             "MATCH (s:Submission {tag : $submission_tag}) "
             "MERGE (sample:Sample {tag : $sample_tag, text : $sample_name, sample_index : $sample_index, created_at : timestamp()}) "
@@ -236,8 +248,11 @@ class Neo4JSamples(SamplesABC):
         """
         ts = []
         for attribute_tree in sample_data:
-            tag = self._condition_applications.insert(condition_application=attribute_tree)
-            ts.append(tag)
+            for c in attribute_tree.children:
+                #separate on first level children
+                updated_tree = AttributeTree(tag = attribute_tree.tag, type = attribute_tree.type, value = attribute_tree.value, children = [c])
+                tag = self._condition_applications.insert(condition_application=updated_tree)
+                ts.append(tag)
 
         ##connect sample to condition applications
         query = ("MATCH (s:Sample {tag : $sample_tag}) "

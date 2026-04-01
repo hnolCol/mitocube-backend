@@ -5,16 +5,17 @@ from config.models.attributes import AttributeTree
 from services.encryption import create_hierarchical_hash
 from typing import Dict, List 
 from neo4j import Driver, Result 
-
-
+from lib.database.abstract.Attributes import AttributesABC
+from lib.database.abstract.Proteins import ProteinsABC
 
 
 class Neo4JConditionApplications(ConditionApplicationABC):
     
-    def __init__(self, driver : Driver, attributes, *args, **kwargs) -> None:
+    def __init__(self, driver : Driver, attributes: AttributesABC, proteins: ProteinsABC, *args, **kwargs) -> None:
         
         self._driver = driver
         self._attributes = attributes
+        self._proteins = proteins
 
 
     def _has_values(self, tag : str) -> bool:
@@ -89,7 +90,6 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             )
 
         r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
-        print(r)
         return [[ConditionApplicationItemModel(**rii) for rii in ri] for ri in r[0]] if len(r) > 0 and len(r[0]) > 0 else [[]]
 
 
@@ -124,11 +124,14 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             Whether to add a separator after the item, by default False
         """
         t = ""
+        print(item, item.attribute_tag == "att_protein")
         if item.value is not None:
                 val = item.value
                 if isinstance(val, float):
                     # Use general format, strip trailing .0, use scientific notation for small numbers
                     t += f"{val:.6g}"
+                elif item.attribute_tag == "att_protein":
+                    t += f"{self._proteins.get_gene_name(item.value)}"
                 else:
                     t += f"{val}"
         t += f"{self._attributes.get_trait_text(item.trait_tag)}"
@@ -274,29 +277,36 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         """
         
         
-    def find(self, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
-        "Returns the tags of matching condition applications"
+    def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
+        "Returns the tags of matching condition applications."
         
         query = "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(:Sample|Submission)"
-        
-        if samples_only:
-            if submission_tag is not None:
-                query += "WHERE EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
-            else:
-                query += "WHERE EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)} "
-        
-        if attribute_tag is not None or trait_tag is not None:
-            if not samples_only:
-                query += "WHERE "
-            else:
-                query += "AND "
-                
-            if attribute_tag is not None:
-                query += "(EXISTS {(ca)-[:OF_ATTRIBUTE]->(a:Attribute {tag : $attribute_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:OF_ATTRIBUTE]->(:Attribute {tag : $attribute_tag})}) "
-            if trait_tag is not None:
-                if attribute_tag is not None:
+        if search_string is not None and search_string != "":
+            
+            query += ("MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                      "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
+                      "WITH ca, a, t, r WHERE t.s CONTAINS $search_string OR a.s CONTAINS $search_string")
+            if samples_only:
+                query += " AND EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)} "
+        else:
+            if samples_only:
+                if submission_tag is not None:
+                    query += "WHERE EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
+                else:
+                    query += "WHERE EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)} "
+            
+            if attribute_tag is not None or trait_tag is not None:
+                if not samples_only:
+                    query += "WHERE "
+                else:
                     query += "AND "
-                query += "(EXISTS {(ca)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})}) "
+                    
+                if attribute_tag is not None:
+                    query += "(EXISTS {(ca)-[:OF_ATTRIBUTE]->(a:Attribute {tag : $attribute_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:OF_ATTRIBUTE]->(:Attribute {tag : $attribute_tag})}) "
+                if trait_tag is not None:
+                    if attribute_tag is not None:
+                        query += "AND "
+                    query += "(EXISTS {(ca)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})}) "
         
         query += "RETURN ca.tag, count(r) as freq "
 

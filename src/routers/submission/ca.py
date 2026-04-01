@@ -101,7 +101,7 @@ def get_ca_tree_for_submission(submission_tag: str, user: UserModel = Depends(ge
     for ca_tag in ca_tags:
         tree = DB.condition_applications.get_tree(tag=ca_tag)
         if tree:
-            result.append(transform_for_ui(tree[0], ca_id=get_random_string(4)))
+            result.append(transform_for_ui(tree[0], ca_id=submission_tag))
     return result
 
 

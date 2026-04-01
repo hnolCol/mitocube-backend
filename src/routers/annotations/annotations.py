@@ -12,7 +12,7 @@ from services.users import get_user_from_token, is_user_admin
 
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
-
+import numpy as np
 DB = Database.DB()
 
 router = APIRouter(
@@ -29,9 +29,7 @@ def find_annotations(search_string: Optional[str] = None, group_tags: Optional[s
                                protein_tags=APIParamString(param = protein_tags).param,  #transforms string with semicolon into list
                                limit=limit, 
                                group_by_group=group_by_group)
-    
     return tags
-
 
 
 @router.get("/{tag}", response_model=AnnotationsModel)
@@ -42,6 +40,33 @@ def get_annotation(tag: str):
     
     annotation= DB.annotations.get(tag= tag)
     return annotation
+
+@router.get("/{tag}/annotates/{protein_tag}", response_model=bool)
+def is_protein_annotated_with(tag: str, protein_tag: str):
+    if not DB.annotations.exists(tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    if ";" in protein_tag: #handle protein groups 
+        protein_tags = APIParamString(param=protein_tag).param
+        
+    else: 
+        protein_tags = [protein_tag]
+    boolIdx = DB.annotations.isin(tag = tag, protein_tags = protein_tags)
+    return np.any(boolIdx.values) if len(boolIdx) > 0 else False
+
+
+@router.get("/{tag}/annotates", response_model=List[Dict])
+def are_proteins_annotated_with(tag: str, protein_tags: str):
+    if not DB.annotations.exists(tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    
+    protein_tags = APIParamString(param=protein_tags).param
+    
+    for pt in protein_tags:
+        if not DB.proteins.exists(pt):
+            raise HTTPException(status_code=404, detail=f"Protein {pt} not found")
+    boolIdcs = DB.annotations.isin(tag = tag, protein_tags = protein_tags)
+    return [{"protein_tag": protein_tag, "isin": boolIdcs[protein_tag], "annotation_tag" : tag}  for protein_tag in boolIdcs.index]
+
 
 @router.post("/", response_model=bool)
 def insert_annotation( annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
@@ -57,7 +82,6 @@ def get_annotation_protein_count( tag: str):
 
     if not DB.annotations.exists(tag):
         raise HTTPException( status_code=404, detail="Annotation not found")
-    print(DB.annotations.count_proteins(tag))
     return DB.annotations.count_proteins(tag)
 
 @router.get("/groups/q", response_model=List[str])
@@ -86,7 +110,6 @@ def get_annotations_in_group(group_tag: str, limit: int = 20, user: UserModel = 
 
 @router.post("/groups/", response_model=bool)
 def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(is_user_admin)):
-    print(DB.annotation_groups.insert(annotation_group, user_tag=user.tag))
     ok = DB.annotation_groups.insert(annotation_group, user_tag=user.tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to insert annotation group")

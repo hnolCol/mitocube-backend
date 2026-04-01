@@ -447,12 +447,11 @@ class OpenAI(BaseSettings):
                         ORDER BY s.created_at DESC
                         
                         To find a user by name (Example here Hendrik Nolte) use:
-                        MATCH (u:User) WHERE u.firstname = "Hendrik" AND u.lastname = "Nolte" RETURN u.firstname, u.lastname, u.email, u.tag
+                        MATCH (u:User) WHERE u.s CONTAINS 'Hendrik Nolte' RETURN u.tag, u.firstname, u.lastname, u.email
                         
-                        If you have to show the date, translate the timestamp to a human readable date using datetime({epochMillis: s.created_at}) AS created_date
-                        
-                        Users nodes have the property tag, firstname, lastname and email.
-                        These are the only parameters that can be used to identify users. Tag and email are unique. Never access the password or any other sensitive information. Email can be used to identify users.
+                        Users nodes have the property tag, firstname, lastname, s and email. 
+                        Never try to access the password or any other sensitive information. Email can be used to identify users.
+                        For finding / searching for users, always use the .s pproperty for matching, e.g. u.s CONTAINS "Hendrik" to be more flexible.
 
                         Return data info:
                     

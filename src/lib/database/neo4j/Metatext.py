@@ -3,7 +3,7 @@
 from neo4j import Driver, Result
 from typing import List 
 from lib.database.abstract.Metatext import MetaTextABC
-
+from config.settings.metatexts import MetaTexts 
 from services.encryption import create_hierarchical_hash
 
 
@@ -20,11 +20,24 @@ class Neo4JMetaText(MetaTextABC):
                                         result_transformer_=Result.value)   
         return r[0] if len(r) > 0 else False
     
-    def insert(self, title : str, text : str, submission_tag : str, user_tag : str) -> bool:
+    def insert(self, title : str, text : str, submission_tag : str, user_tag : str, ignore_exists_error : bool = False, connect_if_exists : bool = False) -> bool:
         "Inserts a new meta text for the given submission. The tag is generated based on the title, submission tag and text." 
-        print(title, text, submission_tag, user_tag)
+        if title in  MetaTexts().names:
+            title = MetaTexts().names[title] 
+            
         metatext_tag = create_hierarchical_hash([title,submission_tag,text])
         if self.exists(tag = metatext_tag):
+            if ignore_exists_error:
+                if connect_if_exists:
+                    query = (
+                        "MATCH (s:Submission {tag : $submission_tag}) "
+                        "MATCH (m:MetaText {tag : $tag}) "
+                        "MERGE (s)-[:HAS_METATEXT]->(m) "
+                        "RETURN m.tag as tag"
+                    )
+                    r = self._driver.execute_query(query, routing_="w", submission_tag=submission_tag, tag=metatext_tag, result_transformer_=Result.value)
+                    return True if len(r) > 0 and r[0] is not None else False
+                return False
             raise ValueError("Tag is already in the database.")
         
         query = (

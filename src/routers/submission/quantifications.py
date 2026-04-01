@@ -68,10 +68,6 @@ def get_submission_quant_exists(submission_tag : str, quantification_type :  Lit
 
 
 
-
-
-
-
 @router.post("/{submission_tag}/quantifications/proteins", summary="Insert protein quantifications for a given submission. Requires curator rights.")
 def insert_protein_quantifications(
     submission_tag: str,
@@ -101,9 +97,11 @@ def insert_protein_quantifications(
     ##first check if all proteins exist
     N = DB.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
     num_quantifications = DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=quantifications.model_dump().get("quantifications", []))
-    if num_quantifications != len(quantifications.quantifications):
-        DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
-        
+    #if num_quantifications != len(quantifications.quantifications):
+    DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
+    DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
+    DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+
     return num_quantifications
 
 

@@ -31,11 +31,9 @@ def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None
     r = DB.protein_groups.get_statistical_ranking(tag = protein_group_tag, attribute_tags = APIParamString(param=attribute_tags).param, limit = limit)
     
     return r
+        
     
     
-    
-    
-
 
 @router.get("/{protein_group_tag}/text}", summary="Get the protein group text.")
 def get_protein_group_text(protein_group_tag : str, user: UserModel = Depends(get_user_from_token)) -> str:

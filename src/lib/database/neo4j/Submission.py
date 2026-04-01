@@ -12,14 +12,14 @@ from lib.database.abstract.Proteomes import ProteomesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
-from config.models.submissions.submissions import AttributeTree, DatasetSubmissionModel
+from config.models.submissions.submissions import AttributeTree,  NewSubmissionModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.exceptions.Proteome import ProteomeNotFoundError
 from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
 from config.models.submissions.metatexts import MetaTextInsertModel
 from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
-
+import os 
 from lib.data.ranking.FeatureRanking import FeatureRanking
 
 class Neo4JSubmissions(SubmissionsABC):
@@ -29,6 +29,8 @@ class Neo4JSubmissions(SubmissionsABC):
         self._driver = driver
         self._proteomes = proteomes
         self._condition_applications = condition_applications
+
+     
 
 
     def _m_insert_timeline(self, tag :str, timeline : List[Dict]):
@@ -286,7 +288,7 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", state_01 = state_01, state_02 = state_02, result_transformer_=Result.value)
         return r
 
-    def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None, submission: DatasetSubmissionModel = None) -> bool:
+    def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None) -> bool:
         ""
         if self.exists(tag):
             raise ValueError("Submission with this tag already exists. Use the update function to update the submission.")
@@ -425,6 +427,54 @@ class Neo4JSubmissions(SubmissionsABC):
         print(r[0] if len(r) > 0 else 0)
         return r[0] if len(r) > 0 else 0
 
+
+    def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given sample in a submission to z-scores.
+        """
+        
+        
+        query = (
+            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "WITH sample, collect(q.value) AS values "
+            "WITH sample, apoc.coll.avg(values) AS mean, apoc.coll.stdev(values) AS stdev "
+            "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "SET q.z_score_sample = (q.value - mean) / stdev "
+            "RETURN count(q) "
+        )
+
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            tag=tag,
+            result_transformer_=Result.value
+        )
+        return r[0] if len(r) > 0 else 0
+
+
+    def transform_quantification_to_zscore_along_protein_groups(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given submission to z-scores.
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "WITH pg, collect(q.value) AS values "
+            "WITH pg, apoc.coll.avg(values) AS mean, apoc.coll.stdev(values) AS stdev WHERE stdev > 0 " #to avoid division by zero, if stdev is zero, z-score will be set to zero as well.
+            "MATCH (sample)-[q:QUANTIFIED]->(pg) "
+            "SET q.z_score_protein_group = (q.value - mean) / stdev "
+            "RETURN count(q) "
+        )   
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            tag=tag,
+            result_transformer_=Result.value
+        )
+        return r[0] if len(r) > 0 else 0
+
+
+
     def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
         ""
         print("not implemented yet")
@@ -447,7 +497,11 @@ class Neo4JSubmissions(SubmissionsABC):
         if not self.exists(tag):  
             raise ValueError("Submission with this tag does not exist. Please create the submission first.")
         for attribute_tree in traits:
-            self.insert_condition_application(tag = tag, attribute_tree = attribute_tree) 
+            for c in attribute_tree.children:
+                #separate on first level children
+                updated_tree = AttributeTree(tag = attribute_tree.tag, type = attribute_tree.type, value = attribute_tree.value, children = [c])
+                
+                self.insert_condition_application(tag = tag, attribute_tree = updated_tree) 
     
     def insert_condition_application(self, tag : str, attribute_tree : AttributeTree):
         """ Inserts a condition procedure into the database connect to a submission This indicates that all samples
@@ -476,7 +530,11 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         self._driver.execute_query(query, routing_="w", tag=tag)
         for attribute_tree in attribute_trees:
-            self.insert_condition_application(tag=tag, attribute_tree=attribute_tree)
+            for c in attribute_tree.children:
+                #separate on first level children
+                updated_tree = AttributeTree(tag = attribute_tree.tag, type = attribute_tree.type, value = attribute_tree.value, children = [c])
+                self.insert_condition_application(tag = tag, attribute_tree = updated_tree) 
+                
         return True
 
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):
@@ -510,7 +568,7 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return [SubmissionCommentModel(**c) for c in r ]
         
-    def get(self, tag: str) -> DatasetSubmissionModel:
+    def get(self, tag: str):
         return super().get(tag)
 
     
@@ -531,6 +589,33 @@ class Neo4JSubmissions(SubmissionsABC):
             return False 
         return True 
     
+    def insert_state_history(self,tag : str, state_history : List[Dict]):
+        """Inserts the state history for a submission. This is used to keep track of the state changes of a submission. This can be used for auditing purposes. This should be called when a state change occurs. The state history is a list of dictionaries with the following keys:
+        - state: the state of the submission
+        - created_at: the timestamp of the state change
+        - user_tag: the user tag of the user who made the state change
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+        state_history : List[Dict]
+            The state history to insert.
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "UNWIND $state_history as state_change "
+            "MATCH (s:State {tag : state_change.state}) "
+            "MERGE (submission)-[r:IN_STATE]->(s) "
+            "SET r.created_at = state_change.created_at, r.user_tag = state_change.user_tag "
+        )
+        try: 
+            self._driver.execute_query(query, tag = tag, state_history = state_history)
+        except Exception as e:
+            print(e)
+            return False 
+        return True 
     
     def set_state(self, tag: str, state: SubmissionStatesEnums, user_tag : str) -> bool:
         """Sets the state of a submission. If the state already exists, it is updated. 
@@ -903,7 +988,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         query = self._add_limit(query,limit)
 
         r = self._driver.execute_query(query, user_tags=user_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-        print(r)
+  
         return r
     
     def filter_by_quantified_protein(self, protein_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
@@ -948,7 +1033,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
         r = self._driver.execute_query(query, states = states, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-        print(r)
         return r
     
     def filter_by_search_string(self, search_string : str, limit : int, ordered : bool = True) -> List[str]:

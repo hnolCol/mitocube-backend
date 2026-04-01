@@ -185,7 +185,6 @@ class Neo4JFeatures(FeaturesABC):
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df)
         
-        print(r)
         return r 
 
     def get_quantification_stats(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame: 
@@ -358,8 +357,12 @@ class Neo4JFeatures(FeaturesABC):
                                        submission_tags = submission_tags)
         return r 
         
-    def get_abundance_distribution(self, tag : str, attribute_tag : str = None) -> List[QuantileModel]:
-        "" 
+    def get_abundance_distribution(self, tag : str, attribute_tag : str = None, value : Literal["raw","z_score_sample","z_score_protein_group"] = "raw") -> List[QuantileModel|Dict[str,QuantileModel]]:
+        """
+        If attribute is provided, returns the abundance distribution of the feature stratified by the attribute values.
+        If no attribute is provided, returns the overall abundance distribution of the across all samples
+        """
+         
         
         if attribute_tag is not None:
             #  query = (
@@ -371,20 +374,17 @@ class Neo4JFeatures(FeaturesABC):
              query = (
                 #match first the sample attributes and then the dataset attributes.
             "MATCH (p:ProteinGroup|Peptide)<-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
-            "OPTIONAL MATCH (protein:Protein)<-[:HAS_PROTEINS]-(p)"
             "MATCH (a:Attribute) WHERE a.tag = $attribute_tag "
             "MATCH (sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a) "
             "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
-            
-            
-            # "OPTIONAL MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a) "
-            # "OPTIONAL MATCH (sample)<-[:HAS_SAMPLE]-(:Submission)-[:HAS_ATTRIBUTE_VALUE]->(avDataset:AttributeValue)<-[:HAS_VALUE]-(a) "
-            # "WHERE (av IS NOT NULL AND avDataset IS NULL) OR (av IS NULL AND avDataset IS NOT NULL) "
-            # "WITH r, COALESCE(av, avDataset) AS avFinal "
-            # "WHERE avFinal IS NOT NULL "
-            "RETURN ca.tag as ca_tag, t.tag as trait_tag, a.tag as attribute_tag, apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles, count(r) as N, p.tag as tag "
-             
+            "RETURN ca.tag as ca_tag, t.tag as trait_tag, a.tag as attribute_tag, count(r) as N, p.tag as tag "
              )
+        if value == "raw":
+            query += ", apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles "
+        elif value == "z_score_sample":
+            query += ", apoc.agg.percentiles(r.z_score_sample, [0,0.25,0.5,0.75,1.0]) as quantiles "
+        elif value == "z_score_protein_group":
+            query += ", apoc.agg.percentiles(r.z_score_protein_group, [0,0.25,0.5,0.75,1.0]) as quantiles "
              
         else:
             query = (
@@ -395,9 +395,17 @@ class Neo4JFeatures(FeaturesABC):
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tag = tag, attribute_tag = attribute_tag)
         
-        print(r)
         if not isinstance(r,list): return []
-        
+        if attribute_tag is not None:
+            return {ri["ca_tag"] : QuantileModel(
+                tag = ri["tag"],
+                min = ri["quantiles"][0], 
+                q25 = ri["quantiles"][1], 
+                m = ri["quantiles"][2],
+                q75 = ri["quantiles"][3],
+                max = ri["quantiles"][4], 
+                N = ri["N"] ) for ri in r}
+            
         return [QuantileModel(
             tag = ri["tag"],
             min = ri["quantiles"][0], 

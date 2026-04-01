@@ -166,8 +166,25 @@ class FeaturesABC(ABC):
         """
         
     @abstractmethod
-    def get_abundance_distribution(self, tag : str, attribute_tag : str = None) -> List[QuantileModel]:
-        ""
+    def get_abundance_distribution(self, tag : str, attribute_tag : str = None, value : Literal["raw","z_score_sample","z_score_protein_group"] = "raw") -> List[QuantileModel|Dict[str,QuantileModel]]:
+        """If attribute is provided, returns the abundance distribution of the feature stratified by the attribute values.
+        If no attribute is provided, returns the overall abundance distribution of the across all samples
+
+        Parameters
+        ----------
+        tag : str
+            The feature tag 
+        attribute_tag : str, optional
+            The attribute tag by which the abundance distribution should be stratified. If None, no stratification will be applied and the overall abundance distribution will be returned, by default None
+        value : Literal["raw","z_score_sample","z_score_protein_group"], optional
+            Whether to return the distribution for the raw abundance values ("raw"), or for the z-scores across samples ("z_score_sample") or across protein groups ("z_score_protein_group"), by default "raw"
+
+        Returns
+        -------
+        List[QuantileModel]|Dict[str,QuantileModel]
+            If attribute_tag is None, a list of QuantileModel will be returned containing the overall abundance distribution of the feature across all samples. 
+            If attribute_tag is given, a dictionary will be returned where the keys are the attribute values and the values are QuantileModels containing the abundance distribution of the feature stratified by the respective attribute value.
+        """
         
     @abstractmethod
     def get_avg_abundance(self, tags : List[str], submission_tags : List[str] = None) -> pd.DataFrame:

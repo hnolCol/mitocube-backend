@@ -70,3 +70,11 @@ class Neo4JProteins(ProteinsABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return FeatureNeoModel(**r[0])
   
+  
+    def get_gene_name(self, tag : str) -> str:
+        query = (
+            "MATCH (p:Protein {tag : $tag}) "
+            "RETURN p.gene_name AS gene_name "
+        )
+        r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None

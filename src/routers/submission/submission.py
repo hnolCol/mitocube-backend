@@ -19,7 +19,7 @@ from config.settings.email import get_email_settings
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
 from config.models.searches import FulltextSearchResult
-from config.models.news.news import NewsModel
+from config.models.news.news import NewsModel, NewsInsertModel
 
 from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
@@ -467,15 +467,12 @@ def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)
 
     
 @router.post("/submissions", summary="Add submission to the database")
-def add_submission(background_task : BackgroundTasks , submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)):
+def add_submission(background_task : BackgroundTasks , submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)) -> bool:
     """
     Adds a submission to the database
     """    
     if DB.submission_exists(tag = submission.tag):
         raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update the submission or use a different tag (/api/submissions/tag).")
-
-
-    print(submission, "submission worked")
     DB.submissions.insert(tag = submission.tag,
                           title = submission.title,
                           user_tag = user.tag,
@@ -495,7 +492,7 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                 genotype_tags = submission.genotypes[idx] 
                 if isinstance(genotype_tags, list):
                     for genotype_tag in genotype_tags: 
-                        if genotype_tag:  
+                        if DB.genotypes.exists(genotype_tag):  
                             DB.samples.insert_genotype(
                                 sample_tags=[sample_tag],
                                 genotype_tag=genotype_tag
@@ -504,38 +501,16 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
     for title, text in submission.metatext.items():
         DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
-        
-        
-    return 
     
-
-
-
-    # mandatory_attributes = DB.attributes.get_mandatory_attributes()
-    # missing_mand_attributes = check_for_missing_mandatory_attribute(submission, mandatory_attributes)
-    
-    # if len(missing_mand_attributes) > 0:
-    #     exception = mandatory_dataset_attrs_not_found_exception
-    #     raise exception
-
-    
-    # metadata = DatasetSubmissionModel(
-    #     created_on=submission.created_on,
-    #     title=submission.title,
-    #     tag= submission.tag,
-    #     replicates=submission.replicates,
-    #     n_samples=len(submission.sampleNames),
-    #     user_tag=user.tag, 
-    #     collaborators=submission.collaborators,
-    #     state = SubmissionStatesEnums.DONE if submission.includes_data else SubmissionStatesEnums.SUBMITTED,
-    #     sample_names=submission.sampleNames,
-    #     dataset_attributes=submission.datasetAttributes,
-    #     samples_attributes=submission.samplesAttributes,
-    #     samples_genotypes=submission.genotypes,
-    #     dataset_attribute_input=submission.datasetAttributeInput,
-    #     metatext=submission.metatext
-    # )
-
+    try:
+    #get features of genotypes ? 
+        DB.news.insert(NewsInsertModel(user_tag=user.tag,
+                                title="New Submission!",
+                                content = f"New submission created: {submission.title} by {user.firstname}.", 
+                                submission_tags=[submission.tag])) 
+    except Exception as e:
+        print("Error when inserting news: ", e)
+    return True
     
     # #save_json(metadata.model_dump(),"MODEL.json")
     # try:
@@ -758,66 +733,66 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
 
 
 
-@router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
-def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(is_user_at_least_curator)): #
-    """
-    Creates a runlist for a specific dataset. 
-    A run is defined as the actual run and the number can be different from the number samples since
-    an online and or offline fractionation might be used. In addition, samples might be pooled when
-    using TMT or SILAC based quantification. 
+# @router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
+# def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(is_user_at_least_curator)): #
+#     """
+#     Creates a runlist for a specific dataset. 
+#     A run is defined as the actual run and the number can be different from the number samples since
+#     an online and or offline fractionation might be used. In addition, samples might be pooled when
+#     using TMT or SILAC based quantification. 
 
-    Updates the submission model runlist parameter. 
+#     Updates the submission model runlist parameter. 
 
-    Parameters
-    ----------
-    submission_label : str 
-        The label assigned to the submission. 
-    runlist_props : RunlistRequestPropsModel 
-        The properties how to create the runlist 
-    user : UserModel
-        The user which is extracted from the token information. The user cannot be submitted as a user model but
-        is based on FastAPI Depends function. 
+#     Parameters
+#     ----------
+#     submission_label : str 
+#         The label assigned to the submission. 
+#     runlist_props : RunlistRequestPropsModel 
+#         The properties how to create the runlist 
+#     user : UserModel
+#         The user which is extracted from the token information. The user cannot be submitted as a user model but
+#         is based on FastAPI Depends function. 
 
-    Returns
-    -------
-    RunListResponseModel
+#     Returns
+#     -------
+#     RunListResponseModel
 
 
-    Raises
-    ------
-    HTTPException
-        If there is a value error when creating the runlist. Please see for more information in the
-        RunListCreator's create function. 
+#     Raises
+#     ------
+#     HTTPException
+#         If there is a value error when creating the runlist. Please see for more information in the
+#         RunListCreator's create function. 
 
-    """
-    # db = MCDatabase.getDatabase()
-    # attributes = MCAttributes.getAttributeDatabase()
-    # attribute_values = attributes.getAttributeValues()
-    # attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
-    # dataset = get_dataset_from_database(db,submission_label)
+#     """
+#     # db = MCDatabase.getDatabase()
+#     # attributes = MCAttributes.getAttributeDatabase()
+#     # attribute_values = attributes.getAttributeValues()
+#     # attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
+#     # dataset = get_dataset_from_database(db,submission_label)
     
-    sample_idces, _ = dataset.getSamplesAttributes()
+#     sample_idces, _ = dataset.getSamplesAttributes()
     
-    if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in sample_idces.columns: raise HTTPException(status_code=400,detail="Aggregate on sample attribute tag not found.")
-    #extract the value of the sample attributes which is used to label the runnames. 
-    for columnName in sample_idces.columns:
-        sample_idces[columnName] = ["_".join([attrValueTag.split(":")[-1] for attrValueTag in sample_attrs.split(" ")]) for sample_attrs in sample_idces[columnName].values]
-    try:
-        runlist = RunListCreator(sample_list=sample_idces, 
-                                 user = user,
-                                 dataset_label=submission_label, 
-                                 **runlist_props.model_dump()
-                                 ).create()
-        meta_data = dataset.getMetaJson().model_dump()
-        #overwrite the json runlist. 
-        meta_data["runlist"] = runlist
-        #TODO: add a timeline entry
-        updated_meta_data = DatasetSubmissionModel(**meta_data)
-        dataset.write_json(updated_meta_data,update=True)
-        response = RunListResponseModel(**runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
-        return response 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+#     if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in sample_idces.columns: raise HTTPException(status_code=400,detail="Aggregate on sample attribute tag not found.")
+#     #extract the value of the sample attributes which is used to label the runnames. 
+#     for columnName in sample_idces.columns:
+#         sample_idces[columnName] = ["_".join([attrValueTag.split(":")[-1] for attrValueTag in sample_attrs.split(" ")]) for sample_attrs in sample_idces[columnName].values]
+#     try:
+#         runlist = RunListCreator(sample_list=sample_idces, 
+#                                  user = user,
+#                                  dataset_label=submission_label, 
+#                                  **runlist_props.model_dump()
+#                                  ).create()
+#         meta_data = dataset.getMetaJson().model_dump()
+#         #overwrite the json runlist. 
+#         meta_data["runlist"] = runlist
+#         #TODO: add a timeline entry
+#         updated_meta_data = DatasetSubmissionModel(**meta_data)
+#         dataset.write_json(updated_meta_data,update=True)
+#         response = RunListResponseModel(**runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
+#         return response 
+#     except ValueError as e:
+#         raise HTTPException(status_code=400, detail=str(e))
         
     
     

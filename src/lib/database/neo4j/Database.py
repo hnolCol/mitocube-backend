@@ -46,7 +46,8 @@ class MCNeo4JDatabase(DatabaseABC):
         self.factory = Neo4JFactory(driver=self.connection.driver)
         self.constructor = Neo4JConstructor(driver=self.connection.driver)
         self.attributes = Neo4JAttributes(driver=self.connection.driver)
-        self.condition_applications = Neo4JConditionApplications(driver=self.connection.driver, attributes=self.attributes)
+        self.proteins = Neo4JProteins(driver = self.connection.driver)
+        self.condition_applications = Neo4JConditionApplications(driver=self.connection.driver, attributes=self.attributes, proteins=self.proteins)
         self.meta = Neo4JMetaHandler(driver=self.connection.driver, attributes=self.attributes)
         self.datasets = Neo4JDataset(driver=self.connection.driver, meta=self.meta)
         
@@ -77,7 +78,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.annotation_groups = Neo4JAnnotationGroups(driver=self.connection.driver)
         
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
-        self.proteins = Neo4JProteins(driver = self.connection.driver)
+        
         self.cache = Neo4JCache()
         self.openai = Neo4JOpenAI(driver = self.connection.driver)
         #checks if all is correctly defined 

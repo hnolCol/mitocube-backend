@@ -41,6 +41,8 @@ class SubmissionsABC(ABC):
     
     """
     
+    
+
     @abstractmethod
     def count(self, state : SubmissionStatesEnums = None) -> int:
         """Counts the total number of submissions in the database
@@ -269,13 +271,19 @@ class SubmissionsABC(ABC):
         """
     
     @abstractmethod
-    def insert(self, submission : DatasetSubmissionModel) -> bool:
+    def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None) -> bool:
         """Adds a new submission to the database. 
 
         Parameters
         ----------
-        submission : DatasetSubmissionModel
-            _description_
+        tag : str
+            The tag of the submission.
+        title : str
+            The title of the submission.
+        user_tag : str
+            The user tag of the creator of the submission.
+        collaborators : List[str], optional
+            A list of collaborators for the submission, by default None
 
         Returns
         -------
@@ -323,6 +331,23 @@ class SubmissionsABC(ABC):
         int
             Number of inserted precursor quantifications.
         """
+        
+    
+    @abstractmethod
+    def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given sample in a submission to z-scores.
+        """
+        
+
+    @abstractmethod
+    def transform_quantification_to_zscore_along_protein_groups(self,tag : str) -> bool:
+        """
+        Transforms the quantification values for a given submission to z-scores.
+        """
+        
+
+        
     @abstractmethod  
     def insert_research_aim(self, tag : str, research_aim : str, user_tag : str) -> bool:
         """Inserts a research aim for a given submission.
@@ -419,7 +444,27 @@ class SubmissionsABC(ABC):
         """Edits a condition application that is connected to the submission.
         Replaces the existing CA relationship with a new one, without deleting the CA node itself.
         """
+    @abstractmethod
+    def insert_state_history(self,tag : str, state_history : List[Dict]):
+        """Inserts the state history for a submission. This is used to keep track of the state changes of a submission. This can be used for auditing purposes. This should be called when a state change occurs. The state history is a list of dictionaries with the following keys:
+        - state: the state of the submission
+        - created_at: the timestamp of the state change
+        - user_tag: the user tag of the user who made the state change
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+        state_history : List[Dict]
+            The state history to insert.
+        """
         
+    @abstractmethod
+    def set_state(self, tag: str, state: SubmissionStatesEnums, user_tag : str) -> bool:
+        """Sets the state of a submission. If the state already exists, it is updated. 
+        If the state does not exist, it is skipped and nothing happens.    """
+    
+    
 class SubmissionFilterABC(ABC):
     
     

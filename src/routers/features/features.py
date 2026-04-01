@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from typing import List
+from typing import List, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
@@ -46,14 +46,12 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     if (include_types is None and exclude_types is None) or (len(include_types) == 0 and len(exclude_types) == 0):
         include_types = ["protein_groups","peptides"]
         
-    print(include_types,exclude_types)
     pgs = []
     peptides = []
     pg_peptides = {}
     if "protein_groups" in include_types:
         
         pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag)
-        print("pgs_search_result ", pgs_search_result)
     if "peptides" in include_types:
         
         peptides = DB.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)
@@ -78,7 +76,7 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
         
 @router.get("/{feature_tag}/d")
 def get_feature_data(feature_tag : str, submission_tag : str, append_condition_procedure : bool = True, user : UserModel = Depends(get_user_from_token)):
-    """Returns the data for a specific feature in all datasets it was detected in. 
+    """Returns the data for a specific feature in a specific submission. This includes the quantification values for the feature in all samples of the submission and, if append_condition_procedure is True, also the condition applications for the samples. 
     This Endpoint combines peptide and protein group features. If you know what type the 
     feature has, you should likely use the more specific endpoints (proteins/{protein_tag}/d). 
     
@@ -171,18 +169,17 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
     "" 
     protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False) 
     if len(protein) == 0: raise protein_not_found
-    filters = DB.filters.get(tag=feature_tag)
-    #DB.features.get_quant_stats(tags = [feature_tag])
 
     return {
             "i" : protein[0],
-            "filters": filters
+            "annotations": []
             }
     
     
 @router.get("/{feature_tag}/abundance") 
-def get_feature_abundance(feature_tag : str, attribute_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]:
-    return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag)
+def get_feature_abundance(feature_tag : str, attribute_tag : str = None, value : Literal["raw","z_score_sample","z_score_protein_group"] = "raw", user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]|Dict[str,QuantileModel]:
+    
+    return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag, value = value)
 
 
 @router.get("/{feature_tag}/abundance/samples")
@@ -255,12 +252,6 @@ def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datas
     attributes = DB.attributes.get(tags = attribute_tags)
     attribute_values = DB.attributes.get_values(tags = attribute_value_tags)
     genotypes = DB.genotypes.get(tags = genotype_tags)
-
-    # db = MCDatabase.getDatabase()
-    # db_helper = MCDatabaseHelper.getDatabaseHelper()
-    # #dataset labels that contain the feature
-    # dataset_labels = db_helper.get_labels_by_feature(feature_key)
-    # #dataset_labels = db.getDataLabels()
 
 
     rsp = FeatureDataResponseModel(
