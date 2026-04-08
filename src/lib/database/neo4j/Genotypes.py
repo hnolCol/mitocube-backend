@@ -330,16 +330,26 @@ class Neo4JGenotype(GenotypeABC):
         def _is_feature(component : AttributeTree) -> bool:
             return component.type == "attribute" and component.tag == "att_protein"
 
+        # def _find_protein_tag(components : List[AttributeTree]) -> str:
+            
+        #     for component in components:
+        #         if _is_feature(component) and len(component.children) > 0:
+        #             #the value is actually in the children 
+        #             return component.children[0].value
+        #         if len(component.children) > 0:
+        #             return _find_protein_tag(component.children)
+
+        #     return None 
         def _find_protein_tag(components : List[AttributeTree]) -> str:
             
             for component in components:
                 if _is_feature(component) and len(component.children) > 0:
-                    #the value is actually in the children 
                     return component.children[0].value
                 if len(component.children) > 0:
-                    return _find_protein_tag(component.children)
-
-            return None 
+                    result = _find_protein_tag(component.children)
+                    if result is not None:
+                        return result
+            return None
 
         protein_tags = [_find_protein_tag([c]) for c in data.components]
         if len(protein_tags) == 0:
@@ -350,14 +360,14 @@ class Neo4JGenotype(GenotypeABC):
 
         tags = []
         for attribute_tree in data.components:
-            tag = self._condition_applications.insert(condition_application=attribute_tree) 
+            tag = self._condition_applications.insert(condition_application=attribute_tree, extra_data_for_hash={"genotype_tag" : genotype_tag}) 
             tags.append(tag)
 
         self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
                              protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
 
-    def edit_genotype( self, tag: str, text: str, application_tags: List[str], protein_tags: List[str], user_tag : str, description: str , publication: str | None, technical_text: str | None) -> bool:
+    def edit_genotype( self, tag: str, new_tag: str,  text: str, application_tags: List[str], protein_tags: List[str], user_tag : str, description: str , publication: str | None, technical_text: str | None) -> bool:
         """Edits the existing genotype.
         """
     
@@ -374,7 +384,7 @@ class Neo4JGenotype(GenotypeABC):
 
         query = (
             "MATCH (gc:Genotype {tag : $tag}) "
-            "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
+            "SET gc.tag = $new_tag, gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
 
             "WITH gc "
             "MATCH (gc)-[oldApp:HAS_APPLICATION]->() "
@@ -401,7 +411,7 @@ class Neo4JGenotype(GenotypeABC):
         )
 
 
-        self._driver.execute_query(query, tag = tag, text = text, application_tags = application_tags, 
+        self._driver.execute_query(query, tag = tag, new_tag= new_tag, text = text, application_tags = application_tags, 
                                    description = description, publication = publication, 
                                    technical_text = technical_text, user_tag = user_tag, 
                                    routing_="w", database_="neo4j", protein_tags = protein_tags)
@@ -409,7 +419,7 @@ class Neo4JGenotype(GenotypeABC):
     
 
     def edit(self, tag : str, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
-        """Edits an existing genotype in the database.
+        """Edits an existing genotype in the database. After edit also change the tag of the genotype to reflect the changes in the components. The tag will be changed to a new hash based on the new components.
 
         Parameters
         ----------
@@ -450,15 +460,16 @@ class Neo4JGenotype(GenotypeABC):
         if len(protein_tags) == 0:
             raise ValueError("No feature (protein tag) found in the genotype components.")
         
+        new_genotype_tag = create_hierarchical_hash([d.model_dump() for d in data.components])
 
         tags = []
         for attribute_tree in data.components:
-            tag = self._condition_applications.insert(condition_application=attribute_tree) 
+            tag = self._condition_applications.insert(condition_application=attribute_tree, extra_data_for_hash={"genotype_tag": new_genotype_tag}) 
             tags.append(tag)
 
-        self.edit_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
+        self.edit_genotype(tag = genotype_tag, new_tag=new_genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
                              protein_tags=[tag for tag in protein_tags if tag is not None])
-        return True
+        return new_genotype_tag
         
 
     def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, is_active : bool = True, user_tag : str = None) -> List[str]:

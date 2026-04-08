@@ -81,7 +81,7 @@ def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_us
     Get the description of a genotype by its tag. 
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise 
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
     genotype_description = DB.genotypes.get_description(tag = genotype_tag)
 
     return genotype_description
@@ -179,8 +179,7 @@ def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserM
     if not edit:
         raise HTTPException(status_code=400, detail="Failed to update genotype.")
 
-    return True
-
+    return edit
 
 @router.get("/genotypes/{genotype_tag}/samples/count")
 def get_genotype_relationship_count(genotype_tag: str,user: UserModel = Depends(get_user_from_token)):
@@ -202,7 +201,7 @@ def get_ca_tree_for_genotype(genotype_tag : str, user : UserModel = Depends(get_
 
     if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
     ca_tags = DB.genotypes.get_condition_applications(tag = genotype_tag)
-
+    print([transform_for_ui(DB.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags])
     return [transform_for_ui(DB.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags]
 
 @router.delete("/genotypes/{genotype_tag}", response_model=bool)
