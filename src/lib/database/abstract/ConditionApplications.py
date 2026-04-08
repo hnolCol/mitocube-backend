@@ -84,7 +84,7 @@ class ConditionApplicationABC(ABC):
         "Return a human-readable text representation of the condition application."
 
     @abstractmethod
-    def insert(self, condition_application : AttributeTree) -> bool:
+    def insert(self, condition_application : AttributeTree, extra_data_for_hash : Dict = {}) -> bool:
         """Inserts a new condition application into the database.
 
         Parameters

@@ -153,7 +153,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             return ""
 
 
-    def _handle_children(self, trait_node : dict, parent_tag : str):
+    def _handle_children(self, trait_node : dict, parent_tag : str, extra_data_for_hash : dict = {}):
         
         for attribute_node in trait_node.get("children", []):
             if attribute_node.get("type") != "attribute":
@@ -162,13 +162,15 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             trait_nodes = attribute_node["children"]
             if len(trait_nodes) > 0:
                 for trait_node in trait_nodes:
-                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag)
-                    if len(trait_node.get("children",[])) > 0:
-                        self._handle_children(trait_node=trait_node, parent_tag=parent_tag_2)
+                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag, extra_data_for_hash = extra_data_for_hash)
+                    # if len(trait_node.get("children",[])) > 0:
+                    #     self._handle_children(trait_node=trait_node, parent_tag=parent_tag_2)
+                    if len(trait_node.get("children", [])) > 0:
+                        self._handle_children(trait_node=trait_node, parent_tag=parent_tag_2, extra_data_for_hash=extra_data_for_hash)
             
-    def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None ):
+    def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None, extra_data_for_hash : dict = {}) -> str:
                 
-        gcv_tag = create_hierarchical_hash(data = {"attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value})
+        gcv_tag = create_hierarchical_hash(data = {"attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value, **extra_data_for_hash})
         query = (
             "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
             "MERGE (cv:ConditionValue {tag : $gcv_tag}) "
@@ -189,10 +191,11 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             )
         
         self._driver.execute_query(query, value = value, trait_tag = trait_tag, gcv_tag = gcv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
+
         return gcv_tag
 
 
-    def insert(self, condition_application : AttributeTree) -> str:
+    def insert(self, condition_application : AttributeTree, extra_data_for_hash : Dict={}) -> str:
         """Inserts a new condition application into the database.
 
         Parameters
@@ -240,8 +243,8 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
         """
         component = condition_application.model_dump()  # Convert Pydantic models to list of dicts if necessary
-        hash_tag = create_hierarchical_hash(component)
-        
+        hash_tag = create_hierarchical_hash({**component, **extra_data_for_hash})        
+
         if not self.exists(hash_tag):
             attribute_tag = component.get("tag") 
             for child in component.get("children", []):
@@ -259,7 +262,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                 )
                 self._driver.execute_query(query, hash_tag = hash_tag, routing_="w", database_="neo4j", child_tag = child_tag, attribute_tag=attribute_tag)
                 if len(child.get("children",[])) > 0:
-                    self._handle_children(trait_node=child, parent_tag=hash_tag)     
+                    self._handle_children(trait_node=child, parent_tag=hash_tag, extra_data_for_hash = extra_data_for_hash)     
         return hash_tag
     
     def delete(self, tag: str) -> bool:
