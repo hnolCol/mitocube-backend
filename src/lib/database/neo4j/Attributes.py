@@ -10,7 +10,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeUnitResponseModel,  AttributeResponseModel, TraitModel, AttributeTraitTagResponseModel
 from config.models.annotations.feature import FeatureModel 
 from config.models.feature import FeatureNeoModel
-from config.models.attributes import AttributeTreeNode
+from config.models.attributes import AttributeTreeNode, InsertTraitModel, UpdateTraitModel
 
 from services.json import read_json
 
@@ -1158,3 +1158,86 @@ class Neo4JAttributes(AttributesABC):
     
         return [AttributeTreeNode(**attributes_tree) for attributes_tree in attribute_tres_sorted]
         
+
+
+
+    def insert_trait(self, trait: "InsertTraitModel") -> bool:
+        """Inserts a trait for an attribute. """
+        query = (
+            "MATCH (a:Attribute {tag: $attribute_tag}) "
+            "MERGE (t:Trait {tag: $trait_tag}) "
+            "ON CREATE "
+            "  SET t.text = $text, "
+            "      t.description = $description, "
+            "      t.value = $value, "
+            "      t.priority = $priority, "
+            "      t.attribute_tag = $attribute_tag, "
+            "      t.s = toLower($text) + ' ' + toLower($description), "
+            "      t.created_at = timestamp() "
+            "MERGE (a)-[:HAS_TRAIT]->(t) "
+            "RETURN t.tag"
+        )
+
+        self._driver.execute_query(
+            query,
+            routing_="w",
+            attribute_tag=trait.attribute_tag,
+            trait_tag=trait.tag,
+            value=trait.value,
+            text=trait.text,
+            description=trait.description or "",
+            priority=trait.priority,
+        )
+        return True
+    
+
+    def update_trait(self, trait_tag: str, trait: UpdateTraitModel) -> bool:
+        """Updates a trait's mutable properties (text, description, priority)."""
+        query = (
+            "MATCH (t:Trait {tag: $trait_tag}) "
+            "SET t += $props "
+            "SET t.s = toLower(coalesce(t.text, '')) + ' ' + toLower(coalesce(t.description, '')), "
+            "    t.modified_at = timestamp() "
+        )
+
+        self._driver.execute_query(
+            query,
+            routing_="w",
+            trait_tag=trait_tag,
+            props=trait.model_dump(exclude_none=True),
+        )
+        return True
+    
+
+    def delete_trait(self, trait_tag: str) -> bool:
+        """Deletes a trait if it's not connected to any condition appplication by the relationship [:INSTANCE_OF].
+           Raises ValueError if the trait is still in use."""
+        
+        
+        query = (
+            "MATCH (t:Trait {tag: $trait_tag}) "
+            "OPTIONAL MATCH (t)<-[:INSTANCE_OF]-(ca:ConditionApplication) "
+            "WITH t, count(ca) AS ca_count "
+            "FOREACH (_ IN CASE WHEN ca_count = 0 THEN [1] ELSE [] END | "
+            "    DETACH DELETE t) "
+            "RETURN ca_count"
+        )
+
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            trait_tag=trait_tag,
+            result_transformer_=Result.value,
+        )
+
+        if len(r) == 0:
+            raise ValueError(f"Trait with tag {trait_tag} does not exist.")
+
+        ca_count = r[0]
+        if ca_count > 0:
+            raise ValueError(
+                f"Trait with tag {trait_tag} cannot be deleted because it is "
+                f"still connected to {ca_count} condition application(s)."
+            )
+
+        return True

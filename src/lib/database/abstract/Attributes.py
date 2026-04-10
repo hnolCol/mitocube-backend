@@ -6,7 +6,7 @@ from collections import OrderedDict
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from config.enums.states import SubmissionStatesEnums
-from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeTreeNode, AttributeTraitResponseModel
+from config.models.attributes import AttributeModel, AttributeUnitResponseModel, AttributeValueModel, AttributeValuesBySubmissionModel, AttributeTreeNode, AttributeTraitResponseModel, InsertTraitModel, UpdateTraitModel
 from config.models.feature import FeatureNeoModel 
 
 class AttributesABC(ABC):
@@ -470,3 +470,18 @@ class AttributesABC(ABC):
         [AttributeValueModel|FeatureNeoModel]
             The list of attribute values / features. 
         """
+
+
+    @abstractmethod
+    def insert_trait(self, trait: InsertTraitModel) -> bool:
+        """Inserts a trait for an attribute. """
+
+    @abstractmethod
+    def update_trait(self, trait_tag: str, trait: UpdateTraitModel) -> bool:
+        """Updates a trait's properties (text, description, priority). """
+    
+
+    @abstractmethod
+    def delete_trait(self, trait_tag: str) -> bool:
+        """Deletes a trait if it's not connected to any condition appplication by the relationship [:INSTANCE_OF].
+           Raises ValueError if the trait is still in use."""

@@ -3,7 +3,7 @@ from typing import List, Optional, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
-from config.models.attributes import AttributeModel, AttribteValueInsertModel
+from config.models.attributes import AttributeModel, AttribteValueInsertModel, InsertTraitModel, UpdateTraitModel
 from config.enums.states import SubmissionStatesEnums
 
 from services.users import get_user_from_token, is_user_at_least_curator
@@ -353,6 +353,44 @@ def update_attribute_value(attribute_tag : str,
     return ok 
     
     
+@router.post("/{attribute_tag}/traits")
+def add_trait_to_attribute( attribute_tag: str, trait: InsertTraitModel, user: UserModel = Depends(get_user_from_token),):
+    "Adds a trait to an attribute."
     
-    
-    
+    trait = InsertTraitModel( attribute_tag=attribute_tag,
+                              value=trait.value,
+                              text=trait.text,
+                              description=trait.description,
+                              priority=trait.priority,
+                            )
+
+    if DB.attributes.exists(tag=attribute_tag, trait=trait.tag):
+        raise HTTPException(
+            status_code=409,
+            detail="A trait with the same tag exists already for this attribute.",
+        )
+
+    DB.attributes.insert_trait(trait=trait)
+    return {"tag": trait.tag}
+
+@router.patch("/{attribute_tag}/traits/{trait_tag}")
+def update_trait (attribute_tag: str, trait_tag: str, updates: UpdateTraitModel, user: UserModel = Depends(is_user_at_least_curator)):
+    "Updates a trait's text, description, and/or priority."
+    if not DB.attributes.exists(tag=attribute_tag, trait=trait_tag):
+        raise HTTPException(
+            status_code=404,
+            detail="Trait not found for this attribute.",
+        )
+
+    DB.attributes.update_trait(trait_tag=trait_tag, trait=updates)
+    return {"tag": trait_tag}
+
+
+@router.delete("/{attribute_tag}/traits/{trait_tag}")
+def delete_trait( attribute_tag: str, trait_tag: str, user: UserModel = Depends(is_user_at_least_curator)):
+    "Deletes a trait if it is not connected to any ConditionApplication."
+    try:
+        DB.attributes.delete_trait(trait_tag=trait_tag)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"tag": trait_tag, "deleted": True}
