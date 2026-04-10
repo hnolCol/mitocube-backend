@@ -2978,7 +2978,7 @@
         },
         {
             "tag": "att_protein_mutation",
-            "requires": "att_gene_engineering:knockin|att_gene_engineering:inducible_expression|att_gene_engineering|stable_expression",
+            "requires": "att_gene_engineering:knockin|att_gene_engineering:inducible_expression|att_gene_engineering:stable_expression",
             "children": "att_protein_position",
             "text": "Protein Mutation",
             "abbr": null,
@@ -3008,9 +3008,40 @@
             "id": 96
         },
         {
+            "tag": "att_protein_untargeted_mutation",
+            "requires": "att_gene_engineering:knockout|att_gene_editing_method:crispr",
+            "children": "att_protein_position",
+            "text": "Untargeted Protein Mutation",
+            "abbr": null,
+            "priority": 400,
+            "allow_input": false,
+            "has_features_value": false,
+            "group_tag": "genotype",
+            "min_state": 0,
+            "mandatory_for_submission": false,
+            "mandatory_for_active": false,
+            "allow_as_filter": true,
+            "allow_for_user": false,
+            "allow_for_genotype": true,
+            "allow_for_qc": false,
+            "allow_for_dataset": false,
+            "allow_for_measurement": false,
+            "attribute_group": "filter|genotype",
+            "mandatory_for_active.1": null,
+            "allow_as_filter.1": "filter",
+            "allow_for_user.1": null,
+            "allow_for_genotype.1": "genotype",
+            "allow_for_qc.1": null,
+            "allow_for_dataset.1": null,
+            "allow_for_measurement.1": null,
+            "instrument": null,
+            "instrumenttype": null,
+            "id": 97
+        },
+        {
             "tag": "att_gene_editing_method",
             "requires": null,
-            "children": "att_grna|att_crispr_hdr|att_protein_mutation",
+            "children": "att_grna|att_crispr_hdr|att_protein_mutation|att_protein_untargeted_mutation",
             "text": "Editing method",
             "abbr": null,
             "priority": 520,
@@ -3036,7 +3067,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 97
+            "id": 98
         },
         {
             "tag": "att_gene_zygosity",
@@ -3067,7 +3098,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 98
+            "id": 99
         },
         {
             "tag": "att_gene_engineering",
@@ -3098,7 +3129,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 99
+            "id": 100
         },
         {
             "tag": "att_grna",
@@ -3129,7 +3160,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 100
+            "id": 101
         },
         {
             "tag": "att_crispr_hdr",
@@ -3160,7 +3191,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 101
+            "id": 102
         },
         {
             "tag": "att_protein_position",
@@ -3191,7 +3222,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 102
+            "id": 103
         },
         {
             "tag": "att_aa_position",
@@ -3222,7 +3253,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 103
+            "id": 104
         },
         {
             "tag": "att_aa_position_start",
@@ -3253,7 +3284,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 104
+            "id": 105
         },
         {
             "tag": "att_aa_position_end",
@@ -3284,7 +3315,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 105
+            "id": 106
         },
         {
             "tag": "att_aa_substitution",
@@ -3315,7 +3346,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 106
+            "id": 107
         },
         {
             "tag": "att_promotor",
@@ -3346,7 +3377,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 107
+            "id": 108
         },
         {
             "tag": "att_experiment",
@@ -3377,7 +3408,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 108
+            "id": 109
         },
         {
             "tag": "att_omics_type",
@@ -3408,7 +3439,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 109
+            "id": 110
         },
         {
             "tag": "att_funding",
@@ -3439,7 +3470,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 110
+            "id": 111
         },
         {
             "tag": "att_spatial_fraction",
@@ -3470,7 +3501,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 111
+            "id": 112
         },
         {
             "tag": "att_offline_frac_instrument",
@@ -3501,7 +3532,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 112
+            "id": 113
         },
         {
             "tag": "att_offline_fractionation",
@@ -3532,7 +3563,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 113
+            "id": 114
         },
         {
             "tag": "att_offline_fraction_index",
@@ -3563,7 +3594,7 @@
             "allow_for_measurement.1": "sample",
             "instrument": null,
             "instrumenttype": null,
-            "id": 114
+            "id": 115
         },
         {
             "tag": "att_knockdown_technique",
@@ -3594,7 +3625,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 115
+            "id": 116
         },
         {
             "tag": "att_gene_expression_alteration",
@@ -3625,7 +3656,7 @@
             "allow_for_measurement.1": "sample",
             "instrument": null,
             "instrumenttype": null,
-            "id": 116
+            "id": 117
         },
         {
             "tag": "att_digestion_method",
@@ -3656,7 +3687,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 117
+            "id": 118
         },
         {
             "tag": "att_reduction",
@@ -3687,7 +3718,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 118
+            "id": 119
         },
         {
             "tag": "att_protease",
@@ -3718,7 +3749,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 119
+            "id": 120
         },
         {
             "tag": "att_reaction_vessel",
@@ -3749,7 +3780,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 120
+            "id": 121
         },
         {
             "tag": "att_liquid_handler",
@@ -3780,7 +3811,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 121
+            "id": 122
         },
         {
             "tag": "att_alkylation",
@@ -3811,7 +3842,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 122
+            "id": 123
         },
         {
             "tag": "att_software",
@@ -3842,7 +3873,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 123
+            "id": 124
         },
         {
             "tag": "att_analysis_mode",
@@ -3873,7 +3904,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 124
+            "id": 125
         },
         {
             "tag": "att_fasta_file",
@@ -3904,7 +3935,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 125
+            "id": 126
         },
         {
             "tag": "att_quant_algorithm",
@@ -3935,7 +3966,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 126
+            "id": 127
         },
         {
             "tag": "att_quantification",
@@ -3966,7 +3997,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 127
+            "id": 128
         },
         {
             "tag": "att_crosslink_hydroamine_cleavable",
@@ -3997,7 +4028,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 128
+            "id": 129
         },
         {
             "tag": "att_crosslink_ms_cleavable",
@@ -4028,7 +4059,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 129
+            "id": 130
         },
         {
             "tag": "att_crosslink_non_clevable",
@@ -4059,7 +4090,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 130
+            "id": 131
         },
         {
             "tag": "att_crosslink_thiol_cleavable",
@@ -4090,7 +4121,7 @@
             "allow_for_measurement.1": null,
             "instrument": null,
             "instrumenttype": null,
-            "id": 131
+            "id": 132
         },
         {
             "tag": "att_batch",
@@ -4121,7 +4152,7 @@
             "allow_for_measurement.1": "sample",
             "instrument": null,
             "instrumenttype": null,
-            "id": 132
+            "id": 133
         },
         {
             "tag": "att_biomolecule",
@@ -4152,7 +4183,7 @@
             "allow_for_measurement.1": "sample",
             "instrument": null,
             "instrumenttype": null,
-            "id": 133
+            "id": 134
         }
     ],
     "traits": [
@@ -4660,7 +4691,7 @@
             "description": "Chloracetamide for protein alkylation.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 122.0
+            "attribute_id": 123.0
         },
         {
             "value": "iaa",
@@ -4671,7 +4702,7 @@
             "description": "Iodoacetamide for protein alkylation.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 122.0
+            "attribute_id": 123.0
         },
         {
             "value": "none",
@@ -4682,7 +4713,7 @@
             "description": "Proteins were not alkylated.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 122.0
+            "attribute_id": 123.0
         },
         {
             "value": "directdia",
@@ -4693,7 +4724,7 @@
             "description": "Direct DIA mode (no DDA library). ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 124.0
+            "attribute_id": 125.0
         },
         {
             "value": "libdia",
@@ -4704,7 +4735,7 @@
             "description": "Experimental library (DDA) based DIA anaylsis. ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 124.0
+            "attribute_id": 125.0
         },
         {
             "value": "adipose_macrophages",
@@ -6376,7 +6407,7 @@
             "description": "EGS (Water insoluble, Membrane-permeable) is a crosslinker that contains amine-reactive NHS-ester ends around a 12-atom spacer arm, which can be cleaved by treatment with hydroxylamine at pH 8.5.\u00a0",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 128.0
+            "attribute_id": 129.0
         },
         {
             "value": "suflo_egs",
@@ -6387,7 +6418,7 @@
             "description": "Sulfo-EGS (Water soluble, membrane impermeable) Sulfo-EGS is a water-soluble crosslinker that contains amine-reactive sulfo-NHS-ester ends around a 12-atom spacer arm, which can be cleaved by treatment with hydroxylamine at pH 8.5.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 128.0
+            "attribute_id": 129.0
         },
         {
             "value": "dsbu",
@@ -6398,7 +6429,7 @@
             "description": "Disuccinimidyl Dibutyric Urea (DSBU, BuUrBUU). Water-insoluble (dissolve first in DMF or DMSO). MS-cleavable and membrane-semi-permeable crosslinkers that contain an amine-reactive N-hydroxysuccinimide (NHS) ester at each end of a 11-atom spacer arm (DSBU). Contains a cleavable functionality in the linker region that enables cleavage in the gas phase using collision-induced dissociation (CID) during tandem MS (MS/MS) fragmentation. The MS cleavage of DSSO or DSBU generates diagnostic ion doublets during MS2, which distinguishes identification of cross-linked peptides from dead-end modifications.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 129.0
+            "attribute_id": 130.0
         },
         {
             "value": "dsso",
@@ -6409,7 +6440,7 @@
             "description": "Disuccinimidyl Sulfoxide (DSSO). Water-insoluble (dissolve first in DMF or DMSO). MS-cleavable and membrane-semi-permeable crosslinkers that contain an amine-reactive N-hydroxysuccinimide (NHS) ester at each end of a 7-carbon spacer arm (DSSO). Contains a cleavable functionality in the linker region that enables cleavage in the gas phase using collision-induced dissociation (CID) during tandem MS (MS/MS) fragmentation. The MS cleavage of DSSO or DSBU generates diagnostic ion doublets during MS2, which distinguishes identification of cross-linked peptides from dead-end modifications.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 129.0
+            "attribute_id": 130.0
         },
         {
             "value": "amas",
@@ -6420,7 +6451,7 @@
             "description": "AMAS is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a very short spacer arm (4.4 angstroms). Features of AMAS: \u2022 Reactive groups: NHS ester and maleimide \u2022 Reactive towards: amino and sulfhydryl groups \u2022...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bm_peg_3",
@@ -6431,7 +6462,7 @@
             "description": "BM(PEG)3 is a bismaleimide-activated PEG compound for crosslinking between sulfhydryl (\u2014SH) groups in proteins and other thiol molecules. The maleimide groups at either end of the PEG3 spacer react specifically and efficiently with reduced sulfhydryls at pH 6.5-7.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bmb",
@@ -6442,7 +6473,7 @@
             "description": "BMB is a mid-length, maleimide crosslinker for covalent, irreversible conjugation between sulfhydryl groups (e.g., protein or peptide cysteines). Features of BMB: \u2022 Reactive groups: maleimide (both ends) \u2022 Reactive towards: sulfhydryl groups \u2022 Mid-length (10.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bmh",
@@ -6453,7 +6484,7 @@
             "description": "BMH is a long-arm, maleimide crosslinker for covalent, irreversible conjugation between sulfhydryl groups (e.g., protein or peptide cysteines). Features of BMH: \u2022 Reactive groups: maleimide (both ends) \u2022 Reactive towards: sulfhydryl groups \u2022 Long (13.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bmoe",
@@ -6464,7 +6495,7 @@
             "description": "BMOE is a short-arm, maleimide crosslinker for covalent, irreversible conjugation between sulfhydryl groups (e.g., protein or peptide cysteines). Features of BMOE: \u2022 Reactive groups: maleimide (both ends) \u2022 Reactive towards: sulfhydryl groups \u2022 Short (8.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bmph",
@@ -6475,7 +6506,7 @@
             "description": "BMPH is a short, maleimide-and-hydrazide crosslinker for conjugating sulfhydryls (cysteines) to carbonyls (aldehyde or ketones, such as those formed by oxidation of glycoprotein carbohydrates).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bmps",
@@ -6486,7 +6517,7 @@
             "description": "BMPS is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a short spacer arm (5.9 \u00c5). Features of BMPS: \u2022 Reactive groups: NHS ester and maleimide \u2022 Reactive towards: amino and sulfhydryl groups \u2022 C3-homolog of...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bs_peg_5",
@@ -6497,7 +6528,7 @@
             "description": "BS(PEG)5 is a bis-succinimide ester-activated PEG compound used for crosslinking between primary amines (\u2014NH2) in proteins and other molecules. The N-hydroxysuccinimide ester (NHS) groups at either end of the PEG5 spacer react specifically and efficiently with lysine and N-terminal amino groups at...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bs_peg_9",
@@ -6508,7 +6539,7 @@
             "description": "BS(PEG)9 is a bis-succinimide ester-activated PEG compound used for crosslinking between primary amines (\u2014NH2) in proteins and other molecules. The N-hydroxysuccinimide ester (NHS) groups at either end of the PEG9 spacer react specifically and efficiently with lysine and N-terminal amino groups at...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bs2g_d0",
@@ -6519,7 +6550,7 @@
             "description": "BS2G-d0/d4 reagents form a matched set of heavy (deuterated) and light mass varieties of a short, amine-reactive crosslinker that facilitates the identification of crosslinked peptides by mass spectrometry. The BS2G-d0/d4 reagents are mass-analogs of BS2G crosslinker.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bs3",
@@ -6530,7 +6561,7 @@
             "description": "BS3 (Sulfo-DSS) is bis(sulfosuccinimidyl)suberate, an amine-to-amine crosslinker that is homobifunctional, water-soluble, non-cleavable and membrane impermeable. BS3 contains an amine-reactive N-hydroxysulfosuccinimide (NHS) ester at each end of an 8-carbon spacer arm.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bs3_d0",
@@ -6541,7 +6572,7 @@
             "description": "BS3-d0/d4 reagents form a matched set of heavy (deuterated) and light mass varieties of BS3 amine-reactive crosslinker that facilitates the identification of crosslinked peptides by mass spectrometry.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "bs3_d4",
@@ -6552,7 +6583,7 @@
             "description": "BS3-d0/d4 reagents form a matched set of heavy (deuterated) and light mass varieties of BS3 amine-reactive crosslinker that facilitates the identification of crosslinked peptides by mass spectrometry.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "dmp",
@@ -6563,7 +6594,7 @@
             "description": "DMP (dimethyl pimelimidate) is dimethyl pimelimidate, a membrane-permeable crosslinker that contains an amine-reactive imidoester group at each end of a 7-atom spacer arm. Features of dimethyl pimelimidate: \u2022 Reactive groups: imidoester (both ends) \u2022 Reactive towards: amino groups (primary amines)...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "dms",
@@ -6574,7 +6605,7 @@
             "description": "DMS (dimethyl suberimidate) is dimethyl suberimidate, a membrane-permeable crosslinker that contains an amine-reactive imidoester group at each end of an 8-atom spacer arm. Features of dimethyl suberimidate: \u2022 Reactive groups: imidoester (both ends) \u2022 Reactive towards: amino groups (primary amines)...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "dss",
@@ -6585,7 +6616,7 @@
             "description": "DSS (disuccinimidyl suberate), also called disuccinimidyl suberate, is noncleavable and membrane permeable crosslinker that contains an amine-reactive N-hydroxysuccinimide (NHS) ester at each end of an 8-carbon spacer arm.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "edc",
@@ -6596,7 +6627,7 @@
             "description": "EDC is 1-ethyl-3-[3-dimethylaminopropyl]carbodiimide hydrochloride, a water-soluble carbodiimide crosslinker that activates carboxyl groups for spontaneous reaction with primary amines, enabling peptide immobilization and hapten-carrier protein conjugation. In the presence of\u00a0N-hydroxysulfosuccinimide (sulfo-NHS), EDC can be used to convert carboxyl groups to amine-reactive sulfo-NHS esters. This is accomplished by mixing the EDC with a carboxyl containing molecule and adding sulfo-NHS.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "emch",
@@ -6607,7 +6638,7 @@
             "description": "EMCH is a mid-length, maleimide-and-hydrazide crosslinker for conjugating sulfhydryls (cysteines) to carbonyls (aldehyde or ketones, such as those formed by oxidation of glycoprotein carbohydrates).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "emcs",
@@ -6618,7 +6649,7 @@
             "description": "EMCS is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a medium-length spacer arm (9.4 angstroms). Features of EMCS: \u2022 Reactive groups: NHS ester and maleimide \u2022 Reactive towards: amino and sulfhydryl groups \u2022...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "gmbs",
@@ -6629,7 +6660,7 @@
             "description": "GMBS is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a short spacer arm (7.3 angstroms). Features of GMBS: \u2022 Reactive groups: NHS ester and maleimide \u2022 Reactive toward: amino and sulfhydryl groups \u2022 C4-homolog...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "kmuh",
@@ -6640,7 +6671,7 @@
             "description": "KMUH is a long, maleimide-and-hydrazide crosslinker for conjugating sulfhydryls (cysteines) to carbonyls (aldehyde or ketones, such as those formed by oxidation of glycoprotein carbohydrates).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "l_photo_methionine",
@@ -6651,7 +6682,7 @@
             "description": "L-Photo-Methionine is an analog of L-methionine that can be incorporated into proteins during synthesis and then light-activated to covalently crosslink interacting proteins in cells.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "lc_smcc",
@@ -6662,7 +6693,7 @@
             "description": "LC-SMCC is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a long cyclohexane-stabilized spacer arm (16.2 angstroms).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "maleimide_peg4_dbco",
@@ -6673,7 +6704,7 @@
             "description": "EZ-Link Maleimide-PEG4-DBCO is a sulfhydryl-reactive hetero-bifunctional crosslinker that contains a dibenzylcyclooctyne (DBCO) group for copper-free click chemistry applications. The thiol/sulfhdryl-reactive maleimide can be used to label a variety of thiol-containing moieties such as free cystines...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "mpbh",
@@ -6684,7 +6715,7 @@
             "description": "MPBH is a long, maleimide-and-hydrazide crosslinker for conjugating sulfhydryls (cysteines) to carbonyls (aldehyde or ketones, such as those formed by oxidation of glycoprotein carbohydrates).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "nhs",
@@ -6695,7 +6726,7 @@
             "description": "NHS is a chemical modification reagent for converting carboxyl groups to amine-reactive NHS esters for bioconjugation, crosslinking, labeling and immobilization methods. Features of NHS: \u2022 Efficiency of EDC-mediated coupling is increased in the presence of NHS \u2022...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "nhs_azide",
@@ -6706,7 +6737,7 @@
             "description": "NHS-Azide is an amine-reactive compound that can be used to derivatize primary amines of proteins or amine-coated polymer surfaces for ligation to phosphine-modified molecules. This NHS-ester compound reacts to form covalent bonds with primary amines (e.g.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "nhs_peg4_azide",
@@ -6717,7 +6748,7 @@
             "description": "NHS-PEG4-Azide is an amine-reactive compound that can be used to derivatize primary amines of proteins or amine-coated polymer surfaces for ligation to phosphine-modified molecules. This NHS-ester compound reacts to form covalent bonds with primary amines (e.g.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "nhs_phosphine",
@@ -6728,7 +6759,7 @@
             "description": "NHS-Phosphine is an amine-reactive compound that can be used to derivatize primary amines of proteins or amine-coated polymer surfaces for ligation to azide-tagged molecules. Features of NHS-Phosphine: \u2022 Soluble\u2014reagent easily dissolves in water-miscible solvents for subsequent...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "pmpi",
@@ -6739,7 +6770,7 @@
             "description": "PMPI (p-maleimidophenyl isocyanate) is a maleimide-and-isocyanate crosslinker for attaching compounds to sulfhydryl groups (cysteines) after conjugating the linker to hydroxyl groups on a molecule by urethane (carbamate) bonds.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sbap",
@@ -6750,7 +6781,7 @@
             "description": "SBAP is a short (6.2 angstrom) crosslinker for amine-to-sulfhydryl conjugation via N-hydroxysuccinimide (NHS) ester and bromoacetyl reactive groups. Features of SBAP: \u2022 Reactive groups: NHS ester and bromoacetyl \u2022 Reactive toward: amino and sulfhydryl groups \u2022 NHS ester...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sda",
@@ -6761,7 +6792,7 @@
             "description": "SDA (NHS-Diazirine) combines proven NHS-ester and diazirine-based photoreaction chemistries with conjugate amine-containing molecules with nearly any other functional group via long-wave UV-light activation. A 3.9\u00c5 spacer arm separates the two photoreactive groups.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sia",
@@ -6772,7 +6803,7 @@
             "description": "SIA (succinimidyl iodoacetate) is a very short (1.5 angstrom) crosslinker for amine-to-sulfhydryl conjugation via N-hydroxysuccinimide (NHS) ester and iodoacetyl reactive groups. Features of SIA: \u2022 Reactive groups: NHS ester and iodoacetyl \u2022 Reactive toward: amino and sulfhydryl groups \u2022 Shortest...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "smpb",
@@ -6783,7 +6814,7 @@
             "description": "SMPB is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a medium-length aromatic spacer arm (11.6 angstroms). Features of SMPB: \u2022 Reactive groups: NHS ester and maleimide \u2022 Reactive towards: amino and sulfhydryl...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "smph",
@@ -6794,7 +6825,7 @@
             "description": "SMPH is an amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a long spacer arm (14.2 angstroms). Features of SMPH: \u2022 Reactive groups: NHS ester and maleimide \u2022 Reactive towards: amino and sulfhydryl groups \u2022 Slightly...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "spb",
@@ -6805,7 +6836,7 @@
             "description": "SPB is an NHS-ester and psoralen crosslinker that effectively conjugates primary amines to DNA via light-activated intercalation next to pyrimidine bases. Features of SPB: \u2022 Reactive groups: NHS ester and psoralen \u2022 Reactive toward: amino groups and thymine \u2022 DNA...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_emcs",
@@ -6816,7 +6847,7 @@
             "description": "Sulfo-EMCS is a water-soluble amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a medium-length spacer arm (9.4 angstroms).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_kmus",
@@ -6827,7 +6858,7 @@
             "description": "Sulfo-KMUS is a water-soluble amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a long spacer arm (16.3 angstroms). Features of Sulfo-KMUS: \u2022 Reactive groups: sulfo-NHS ester and maleimide \u2022 Reactive toward: amino and...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_lc_sda",
@@ -6838,7 +6869,7 @@
             "description": "Sulfo-LC-SDA (Sulfo-NHS-LC-Diazirine) combines proven NHS-ester and diazirine-based photoreaction chemistries with conjugate amine-containing molecules with nearly any other functional group via long-wave UV-light activation. A 12.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_mbs",
@@ -6849,7 +6880,7 @@
             "description": "Sulfo-MBS (m-maleimidobenzoyl-N-hydroxysulfosuccinimide ester) is a water-soluble amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a short aromatic spacer arm (7.3 angstroms).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_sda",
@@ -6860,7 +6891,7 @@
             "description": "Sulfo-SDA (Sulfo-NHS-Diazirine) combines proven NHS-ester and diazirine-based photoreaction chemistries with conjugate amine-containing molecules with nearly any other functional group via long-wave UV-light activation. A 3.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_siab",
@@ -6871,7 +6902,7 @@
             "description": "Sulfo-SIAB a water-soluble, mid-length (10.6 angstrom) crosslinker for amine-to-sulfhydryl conjugation via sulfo-N-hydroxysuccinimide (sulfo-NHS) ester and iodoacetyl reactive groups.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_smcc",
@@ -6882,7 +6913,7 @@
             "description": "Sulfo-SMCC is a water-soluble, amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a medium-length cyclohexane spacer arm (8.3 angstroms).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "sulfo_smpb",
@@ -6893,7 +6924,7 @@
             "description": "Sulfo-SMPB is a water-soluble amine-to-sulfhydryl crosslinker that contains NHS-ester and maleimide reactive groups at opposite ends of a medium-length aromatic spacer arm (11.6 angstroms).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "tbdspp",
@@ -6904,7 +6935,7 @@
             "description": "Chemical crosslinking in combination with mass spectrometry is a powerful method to improve protein characterization, and to identify protein-protein interactions. This method has been applied to recombinant and native protein complexes, and more recently, to whole cell lysates or intact unicellular...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "tfpester_peg12_dbco",
@@ -6915,7 +6946,7 @@
             "description": "EZ-Link TFP Ester-PEG12-DBCO is a hetero-bifunctional crosslinker that contains an amine-reactive tetrafluorophenyl (TFP) group and a dibenzylcyclooctyne (DBCO) group with a water-solubilizing long PEG12 spacer in between.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "tfpester_peg4_dbco",
@@ -6926,7 +6957,7 @@
             "description": "EZ-Link TFP Ester-PEG4-DBCO is an amine-reactive hetero-bifunctional crosslinker that contains a dibenzylcyclooctyne (DBCO) group for copper-free click-chemistry applications. This crosslinker can be used to label a variety of amine-containing molecules such as proteins, biomolecules, or small...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "tmea",
@@ -6937,7 +6968,7 @@
             "description": "TMEA (tris(2-maleimidoethyl)amine) is a trifunctional crosslinker containing three reactive maleimide groups to enable three-way conjugation and polymerization of sulfhydryl-containing molecules. Features of TMEA: \u2022 Reactive groups: maleimide (on three termini) \u2022 Reactive...",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "tsat",
@@ -6948,7 +6979,7 @@
             "description": "TSAT is tris-(succinimidyl) aminotriacetate, a novel trifunctional crosslinker that contains three short spacers arms linked to a central nitrogen atom, each ending in an amine-reactive NHS-ester group.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 130.0
+            "attribute_id": 131.0
         },
         {
             "value": "dsp",
@@ -6959,7 +6990,7 @@
             "description": "DSP (Lomant's Reagent) is a water-insoluble, homo-bifunctional N-hydroxysuccimide ester (NHS ester) crosslinker that is thiol-cleavable, primary amine-reactive, and useful for many applications. DSP contains an amine-reactive NHS ester at each end of an 8-carbon spacer arm.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "dtbp",
@@ -6970,7 +7001,7 @@
             "description": "DTBP is dimethyl 3,3'-dithiobispropionimidate, a crosslinker that contains amine-reactive imidoester groups around an 8-atom spacer arm, whose central disulfide bond can be cleaved with reducing agents.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "dtme",
@@ -6981,7 +7012,7 @@
             "description": "DTME (dithiobismaleimidoethane) is a mid-length, maleimide crosslinker for reversible covalent conjugation between sulfhydryl groups (e.g., protein or peptide cysteines) by reduction of the disulfide bond in the center of the spacer arm.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "dtssp",
@@ -6992,7 +7023,7 @@
             "description": "DTSSP (3,3'-dithiobis(sulfosuccinimidyl propionate))\u00a0 is a popular water-soluble crosslinker that contains amine-reactive NHS-ester ends around an 8-atom spacer arm, whose central disulfide bond can be cleaved with reducing agents.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "lc_spdp",
@@ -7003,7 +7034,7 @@
             "description": "LC-SPDP  (succinimidyl 6-(3(2-pyridyldithio)propionamido)hexanoate)\u00a0\u00a0 is a long-chain crosslinker for amine-to-sulfhydryl conjugation via NHS-ester and pyridyldithiol reactive groups that form cleavable (reducible) disulfide bonds with cysteine sulfhydryls.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "pdph",
@@ -7014,7 +7045,7 @@
             "description": "PDPH (3-(2-pyridyldithio)propionyl hydrazide)\u00a0 is a short, pyridyldithiol-and-hydrazide crosslinker for reversibly conjugating sulfhydryls (cysteines) to carbonyls (aldehyde or ketones, such as those formed by oxidation of glycoprotein carbohydrates).",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "peg12_spdp",
@@ -7025,7 +7056,7 @@
             "description": "PEG12-SPDP is a multifunctional crosslinker for protein conjugation via amine-to-amine or amine-to-sulfhydryl crosslinks that contain a 12-unit polyethylene glycol (PEG) group and a reducible (cleavable) disulfide bond.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "peg4_spdp",
@@ -7036,7 +7067,7 @@
             "description": "PEG4-SPDP is a multifunctional crosslinker for protein conjugation via amine-to-amine or amine-to-sulfhydryl crosslinks that contain a 4-unit polyethylene glycol (PEG) group and a reducible (cleavable) disulfide bond.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "sdad",
@@ -7047,7 +7078,7 @@
             "description": "SDAD (NHS-SS-Diazirine) combines proven NHS-ester and diazirine-based photoreaction chemistries with conjugate amine-containing molecules with nearly any other functional group via long-wave UV-light activation. A 13.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "smcc",
@@ -7058,7 +7089,7 @@
             "description": "SMCC is a hetero-bifunctional crosslinker that contain N-hydroxysuccinimide (NHS) ester and maleimide groups that allow covalent conjugation of amine- and sulfhydryl-containing molecules.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "smpt",
@@ -7069,7 +7100,7 @@
             "description": "SMPT (4-succinimidyloxycarbonyl-alpha-methyl-\u03b1(2-pyridyldithio)toluene) is a long-chain crosslinker for amine-to-sulfhydryl conjugation via NHS-ester and pyridyldithiol reactive groups that form strong (hindered) yet cleavable (reducible) disulfide bonds with cysteine sulfhydryls.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "spdp",
@@ -7080,7 +7111,7 @@
             "description": "SPDP (succinimidyl 3-(2-pyridyldithio)propionate)\u00a0 is a short-chain crosslinker for amine-to-sulfhydryl conjugation via NHS-ester and pyridyldithiol reactive groups that form cleavable (reducible) disulfide bonds with cysteine sulfhydryls.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "sulfo_lc_spdp",
@@ -7091,7 +7122,7 @@
             "description": "Sulfo-LC-SPDP  (sulfosuccinimidyl 6-(3'-(2-pyridyldithio)propionamido)hexanoate)\u00a0is a water-soluble, long-chain crosslinker for amine-to-sulfhydryl conjugation via NHS-ester and pyridyldithiol reactive groups that form cleavable (reducible) disulfide bonds with cysteines.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "sulfo_sanpah",
@@ -7102,7 +7133,7 @@
             "description": "Sulfo-SANPAH is a hetero-bifunctional crosslinker that contains an amine-reactive N-hydroxysuccinimide (NHS) ester and a photoactivatable nitrophenyl azide. NHS esters react efficiently with primary amino groups (-NH2) in pH 7\u20139 buffers to form stable amide bonds.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "sulfo_sdad",
@@ -7113,7 +7144,7 @@
             "description": "Sulfo-SDAD (Sulfo-NHS-SS-Diazirine) combines proven NHS-ester and diazirine-based photoreaction chemistries with conjugate amine-containing molecules with nearly any other functional group via long-wave UV-light activation. A 13.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 131.0
+            "attribute_id": 132.0
         },
         {
             "value": "chaps",
@@ -7223,7 +7254,7 @@
             "description": "Filter Aided Sample Preparation based digestion method.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 117.0
+            "attribute_id": 118.0
         },
         {
             "value": "ingel",
@@ -7234,7 +7265,7 @@
             "description": "In gel digestion method",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 117.0
+            "attribute_id": 118.0
         },
         {
             "value": "insol",
@@ -7245,7 +7276,7 @@
             "description": "In solution digestion method",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 117.0
+            "attribute_id": 118.0
         },
         {
             "value": "sp3",
@@ -7256,7 +7287,7 @@
             "description": "SP3 magnetic bead based digestion method ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 117.0
+            "attribute_id": 118.0
         },
         {
             "value": "als",
@@ -7608,7 +7639,7 @@
             "description": "Acetylome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "dvp",
@@ -7619,7 +7650,7 @@
             "description": "Fractionated Samples (DVP)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "expression_proteome",
@@ -7630,7 +7661,7 @@
             "description": "Expression Proteome comparing multiple samples of different conditions and/or genotypes.",
             "priority": 600.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "microscoop",
@@ -7641,7 +7672,7 @@
             "description": "Microscoop aided photolabeling and pull-down of biotinylated proteins.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "proximity",
@@ -7652,7 +7683,7 @@
             "description": "Proximity Labeling using BioID or Apex based assays",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "interaction",
@@ -7663,7 +7694,7 @@
             "description": "Interaction Proteome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "metrs",
@@ -7674,7 +7705,7 @@
             "description": "MetRS",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "neo_nterm_enrichment",
@@ -7685,7 +7716,7 @@
             "description": "Neo N-term enrichment",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "oxinome",
@@ -7696,7 +7727,7 @@
             "description": "Oxinome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "phosphoproteome",
@@ -7707,7 +7738,7 @@
             "description": "Phosphoproteome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "pulse_silac",
@@ -7718,7 +7749,7 @@
             "description": "Pulse-SILAC",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "secretome",
@@ -7729,7 +7760,7 @@
             "description": "Secretome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "spatial",
@@ -7740,7 +7771,7 @@
             "description": "Spatial Proteome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "ubiquitinome",
@@ -7751,7 +7782,7 @@
             "description": "Ubiquitinome",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "solub",
@@ -7762,7 +7793,7 @@
             "description": "Solubilization uses a lysis buffer with low percentage of detergent yielding usually a pellet and supernatant fraction.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "pisa",
@@ -7773,7 +7804,7 @@
             "description": "PISA is based on perturbing the soluble state of the whole proteome by a temperature gradient (also named PISA-T). There are different versions of PISA and are distinguished by the temperature gradient and if a melting curve is measured.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 108.0
+            "attribute_id": 109.0
         },
         {
             "value": "100c",
@@ -8026,7 +8057,7 @@
             "description": "Hmologous recombination is a DNA repair mechanism that is employed in gene targeting to insert a designed mutation into the homologous genetic locus. Targeted homologous recombination can be performed in murine ES cells through electroporation of a targeting construct. These ES cells are totipotent and, when injected into a mouse blastocyst, they can diffentiate into all cell types of a chimeric mouse.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "biggybac",
@@ -8037,7 +8068,7 @@
             "description": "The PiggyBac (PB) transposon is a mobile genetic element that efficiently transposes between vectors and chromosomes via a 'cut and paste' mechanism. During transposition, the PB transposase recognizes transposon-specific inverted terminal repeat sequences (ITRs) located on both ends of the transposon vector and efficiently moves the contents from the original sites and integrates them into TTAA chromosomal sites",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "crispr",
@@ -8048,7 +8079,7 @@
             "description": "A CRISPR-associated (Cas) enzyme is used to cleave target DNA, resulting in a double-strand break (DSB). The Cas enzyme is directed by the guide RNA (gRNA) to a user-defined site in the genome, and then the Cas enzyme cuts the DNA.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "crispr_hdr",
@@ -8059,7 +8090,7 @@
             "description": "HDR is an acronym for homology-directed repair, one of the common mechanisms for DNA double-strand break repair in eukaryotes. HDR can be used as part of CRISPR-mediated editing to introduce an exogenous DNA repair template composed of homology arms flanking a sequence of interest.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "lentiviral",
@@ -8070,7 +8101,7 @@
             "description": "Lentivirus based genome integration.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "talen",
@@ -8081,7 +8112,7 @@
             "description": "Transcription activator-like effector nucleases (TALEN) are restriction enzymes that can be engineered to cut specific sequences of DNA. They are made by fusing a TAL effector DNA-binding domain to a DNA cleavage domain (a nuclease which cuts DNA strands). Transcription activator-like effectors (TALEs) can be engineered to bind to practically any desired DNA sequence, so when combined with a nuclease, DNA can be cut at specific locations.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "zincfinger",
@@ -8092,7 +8123,7 @@
             "description": "Zinc-finger nucleases (ZFNs) are artificial restriction enzymes generated by fusing a zinc finger DNA-binding domain to a DNA-cleavage domain. Zinc finger domains can be engineered to target specific desired DNA sequences and this enables zinc-finger nucleases to target unique sequences within complex genomes.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 97.0
+            "attribute_id": 98.0
         },
         {
             "value": "deletion",
@@ -8103,7 +8134,7 @@
             "description": "Gene deletion",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 99.0
+            "attribute_id": 100.0
         },
         {
             "value": "inducible_expression",
@@ -8114,7 +8145,7 @@
             "description": "Inducible gene expression. ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 99.0
+            "attribute_id": 100.0
         },
         {
             "value": "knockin",
@@ -8125,7 +8156,7 @@
             "description": "Gene knock in. One-for-one substitution of DNA sequence information in a genetic locus or the insertion of sequence information not found within the locus. ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 99.0
+            "attribute_id": 100.0
         },
         {
             "value": "ko",
@@ -8136,7 +8167,7 @@
             "description": "Gene knock out.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 99.0
+            "attribute_id": 100.0
         },
         {
             "value": "stable_expression",
@@ -8147,7 +8178,7 @@
             "description": "Stable gene expression.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 99.0
+            "attribute_id": 100.0
         },
         {
             "value": "hetero",
@@ -8158,7 +8189,7 @@
             "description": "Heterozygous",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 98.0
+            "attribute_id": 99.0
         },
         {
             "value": "homozygot",
@@ -8169,7 +8200,7 @@
             "description": "Homozygous",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 98.0
+            "attribute_id": 99.0
         },
         {
             "value": "wt",
@@ -8180,7 +8211,7 @@
             "description": "Wildtype",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 98.0
+            "attribute_id": 99.0
         },
         {
             "value": "hemi",
@@ -8191,7 +8222,7 @@
             "description": "Hemizygot",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 98.0
+            "attribute_id": 99.0
         },
         {
             "value": "unknown",
@@ -8202,7 +8233,7 @@
             "description": "Unknown. Examples: virus- or biggy-bag expression.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 98.0
+            "attribute_id": 99.0
         },
         {
             "value": "male",
@@ -8268,7 +8299,7 @@
             "description": "Eupheria Biotch - esiRNA knock down technique.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 115.0
+            "attribute_id": 116.0
         },
         {
             "value": "grna",
@@ -8279,7 +8310,7 @@
             "description": "gRNA based knockdown in a polyclonal population",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 115.0
+            "attribute_id": 116.0
         },
         {
             "value": "mirna",
@@ -8290,7 +8321,7 @@
             "description": "miRNA based gene expression knockdown.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 115.0
+            "attribute_id": 116.0
         },
         {
             "value": "shrna",
@@ -8301,7 +8332,7 @@
             "description": "shRNA based gene expression kockdown ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 115.0
+            "attribute_id": 116.0
         },
         {
             "value": "sirna",
@@ -8312,7 +8343,7 @@
             "description": "siRNA based gene expression knock down by RNA interference",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 115.0
+            "attribute_id": 116.0
         },
         {
             "value": "e1000",
@@ -8444,7 +8475,7 @@
             "description": "Agilent Bravo Sample Preparaton",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "felix",
@@ -8455,7 +8486,7 @@
             "description": "Analytic Jena Liquid Handler CyBio Felix",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "kingfisher",
@@ -8466,7 +8497,7 @@
             "description": "King Fisher Thermo Fisher Liquid Handler (magnetic beads)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "microlabhamilton",
@@ -8477,7 +8508,7 @@
             "description": "Hamilton Microlab Star M",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "mosquitoHV",
@@ -8488,7 +8519,7 @@
             "description": "Mosquit liquid handler (lhigh volume)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "mosquitoLV",
@@ -8499,7 +8530,7 @@
             "description": "Mosquit liquid handler (low volume)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "opentrons",
@@ -8510,7 +8541,7 @@
             "description": "Opentrons Flex",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "opentronsot2",
@@ -8521,7 +8552,7 @@
             "description": "Opentrons OT-2",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "tecan",
@@ -8532,7 +8563,7 @@
             "description": "Tecan liquid handler. ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "none",
@@ -8543,7 +8574,7 @@
             "description": "Manual pipetting (By hand)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 121.0
+            "attribute_id": 122.0
         },
         {
             "value": "one_sdc",
@@ -11535,7 +11566,7 @@
             "description": "Zirconium HPLC Pumps coupled to a PAL autosampler for offline high-pH fractionation.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 112.0
+            "attribute_id": 113.0
         },
         {
             "value": "bgpage",
@@ -11546,7 +11577,7 @@
             "description": "Blue Native PAGE ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 113.0
+            "attribute_id": 114.0
         },
         {
             "value": "highph_hplc",
@@ -11557,7 +11588,7 @@
             "description": "High-pH HPLC peptide based fractionation",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 113.0
+            "attribute_id": 114.0
         },
         {
             "value": "highph_tip",
@@ -11568,7 +11599,7 @@
             "description": "High-pH StageTip peptide based fractionation",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 113.0
+            "attribute_id": 114.0
         },
         {
             "value": "sax",
@@ -11579,7 +11610,7 @@
             "description": "SAX peptide based fractionation",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 113.0
+            "attribute_id": 114.0
         },
         {
             "value": "scx",
@@ -11590,7 +11621,7 @@
             "description": "SCX peptide based fractionation",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 113.0
+            "attribute_id": 114.0
         },
         {
             "value": "sdspage",
@@ -11601,7 +11632,7 @@
             "description": "SDS Page Acrylamide Gel",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 113.0
+            "attribute_id": 114.0
         },
         {
             "value": "proteomics",
@@ -11612,7 +11643,7 @@
             "description": "Proteomics experiment.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 109.0
+            "attribute_id": 110.0
         },
         {
             "value": "appendix",
@@ -12118,7 +12149,7 @@
             "description": "ArgC - Cleaves C-term of arginine (R) residues",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "aspn",
@@ -12129,7 +12160,7 @@
             "description": "AspN N-terminal of Asp, optimal pH = 4-9",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "chymotrypsin",
@@ -12140,7 +12171,7 @@
             "description": "Chymotrypsin, cleaves C-terminal of Tyr, Phe, Trp",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "elastase",
@@ -12151,7 +12182,7 @@
             "description": "Elastase, C-terminal of Ala, Val, Ser, Gly, Leu and ile, optimal pH = 9.0",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "gluc",
@@ -12162,7 +12193,7 @@
             "description": "GlucC - Cleaves C-term of glutamine \u20ac residues",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "lysc",
@@ -12173,7 +12204,7 @@
             "description": "LysC (Wako) - Cleaves C-term of lysine",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "raspn",
@@ -12184,7 +12215,7 @@
             "description": "rAsp-N, N-terminal of Asp, optimal pH = 6 - 9",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "trypsin",
@@ -12195,7 +12226,7 @@
             "description": "Trypsin (Sigma) - Cleave C-term of arginine (R) and lysine (K)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 119.0
+            "attribute_id": 120.0
         },
         {
             "value": "apex",
@@ -12254,14 +12285,25 @@
         },
         {
             "value": "frameshift",
-            "attribute_tag": "att_protein_mutation",
-            "tag": "att_protein_mutation:frameshift",
+            "attribute_tag": "att_protein_untargeted_mutation",
+            "tag": "att_protein_untargeted_mutation:frameshift",
             "keyword": null,
             "text": "Frameshift",
             "description": "Frameshift mediated by a double strand break",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 96.0
+            "attribute_id": 97.0
+        },
+        {
+            "value": "premstop",
+            "attribute_tag": "att_protein_untargeted_mutation",
+            "tag": "att_protein_untargeted_mutation:premstop",
+            "keyword": null,
+            "text": "preSTOP",
+            "description": "Premature stop codon mediated by a double strand break",
+            "priority": 500.0,
+            "ols": null,
+            "attribute_id": 97.0
         },
         {
             "value": "gfp",
@@ -12371,7 +12413,7 @@
             "description": "Specific amino acid position",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 102.0
+            "attribute_id": 103.0
         },
         {
             "value": "cterm",
@@ -12382,7 +12424,7 @@
             "description": "C-terminus of the protein",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 102.0
+            "attribute_id": 103.0
         },
         {
             "value": "nterm",
@@ -12393,7 +12435,7 @@
             "description": "N-terminus of the protein",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 102.0
+            "attribute_id": 103.0
         },
         {
             "value": "region",
@@ -12404,7 +12446,7 @@
             "description": "Protein region defined by a start and stop amino acid. Use this for truncation or gRNA target sequences.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 102.0
+            "attribute_id": 103.0
         },
         {
             "value": "antibody",
@@ -12448,7 +12490,7 @@
             "description": null,
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 126.0
+            "attribute_id": 127.0
         },
         {
             "value": "ibaq",
@@ -12459,7 +12501,7 @@
             "description": "Intensity normalization to estimate absolute protein levels.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 126.0
+            "attribute_id": 127.0
         },
         {
             "value": "maxlfq",
@@ -12470,7 +12512,7 @@
             "description": null,
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 126.0
+            "attribute_id": 127.0
         },
         {
             "value": "speccount",
@@ -12481,7 +12523,7 @@
             "description": null,
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 126.0
+            "attribute_id": 127.0
         },
         {
             "value": "isobaric",
@@ -12492,7 +12534,7 @@
             "description": "isobaric (TMT)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 127.0
+            "attribute_id": 128.0
         },
         {
             "value": "istopic",
@@ -12503,7 +12545,7 @@
             "description": "istopic (PlexDIA)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 127.0
+            "attribute_id": 128.0
         },
         {
             "value": "label_free",
@@ -12514,7 +12556,7 @@
             "description": "Label-free quantification",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 127.0
+            "attribute_id": 128.0
         },
         {
             "value": "silac",
@@ -12525,7 +12567,7 @@
             "description": "Stable isotope labeling by/with amino acids in cell culture (SILAC)",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 127.0
+            "attribute_id": 128.0
         },
         {
             "value": "dtt",
@@ -12536,7 +12578,7 @@
             "description": "Dithiothreitol, at a final above 0.1 M concentration, DTT is also widely used for disruption of protein disulfide bonds prior to protein digestion.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 118.0
+            "attribute_id": 119.0
         },
         {
             "value": "no_reduction",
@@ -12547,7 +12589,7 @@
             "description": "Proteins were not reduced - intact S-S bridges",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 118.0
+            "attribute_id": 119.0
         },
         {
             "value": "tcep",
@@ -12558,7 +12600,7 @@
             "description": "TCEP (tris(2-carboxyethyl)phosphine) is\u00a0a reducing agent frequently used in biochemistry and molecular biology applications. It is often prepared and used as a hydrochloride salt (TCEP-HCl) with a molecular weight of 286.65 gram/mol.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 118.0
+            "attribute_id": 119.0
         },
         {
             "value": "diann",
@@ -12569,7 +12611,7 @@
             "description": "universal automated software suite for DIA proteomics data analysis",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "maxquant",
@@ -12580,7 +12622,7 @@
             "description": "MPI\u2019s MaxQuant quantitiative proteomics software package",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "metamorpheus",
@@ -12591,7 +12633,7 @@
             "description": "Open-Source PTM Disocvery; smith-chem-wisc",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "minora",
@@ -12602,7 +12644,7 @@
             "description": "Proteome Discoverer, Minora; Thermo Fisher",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "msfragger",
@@ -12613,7 +12655,7 @@
             "description": "Nesvilab\u2019s MSFragger",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "msgf",
@@ -12624,7 +12666,7 @@
             "description": "MS-GF+ (aka MSGF+ or MSGFPlus) ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "spectronaut",
@@ -12635,7 +12677,7 @@
             "description": "BioGnoSys\u2019s Spectronaut; DIA proteomics analysis",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 123.0
+            "attribute_id": 124.0
         },
         {
             "value": "wc",
@@ -16441,7 +16483,7 @@
             "description": "Knockdown of a gene expression using siRNA, esiRNA, shRNA, mirRNA, gRNA etc. Please define the knock down technique separately. Provide the time, the concentration and the targeting feature in the user input section.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 116.0
+            "attribute_id": 117.0
         },
         {
             "value": "overexpression",
@@ -16452,7 +16494,7 @@
             "description": "Overexpression of a gene. ",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 116.0
+            "attribute_id": 117.0
         },
         {
             "value": "cumate",
@@ -17508,7 +17550,7 @@
             "description": "Single-guide RNA (sgRNA). A\u00a0fusion\u00a0of CRISPR RNA (crRNA) and trans-activating CRISPR RNA (tracrRNA). Most common in\u00a0CRISPR-Cas9\u00a0systems. Length: ~100 nucleotides.",
             "priority": 600.0,
             "ols": null,
-            "attribute_id": 100.0
+            "attribute_id": 101.0
         },
         {
             "value": "sgrnahdr",
@@ -17519,7 +17561,7 @@
             "description": "Combination of sgRNA and a replair template (HDR) use for Knock-in.",
             "priority": 600.0,
             "ols": null,
-            "attribute_id": 100.0
+            "attribute_id": 101.0
         },
         {
             "value": "dcas9grna",
@@ -17530,7 +17572,7 @@
             "description": "CRISPRi / CRISPRa - Used for transcriptional repression (interference) or activation.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 100.0
+            "attribute_id": 101.0
         },
         {
             "value": "pegrna",
@@ -17541,7 +17583,7 @@
             "description": "prime editing gRNA - Extended sgRNA with primer-binding site and reverse transcriptase template.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 100.0
+            "attribute_id": 101.0
         },
         {
             "value": "ssdna",
@@ -17552,7 +17594,7 @@
             "description": "single stranded DNA as a HDR template",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 101.0
+            "attribute_id": 102.0
         },
         {
             "value": "dsdna",
@@ -17563,7 +17605,7 @@
             "description": "double stranded DNA as a HDR template",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 101.0
+            "attribute_id": 102.0
         },
         {
             "value": "aa",
@@ -17574,7 +17616,7 @@
             "description": "Amino acid index",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 104.0
+            "attribute_id": 105.0
         },
         {
             "value": "aa",
@@ -17585,7 +17627,7 @@
             "description": "Amino acid index",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 105.0
+            "attribute_id": 106.0
         },
         {
             "value": "aa",
@@ -17596,7 +17638,7 @@
             "description": "Define the amino acid sequence for the substitution.",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 106.0
+            "attribute_id": 107.0
         },
         {
             "value": "aa",
@@ -17607,7 +17649,7 @@
             "description": "Amino acid index",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 103.0
+            "attribute_id": 104.0
         },
         {
             "value": "ef1alpha",
@@ -17618,7 +17660,7 @@
             "description": "Origin: Human Strength: Strong Expression Profile Broad, constitutive expression in dividing and non-dividing mammalian cells Stable, long-term expression of transgenes",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "gag",
@@ -17629,7 +17671,7 @@
             "description": "Origin: Viral (HIV-1 or MLV) Strength: Moderate\u2013Strong Expression Profile Context-dependent; active in cells supporting viral replication Viral packaging and structural gene expression",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "cmv",
@@ -17640,7 +17682,7 @@
             "description": "Origin: Human cytomegalovirus Strength: Very Strong Expression Profile Broad, high-level expression in many mammalian cell types Transient transfection; high recombinant protein yield",
             "priority": 650.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "pgk1",
@@ -17651,7 +17693,7 @@
             "description": "Origin: Human or Mouse Strength: Moderate Expression Profile Ubiquitous, constitutive expression in most mammalian cells Stable, long-term expression with lower silencing risk",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "ubc1",
@@ -17662,7 +17704,7 @@
             "description": "Origin: Human Strength: Moderate\u2013Strong Expression Profile Broad, constitutive expression across many cell types Stable, long-term expression of transgenes",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "cmvteto",
@@ -17673,7 +17715,7 @@
             "description": "Hybrid (CMV promoter with tetracycline operator elements) Inducible (Strong when ON) Broad expression; controlled by Tet-On or Tet-Off system depending on presence of doxycycline/tetracycline Tight, inducible expression of transgenes in mammalian cells",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "cmvcuo",
@@ -17684,172 +17726,183 @@
             "description": "Hybrid (CMV promoter with copper-operator elements) Inducible (Strong when ON) Broad expression; controlled by copper-sensitive repressor system Metal-inducible expression in mammalian cells",
             "priority": 500.0,
             "ols": null,
-            "attribute_id": 107.0
+            "attribute_id": 108.0
         },
         {
             "value": "dATP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dATP",
             "keyword": null,
-            "text": "Deoxyadenosine triphosphate",
-            "description": "DNA building block with Adenine base",
+            "text": "dATP",
+            "description": "Deoxyadenosine triphosphate DNA building block with Adenine base",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxyadenosine triphosphate DNA building block with Adenine base",
+            "attribute_id": 134.0
         },
         {
             "value": "dGTP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dGTP",
             "keyword": null,
-            "text": "Deoxyguanosine triphosphate",
-            "description": "DNA building block with Guanine base",
+            "text": "dGTP",
+            "description": "Deoxyguanosine triphosphate DNA building block with Guanine base",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxyguanosine triphosphate DNA building block with Guanine base",
+            "attribute_id": 134.0
         },
         {
             "value": "dCTP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dCTP",
             "keyword": null,
-            "text": "Deoxycytidine triphosphate",
-            "description": "DNA building block with Cytosine base",
+            "text": "dCTP",
+            "description": "Deoxycytidine triphosphate DNA building block with Cytosine base",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxycytidine triphosphate DNA building block with Cytosine base",
+            "attribute_id": 134.0
         },
         {
             "value": "dTTP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dTTP",
             "keyword": null,
-            "text": "Deoxythymidine triphosphate",
-            "description": "DNA building block with Thymine base",
+            "text": "dTTP",
+            "description": "Deoxythymidine triphosphate DNA building block with Thymine base",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxythymidine triphosphate DNA building block with Thymine base",
+            "attribute_id": 134.0
         },
         {
             "value": "ATP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:ATP",
             "keyword": null,
-            "text": "Adenosine triphosphate",
-            "description": "RNA building block and primary energy carrier",
+            "text": "ATP",
+            "description": "Adenosine triphosphate RNA building block and primary energy carrier",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Adenosine triphosphate RNA building block and primary energy carrier",
+            "attribute_id": 134.0
         },
         {
             "value": "GTP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:GTP",
             "keyword": null,
-            "text": "Guanosine triphosphate",
-            "description": "RNA building block and signaling molecule",
+            "text": "GTP",
+            "description": "Guanosine triphosphate RNA building block and signaling molecule",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Guanosine triphosphate RNA building block and signaling molecule",
+            "attribute_id": 134.0
         },
         {
             "value": "CTP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:CTP",
             "keyword": null,
-            "text": "Cytidine triphosphate",
-            "description": "RNA building block and lipid synthesis co-factor",
+            "text": "CTP",
+            "description": "Cytidine triphosphate RNA building block and lipid synthesis co-factor",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Cytidine triphosphate RNA building block and lipid synthesis co-factor",
+            "attribute_id": 134.0
         },
         {
             "value": "UTP",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:UTP",
             "keyword": null,
-            "text": "Uridine triphosphate",
-            "description": "RNA building block and carbohydrate metabolism activator",
+            "text": "UTP",
+            "description": "Uridine triphosphate RNA building block and carbohydrate metabolism activator",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Uridine triphosphate RNA building block and carbohydrate metabolism activator",
+            "attribute_id": 134.0
         },
         {
             "value": "dA",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dA",
             "keyword": null,
-            "text": "Deoxyadenosine",
-            "description": "DNA nucleoside (Adenine + Deoxyribose sugar)",
+            "text": "dA",
+            "description": "Deoxyadenosine DNA nucleoside (Adenine + Deoxyribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxyadenosine DNA nucleoside (Adenine + Deoxyribose sugar)",
+            "attribute_id": 134.0
         },
         {
             "value": "dG",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dG",
             "keyword": null,
-            "text": "Deoxyguanosine",
-            "description": "DNA nucleoside (Guanine + Deoxyribose sugar)",
+            "text": "dG",
+            "description": "Deoxyguanosine DNA nucleoside (Guanine + Deoxyribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxyguanosine DNA nucleoside (Guanine + Deoxyribose sugar)",
+            "attribute_id": 134.0
         },
         {
             "value": "dC",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dC",
             "keyword": null,
-            "text": "Deoxycytidine",
-            "description": "DNA nucleoside (Cytosine + Deoxyribose sugar)",
+            "text": "dC",
+            "description": "Deoxycytidine DNA nucleoside (Cytosine + Deoxyribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxycytidine DNA nucleoside (Cytosine + Deoxyribose sugar)",
+            "attribute_id": 134.0
         },
         {
             "value": "dT",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:dT",
             "keyword": null,
-            "text": "Deoxythymidine",
-            "description": "DNA nucleoside (Thymine + Deoxyribose sugar)",
+            "text": "dT",
+            "description": "Deoxythymidine DNA nucleoside (Thymine + Deoxyribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Deoxythymidine DNA nucleoside (Thymine + Deoxyribose sugar)",
+            "attribute_id": 134.0
         },
         {
             "value": "A",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:A",
             "keyword": null,
-            "text": "Adenosine",
-            "description": "RNA nucleoside (Adenine + Ribose sugar)",
+            "text": "A",
+            "description": "Adenosine RNA nucleoside (Adenine + Ribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Adenosine RNA nucleoside (Adenine + Ribose sugar)",
+            "attribute_id": 134.0
         },
         {
             "value": "G",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:G",
             "keyword": null,
-            "text": "Guanosine",
-            "description": "RNA nucleoside (Guanine + Ribose sugar)",
+            "text": "G",
+            "description": "Guanosine RNA nucleoside (Guanine + Ribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Guanosine RNA nucleoside (Guanine + Ribose sugar)",
+            "attribute_id": 134.0
         },
         {
             "value": "C",
             "attribute_tag": "att_biomolecule",
             "tag": "att_biomolecule:C",
             "keyword": null,
-            "text": "Cytidine",
-            "description": "RNA nucleoside (Cytosine + Ribose sugar)",
+            "text": "C",
+            "description": "Cytidine RNA nucleoside (Cytosine + Ribose sugar)",
             "priority": 500.0,
-            "ols": null,
-            "attribute_id": 133.0
+            "ols": "Cytidine RNA nucleoside (Cytosine + Ribose sugar)",
+            "attribute_id": 134.0
+        },
+        {
+            "value": "ctrl",
+            "attribute_tag": "att_biomolecule",
+            "tag": "att_biomolecule:ctrl",
+            "keyword": null,
+            "text": "ctrl",
+            "description": "control control conditions",
+            "priority": 600.0,
+            "ols": "control control conditions",
+            "attribute_id": 134.0
         }
     ]
 }

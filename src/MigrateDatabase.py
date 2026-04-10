@@ -59,7 +59,7 @@ def get_tags_by_sample(samples_attrs : dict):
     
    
     samples_idcs = np.sort(np.unique(np.concatenate([np.array(indices) for indices in samples_attrs.values()])))
-    return [[genotype_tag for genotype_tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
+    return [[tag for tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
    
    
 def map_genotype_labels_to_tags(samples_genotypes: dict):
