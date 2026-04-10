@@ -129,6 +129,7 @@ import pandas as pd
 from scipy import stats
 from itertools import combinations
 
+
 class FeatureRanking(object):
     
     def __init__(self):
@@ -150,10 +151,10 @@ class FeatureRanking(object):
         """
         
         df_no_nan = df.dropna(subset=["value", "ca_tags"])
-        results = []
+        total_results = []
         for attribute_tag, df in df_no_nan.groupby("attribute_tag"):
         
-        
+            results = []
             df_pivot_mean = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="mean")
             df_pivot_count = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="count")
             df_grouped_values = df.groupby(["protein_group_tag","ca_tags"])["value"].apply(list)
@@ -161,14 +162,12 @@ class FeatureRanking(object):
 
             for protein_group_tag, pdf in df.groupby("protein_group_tag"):
                 exclusively = False
+                exclusively_ca_tags = None
                 f_stat, p_value = np.nan, np.nan
                 # Drop missing
                 pdf = pdf.dropna(subset=["value", "ca_tags"])
 
                 groups = pdf.groupby("ca_tags")["value"].apply(list)
-
-                if len(groups) < 2:
-                    continue
 
                 # ---------------------------
                 # Basic stats
@@ -186,14 +185,16 @@ class FeatureRanking(object):
                 bools_group_size_not_null = [s > 0 for s in sizes]
                 bools_group_size_at_least_2 = [s >= 2 for s in sizes]
                 group_sizes_not_null_sum = sum(bools_group_size_not_null)
-                exclusively = group_sizes_not_null_sum == 1 and sum(sizes) > 3 #if only one group has non-null size and that size is > 4, we consider the protein exclusively present in that group. In this case, ANOVA is not applicable, but we can still compute effect sizes.
+                exclusively = group_sizes_not_null_sum == 1 and sum(sizes) > 1 #if only one group has non-null size and that size is > 4, we consider the protein exclusively present in that group. In this case, ANOVA is not applicable, but we can still compute effect sizes.
+                if exclusively:
+                    exclusively_ca_tags = [g for g, s in group_sizes.items() if s > 0]
                 
                 if not exclusively and group_sizes_not_null_sum > 1 and sum(bools_group_size_at_least_2) >= 2: #ANOVA requires at least 2 groups with non-null size
                     try:
                         f_stat, p_value = stats.f_oneway(*df_grouped_values.loc[protein_group_tag].values)
                     except Exception:
                         pass 
-                
+        
                 # group means and counts as arrays
                 means = np.array([group_means[g] for g in groups.keys()])
                 counts = np.array([group_sizes[g] for g in groups.keys()])
@@ -248,6 +249,9 @@ class FeatureRanking(object):
                 results.append({
                     "protein_group_tag": protein_group_tag,
                     "attribute_tag": attribute_tag,
+                    "score": score,
+                    "mean": np.mean(all_values),
+                    "quantified_in_samples": observed,
                     "F": f_stat,
                     "p_value": p_value,
                     "eta_squared": eta_squared,
@@ -256,11 +260,21 @@ class FeatureRanking(object):
                     "std_means": std_means,
                     "missingness": missingness,
                     "n_groups": n_groups,
-                    "score": score,
-                    "exclusively": exclusively
+                    "exclusively": exclusively,
+                    "exclusively_ca_tags": exclusively_ca_tags
                 })
-
-        return pd.DataFrame(results)
+            df_attribute = pd.DataFrame(results)
+            df_attribute.loc[:,"FDR"] = np.nan
+            df_attribute.loc[:,"rank"] = df_attribute["score"].rank(ascending=False, method="min").values
+            df_no_nan_attribute = df_attribute.dropna(subset=["p_value"])
+            p_adjusted = stats.false_discovery_control(df_no_nan_attribute["p_value"].values, method="bh")
+            df_attribute.loc[df_no_nan_attribute.index, "FDR"] = p_adjusted[1]
+            total_results.append(df_attribute)
+        df = pd.concat(total_results, ignore_index=True)
+            
+        #df.loc[:,"FDR"] = df.groupby("attribute_tag")["p_value"].transform(lambda p: stats.false_discovery_control(p, method="fdr_bh")[1])
+        #df.loc[:"rank"] = df.groupby("attribute_tag")["score"].rank(ascending=False, method="min")
+        return df
 
         
     

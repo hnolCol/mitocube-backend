@@ -45,16 +45,30 @@ class FeatureSequenceResponseModel(BaseModel):
     
     
 class ProteinGroupSubmissionStatisticsModel(BaseModel):
+    tag : str
     attribute_tag : str 
     submission_tag : str
+    score : float
+    mean : float
+    quantified_in_samples : int
     p_value : float
     F : float
     eta_squared : float
     cohen_f : float
+    exclusively_ca_tags : List[str]
     max_fc : float
     std_means : float
     missingness : float
     n_groups : int
-    score : float
     exclusively : bool
+    rank : int 
+    FDR : float
     
+    
+class ExclusivelyQuantifiedModel(BaseModel):
+    tag : str
+    attribute_tag : str 
+    stats_tag : str 
+    mean : Optional[float] = 0.0
+    exclusively_ca_tags : List[str] = []
+    quantified_in_samples : int = 0

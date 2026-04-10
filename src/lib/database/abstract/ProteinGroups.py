@@ -2,11 +2,7 @@ from __future__ import annotations
 from abc import abstractmethod, ABC
 
 from typing import List, Dict, Optional, Tuple
-from deprecated import deprecated
-
-from config.models.user import UserModel 
-from config.models.feature import FeatureNeoModel
-from config.models.filter import FilterModel
+from config.models.feature import ExclusivelyQuantifiedModel
 
 import pandas as pd 
 
@@ -122,7 +118,7 @@ class ProteinGroupsABC(ABC):
         
         
     @abstractmethod
-    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[Dict]:
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tag : str = None, limit : Optional[int] = 20) -> List[Dict]:
         """Returns the statistical ranking for a given protein group.
 
         Parameters
@@ -138,4 +134,24 @@ class ProteinGroupsABC(ABC):
         -------
         List[Dict]
             A list of dictionaries containing the statistical ranking information.
+        """
+        
+        
+    @abstractmethod
+    def get_exclusively_quantified(self, submission_tag : str) -> List[ExclusivelyQuantifiedModel]:
+        """Returns the list of protein group tags that are exclusively quantified in a given submission.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag 
+
+        Returns
+        -------
+        List[ExclusivelyQuantifiedModel]
+             A list of ExclusivelyQuantifiedModel that are exclusively quantified in the given submission.
+             -tag  
+             -attribute_tag
+             -stats_tag
+             -mean
         """

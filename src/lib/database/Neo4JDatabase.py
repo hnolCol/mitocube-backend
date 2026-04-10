@@ -116,6 +116,7 @@ constraints = [
     ConstraintModel(constrain_label  = "genotype_tag",node_label = NodeLabelModel(label = "Genotype"), property_name = "tag"),
     ConstraintModel(constrain_label  = "condition_value_tag",node_label = NodeLabelModel(label = "ConditionValue"), property_name = "tag"),
     ConstraintModel(constrain_label  = "external_service_tag",node_label = NodeLabelModel(label = "ExternalService"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "statistics_tag",node_label = NodeLabelModel(label = "Statistics"), property_name = "tag"),
 ]
 
 DB_SETTINGS = get_db_settings()

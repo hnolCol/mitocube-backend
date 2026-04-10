@@ -8,7 +8,7 @@ from config.models.conditions_applications import ConditionApplicationAttributeM
 from services.random_generators import get_random_string
 from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
-from typing import List, Dict
+from typing import List, Dict, OrderedDict
 import pandas as pd
 
 from config.models.parameter import APIParamString 
@@ -39,9 +39,10 @@ router = APIRouter(
     )
 
 @router.get("/{submission_tag}/ca")
-def get_submission_condition_applications(submission_tag: str, group_by_attribute : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
+def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
     "Return the condition applications for a given submission."
-    return DB.submissions.get_conditions_applications(submission_tag, group_by_attribute=group_by_attribute)
+    print(APIParamString(param=attribute_tags).param,"ATTRIBUTE_TAGGS")
+    return DB.submissions.get_conditions_applications(submission_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=group_by_attribute)
 
 
 @router.get("/{submission_tag}/ca/attributes")
@@ -54,8 +55,24 @@ def get_submission_condition_application_attributes(submission_tag: str, user: U
 
 
 @router.get("/{submission_tag}/samples/ca")
-def get_submission_sample_condition_applications(submission_tag: str, attribute_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List:
-
+def get_submission_sample_condition_applications(submission_tag: str, attribute_tags : str = None, return_unique: bool = False, user: UserModel = Depends(get_user_from_token)) -> List|OrderedDict:
+    """Return the condition applications for samples of a given submission.
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission to get the condition applications for.
+    attribute_tags : str, optional
+        If provided, only condition applications with the given attribute tags are returned. By default, None, which means that condition applications of all attributes are returned. Multiple attribute tags can be provided as a
+        semicolon-separated string.
+    return_unique : bool, optional
+        If True, only unique condition application tags are returned. By default, False, which means that a list of sample_tag and the associated ca_tags is returned. If True, a list with unique ca_tags across all samples is returned.
+    user : UserModel, optional
+        The user to get the condition applications for. By default, the user is extracted from the token.
+    Returns
+    -------
+    List|Dict
+        A list of condition application tags for the samples of the submission. If return_unique is False, a list of dictionaries with sample_tag and the associated ca_tags is returned. If return_unique is True, a dictionary with unique ca_tags acrross attribute_tags is returned 
+    """
     sample_tags = DB.submissions.get_samples(tag = submission_tag)  #get samples 
     r = []
     
@@ -68,6 +85,17 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
         r.append(ri)
         
     df = pd.DataFrame.from_dict(r)
+    if return_unique:
+        attribute_tags = [col for col in df.columns if col != "tag"] #tag = sample_tag
+        r = OrderedDict() 
+        for attribute_tag in attribute_tags:
+            unique_cas = set() 
+            for ca_tag in df[attribute_tag].str.join(";").values:
+                unique_cas.add(ca_tag) 
+            r[attribute_tag] = [ca_tag.split(";") for ca_tag in list(unique_cas)]
+        print(r)
+        return r 
+    
     return df.to_dict(orient="records")
     
     

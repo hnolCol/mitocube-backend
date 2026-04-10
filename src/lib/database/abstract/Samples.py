@@ -116,6 +116,8 @@ class SamplesABC(ABC):
         ----------
         tag : str
             The tag of the sample to get the condition procedures for.
+        attribute_tags : List[str], optional
+            If provided, only condition procedures with the given attribute tags are returned. By default, None, which means that condition procedures of all attributes are returned.
         group_by_attribute : bool, optional
             If True, the results are grouped by attribute and returned as a list of ConditionApplicationAttribute
             

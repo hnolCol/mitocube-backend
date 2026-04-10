@@ -94,13 +94,15 @@ class SubmissionsABC(ABC):
         "Sets the title of the submission."
     
     @abstractmethod
-    def get_conditions_applications(self, tag : str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
         """Returns the condition application tag for the submission by its tag.
         
         Parameters
         ----------
         tag : str
             The submission tag.
+        attribute_tag : str, optional
+            The attribute tag to filter condition applications, by default None
         group_by_attribute : bool, optional
             If True, the condition applications are grouped by attribute, by default False  
         Returns
@@ -332,6 +334,21 @@ class SubmissionsABC(ABC):
             Number of inserted precursor quantifications.
         """
         
+        
+    @abstractmethod
+    def remove_multiple_comparison_metrices(self, tag : str) -> bool:
+        """Removes the multiple comparison statistics for a given submission tag. This can be used to remove the statistics before recalculating them. Neo4J implementation. 
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        bool
+            True if the statistics were removed successfully, False otherwise.
+        """
     
     @abstractmethod
     def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:

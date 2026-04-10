@@ -72,24 +72,33 @@ def nx_to_indexed_graph_with_layout(
     }
     
     
-def make_fake_graph(protein_tags : List[str] = None, annotation_tags : List[str] = None) -> nx.Graph:
+def make_graph(graph_data : List[tuple] = None) -> nx.Graph:
+    """Creates a nx.Graph from the annotation data
+
+    Parameters
+    ----------
+    graph_data : List[tuple], optional
+        _description_, by default None
+
+    Returns
+    -------
+    nx.Graph
+        _description_
+    """
     G = nx.Graph()
 
-    for p in protein_tags:
-        G.add_node(p, type="protein")
-
-    for a in annotation_tags:
-        G.add_node(a, type="annotation")
-
-    # random connections
-    for p in protein_tags:
-        for a in annotation_tags:
-            G.add_edge(p, a)
-
+    for annotation_tag, protein_tags in graph_data:
+        
+        for p in protein_tags:
+            G.add_node(p, type="protein")
+        G.add_node(annotation_tag, type="annotation")
+        for p in protein_tags:
+            G.add_edge(p, annotation_tag)
+            
     return G
 
 @router.get("/{submission_tag}/annotations/network")
-def get_annotation_network(submission_tag : str, annotation_group_tag : str = None, min_proteins : int = 3, user : UserModel = Depends(get_user_from_token)):
+def get_annotation_network(submission_tag : str, annotation_group_tag : str = None, min_proteins : int = 0, user : UserModel = Depends(get_user_from_token)):
     "" 
     
     print(annotation_group_tag)
@@ -100,16 +109,16 @@ def get_annotation_network(submission_tag : str, annotation_group_tag : str = No
     if DB.annotation_groups.exists(tag = annotation_group_tag):
         annotation_tags = DB.annotation_groups.get_annotations(group_tag = annotation_group_tag)
         print(annotation_tags)
+        graph_data = []
         for annotation_tag in annotation_tags:
             if DB.annotations.exists(tag = annotation_tag): 
                 if DB.annotations.count_proteins(tag = annotation_tag) >= min_proteins:
                     #get the annotation data and add it to the network
                     #TO DO : add the annotation data to the network
                     protein_tags = DB.annotations.get_protein_tags(tag = annotation_tag)
-                   
-                    #TO DO: FIX LINKS
-        print(annotation_tags)
-        G = make_fake_graph(protein_tags=protein_tags, annotation_tags=annotation_tags)
-    
-    
+                    graph_data.append((annotation_tag, protein_tags))
+        print(graph_data)
+        G = make_graph(graph_data)
+        print(G)
+        print(nx_to_indexed_graph_with_layout(G))
         return nx_to_indexed_graph_with_layout(G)

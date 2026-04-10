@@ -28,7 +28,7 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 ### import routers
 from routers.dataset import dataset
 from routers.dataset import correlation as submission_correlation # volcano
-from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim
+from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim, ranking
 from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap
 from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
@@ -68,6 +68,7 @@ from routers.metatexts import metatexts
 from routers.condition_applications import condition_applications
 from routers.ai import openai
 
+
 from routers.stats import submissions as submission_stats
 # from routers import play  # route to test things during development ###########################################################
 
@@ -83,6 +84,7 @@ router_sources = [dataset,
                   submission_stats, 
                   quantifications,
                   researchaim,
+                  ranking,
                   submission, 
                   comments,
                   count,
@@ -147,7 +149,6 @@ DB = Database.DB()
 #check for users, essentially, create admin user if no users exists with the defined admin email.
 DB.users.check()
 DB.users._utils_migrate(path_to_user_data="/Users/hnolte/Documents/GitHub/mitocube-backend/resources/users/users.json")
-
 
 
 
