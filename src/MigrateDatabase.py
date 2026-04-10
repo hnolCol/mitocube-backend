@@ -13,10 +13,11 @@ import numpy as np
 from config.settings.metatexts import MetaTexts 
 
 
+genotype_labels_path = "/Users/PParsa/Documents/GitHub/mitocube-backend/label_to_tag.json"
+genotype_labels_to_tags = read_json(genotype_labels_path)
 
-print(MetaTexts().names)
+fall_back_user = "WX9r5zQJ"
 
-fall_back_user = "x7rk6lRY"
 proteom_mapper = {
     "att_organism:UP000005640" : "att_proteome:UP000005640",
     "att_organism:controls" : "att_proteome:ctrl"
@@ -44,9 +45,9 @@ def handle_knockdown(tags : List[str]):
     return r 
 
 
-genotype_mapping = { 
+# genotype_mapping = { 
             
-        } #genotype tags have changed, since the tag is not generate based on the data inserted. 
+#         } #genotype tags have changed, since the tag is not generate based on the data inserted. 
 
 
 def build_tree(attribute_tag, trait_tags : List[str], value = None):
@@ -61,7 +62,23 @@ def get_tags_by_sample(samples_attrs : dict):
     return [[genotype_tag for genotype_tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
    
    
-   
+def map_genotype_labels_to_tags(samples_genotypes: dict):
+    """Convert old genotype labels per sample into new genotype tags."""
+    if not samples_genotypes:
+        return []
+    labels_by_sample = get_tags_by_sample(samples_genotypes)
+    tags_by_sample = []
+    for sample_labels in labels_by_sample:
+        sample_tags = []
+        for label in sample_labels:
+            if label in genotype_labels_to_tags:
+                sample_tags.append(genotype_labels_to_tags[label])
+            else:
+                print(f"WARNING: no genotype tag mapping for label '{label}'")
+        tags_by_sample.append(sample_tags)
+    return tags_by_sample
+
+
 def build_sample_attributes(sample_attrs_input : dict):
     
     r = OrderedDict()
@@ -103,8 +120,8 @@ class MigrateData:
     def __init__(self, ):
         
 
-        PATH_TO_SUBMISSION_FOLDER = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data"
-        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "LOGtC9tNC13b"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
+        PATH_TO_SUBMISSION_FOLDER = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/data"
+        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "BuXOSlIl6G"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
 
         print(dirList)
 
@@ -113,19 +130,24 @@ class MigrateData:
         for submission_tag in dirList:
             print(submission_tag)
             jsonFile = read_json(os.path.join(PATH_TO_SUBMISSION_FOLDER,submission_tag,"params.json"))
-            user_tag = jsonFile["user_label"] if DB.users.exists(tag=jsonFile["user_label"]) else fall_back_user
+            #user_tag = jsonFile["user_label"] if DB.users.exists(tag=jsonFile["user_label"]) else fall_back_user
+            user_tag = jsonFile.get("user_tag") or jsonFile.get("user_label")
+            if not user_tag or not DB.users.exists(tag=user_tag):
+                user_tag = fall_back_user
+            sample_names = jsonFile["sample_names"]
             sample_names = jsonFile["sample_names"]
             metatext = jsonFile["metatext"]
             meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
             print(meta_text)
-            genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
+            #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
+            genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"])
             dataset_attributes = build_dataset_condition_applications(jsonFile["dataset_attributes"])
             
     
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"])
             print(sample_attributes)
             timeline = jsonFile.get("timeline", {})
-            timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag" : t["user_label"], "state" : t["state"]}for t in  timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
+            timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": t.get("user_tag") or t.get("user_label"), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
             if not DB.submission_exists(tag = submission_tag):
                 submission_insert_model = NewSubmissionModel(tag = submission_tag,
                                                              user_tag= user_tag,
@@ -167,7 +189,20 @@ class MigrateData:
                     if idx < len(submission_insert_model.samples_attributes):
                         sample_attributes = submission_insert_model.samples_attributes[idx] 
                         DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
-                    
+
+                    #connect sample to genotype_mapping
+            
+                    if idx < len(submission_insert_model.genotypes):
+                        for genotype_tag in submission_insert_model.genotypes[idx]:
+                            if DB.genotypes.exists(genotype_tag):
+                                DB.samples.insert_genotype(
+                                    sample_tags=[sample_tag],
+                                    genotype_tag=genotype_tag,
+                                )
+                            else:
+                                print(f"WARNING: genotype tag '{genotype_tag}' not found in DB, skipping for sample {sample_tag}")
+
+                ### upoad quantification data. 
           
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")

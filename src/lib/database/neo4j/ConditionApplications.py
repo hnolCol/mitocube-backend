@@ -169,8 +169,8 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                         self._handle_children(trait_node=trait_node, parent_tag=parent_tag_2, extra_data_for_hash=extra_data_for_hash)
             
     def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None, extra_data_for_hash : dict = {}) -> str:
-                
-        gcv_tag = create_hierarchical_hash(data = {"attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value, **extra_data_for_hash})
+        gcv_tag = create_hierarchical_hash(data = {"parent_tag" : parent_tag, "attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value, **extra_data_for_hash})         
+        #gcv_tag = create_hierarchical_hash(data = {"attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value, **extra_data_for_hash})
         query = (
             "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
             "MERGE (cv:ConditionValue {tag : $gcv_tag}) "
