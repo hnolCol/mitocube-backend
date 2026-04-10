@@ -40,6 +40,7 @@ from routers.features.proteins import receive as protein_receive
 from routers.features import correlations as feature_correlation
 from routers.genotypes import permissions as genotype_permissions
 from routers.genotypes import genotypes
+from routers.attributes import permissions as attribute_permissions
 from routers.attributes import attributes
 from routers.instruments import instruments
 from routers.network import network
@@ -99,6 +100,7 @@ router_sources = [dataset,
                   volcano,
                   genotype_permissions, 
                   genotypes, 
+                  attribute_permissions,
                   attributes, 
                   instruments, 
                   network, 
@@ -142,13 +144,13 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
 #DB.instrument_states.get_fractional_state_durations()
-#DB.attributes._utils_insert_from_file()
+# DB.attributes._utils_insert_from_file()
 #DB.instrument_states._utils_insert_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
 #DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t")        
                                      
 #check for users, essentially, create admin user if no users exists with the defined admin email.
 DB.users.check()
-DB.users._utils_migrate(path_to_user_data="/Users/hnolte/Documents/GitHub/mitocube-backend/resources/users/users.json")
+# DB.users._utils_migrate(path_to_user_data="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/users/users.json")
 
 
 

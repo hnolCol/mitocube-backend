@@ -1,5 +1,5 @@
-from pydantic import BaseModel, field_validator
-
+from pydantic import BaseModel, field_validator, model_validator
+import re
 from typing import Any, Optional, List, Union, Literal, ForwardRef, Dict
 import numpy as np 
 
@@ -206,6 +206,8 @@ class TraitBaseModel(BaseModel):
     text : str
     tag : str 
     description : Optional[str] = ""
+    priority: Optional[float] = 500
+    
 class TraitModel(TraitBaseModel):
     """
     BaseModel for a trait
@@ -364,3 +366,31 @@ class AttributeUnitResponseModel(BaseModel):
     # units : List[AttributeUnitModel]
 
 
+
+
+
+
+class InsertTraitModel(BaseModel):
+    """Model for inserting a new trait. The tag is generated from
+    attribute_tag and value as '{attribute_tag}:{value}'."""
+
+    attribute_tag: str
+    value: str
+    text: str
+    description: Optional[str] = ""
+    priority: int = 500
+    tag: Optional[str] = None
+
+    @model_validator(mode="after")
+    def generate_tag(self):
+        self.tag = f"{self.attribute_tag}:{self.value}"
+        return self
+    
+
+
+class UpdateTraitModel(BaseModel):
+    """Model for updating an existing trait. Only text, description,
+    and priority can be modified."""
+    text: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[float] = None
