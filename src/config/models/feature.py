@@ -49,13 +49,13 @@ class ProteinGroupSubmissionStatisticsModel(BaseModel):
     attribute_tag : str 
     submission_tag : str
     score : float
-    mean : float
+    mean : Optional[float] = 0.0
     quantified_in_samples : int
     p_value : float
     F : float
     eta_squared : float
     cohen_f : float
-    exclusively_ca_tags : List[str]
+    exclusively_ca_tags : Optional[List[str]] = []
     max_fc : float
     std_means : float
     missingness : float
@@ -70,5 +70,5 @@ class ExclusivelyQuantifiedModel(BaseModel):
     attribute_tag : str 
     stats_tag : str 
     mean : Optional[float] = 0.0
-    exclusively_ca_tags : List[str] = []
+    exclusively_ca_tags : Optional[List[str]] = []
     quantified_in_samples : int = 0

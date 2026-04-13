@@ -21,7 +21,7 @@ class General(BaseSettings):
     frontend_build : DirectoryPath
     frontend_build_assets : DirectoryPath
     
-    use_terms_file : FilePath = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/terms/usage.json"
+    use_terms_file : FilePath
     
     class Config:
          env_file = ".env"

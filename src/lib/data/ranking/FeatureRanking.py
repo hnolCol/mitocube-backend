@@ -162,7 +162,7 @@ class FeatureRanking(object):
 
             for protein_group_tag, pdf in df.groupby("protein_group_tag"):
                 exclusively = False
-                exclusively_ca_tags = None
+                exclusively_ca_tags = []
                 f_stat, p_value = np.nan, np.nan
                 # Drop missing
                 pdf = pdf.dropna(subset=["value", "ca_tags"])

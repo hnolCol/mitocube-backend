@@ -379,6 +379,11 @@ class Neo4JFeatures(FeaturesABC):
             "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
             "RETURN ca.tag as ca_tag, t.tag as trait_tag, a.tag as attribute_tag, count(r) as N, p.tag as tag "
              )
+        else:
+            query = (
+                "MATCH (p:ProteinGroup|Peptide)<-[r:QUANTIFIED]-(sample:Sample) WHERE p.tag = $tag "
+                "RETURN p.tag as tag, count(r) as N "
+            )
         if value == "raw":
             query += ", apoc.agg.percentiles(r.value, [0,0.25,0.5,0.75,1.0]) as quantiles "
         elif value == "z_score_sample":

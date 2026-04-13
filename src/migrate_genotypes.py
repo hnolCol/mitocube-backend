@@ -3,10 +3,10 @@ from pydantic import BaseModel
 from typing import List, Optional, ForwardRef, Literal
 
 from lib.database.Database import Database
-
+import argparse
 DB = Database.DB()
 
-GENOTYPES_PATH = "/Users/HNolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json"
+GENOTYPES_PATH = "/home/cloud/resources/genotypes/genotypes.json"
 USER_TAG = "kxWH7py3"
 ONLY_LABEL = None   # set to a label string to migrate only one, or None to migrate all
 
@@ -33,12 +33,20 @@ class InsertGeneticApplicationModel(BaseModel):
 
 # Tag mappings
 
+parser = argparse.ArgumentParser(description='Migrate genotypes from JSON file')
+parser.add_argument('--user-tag', default='kxWH7py3', help='User tag for database insertion')
+parser.add_argument('--genotypes-path', default='/home/cloud/resources/genotypes/genotypes.json', help='Path to genotypes JSON file')
+args = parser.parse_args()
+
 ZYGOSITY_MAP = {
     "(+/+)": "wt",
     "(-/-)": "homozygot",
     "(+/-)": "hetero",
     "(-/+)": "hetero",
 }
+
+GENOTYPES_PATH = args.genotypes_path
+USER_TAG = args.user_tag
 
 UNTARGETED_MUTATIONS = {"frameshift", "premstop"}
 
@@ -122,6 +130,7 @@ def build_component(attr_block):
 
 #  Migration 
 from services.encryption import create_hierarchical_hash
+import argparse
 
 class MigrateGenotypes:
 
@@ -172,5 +181,5 @@ class MigrateGenotypes:
             json.dump(label_to_tag, f, indent=2)
         print(f"Label to tag mapping saved to label_to_tag.json")
 
-
-MigrateGenotypes()
+if __name__ == "__main__":
+    MigrateGenotypes()

@@ -211,7 +211,6 @@ class MigrateData:
                 ### upoad quantification data. 
                 if df is not None:
                     df_melt = df.reset_index(names="tag").melt(id_vars=["tag"], var_name="sample_tag", value_name="value").dropna(subset=["value"])
-                    print(df_melt)
                     
                     DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**x) for x in df_melt.to_dict(orient="records")]) 
                     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)

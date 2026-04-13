@@ -53,16 +53,16 @@ attr = pd.read_excel(FILE,sheet_name=ATTRIBUTE_SHEET)
 attr_values = pd.read_excel(FILE,sheet_name=ATTRIBUTE_VALUES_SHEET)
 attr_values["tag"] = [f"{attr_tag}:{tag}" for attr_tag, tag in attr_values[["attribute_tag","tag"]].values]
 attrs = attr.dropna(how="all")
-attrs["id"] = np.arange(attrs.index.size)
-tag_mapper = dict([(tag,id) for tag, id in attrs[["tag","id"]].values])
+#attrs["id"] = np.arange(attrs.index.size)
+#tag_mapper = dict([(tag,id) for tag, id in attrs[["tag","id"]].values])
 #parent_ids = attrs["parent_tag"].map(tag_mapper)
 
 
 
 #attrs.loc[:,"parent_id"] = parent_ids  # ToDo: issue, saved as float, parent_ids.astype(int, errors="ignore") does not work
-attr_values.loc[:,"attribute_id"] = attr_values["attribute_tag"].map(tag_mapper)
+#attr_values.loc[:,"attribute_id"] = attr_values["attribute_tag"].map(tag_mapper)
 attr_values = attr_values.dropna(how="all")
-attr_values.dropna(subset=["attribute_id"], inplace=True)
+#attr_values.dropna(subset=["attribute_id"], inplace=True)
 #attr_values["id"] = np.arange(attr_values.index.size)
 
 

@@ -76,6 +76,8 @@ from services.json import read_json
 import pandas as pd
 
 
+migrate = False
+
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
                   protein_groups,
@@ -150,17 +152,21 @@ DB = Database.DB()
                                      
 #check for users, essentially, create admin user if no users exists with the defined admin email.
 DB.users.check()
-# DB.users._utils_migrate(path_to_user_data="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/users/users.json")
+#DB.attributes._utils_insert_from_file(path_to_file ="/Users/HNolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json")
 
+if migrate:
+    DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
+    DB.attributes._utils_insert_from_file(path_to_file ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
+    DB.instrument_states._utils_insert_from_file(file_path="/home/cloud/resources/maintenance/instrumentstates.txt", sep="\t")
+    DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/home/cloud/resources/maintenance/maintenancestates.txt", sep="\t") 
+    DB.maintenance_procedures._utils_insert_from_file(path_to_file="/home/cloud/resources/maintenance/procedures.txt", sep="\t")
 
-
-
-if CTRL_PROTEOME_SETTINGS.add_control_proteome:
-    control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
-    #adding proteme details, will set is_updating to true
-    DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
-    DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
-    DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+    if CTRL_PROTEOME_SETTINGS.add_control_proteome:
+        control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
+        #adding proteme details, will set is_updating to true
+        DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
+        DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
+        DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
 
 origins = [
     "http://localhost:5000",
@@ -195,6 +201,7 @@ templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):
+    print("QUERS")
     return templates.TemplateResponse("index.html", {"request": request})
 
 app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_assets, html=True), name="frontend assets")
