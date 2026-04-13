@@ -39,7 +39,7 @@ def get_sample_condition_applications(sample_tag: str, group_by_attribute : bool
 
 
 @router.get("/{sample_tag}/genotype")
-def get_sample_genotype(sample_tag : str, user: UserModel = Depends(get_user_from_token)) -> Optional[str]:
+def get_sample_genotype(sample_tag : str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     "Return the genotype for the given sample."
     return DB.samples.get_sample_genotype(tag = sample_tag)
 

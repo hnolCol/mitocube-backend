@@ -153,6 +153,12 @@ class SamplesABC(ABC):
             Multiple tags are separated by a semicolon.
         """
         pass
+    
+    @abstractmethod
+    def get_genotypes_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
+        """Get all genotypes for all samples in a submission, indexed by sample index."""
+
+
     @abstractmethod
     def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float|None: 
         """Get the quantified data for a given sample and feature.
@@ -161,8 +167,8 @@ class SamplesABC(ABC):
         pass
 
     @abstractmethod
-    def get_sample_genotype(self, tag : str) -> str:
-        """Get the genotype for a given sample
+    def get_sample_genotype(self, tag : str) -> List[str]:
+        """Get the genotype tag for a given sample
         """
         pass
 

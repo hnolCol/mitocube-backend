@@ -233,27 +233,23 @@ class Neo4JDataset(DatasetABC):
                 )
         else:
             query = (
-                "MATCH (a:Annotation) "
-                "WHERE a.tag = $annotation_tag "
-                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
-                "WHERE EXISTS {(a)-[:ANNOTATES]->(p)} "
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag}) "
             )
             
             
         if sample_tags is not None and len(sample_tags) > 0:
-            if annotation_tag is None:
                 query += "WHERE sample.tag IN $sample_tags " 
-            else:   
-                query += "AND sample.tag IN $sample_tags "
-            
+
         
         query += "RETURN pg.tag as tag, collect(r.value) as qs, collect(sample.sample_index) as idx, collect(sample.tag) as sample_tags "
+       
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df, sample_tags = sample_tags, annotation_tag = annotation_tag)
-        
+       # r = r.drop_duplicates(subset=["tag","sample_tags"])
+        print(r.explode(["qs","sample_tags"], ignore_index=True))
         if use_sample_tags:
-            datatable = r.explode(["qs","sample_tags"]).pivot(index="tag",columns="sample_tags",values="qs").astype(float)
+            datatable = r.explode(["qs","sample_tags"], ignore_index=True).drop_duplicates(subset=["tag","sample_tags"]).pivot(index="tag",columns="sample_tags",values="qs").astype(float)
         else:
-            datatable = r.explode(["qs","idx"]).pivot(index="tag",columns="idx",values="qs").astype(float)
+            datatable = r.explode(["qs","idx"], ignore_index=True).drop_duplicates(subset=["tag","sample_tags"]).pivot(index="tag",columns="idx",values="qs").astype(float)
         return datatable
         
         

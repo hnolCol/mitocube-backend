@@ -52,6 +52,16 @@ def get_genotype_proteome(genotype_tag: str, user: UserModel = Depends(get_user_
 
     return proteome_tag 
 
+@router.get("/genotypes/{genotype_tag}/exists")
+def check_genotype_exists(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> bool:
+    """ 
+    Check if a genotype exists by its tag. 
+    """
+
+    exists = DB.genotypes.exists(tag = genotype_tag)
+
+    return exists
+
 
 @router.get("/genotypes/{genotype_tag}/proteins")
 def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:

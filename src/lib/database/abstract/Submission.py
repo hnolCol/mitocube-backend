@@ -120,6 +120,11 @@ class SubmissionsABC(ABC):
         """
 
     @abstractmethod
+    def has_genotypes(self, tag : str) -> bool:
+        """Checks if the submission has genotypes associated with it."""
+
+
+    @abstractmethod
     def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
         """Gets the condition application data associated with the submission.
 

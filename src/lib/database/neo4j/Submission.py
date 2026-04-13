@@ -22,6 +22,7 @@ from services.random_generators import get_random_string
 import os 
 from lib.data.ranking.FeatureRanking import FeatureRanking
 import numpy as np
+
 class Neo4JSubmissions(SubmissionsABC):
 
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC, condition_applications : ConditionApplicationABC) -> None:
@@ -290,6 +291,16 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", state_01 = state_01, state_02 = state_02, result_transformer_=Result.value)
         return r
 
+    def has_genotypes(self, tag : str) -> bool:
+        """Checks if the submission has genotypes associated with it."""
+        query = (
+            "WITH EXISTS {(sub:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype)} as genotype_exists "
+            "RETURN genotype_exists "
+        )
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+
+
     def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None) -> bool:
         ""
         if self.exists(tag):
@@ -418,15 +429,15 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN count(q) "
         )
 
-        print("Deleting existing quantifications for submission:", tag)
+        # print("Deleting existing quantifications for submission:", tag)
         r = self._driver.execute_query(
             query,
             routing_="w",
             tag=tag,
-            quantifications=quantifications,
+            quantifications=[x.model_dump() for x in quantifications],
             result_transformer_=Result.value
         )
-        print(r[0] if len(r) > 0 else 0)
+        # print(r[0] if len(r) > 0 else 0)
         return r[0] if len(r) > 0 else 0
 
 
@@ -766,12 +777,22 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN p.tag as protein_group_tag, q.value as value, a.tag as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
             
         )
+        r_ca = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+        
+        if self.has_genotypes(tag = tag):
+              
+            query = (
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+                "MATCH (s)-[:HAS_GENOTYPE]->(g:Genotype) "
+                "WITH p, q, collect(g.tag) as ca_tags, s "
+                "RETURN p.tag as protein_group_tag, q.value as value, 'att_genotype' as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
+            )
         
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+            r_g = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+            r_ca = pd.concat([r_ca, r_g], ignore_index=True)
         
-        df = FeatureRanking().compute_metrics(df = r)
-        print(df.loc[:,["exclusively_ca_tags"]])
+        df = FeatureRanking().compute_metrics(df = r_ca)
         rows = df.to_dict("records")
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i+batch_size]

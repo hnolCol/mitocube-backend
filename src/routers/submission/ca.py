@@ -46,16 +46,19 @@ def get_submission_condition_applications(submission_tag: str, attribute_tags : 
 
 
 @router.get("/{submission_tag}/ca/attributes")
-def get_submission_condition_application_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_submission_condition_application_attributes(submission_tag: str, include_genotypes : bool = True, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     "Return the condition application attributes for a given submission."
     ca_tags = DB.submissions.get_conditions_applications(submission_tag, group_by_attribute=False)
     attribute_tags = [DB.condition_applications.get_attribute(ca_tag) for ca_tag in ca_tags]
+    print("SAKING FOR CA ATTRIBUTES", DB.submissions.has_genotypes(tag = submission_tag))
+    if include_genotypes and DB.submissions.has_genotypes(tag = submission_tag):
+        attribute_tags = ["att_genotype"] + attribute_tags
     return [attr_tag for attr_tag in attribute_tags if attr_tag is not None]
 
 
 
 @router.get("/{submission_tag}/samples/ca")
-def get_submission_sample_condition_applications(submission_tag: str, attribute_tags : str = None, return_unique: bool = False, user: UserModel = Depends(get_user_from_token)) -> List|OrderedDict:
+def get_submission_sample_condition_applications(submission_tag: str, attribute_tags : str = None, return_unique: bool = False, include_genotype : bool = True, user: UserModel = Depends(get_user_from_token)) -> List|OrderedDict:
     """Return the condition applications for samples of a given submission.
     Parameters
     ----------
@@ -75,11 +78,15 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
     """
     sample_tags = DB.submissions.get_samples(tag = submission_tag)  #get samples 
     r = []
-    
+    genotype_exists = DB.submissions.has_genotypes(tag = submission_tag)
     for sample_tag in sample_tags:
         
         ri = {"tag" : sample_tag}
         ca_tags = DB.samples.get_condition_applications(tag=sample_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=True)  #preload condition applications for samples
+        
+        if genotype_exists:
+            genotype_tags = DB.samples.get_sample_genotype(tag = sample_tag)
+            ri["att_genotype"] = genotype_tags
         for ca_tag in ca_tags:
             ri[ca_tag.attribute_tag] = ca_tag.condition_application_tags
         r.append(ri)
@@ -101,7 +108,7 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
     
     
 @router.get("/{submission_tag}/samples/ca/attributes")
-def get_submission_sample_condition_application_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_submission_sample_condition_application_attributes(submission_tag: str, include_genotypes : bool = True, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     "Return the condition application attributes for samples of a given submission."
     if not DB.submissions.exists(tag = submission_tag):
         return tag_not_found
@@ -113,7 +120,9 @@ def get_submission_sample_condition_application_attributes(submission_tag: str, 
     for sample_tag in sample_tags:
         ca_tags = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=False)
         attribute_tags.extend([DB.condition_applications.get_attribute(ca_tag) for ca_tag in ca_tags])
-
+    print(DB.submissions.has_genotypes(tag = submission_tag))
+    if include_genotypes and DB.submissions.has_genotypes(tag = submission_tag):
+        attribute_tags = ["att_genotype"] + attribute_tags
     return pd.Series(attribute_tags).dropna().unique().tolist()
 
 

@@ -43,7 +43,8 @@ class Neo4JSamples(SamplesABC):
               submission_tag : str = None, 
               trait_tag : str = None,
               instrument_tag : str =None,
-              genotype_tag : str = None) -> int:
+              genotype_tag : str = None,
+              ) -> int:
 
         "Counts the number of samples. If a specific trait tag is provided, the number of samples with a trait will be counted."
         if protein_group_tag is not None:
@@ -384,9 +385,52 @@ class Neo4JSamples(SamplesABC):
     
         # add useGetSampleGenotype
     
+    def get_genotypes_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
+        """Get all genotypes for all samples in a submission, indexed by sample index. 
+        
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag to get the genotypes for.
+        join : str, optional
+            If provided, multiple genotype tags will be joined into a single string using this separator.
+        pivot : bool, optional
+            If True, the result will be pivoted to have attributes as columns.
+        sort_ca_tags : bool, optional
+            If True, the genotype tags will be sorted alphabetically before joining.
+        return_sample_index : bool, optional
+            If True, the DataFrame will be indexed by sample index. If False, it will be indexed by sample tag.
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with sample indices as index and genotypes as columns.
+            The columns names represent the instance attribute (e.g. att_genotype).
+            The values are the genotype tags. 
+            Multiple tags are separated by a semicolon, if join is provided. The tags are sorted alphabetically if sort_ca_tags is True.
+            Pivot is applied if pivot is True, leading to attribute_tags as column names. 
+            
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
+            "RETURN s.sample_index as sample_index, s.tag as sample_tag, 'att_genotype' as attribute_tag, collect(g.tag) as condition_tags "
+            "ORDER BY s.sample_index ASC "
+        )
+        df = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag)
+        if return_sample_index:
+            df.set_index("sample_index", inplace=True)
+        else:
+            df.set_index("sample_tag", inplace=True)
+        if join is not None:
+            if sort_ca_tags:
+                df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(sorted(x)))
+            else:
+                df["condition_tags"] = df["condition_tags"].apply(lambda x: join.join(x))
+            if pivot:
+                df = df.pivot_table(index=df.index, columns="attribute_tag", values="condition_tags", aggfunc='first')
+        return df
     
-    
-    def get_sample_genotype(self, tag : str) -> str :
+    def get_sample_genotype(self, tag : str) -> List[str] :
         """Get the genotype tag associated with a given sample.
 
         Parameters
@@ -402,7 +446,7 @@ class Neo4JSamples(SamplesABC):
 
         query = (
         "MATCH (s:Sample {tag: $tag})-[:HAS_GENOTYPE]->(g:Genotype) "
-        "RETURN g.tag AS genotype_tag"
+        "RETURN collect(g.tag) AS genotype_tag"
         )
 
 
@@ -414,8 +458,7 @@ class Neo4JSamples(SamplesABC):
                                         result_transformer_=Result.value,
                                         tag=tag
                                     )
-
-        return r[0] if len(r) > 0 else None
+        return r[0] if len(r) > 0 and r[0] is not None else []
 
     def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):
         """Insert proteins quantified in a given sample of a submission.

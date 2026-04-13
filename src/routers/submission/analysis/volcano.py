@@ -65,7 +65,15 @@ def get_dataset_volcano(submission_tag : str,
         raise HTTPException(status_code=400, detail="Left and right condition application tags must be different.")
     
     condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
-    attribute_tag = DB.condition_applications.get_attribute(ca_tag_left)
+    if DB.submissions.has_genotypes(tag = submission_tag):
+        genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
+        condition_applications = condition_applications.join(genotypes, how="outer")
+        
+    if DB.genotypes.exists(tag = ca_tag_left):
+        attribute_tag = "att_genotype"
+    else:
+        attribute_tag = DB.condition_applications.get_attribute(ca_tag_left)
+        
     if attribute_tag not in condition_applications.columns:
         raise HTTPException(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
     
