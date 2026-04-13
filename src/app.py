@@ -76,7 +76,7 @@ from services.json import read_json
 import pandas as pd
 
 
-migrate = False
+migrate = True
 
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
