@@ -76,7 +76,7 @@ from services.json import read_json
 import pandas as pd
 
 
-migrate = True
+migrate = False
 
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
@@ -201,7 +201,6 @@ templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):
-    print("QUERS")
     return templates.TemplateResponse("index.html", {"request": request})
 
 app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_assets, html=True), name="frontend assets")

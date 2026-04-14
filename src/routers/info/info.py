@@ -274,7 +274,7 @@ Focus on:
 
 
 @router.get("/info/app",summary="Returns basic information about the app.", response_model=InfoResponse)
-def get_application_info(user : UserModel = Depends(get_user_from_token)):
+def get_application_info(): #user : UserModel = Depends(get_user_from_token)
     """"""
     return InfoResponse(
         app_name=GENERAL_SETTINGS.app_name, 

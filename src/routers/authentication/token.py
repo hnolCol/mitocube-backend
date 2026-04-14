@@ -102,7 +102,7 @@ def check_token(user : UserModel = Depends(get_user_from_token)):
 @router.post("/verify", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
              response_model=TokenResponse)
-def verify_token_by_code(verification : TokenVerificationCode, 
+def verify_token_by_code(verification : TokenVerificationCode,
                          decoded_token: dict = Depends(check_for_verification_code_in_token)):
     """
     Verifies jwt by comparing the verification code that has been sent by mail to the one hidden in the jwt token.
@@ -112,7 +112,6 @@ def verify_token_by_code(verification : TokenVerificationCode,
         raise verification_code_incorrect
     #get user by id 
     user_tag = decoded_token["tag"]
-    
     allowed, user  = DB.users.is_user_allowed(tag = user_tag)
     if not allowed: raise user_blocked
 
