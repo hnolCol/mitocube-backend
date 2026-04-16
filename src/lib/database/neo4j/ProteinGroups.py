@@ -3,9 +3,7 @@ from typing import Optional,List, Dict
 from neo4j import Driver, Result
 
 from lib.database.abstract.ProteinGroups import ProteinGroupsABC
-
-from config.models.filter import FilterModel
-from config.models.feature import ProteinGroupSubmissionStatisticsModel 
+from config.models.feature import ExclusivelyQuantifiedModel, ProteinGroupSubmissionStatisticsModel 
 
 import pandas as pd 
 
@@ -132,7 +130,7 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         return True
     
     
-    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[ProteinGroupSubmissionStatisticsModel]:
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tag : str = None, limit : Optional[int] = 20) -> List[ProteinGroupSubmissionStatisticsModel]:
         ""
         if not self.exists(tag): raise ValueError(f"Protein group with tag {tag} does not exist.")
         
@@ -140,7 +138,11 @@ class Neo4JProteinGroups(ProteinGroupsABC):
             "MATCH (pg:ProteinGroup {tag : $tag})<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "WHERE a.tag IN $attribute_tags OR $attribute_tags IS NULL "
             "MATCH (stats)<-[:HAS_STATS]-(submission:Submission) "
-            "RETURN a.tag as attribute_tag, stats.F as F, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.exclusively as exclusively, submission.tag as submission_tag "
+        )
+        if submission_tag is not None:
+            query += "WHERE submission.tag = $submission_tag "
+        query += (    
+            "RETURN stats.tag as tag, a.tag as attribute_tag, stats.F as F, stats.rank as rank, stats.FDR as FDR, stats.exclusively_ca_tags  as exclusively_ca_tags, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.quantified_in_samples as quantified_in_samples, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.exclusively as exclusively, submission.tag as submission_tag "
             "ORDER BY stats.score DESC "
         )
         if limit is not None:
@@ -149,4 +151,14 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, limit=limit, result_transformer_=Result.data)
         return [ProteinGroupSubmissionStatisticsModel(**ri) for ri in r]
     
-    
+    def get_exclusively_quantified(self, submission_tag : str ) -> List[ExclusivelyQuantifiedModel]:
+        
+        
+        query = (
+            "MATCH (pg:ProteinGroup)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute)  " 
+            "WHERE EXISTS {(stats)-[:HAS_STATS]-(submission:Submission {tag : $submission_tag})} AND stats.exclusively = true "
+            "RETURN pg.tag as tag, a.tag as attribute_tag, stats.tag as stats_tag, stats.mean as mean, stats.exclusively_ca_tags as exclusively_ca_tags, stats.quantified_in_samples as quantified_in_samples ORDER BY mean DESC "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.data)
+        return sorted([ExclusivelyQuantifiedModel(**ri) for ri in r], key=lambda x: ";".join(x.exclusively_ca_tags), reverse=True)

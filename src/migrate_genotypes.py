@@ -3,11 +3,11 @@ from pydantic import BaseModel
 from typing import List, Optional, ForwardRef, Literal
 
 from lib.database.Database import Database
-
+import argparse
 DB = Database.DB()
 
-GENOTYPES_PATH = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json"
-USER_TAG = "WX9r5zQJ"
+GENOTYPES_PATH = "/home/cloud/resources/genotypes/genotypes.json"
+USER_TAG = "kxWH7py3"
 ONLY_LABEL = None   # set to a label string to migrate only one, or None to migrate all
 
 
@@ -33,12 +33,20 @@ class InsertGeneticApplicationModel(BaseModel):
 
 # Tag mappings
 
+parser = argparse.ArgumentParser(description='Migrate genotypes from JSON file')
+parser.add_argument('--user-tag', default='kxWH7py3', help='User tag for database insertion')
+parser.add_argument('--genotypes-path', default='/home/cloud/resources/genotypes/genotypes.json', help='Path to genotypes JSON file')
+args = parser.parse_args()
+
 ZYGOSITY_MAP = {
     "(+/+)": "wt",
     "(-/-)": "homozygot",
     "(+/-)": "hetero",
     "(-/+)": "hetero",
 }
+
+GENOTYPES_PATH = args.genotypes_path
+USER_TAG = args.user_tag
 
 UNTARGETED_MUTATIONS = {"frameshift", "premstop"}
 
@@ -105,9 +113,11 @@ def build_component(attr_block):
         tag="att_gene_editing_method", type="attribute",
         children=[AttributeTree(tag=f"att_gene_editing_method:{method_tag}", type="trait", children=mutation_attrs)]
     )
+    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag=protein_key)  # check if protein exists, will raise exception if not
+    print(proteome_tag)
     protein_attr = AttributeTree(
         tag="att_protein", type="attribute",
-        children=[AttributeTree(tag="ctrl", type="trait", value=protein_key, children=[])]
+        children=[AttributeTree(tag=proteome_tag, type="trait", value=protein_key, children=[])]
     )
     return AttributeTree(
         tag="att_gene_engineering", type="attribute",
@@ -120,10 +130,14 @@ def build_component(attr_block):
 
 #  Migration 
 from services.encryption import create_hierarchical_hash
+import argparse
 
 class MigrateGenotypes:
 
     def __init__(self):
+        
+        
+        
         with open(GENOTYPES_PATH) as f:
             genotypes = json.load(f)
 
@@ -136,12 +150,16 @@ class MigrateGenotypes:
             components = []
             for block in g["attributes"]:
                 mutations = block.get("att_protein_mutation", [])
-                if len(mutations) <= 1:
-                    components.append(build_component(block))
-                else:
-                    for mut in mutations:
-                        single_mut_block = {**block, "att_protein_mutation": [mut]}
-                        components.append(build_component(single_mut_block))
+                try:
+                    if len(mutations) <= 1:
+                        components.append(build_component(block))
+                    else:
+                        for mut in mutations:
+                            single_mut_block = {**block, "att_protein_mutation": [mut]}
+                            components.append(build_component(single_mut_block))
+                except: 
+                    continue
+                
             model = InsertGeneticApplicationModel(
                 text=g["text"],
                 description= "Genotype imported from old database, original label: " + label,
@@ -149,16 +167,19 @@ class MigrateGenotypes:
             )
             genotype_tag = create_hierarchical_hash([c.model_dump() for c in model.components])
             label_to_tag[label] = genotype_tag
-
-            ok = DB.genotypes.insert(model, user_tag=USER_TAG)
-            if ok:
-                print(f"Genotype {label} inserted successfully.")
-            else:
-                print(f"Genotype {label} already exists. Skipping.")
+            try:
+                ok = DB.genotypes.insert(model, user_tag=USER_TAG)
+                if ok:
+                    print(f"Genotype {label} inserted successfully.")
+                else:
+                    print(f"Genotype {label} already exists. Skipping.")
+            except Exception as e:
+                print(f"Error inserting genotype {label}: {e}")
+                continue
 
         with open("label_to_tag.json", "w") as f:
             json.dump(label_to_tag, f, indent=2)
         print(f"Label to tag mapping saved to label_to_tag.json")
 
-
-MigrateGenotypes()
+if __name__ == "__main__":
+    MigrateGenotypes()

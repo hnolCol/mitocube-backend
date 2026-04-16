@@ -18,6 +18,7 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 # from lib.database.ABCDatabase import MCAttributes
 from lib.database.Database import Database
 # 
+
 # 
 ### import services
 from services.paths.utils import get_absolute_path_to_dir
@@ -28,7 +29,7 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 ### import routers
 from routers.dataset import dataset
 from routers.dataset import correlation as submission_correlation # volcano
-from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim
+from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim, ranking
 from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap
 from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
@@ -68,12 +69,14 @@ from routers.peptides import peptides
 from routers.metatexts import metatexts
 from routers.condition_applications import condition_applications
 from routers.ai import openai
-
 from routers.stats import submissions as submission_stats
 # from routers import play  # route to test things during development ###########################################################
 
 from services.json import read_json
 import pandas as pd
+
+
+migrate = False
 
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
@@ -84,6 +87,7 @@ router_sources = [dataset,
                   submission_stats, 
                   quantifications,
                   researchaim,
+                  ranking,
                   submission, 
                   comments,
                   count,
@@ -148,18 +152,21 @@ DB = Database.DB()
                                      
 #check for users, essentially, create admin user if no users exists with the defined admin email.
 DB.users.check()
-# DB.users._utils_migrate(path_to_user_data="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/users/users.json")
+#DB.attributes._utils_insert_from_file(path_to_file ="/Users/HNolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json")
 
+if migrate:
+    DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
+    DB.attributes._utils_insert_from_file(path_to_file ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
+    DB.instrument_states._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
+    DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t") 
+    DB.maintenance_procedures._utils_insert_from_file(path_to_file="/home/cloud/mitocube-backend/resources/maintenance/procedures.txt", sep="\t")
 
-
-
-
-if CTRL_PROTEOME_SETTINGS.add_control_proteome:
-    control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
-    #adding proteme details, will set is_updating to true
-    DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
-    DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
-    DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+    if CTRL_PROTEOME_SETTINGS.add_control_proteome:
+        control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
+        #adding proteme details, will set is_updating to true
+        DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
+        DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
+        DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
 
 origins = [
     "http://localhost:5000",

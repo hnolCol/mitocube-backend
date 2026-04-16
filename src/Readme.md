@@ -62,8 +62,8 @@ mail_from_name : str = "Name that apperas in an email"
 mail_cc : List[EmailStr] = ["m.m@email.de"] 
 mail_template_dir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/templates/email" #absolute path
 
-
-#db settings
+NUMPY==1.25.1
+#db settings==1.25.1
 attribute_file : FilePath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json" #attribute file must exists
 db_datadir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/data" #path where to store data
 db_userdir : DirectoryPath = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/users" #must exist

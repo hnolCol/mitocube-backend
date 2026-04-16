@@ -16,12 +16,8 @@ router = APIRouter(
     tags=["Submission","Analysis"],
     )
 
-
-
-#pca endpoints
 @router.get("/{submission_tag}/pca",
             tags=["Dimensional reduction","PCA"])
-
 def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : bool = True, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the result of a Principal component analysis (PCA).
@@ -35,40 +31,15 @@ def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : b
                                         n_components=4,
                                         scale = scale).transform()
 
-    condition_procedures = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag)
-    print(condition_procedures)
+    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+    if DB.submissions.has_genotypes(tag = submission_tag):
+        genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
+        condition_applications = condition_applications.join(genotypes, how="outer")
+        
     
-    projected_data = projected_data.join(condition_procedures, how="left")
-    print(projected_data)
+    projected_data = projected_data.join(condition_applications, how="left")
     return DatasetPCAResponse(projection=projected_data.to_dict(orient="records"), 
                               drivers=drivers.reset_index(names="tag").to_dict(orient="records"), 
                               variance_explained=variance_explained.tolist())
     
     
-    
-    # #if not DB.dataset_has_data(tag = dataset_tag): raise no_data_found_http_exception
-    # data_table = DB.get_datatable(tag = submission_tag, filter_tag = filter_tag)
-    # projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
-    #                                     n_components=4,
-    #                                     scale = scale).transform()
-   
-    # sample_attributes, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)     
-    # #match the sample attributes to the PCA projection.
-    # projected_data = projected_data.join(sample_map)
-    # projected_data_to_browser = projected_data.reset_index(names="index").to_dict(orient="records")    
-    
-    # # add feature information to drivers
-    # feature_keys = drivers.index 
-    # features = DB.features.get_protein_by_tags(tags = feature_keys.tolist(), as_data_frame=True)
-    # #features = feature_db.get(keys=feature_keys.tolist(), proteome_ids=proteome_ids, ignoreMissing=True)
-   
-    # drivers_with_feature_info = pd.concat([drivers,features],axis=1)
-    # drivers_with_feature_info.reset_index(names="index", inplace=True)
-    # drivers_to_browser = drivers_with_feature_info.to_dict(orient="records")
-    # return DatasetPCAResponse(
-    #     projection = projected_data_to_browser,
-    #     drivers = drivers_to_browser,
-    #     variance_explained = variance_explained, 
-    #     samples_attributes = sample_attributes
-    #     )
-

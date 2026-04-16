@@ -21,6 +21,7 @@ from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
 import os 
 from lib.data.ranking.FeatureRanking import FeatureRanking
+import numpy as np
 
 class Neo4JSubmissions(SubmissionsABC):
 
@@ -212,15 +213,17 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else None
 
 
-    def get_conditions_applications(self, tag : str, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]: #TODO: make Dict a pydanitc model
+    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]: #TODO: make Dict a pydanitc model
         """Returns the condition application tag for the submission by its tag. """
         
         query =  "MATCH (submission:Submission {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication)" 
+        if attribute_tags and len(attribute_tags) > 0:
+            query += "WHERE EXISTS {(condition)-[:OF_ATTRIBUTE]->(aa:Attribute) WHERE aa.tag IN $attribute_tags} "
         if group_by_attribute:
             query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) RETURN a.tag, collect(condition.tag) "
         else:
             query += "RETURN collect(condition.tag) "
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.values if group_by_attribute else Result.value)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, result_transformer_=Result.values if group_by_attribute else Result.value)
         if group_by_attribute:
             return [{"attribute_tag" : ri[0], "condition_application_tags" : ri[1]} for ri in r]
         return r[0] if len(r) > 0 else []
@@ -287,6 +290,16 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         r = self._driver.execute_query(query, routing_="r", state_01 = state_01, state_02 = state_02, result_transformer_=Result.value)
         return r
+
+    def has_genotypes(self, tag : str) -> bool:
+        """Checks if the submission has genotypes associated with it."""
+        query = (
+            "WITH EXISTS {(sub:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype)} as genotype_exists "
+            "RETURN genotype_exists "
+        )
+        r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
+        return r[0]
+
 
     def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None) -> bool:
         ""
@@ -416,15 +429,15 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN count(q) "
         )
 
-        print("Deleting existing quantifications for submission:", tag)
+        # print("Deleting existing quantifications for submission:", tag)
         r = self._driver.execute_query(
             query,
             routing_="w",
             tag=tag,
-            quantifications=quantifications,
+            quantifications=[x.model_dump() for x in quantifications],
             result_transformer_=Result.value
         )
-        print(r[0] if len(r) > 0 else 0)
+        # print(r[0] if len(r) > 0 else 0)
         return r[0] if len(r) > 0 else 0
 
 
@@ -764,11 +777,22 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN p.tag as protein_group_tag, q.value as value, a.tag as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
             
         )
+        r_ca = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+        
+        if self.has_genotypes(tag = tag):
+              
+            query = (
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+                "MATCH (s)-[:HAS_GENOTYPE]->(g:Genotype) "
+                "WITH p, q, collect(g.tag) as ca_tags, s "
+                "RETURN p.tag as protein_group_tag, q.value as value, 'att_genotype' as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
+            )
         
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+            r_g = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
+            r_ca = pd.concat([r_ca, r_g], ignore_index=True)
         
-        df = FeatureRanking().compute_metrics(df = r)
+        df = FeatureRanking().compute_metrics(df = r_ca)
         rows = df.to_dict("records")
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i+batch_size]
@@ -777,27 +801,104 @@ class Neo4JSubmissions(SubmissionsABC):
                 "MATCH (p:ProteinGroup {tag : row.protein_group_tag}) "
                 "MATCH (submission:Submission {tag : $tag}) "
                 "MATCH (a:Attribute {tag : row.attribute_tag}) "
-                "MERGE (submission)-[:HAS_STATS]->(stats:Statistics {tag : 'stats_' + row.protein_group_tag + '_' + row.attribute_tag + '_' + $tag})-[:FOR_PROTEIN_GROUP]->(p) "
-                "WITH p, row, a, stats "
-                "MERGE (stats)-[:OF_ATTRIBUTE]->(a) "
+                "MERGE (stats:Statistics {tag : 'stats_' + row.protein_group_tag + '_' + row.attribute_tag + '_' + $tag}) "
                 "SET stats.F = row.F,"
+                "stats.created_at = timestamp(),"
                 "stats.p_value = row.p_value,"
                 "stats.eta_squared = row.eta_squared,"
                 "stats.cohen_f = row.cohen_f,"
                 "stats.max_fc = row.max_fc,"
+                "stats.FDR = row.FDR,"
+                "stats.rank = row.rank,"
                 "stats.std_means = row.std_means,"
                 "stats.missingness = row.missingness,"
                 "stats.n_groups = row.n_groups,"
+                "stats.exclusively_ca_tags = row.exclusively_ca_tags, "
                 "stats.score = row.score, "
+                "stats.mean = row.mean, "
+                "stats.quantified_in_samples = row.quantified_in_samples, "
                 "stats.exclusively = row.exclusively "
+                "WITH submission, stats, p, a, row "
+                "MERGE (submission)-[:HAS_STATS]->(stats)-[:FOR_PROTEIN_GROUP]->(p) "
+                "WITH p, row, a, stats "
+                "MERGE (stats)-[:OF_ATTRIBUTE]->(a) "
+                
             )
             r = self._driver.execute_query(query, routing_="w", batch = batch, tag = tag)
         
         
         return True
         
+        
+    def remove_multiple_comparison_metrices(self, tag : str) -> bool:
+        """Removes the multiple comparison statistics for a given submission tag. This can be used to remove the statistics before recalculating them. Neo4J implementation. 
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        bool
+            True if the statistics were removed successfully, False otherwise.
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_STATS]->(stats:Statistics) "
+            "DETACH DELETE stats "
+        )
+        
+        try: 
+            self._driver.execute_query(query, routing_="w", tag = tag)
+        except Exception as e:
+            print(e)
+            return False 
+        return True
     
-    
+    def get_mutli_comp_stats(self, tag : str, attribute_tag : str = None) -> pd.DataFrame:
+        """Returns the multiple comparison statistics for a given submission tag. Neo4J implementation. 
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        pd.DataFrame
+            A data frame with the following columns:
+            ```
+                - 'protein_group_tag' (str) : The protein group tag
+                - 'attribute_tag' (str) : The attribute tag
+                - 'F' (float) : The F-value of the ANOVA test
+                - 'p_value' (float) : The p-value of the ANOVA test
+                - 'eta_squared' (float) : The eta squared value of the ANOVA test
+                - 'cohen_f' (float) : The Cohen's f value of the ANOVA test
+                - 'max_fc' (float) : The maximum fold change between groups
+                - 'std_means' (float) : The standard deviation of the group means
+                - 'missingness' (float) : The percentage of missing values for the protein group across all samples
+                - 'n_groups' (int) : The number of groups compared in the ANOVA test
+                - 'score' (float) : A combined score based on the other metrics for ranking purposes
+                - 'mean' (float) : The mean quantification value across all samples for the protein group
+                - 'quantified_in_samples' (int) : The number of samples in which the protein group is quantified
+                - 'exclusively' (bool) : Whether the protein group is exclusively quantified in one group or not 
+            ```
+        """
+        
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_STATS]->(stats:Statistics)-[:FOR_PROTEIN_GROUP]->(p:ProteinGroup) "
+            "MATCH (stats)-[:OF_ATTRIBUTE]->(a:Attribute) "
+        )
+        if attribute_tag is not None:
+            query += "WHERE a.tag = $attribute_tag "
+            
+        query += ("RETURN p.tag as protein_group_tag, a.tag as attribute_tag,  stats.F as F, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.rank as rank, stats.FDR as FDR, "
+                "stats.quantified_in_samples as quantified_in_samples, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.mean as mean, stats.exclusively as exclusively ")
+
+        
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tag = attribute_tag, result_transformer_=Result.to_df)
+        return r
     
     
 

@@ -116,6 +116,8 @@ class SamplesABC(ABC):
         ----------
         tag : str
             The tag of the sample to get the condition procedures for.
+        attribute_tags : List[str], optional
+            If provided, only condition procedures with the given attribute tags are returned. By default, None, which means that condition procedures of all attributes are returned.
         group_by_attribute : bool, optional
             If True, the results are grouped by attribute and returned as a list of ConditionApplicationAttribute
             
@@ -151,6 +153,12 @@ class SamplesABC(ABC):
             Multiple tags are separated by a semicolon.
         """
         pass
+    
+    @abstractmethod
+    def get_genotypes_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:
+        """Get all genotypes for all samples in a submission, indexed by sample index."""
+
+
     @abstractmethod
     def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float|None: 
         """Get the quantified data for a given sample and feature.
@@ -159,8 +167,8 @@ class SamplesABC(ABC):
         pass
 
     @abstractmethod
-    def get_sample_genotype(self, tag : str) -> str:
-        """Get the genotype for a given sample
+    def get_sample_genotype(self, tag : str) -> List[str]:
+        """Get the genotype tag for a given sample
         """
         pass
 

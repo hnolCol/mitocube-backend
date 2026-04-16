@@ -8,12 +8,17 @@ from typing import List, OrderedDict
 from lib.database.Database import Database
 from config.models.submissions.submissions import NewSubmissionModel
 from config.models.submissions.states import SubmissionStatesEnums
+from config.models.submissions.quantifications import ProteinGroupQuantificationModel
+
 from services.json import read_json
 import numpy as np
 from config.settings.metatexts import MetaTexts 
 import pandas as pd
 
 genotype_labels_path = "/Users/PParsa/Documents/GitHub/mitocube-backend/label_to_tag.json"
+
+#import pandas as pd
+#genotype_labels_path = "/Users/HNolte/Documents/GitHub/mitocube-backend/label_to_tag.json"
 genotype_labels_to_tags = read_json(genotype_labels_path)
 
 fall_back_user = "WX9r5zQJ"
@@ -67,7 +72,7 @@ def get_tags_by_sample(samples_attrs : dict):
     
    
     samples_idcs = np.sort(np.unique(np.concatenate([np.array(indices) for indices in samples_attrs.values()])))
-    return [[genotype_tag for genotype_tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
+    return [[tag for tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
    
    
 def map_genotype_labels_to_tags(samples_genotypes: dict):
@@ -170,6 +175,8 @@ class MigrateData:
         
 
         PATH_TO_SUBMISSION_FOLDER = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/data"
+        #PATH_TO_SUBMISSION_FOLDER = "/Users/HNolte/Documents/GitHub/mitocube-backend/resources/data"
+        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "3QSa4X0IvM6f"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
 
         dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "QPa98BBMhS"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
         print(dirList)
@@ -178,7 +185,13 @@ class MigrateData:
 
         for submission_tag in dirList:
             print(submission_tag)
+            df = None
             jsonFile = read_json(os.path.join(PATH_TO_SUBMISSION_FOLDER,submission_tag,"params.json"))
+            path_to_quant = os.path.join(PATH_TO_SUBMISSION_FOLDER,submission_tag,"data.txt") 
+            path_to_quant_exists = os.path.exists(path_to_quant)
+            if path_to_quant_exists:
+                df = pd.read_csv(path_to_quant, sep="\t").set_index("Key")
+                df.columns = [f"{submission_tag}|{col}" for col in df.columns]
             #user_tag = jsonFile["user_label"] if DB.users.exists(tag=jsonFile["user_label"]) else fall_back_user
             user_tag = jsonFile.get("user_tag") or jsonFile.get("user_label")
             if not user_tag or not DB.users.exists(tag=user_tag):
@@ -187,13 +200,11 @@ class MigrateData:
             sample_names = jsonFile["sample_names"]
             metatext = jsonFile["metatext"]
             meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
-            print(meta_text)
             #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
             genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"])
             dataset_attributes = build_dataset_condition_applications(jsonFile["dataset_attributes"])
 
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"])
-            print(sample_attributes)
             timeline = jsonFile.get("timeline", {})
             timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": t.get("user_tag") or t.get("user_label"), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
             if not DB.submission_exists(tag = submission_tag):
@@ -251,7 +262,13 @@ class MigrateData:
                                 print(f"WARNING: genotype tag '{genotype_tag}' not found in DB, skipping for sample {sample_tag}")
 
                 ### upoad quantification data. 
-          
+                if df is not None:
+                    df_melt = df.reset_index(names="tag").melt(id_vars=["tag"], var_name="sample_tag", value_name="value").dropna(subset=["value"])
+                    
+                    DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**x) for x in df_melt.to_dict(orient="records")]) 
+                    DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
+                    DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+                    DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
         # class DatasetSubmissionModel(BaseModel):

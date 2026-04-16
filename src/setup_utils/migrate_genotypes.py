@@ -76,7 +76,6 @@ with open(GENOTYPES_PATH, "r") as f:
 
 
 
-
 for g in genotypes:
      
     genotype_tag = g["label"]
