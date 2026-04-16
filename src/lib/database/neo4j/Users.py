@@ -463,4 +463,29 @@ class Neo4JUser(UserABC):
         return users
 
     def update(self, tag: str, user_props: Dict) -> bool:
-        return super().update(tag, user_props)
+        """Updates properties of a user by tag.
+
+        Parameters
+        ----------
+        tag : str
+            The user's tag.
+        user_props : Dict
+            Dict of properties to update (e.g. {"password": "<hashed>"}).
+
+        Returns
+        -------
+        bool
+            True if the update succeeded, False otherwise.
+        """
+        if not self.exists(tag):
+            return False
+        query = (
+            "MATCH (u:User {tag: $tag}) "
+            "SET u += $props"
+        )
+        try:
+            self._driver.execute_query(query, routing_="w", tag=tag, props=user_props)
+        except Exception as e:
+            print("Update failed: " + str(e))
+            return False
+        return True

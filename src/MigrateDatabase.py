@@ -13,9 +13,12 @@ from config.models.submissions.quantifications import ProteinGroupQuantification
 from services.json import read_json
 import numpy as np
 from config.settings.metatexts import MetaTexts 
-
 import pandas as pd
-genotype_labels_path = "/Users/HNolte/Documents/GitHub/mitocube-backend/label_to_tag.json"
+
+genotype_labels_path = "/Users/PParsa/Documents/GitHub/mitocube-backend/label_to_tag.json"
+
+#import pandas as pd
+#genotype_labels_path = "/Users/HNolte/Documents/GitHub/mitocube-backend/label_to_tag.json"
 genotype_labels_to_tags = read_json(genotype_labels_path)
 
 fall_back_user = "WX9r5zQJ"
@@ -36,6 +39,14 @@ attr_update = {
     "att_organism" : "att_proteome"
 }
 
+time_to_att_duration = {
+    "s":   "att_duration:s",   # Seconds
+    "min": "att_duration:min", # Minutes
+    "h":   "att_duration:h",   # Hours
+    "d":   "att_duration:d",   # Days 
+    "w":   "att_duration:w",   # Weeks
+    "a":   "att_duration:a",   # A Year
+}
 
 def handle_knockdown(tags : List[str]):
     "" 
@@ -81,30 +92,72 @@ def map_genotype_labels_to_tags(samples_genotypes: dict):
     return tags_by_sample
 
 
-def build_sample_attributes(sample_attrs_input : dict):
-    
+def _build_duration_child_for_sample(sample_idx: int, time_data_by_key: dict):
+    """time_data_by_key maps {att_time_<unit>: {trait_tag: [indices]}} for this submission.
+    Returns an att_duration subtree for whichever time entry covers this sample, or None."""
+    for time_key, sample_attrs in time_data_by_key.items():
+        unit = time_key.replace("att_time_", "")
+        trait_tag = time_to_att_duration.get(unit)
+        if trait_tag is None:
+            print(f"WARNING: unknown time unit '{unit}' from key '{time_key}'")
+            continue
+        for legacy_trait, indices in sample_attrs.items():
+            if sample_idx in indices:
+                try:
+                    value = float(legacy_trait.split(":")[1])
+                except (IndexError, ValueError):
+                    print(f"WARNING: could not parse value from '{legacy_trait}'")
+                    return None
+                return {
+                    "type": "attribute",
+                    "tag": "att_duration",
+                    "children": [
+                        {"type": "trait", "tag": trait_tag, "value": value, "children": []}
+                    ],
+                }
+    return None
+
+def build_sample_attributes(sample_attrs_input: dict):
     r = OrderedDict()
+    
+    time_data_by_key = {
+        k: sample_attrs_input.pop(k)
+        for k in list(sample_attrs_input.keys())
+        if k.startswith("att_time_")
+    }
+    
     for attribute_tag, sample_attrs in sample_attrs_input.items():
         if len(r) == 0:
-            
             samples_idcs = np.sort(np.unique(np.concatenate([np.array(indices) for indices in sample_attrs.values()])))
             for idx in samples_idcs:
                 r[idx] = []
-                
+        
         tags_by_sample_idcs = [(sample_idx, [sample_attribute for sample_attribute, idcs in sample_attrs.items() if sample_idx in idcs]) for sample_idx in samples_idcs]
         for sampleIdx, sample_attribute_tags in tags_by_sample_idcs:
             if attribute_tag == "att_knockdown":
                 for tag in sample_attribute_tags:
-                    r[sampleIdx].append(handle_knockdown(tag)) 
-            else: 
+                    r[sampleIdx].append(handle_knockdown(tag))
+            elif attribute_tag == "att_compound" and time_data_by_key:
+                duration_child = _build_duration_child_for_sample(sampleIdx, time_data_by_key)
+                tree = {
+                    "type": "attribute",
+                    "tag": "att_compound",
+                    "children": [
+                        {
+                            "type": "trait",
+                            "tag": trait_tag,
+                            "value": None,
+                            "children": [duration_child] if duration_child else [],
+                        }
+                        for trait_tag in sample_attribute_tags
+                    ],
+                }
+                r[sampleIdx].append(tree)
+            else:
                 t = build_tree(attribute_tag=attribute_tag, trait_tags=sample_attribute_tags)
                 r[sampleIdx].append(t)
     
-
     return list(r.values())
-        
-        
-    #samples_idcs = np.sort(np.unique(np.array([list(samples_attrs.values())]).flatten()))
    
 def build_dataset_condition_applications(dataset_attributes : dict): 
     "" 
@@ -115,16 +168,17 @@ def build_dataset_condition_applications(dataset_attributes : dict):
     for attribute_tag, trait_tags in dataset_attributes.items():
         r.append(build_tree(attribute_tag, trait_tags))
     return r
-
-
+        
 class MigrateData:
     
     def __init__(self, ):
         
 
-        PATH_TO_SUBMISSION_FOLDER = "/Users/HNolte/Documents/GitHub/mitocube-backend/resources/data"
+        PATH_TO_SUBMISSION_FOLDER = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/data"
+        #PATH_TO_SUBMISSION_FOLDER = "/Users/HNolte/Documents/GitHub/mitocube-backend/resources/data"
         dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "3QSa4X0IvM6f"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
 
+        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "QPa98BBMhS"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
         print(dirList)
 
    
@@ -149,8 +203,7 @@ class MigrateData:
             #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
             genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"])
             dataset_attributes = build_dataset_condition_applications(jsonFile["dataset_attributes"])
-            
-    
+
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"])
             timeline = jsonFile.get("timeline", {})
             timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": t.get("user_tag") or t.get("user_label"), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.

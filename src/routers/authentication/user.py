@@ -6,7 +6,7 @@ from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser, UserCreateModel, UserInsertModel
 from config.models.parameter import APIParamString
-from services.encryption import decode_token
+from services.encryption import verify_password
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
 from services.enums import get_enum_as_dict
@@ -95,32 +95,71 @@ def query_user_db(search_string : str = None, limit : int = 40, user : UserModel
 
     return DB.users.find(search_string, limit=limit)
 
-@router.post("/users/pw",summary="Allows users to change the password for themselves.")
-def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
-    """_summary_
+# @router.post("/users/pw",summary="Allows users to change the password for themselves.")
+# def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
+#     """_summary_
 
-    Parameters
-    ----------
-    updated_pw : Dict
-        A dict of shape updated_pw = {"password" : <string>}.
-    user : UserModel, optional
-        The User identified using the jwt token, by default Depends(get_user_from_token)
+#     Parameters
+#     ----------
+#     updated_pw : Dict
+#         A dict of shape updated_pw = {"password" : <string>}.
+#     user : UserModel, optional
+#         The User identified using the jwt token, by default Depends(get_user_from_token)
 
-    Returns
-    -------
-    _type_
-        _description_
+#     Returns
+#     -------
+#     _type_
+#         _description_
 
-    Raises
-    ------
-    HTTPException
-        _description_
-    """
-    try:
-        UserDB.update_user_password_by_label(user_label=user.label, password = updated_pw["password"])
-    except Exception as e:
-        raise HTTPException(status_code=400,detail="An error occurred during password change.")
+#     Raises
+#     ------
+#     HTTPException
+#         _description_
+#     """
+#     # try:
+#     #     UserDB.update_user_password_by_label(user_label=user.label, password = updated_pw["password"])
+#     # except Exception as e:
+#     #     raise HTTPException(status_code=400,detail="An error occurred during password change.")
+
+#     new_password = updated_pw.get("password")
+#     if not new_password:
+#         raise HTTPException(422, "Password is required.")
+
+#     try:
+#         hashed = DB.users.hash_password(new_password)
+#     except ValueError as e:
+#         raise HTTPException(422, str(e))
+
+#     if not DB.users.update(tag=user.tag, user_props={"password": hashed}):
+#         raise HTTPException(400, "Could not update password.")
     
+@router.post("/users/pw", summary="Allows users to change the password for themselves.")
+def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_user_from_token)):
+    """Change the authenticated user's password."""
+    old_password = updated_pw.get("old_password")
+    new_password = updated_pw.get("password")
+
+    if not old_password or not new_password:
+        raise HTTPException(422, "Old and new password are required.")
+    if old_password == new_password:
+        raise HTTPException(422, "New password must be different from the current password.")
+
+    db_user = DB.users.get_user_by_tag(user.tag)
+    if db_user is None or db_user.password is None:
+        raise HTTPException(404, "User not found.")
+
+    if not verify_password(old_password, db_user.password.get_secret_value()):
+        raise HTTPException(401, "Current password is incorrect.")
+
+    try:
+        hashed = DB.users.hash_password(new_password)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+    if not DB.users.update(tag=user.tag, user_props={"password": hashed}):
+        raise HTTPException(400, "Could not update password.")
+    
+
 @router.patch("/users/user", summary="Updates some properties of a user")
 def update_user(user_props : dict, user : UserModel = Depends(is_user_admin)):
     """Requires admin rights. Change to allow that users modify themselves."""
