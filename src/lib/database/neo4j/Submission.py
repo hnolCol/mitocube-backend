@@ -314,7 +314,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "WITH submission "
             "UNWIND $collaborators as collaborator_tag "
             "MATCH (c:User {tag : collaborator_tag}) "
-            "MERGE (submission)-[:COLLABORATES]->(c) "
+            "MERGE (submission)<-[:COLLABORATES]-(c) "
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators)

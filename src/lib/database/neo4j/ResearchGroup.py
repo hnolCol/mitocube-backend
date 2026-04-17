@@ -11,7 +11,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
     
-    def add_users(self, tag : str, user_tags : List[str]):
+    def insert_users(self, tag : str, user_tags : List[str]):
         ""
         if not self.exists(tag): raise ValueError("Research group with tag {tag} does not exist.")
         
@@ -26,8 +26,6 @@ class Neo4JResearchGroup(ResearchGroupABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
         
-        
-         
     def delete(self, tag: str) -> bool:
         return super().delete(tag)
        
@@ -67,6 +65,17 @@ class Neo4JResearchGroup(ResearchGroupABC):
         return ResearchGroupModel(**r[0]) if len(r) > 0 else None
 
 
+    def get_submissions_count(self, tag : str) -> int:
+        ""
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[:IS_PART_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
+            "RETURN count(s) "
+        )
+        
+        r = self._driver.execute_query(query, tag = tag, routing_= "r", result_transformer_=Result.value)
+        if len(r) == 0:  return 0
+        return r[0]
+
     def get_tags(self, limit : int = 40) -> List[str]:
         ""
         
@@ -101,23 +110,23 @@ class Neo4JResearchGroup(ResearchGroupABC):
         if len(r) == 0:  return 0
         return r[0]
     
-    def insert(self, research_group : ResearchGroupInput):
+    def insert(self, tag : str, research_group : ResearchGroupInput):
         "" 
-        if self.exists(research_group.tag): raise ValueError("Tag exists already. Delete first or use the update function.")
+        if self.exists(tag): raise ValueError("Tag exists already. Delete first or use the update function.")
         
         query = (
-            "MERGE (rg:ResearchGroup {tag : $research_group.tag}) "
+            "MERGE (rg:ResearchGroup {tag : $tag}) "
             "ON CREATE "
             "SET rg.created_at = timestamp(), rg.text =  $research_group.text, rg.abbreviation =  $research_group.abbreviation, "
-            "rg.address =  $research_group.address, rg.email =  $research_group.email "   
+            "rg.address =  $research_group.address, rg.email =  $research_group.email, rg.institute =  $research_group.institute, rg.url =  $research_group.url "   
             "ON MATCH "
             "SET rg.modified_at = timestamp(), rg.text =  $research_group.text, rg.abbreviation =  $research_group.abbreviation, "
-            "rg.address =  $research_group.address, rg.email =  $research_group.email "   
+            "rg.address =  $research_group.address, rg.email =  $research_group.email, rg.institute =  $research_group.institute, rg.url =  $research_group.url "   
+            "RETURN rg.tag"
         )
         
-        r = self._driver.execute_query(query, routing_="w", research_group = research_group.model_dump(exclude_none=True))
-        
-        
+        r = self._driver.execute_query(query, routing_="w", tag = tag, research_group = research_group.model_dump(exclude_none=True), result_transformer_=Result.value)
+        return True if len(r) > 0 else False
         
     def remove_users(self, tag : str, user_tags): 
 

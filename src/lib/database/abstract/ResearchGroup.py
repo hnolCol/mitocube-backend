@@ -9,7 +9,7 @@ class ResearchGroupABC(ABC):
         ""
         
     @abstractmethod  
-    def add_users(self, tag : str, user_tags : List[str]):
+    def insert_users(self, tag : str, user_tags : List[str]):
         " "
     @abstractmethod
     def exists(self, tag : str) -> bool:
@@ -20,6 +20,11 @@ class ResearchGroupABC(ABC):
     @abstractmethod
     def get_users_count(self, tag : str) -> int:
         " "
+    
+    @abstractmethod
+    def get_submissions_count(self, tag : str) -> int:
+        ""
+        
     @abstractmethod    
     def insert(self, research_group):
         "" 

@@ -9,13 +9,21 @@ class ResearchGroupModel(BaseModel):
     abbreviation : str 
     email : EmailStr
     address: str 
+    institute : str
+    url : Optional[str] = None
+    
     
 class ResearchGroupResponseModel(ResearchGroupModel):
     n_users : Optional[int] = None 
     n_datasets : Optional[int] = None
     
-class ResearchGroupInput(ResearchGroupModel):
-    tag : str = Field(...,min_length=8,max_length=8,default_factory=lambda : get_random_string(8))
+class ResearchGroupInput(BaseModel):
+    text : str 
+    abbreviation : str 
+    email : EmailStr
+    address: str 
+    institute : str
+    url : Optional[str] = None
     
     
 class ResearchGroupResponseModel(ResearchGroupModel):
