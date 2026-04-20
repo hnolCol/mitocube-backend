@@ -1,5 +1,5 @@
+from typing import List, Dict, Optional
 
-from typing import List, Dict
 from fastapi import APIRouter, Depends, HTTPException
 from config.models.user import UserModel, PublicUser
 from config.models.timeline import SubmissionTimelineResponseModel, TimelineModel, TimelineInputModel
@@ -15,7 +15,20 @@ router = APIRouter(
     tags=["Research Groups","Permissions"],
     )
 
+
 research_group_not_found_exception = HTTPException(status_code=404, detail="Research group not found")
+
+@router.get("/q", response_model=List[str])
+def find_research_groups(search_string: Optional[str] = None, user_tags: Optional[str] = None, submission_tags: Optional[str] = None, limit: int = 40, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    """Finds research groups matching the search criteria."""
+    
+    return DB.research_groups.find(
+        search_string=search_string,
+        user_tags=APIParamString(param=user_tags).param,
+        submission_tags=APIParamString(param=submission_tags).param,
+        limit=limit
+    )
+    
 
 @router.get("/")
 def get_research_groups() -> List[str]:
