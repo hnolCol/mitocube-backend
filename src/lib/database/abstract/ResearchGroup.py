@@ -33,5 +33,7 @@ class ResearchGroupABC(ABC):
     @abstractmethod 
     def update(self) -> Dict:
         "" 
-        
+    @abstractmethod
+    def get_details(self) -> List[ResearchGroupModel]:
+        ""
         

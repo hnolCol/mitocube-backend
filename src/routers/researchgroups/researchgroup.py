@@ -5,7 +5,7 @@ from config.models.user import UserModel, PublicUser
 from config.models.timeline import SubmissionTimelineResponseModel, TimelineModel, TimelineInputModel
 from services.users import get_user_from_token, is_user_at_least_curator
 from lib.database.Database import Database
-from config.models.researchgroup import ResearchGroupInput, ResearchGroupResponseModel, ResearchGroupResponseModel
+from config.models.researchgroup import ResearchGroupInput, ResearchGroupResponseModel, ResearchGroupResponseModel, ResearchGroupModel
 from config.models.parameter import APIParamString
 
 DB = Database.DB()
@@ -16,6 +16,11 @@ router = APIRouter(
     )
 
 research_group_not_found_exception = HTTPException(status_code=404, detail="Research group not found")
+
+
+@router.get("/details")
+def get_research_groups_details(user: UserModel = Depends(get_user_from_token)) -> List[ResearchGroupModel]:
+    return DB.research_groups.get_details()
 
 @router.get("/")
 def get_research_groups() -> List[str]:
