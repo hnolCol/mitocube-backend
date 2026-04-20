@@ -39,4 +39,7 @@ class ResearchGroupABC(ABC):
     def update(self) -> Dict:
         "" 
         
+    @abstractmethod
+    def find(self, search_string: str = None, user_tags: List[str] = None, submission_tags: List[str] = None, limit: int = 20) -> List[str]:
+        """Finds research group tags that match the search string, user tags, or submission tags."""
         

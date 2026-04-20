@@ -38,19 +38,60 @@ class Neo4JResearchGroup(ResearchGroupABC):
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return r[0]
     
-    def find(self, search_string : str, limit : int = 20) -> List[str]:
-        ""
-        query = (
-            "MATCH (rg:ResearchGroup) "
-            "WHERE toLower(rg.text) CONTAINS $search_string OR toLower(rg.abbreviation) CONTAINS $search_string OR toLower(rg.tag) CONTAINS $search_string "
-            "RETURN rg.tag "
+    # def find(self, search_string : str, limit : int = 20) -> List[str]:
+    #     ""
+    #     query = (
+    #         "MATCH (rg:ResearchGroup) "
+    #         "WHERE toLower(rg.text) CONTAINS $search_string OR toLower(rg.abbreviation) CONTAINS $search_string OR toLower(rg.tag) CONTAINS $search_string "
+    #         "RETURN rg.tag "
             
-        )
+    #     )
+    #     if limit is not None:
+    #         query += "LIMIT $limit"
+            
+    #     r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, search_string=search_string.lower(), limit=limit)
+    #     return r
+
+    def find(self, search_string: str = None, user_tags: List[str] = None, submission_tags: List[str] = None, limit: int = 40) -> List[str]:
+        """Finds research group tags that match the search string, user tags, or submission tags."""
+        
+        if user_tags is not None:
+            query = (
+                "MATCH (rg:ResearchGroup)<-[:IS_PART_OF]-(u:User) "
+                "WHERE u.tag IN $user_tags "
+            )
+            if submission_tags is not None:
+                query += "AND EXISTS {(rg)<-[:IS_PART_OF]-(su:User)-[:CREATED|COLLABORATES]->(s:Submission) WHERE s.tag IN $submission_tags} "
+        elif submission_tags is not None:
+            query = (
+                "MATCH (rg:ResearchGroup)<-[:IS_PART_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
+                "WHERE s.tag IN $submission_tags "
+            )
+        else:
+            query = (
+                "MATCH (rg:ResearchGroup) "
+                "WHERE true "
+            )
+        
+        if search_string is not None and search_string != "":
+            query += "AND (toLower(rg.text) CONTAINS $search_string OR toLower(rg.abbreviation) CONTAINS $search_string OR toLower(rg.tag) CONTAINS $search_string) "
+        
+        query += "RETURN DISTINCT rg.tag as tag "
+        
         if limit is not None:
             query += "LIMIT $limit"
-            
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, search_string=search_string.lower(), limit=limit)
+        
+        r = self._driver.execute_query(
+            query,
+            routing_="r",
+            result_transformer_=Result.value,
+            search_string=search_string.lower() if search_string is not None else None,
+            user_tags=user_tags,
+            submission_tags=submission_tags,
+            limit=limit
+        )
         return r
+        
     
     def get(self, tag : str) -> ResearchGroupModel:
         
@@ -147,3 +188,4 @@ class Neo4JResearchGroup(ResearchGroupABC):
     def update(self, research_group : ResearchGroupInput):
         "" 
         self.insert(research_group)
+

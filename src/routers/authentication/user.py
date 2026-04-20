@@ -44,6 +44,13 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Use
     if not ok:
         raise HTTPException(status_code=500, detail="Could not insert user in the database.")
 
+    # Link user to research group if provided
+    if user_props.research_group:
+        if not DB.research_groups.exists(user_props.research_group):
+            raise HTTPException(status_code=404, detail="Research group not found.")
+        DB.research_groups.insert_users(tag=user_props.research_group, user_tags=[tag])
+
+    
     send_email_in_background(background_tasks=background_task,
                              subject="Account generated.",
                              email_to=[user_props.email],
