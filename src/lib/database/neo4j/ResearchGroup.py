@@ -62,6 +62,8 @@ class Neo4JResearchGroup(ResearchGroupABC):
                 "MATCH (rg:ResearchGroup)<-[:IS_PART_OF]-(u:User) "
                 "WHERE u.tag IN $user_tags "
             )
+            if submission_tags is not None:
+                query += "AND EXISTS {(rg)<-[:IS_PART_OF]-(su:User)-[:CREATED]->(s:Submission) WHERE s.tag IN $submission_tags} "
         elif submission_tags is not None:
             query = (
                 "MATCH (rg:ResearchGroup)<-[:IS_PART_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
@@ -91,7 +93,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
             limit=limit
         )
         return r
-    
+        
     
     def get(self, tag : str) -> ResearchGroupModel:
         
