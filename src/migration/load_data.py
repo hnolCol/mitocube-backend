@@ -27,13 +27,13 @@ class MigrateScripts:
         self.genotypes = genotypes
 
 
-    def add_users(self):
+    def insert_users(self):
         "" 
         users_path = os.path.join(DIR,"users","users.json")
         if os.path.exists(users_path):
             us = read_json(users_path)
             users = [UserModel(**u, tag = u["label"]) for u in us]
-            self.users.add_users(users=users)
+            self.users.insert_users(users=users)
             
 
     def add_genotypes(self):

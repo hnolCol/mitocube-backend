@@ -1,15 +1,15 @@
 from typing import List, Dict, Optional
 
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException
-from config.models.user import UserModel, PublicUser
-from config.models.timeline import SubmissionTimelineResponseModel, TimelineModel, TimelineInputModel
+from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_at_least_curator
+from services.encryption import create_hierarchical_hash
 from lib.database.Database import Database
 from config.models.researchgroup import ResearchGroupInput, ResearchGroupResponseModel, ResearchGroupResponseModel
 from config.models.parameter import APIParamString
 
 DB = Database.DB()
-
 router = APIRouter(
     prefix="/api/researchgroups",
     tags=["Research Groups","Permissions"],
@@ -31,21 +31,19 @@ def find_research_groups(search_string: Optional[str] = None, user_tags: Optiona
     
 
 @router.get("/")
-def get_research_groups() -> List[str]:
+def get_research_groups(user : UserModel = Depends(get_user_from_token)) -> List[str]:
     ""
-    print(DB.research_groups.get_tags())
     return DB.research_groups.get_tags()
     
-    
 @router.get("/{research_group_tag}/users/count")
-def get_research_group_user_count(research_group_tag : str) -> int:
+def get_research_group_user_count(research_group_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
     "" 
     if not DB.research_groups.exists(tag = research_group_tag):
-        raise 
+        raise research_group_not_found_exception
     return DB.research_groups.get_users_count(tag = research_group_tag)
 
 @router.get("/{research_group_tag}")
-def get_research_group_by_tag(research_group_tag : str) -> ResearchGroupResponseModel:
+def get_research_group_by_tag(research_group_tag : str, user : UserModel = Depends(get_user_from_token)) -> ResearchGroupResponseModel:
     "" 
     if not DB.research_groups.exists(tag = research_group_tag):
         raise research_group_not_found_exception
@@ -53,17 +51,18 @@ def get_research_group_by_tag(research_group_tag : str) -> ResearchGroupResponse
     return ResearchGroupResponseModel(**research_group.model_dump())
 
 @router.post("/")
-def add_research_group(research_group : ResearchGroupInput) -> bool:
-    return DB.research_groups.insert(research_group)
+def add_research_group(research_group : ResearchGroupInput, user : UserModel = Depends(get_user_from_token)) -> bool:
+    tag = create_hierarchical_hash(research_group.model_dump()) #create a unique tag based on the content of the research group. This way, we can avoid duplicates and also easily check if a research group with the same content already exists.
+    return DB.research_groups.insert(tag, research_group)
     
     
 @router.post("/{research_group_tag}/users")
-def add_users_to_research_group(research_group_tag : str, user_tags : List[str]):
+def insert_users_to_research_group(research_group_tag : str, user_tags : List[str], user : UserModel = Depends(is_user_at_least_curator)):
     "" 
-    DB.research_groups.add_users(tag = research_group_tag, user_tags = user_tags)
+    DB.research_groups.insert_users(tag = research_group_tag, user_tags = user_tags)
     
 @router.delete("/{research_group_tag}/users")
-def add_users_to_research_group(research_group_tag : str, user_tags : List[str]):
+def remove_users_from_research_group(research_group_tag : str, user_tags : List[str], user : UserModel = Depends(is_user_at_least_curator)):
     "" 
     DB.research_groups.remove_users(tag = research_group_tag, user_tags = user_tags)
     
