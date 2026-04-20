@@ -139,11 +139,3 @@ class Neo4JResearchGroup(ResearchGroupABC):
         "" 
         self.insert(research_group)
 
-
-    def get_details(self) -> List[ResearchGroupModel]:
-        query = (
-            "MATCH (rg:ResearchGroup) "
-            "RETURN properties(rg) ORDER BY rg.created_at DESC"
-        )
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
-        return [ResearchGroupModel(**rg) for rg in r]
