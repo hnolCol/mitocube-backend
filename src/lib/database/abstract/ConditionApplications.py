@@ -36,7 +36,7 @@ class ConditionApplicationABC(ABC):
         """
     
     @abstractmethod
-    def find(self, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
+    def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
         """Returns the tags of matching condition applications
         
         Parameters

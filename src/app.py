@@ -154,6 +154,7 @@ DB = Database.DB()
 DB.users.check()
 #DB.attributes._utils_insert_from_file(path_to_file ="/Users/HNolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json")
 
+#
 if migrate:
     DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
     DB.attributes._utils_insert_from_file(path_to_file ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")

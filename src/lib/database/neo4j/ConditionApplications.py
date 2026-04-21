@@ -311,15 +311,16 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                         query += "AND "
                     query += "(EXISTS {(ca)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})} OR EXISTS {(ca)-[:HAS_VALUE*0..]->(:ConditionValue)-[:INSTANCE_OF]->(t:Trait {tag : $trait_tag})}) "
         
-        query += "RETURN ca.tag, count(r) as freq "
+        query += "RETURN ca.tag as tag, count(r) as freq "
 
         if sort_by_frequency:
             query += "ORDER BY freq DESC "
         if limit is not None:
             query += "LIMIT $limit "
 
-        r = self._driver.execute_query( query_= query, routing_="r", submission_tag=submission_tag, attribute_tag=attribute_tag, trait_tag=trait_tag, limit = limit, result_transformer_=Result.value)
+        r = self._driver.execute_query( query_= query, routing_="r",  search_string = search_string, submission_tag=submission_tag, attribute_tag=attribute_tag, trait_tag=trait_tag, limit = limit, result_transformer_=Result.value)
         print(r)
+        #print([ri["tag"] for ri in r[0]])
 
         return r
     
