@@ -42,6 +42,13 @@ def get_research_group_user_count(research_group_tag : str, user : UserModel = D
         raise research_group_not_found_exception
     return DB.research_groups.get_users_count(tag = research_group_tag)
 
+@router.get("/{research_group_tag}/submissions/count")
+def get_research_group_submission_count(research_group_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
+    ""  
+    if not DB.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    return DB.research_groups.get_submissions_count(tag = research_group_tag)
+
 @router.get("/{research_group_tag}")
 def get_research_group_by_tag(research_group_tag : str, user : UserModel = Depends(get_user_from_token)) -> ResearchGroupResponseModel:
     "" 
