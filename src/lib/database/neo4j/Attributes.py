@@ -22,13 +22,13 @@ class Neo4JAttributes(AttributesABC):
         self._driver = driver
         
         
-    def _utils_insert_from_file(self, path_to_file : str = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json", *args, **kwargs) -> None:
+    def _utils_insert_from_file(self, file_path : str = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json", *args, **kwargs) -> None:
         ""    
                 
         
         #DB_SETTINGS = get_db_settings()
 
-        attributes = read_json(path_to_file)
+        attributes = read_json(file_path)
         
         if "attributes" not in attributes: raise ValueError("The loaded file has to have an 'attributes' key.")
         if "traits" not in attributes: raise ValueError("The loaded file has to have a 'traits' key.")

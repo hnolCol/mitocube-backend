@@ -24,7 +24,7 @@ class Neo4jSpareParts(SparePartsABC):
             "SET s.created_at = timestamp(), s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.company = sp_props.company, "
             "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link, s.is_active = true "
             "ON MATCH "
-            "s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link, s.is_active = true"
+            "SET s.price = sp_props.price, s.product_id = sp_props.product_id, s.link = sp_props.link, s.is_active = true, s.description = sp_props.description, s.priority = sp_props.priority, s.s = sp_props.s, s.text = sp_props.text, s.modified_at = timestamp() "
             "RETURN count(s) as count"
         )
     

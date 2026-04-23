@@ -698,9 +698,9 @@ class Neo4JMaintenanceProcedure(MaintenanceProcedureABC):
         self._driver = driver 
         
         
-    def _utils_insert_from_file(self, path_to_file : str = "/Users/hnolte/Documents/GitHub/mitocube-backend/resources/maintenance/procedures.txt", *args, **kwargs) -> None:
+    def _utils_insert_from_file(self, file_path :str, *args, **kwargs) -> None:
         ""    
-        maintenance_file : pd.DataFrame = pd.read_csv(path_to_file, *args, **kwargs)
+        maintenance_file : pd.DataFrame = pd.read_csv(file_path, *args, **kwargs)
         
         if not all(column_name in maintenance_file.columns for column_name in REQUIRED_COLUMNS):
             raise ValueError(f"The file does not contain one of the following column names: {REQUIRED_COLUMNS}")

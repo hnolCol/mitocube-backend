@@ -74,9 +74,13 @@ from routers.stats import submissions as submission_stats
 
 from services.json import read_json
 import pandas as pd
+import argparse 
 
 
-migrate = False
+args = argparse.ArgumentParser(description="Migrate data from old json files to the database. ")
+args.add_argument("--migrate", action="store_true", help="Whether to run the migration scripts. This should only be set to true if you want to run the migration, otherwise it should be false, as the migration scripts are not idempotent. ")
+args = args.parse_args()
+migrate = args.migrate
 
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
@@ -157,10 +161,11 @@ DB.users.check()
 #
 if migrate:
     DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
-    DB.attributes._utils_insert_from_file(path_to_file ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
+    DB.attributes._utils_insert_from_file(file_path ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
     DB.instrument_states._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
     DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t") 
-    DB.maintenance_procedures._utils_insert_from_file(path_to_file="/home/cloud/mitocube-backend/resources/maintenance/procedures.txt", sep="\t")
+    DB.maintenance_procedures._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/procedures.txt", sep="\t")
+    DB.symptoms._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/symptoms.txt", sep="\t")
 
     if CTRL_PROTEOME_SETTINGS.add_control_proteome:
         control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
