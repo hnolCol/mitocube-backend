@@ -131,7 +131,12 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                     # Use general format, strip trailing .0, use scientific notation for small numbers
                     t += f"{val:.6g}"
                 elif item.attribute_tag == "att_protein":
-                    t += f"{self._proteins.get_gene_name(item.value)}"
+                    if "||" in str(item.value):
+                        protein_tags = item.value.split("||")
+                        gene_names = [self._proteins.get_gene_name(tag) for tag in protein_tags if tag]
+                        t += " | ".join(gene_names)
+                    else:
+                        t += f"{self._proteins.get_gene_name(item.value)}"
                 else:
                     t += f"{val}"
         t += f"{self._attributes.get_trait_text(item.trait_tag)}"
