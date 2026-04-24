@@ -15,17 +15,13 @@ import numpy as np
 from config.settings.metatexts import MetaTexts 
 import pandas as pd
 
-genotype_labels_path = "/Users/PParsa/Documents/GitHub/mitocube-backend/label_to_tag.json"
-
-#import pandas as pd
-#genotype_labels_path = "/Users/HNolte/Documents/GitHub/mitocube-backend/label_to_tag.json"
-genotype_labels_to_tags = read_json(genotype_labels_path)
 
 fall_back_user = "WX9r5zQJ"
 
 proteom_mapper = {
-    "att_organism:UP000005640" : "att_proteome:UP000005640",
-    "att_organism:controls" : "att_proteome:ctrl"
+    "att_organism:UP000000589" : "proteome:UP000000589", #mouse 
+    "att_organism:UP000005640" : "att_proteome:UP000005640", #human
+    "att_organism:controls" : "att_proteome:ctrl" #ctrl proteins
 }
 
 protein_tag_mapper = {
@@ -58,11 +54,6 @@ def handle_knockdown(tags : List[str]):
     return r 
 
 
-# genotype_mapping = { 
-            
-#         } #genotype tags have changed, since the tag is not generate based on the data inserted. 
-
-
 def build_tree(attribute_tag, trait_tags : List[str], value = None):
         if attribute_tag in attr_update:
             attribute_tag = attr_update[attribute_tag]
@@ -75,7 +66,7 @@ def get_tags_by_sample(samples_attrs : dict):
     return [[tag for tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
    
    
-def map_genotype_labels_to_tags(samples_genotypes: dict):
+def map_genotype_labels_to_tags(samples_genotypes: dict, genotype_labels_to_tags: dict):
     """Convert old genotype labels per sample into new genotype tags."""
     if not samples_genotypes:
         return []
@@ -171,23 +162,30 @@ def build_dataset_condition_applications(dataset_attributes : dict):
         
 class MigrateData:
     
-    def __init__(self, ):
+    def __init__(self, path_to_submission_folder : str = None, genotype_labels_path : str = None):
         
+        if not os.path.exists(path_to_submission_folder):
+            raise ValueError(f"Path to submission folder does not exist: {path_to_submission_folder}")
+        
+        if not os.path.exists(genotype_labels_path):
+            raise ValueError(f"Path to genotype labels file does not exist: {genotype_labels_path}")
+        
+        self.path_to_folder = path_to_submission_folder  #or "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/data"
+        self.dirList = [l for l in os.listdir(self.path_to_folder) if os.path.isdir(os.path.join(self.path_to_folder,l))] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
 
-        PATH_TO_SUBMISSION_FOLDER = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/data"
-        #PATH_TO_SUBMISSION_FOLDER = "/Users/HNolte/Documents/GitHub/mitocube-backend/resources/data"
-        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "3QSa4X0IvM6f"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
+        self.genotype_labels_path = genotype_labels_path #or "/Users/PParsa/Documents/GitHub/mitocube-backend/label_to_tag.json"
 
-        dirList = [l for l in os.listdir(PATH_TO_SUBMISSION_FOLDER) if os.path.isdir(os.path.join(PATH_TO_SUBMISSION_FOLDER,l)) if l == "QPa98BBMhS"] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
-        print(dirList)
+        self.genotype_labels_to_tags = read_json(genotype_labels_path)
 
-   
+        print(f"Found submission folders: {self.dirList}")
+        print("Execute run() to start the migration.")
+        
+    def run(self):
 
-        for submission_tag in dirList:
-            print(submission_tag)
+        for submission_tag in self.dirList:
             df = None
-            jsonFile = read_json(os.path.join(PATH_TO_SUBMISSION_FOLDER,submission_tag,"params.json"))
-            path_to_quant = os.path.join(PATH_TO_SUBMISSION_FOLDER,submission_tag,"data.txt") 
+            jsonFile = read_json(os.path.join(self.path_to_folder,submission_tag,"params.json"))
+            path_to_quant = os.path.join(self.path_to_folder,submission_tag,"data.txt") 
             path_to_quant_exists = os.path.exists(path_to_quant)
             if path_to_quant_exists:
                 df = pd.read_csv(path_to_quant, sep="\t").set_index("Key")
@@ -201,7 +199,7 @@ class MigrateData:
             metatext = jsonFile["metatext"]
             meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
             #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
-            genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"])
+            genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"], self.genotype_labels_to_tags)
             dataset_attributes = build_dataset_condition_applications(jsonFile["dataset_attributes"])
 
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"])
@@ -271,64 +269,6 @@ class MigrateData:
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
-        # class DatasetSubmissionModel(BaseModel):
-        #     ""
-#     created_on : float
-#     modified_on : Optional[float] = None
-#     state : SubmissionStatesEnums
-#     label : Optional[str] = None
-#     tag : str
-#     title : str
-#     user_tag : str
-#     collaborators : List[str]
-#     replicates : List[int]
-#     sample_names : List[str]
-#     n_samples : int
-#     metatext : Dict[str,str] = {}
-#     dataset_attributes : Dict[str,List[str]]
-#     samples_attributes : Dict[str,Dict[str,List[int]]]
-#     samples_genotypes : Optional[Dict[str,List[int]]] = Field(...,default_factory=dict)
-#     links : List[SubmissionLink] = []
-#     timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
-#     runlist : Optional[RunListModel] = None 
-#     #samples_attributes_input : Optional[Dict[str,List[SampleAttributeInput]]] = None #input in terms of 'by the user' If input is allowed, it is defined in the attributes.
-#     class Config:
-#         use_enum_values = True 
-
-    
-    #DB.submissions.insert(submission_insert_model.dict())
-    
-    
-    # if DB.submission_exists(tag = submission.tag):
-    #     raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update the submission or use a different tag (/api/submissions/tag).")
-    # DB.submissions.insert(tag = submission.tag,
-    #                       title = submission.title,
-    #                       user_tag = user.tag,
-    #                       collaborators = submission.collaborators)
-    # #set the state to submitted
-    # DB.submissions.set_state(tag = submission.tag, state = SubmissionStatesEnums.SUBMITTED, user_tag = user.tag) 
-    # DB.submissions.insert_attributes(tag = submission.tag, traits = submission.dataset_attributes) 
-    # #insert samples and sample conditions (attributes/traits)
-    # for idx,sample_name in enumerate(submission.sample_names):
-    #         sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
-    #         sample_attributes = submission.samples_attributes[idx] 
-    #         DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
-            
-    #         if submission.genotypes and idx < len(submission.genotypes):
-    #             genotype_tags = submission.genotypes[idx] 
-    #             if isinstance(genotype_tags, list):
-    #                 for genotype_tag in genotype_tags: 
-    #                     if DB.genotypes.exists(genotype_tag):  
-    #                         DB.samples.insert_genotype(
-    #                             sample_tags=[sample_tag],
-    #                             genotype_tag=genotype_tag
-    #                         )
-    # ## add meta text 
-    # DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
-    # for title, text in submission.metatext.items():
-    #     DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
-    
+      
 
 
-
-MigrateData()

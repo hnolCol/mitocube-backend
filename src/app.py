@@ -77,10 +77,6 @@ import pandas as pd
 import argparse 
 
 
-args = argparse.ArgumentParser(description="Migrate data from old json files to the database. ")
-args.add_argument("--migrate", action="store_true", help="Whether to run the migration scripts. This should only be set to true if you want to run the migration, otherwise it should be false, as the migration scripts are not idempotent. ")
-args = args.parse_args()
-migrate = args.migrate
 
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
@@ -149,32 +145,14 @@ ROOT_PATH = get_absolute_path_to_dir(__file__)
 CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
-#DB.instrument_states.get_fractional_state_durations()
-# DB.attributes._utils_insert_from_file()
-#DB.instrument_states._utils_insert_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
-#DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/Users/PParsa/Documents/GitHub/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t")        
-                                     
+
 #check for users, essentially, create admin user if no users exists with the defined admin email.
 DB.users.check()
-#DB.attributes._utils_insert_from_file(path_to_file ="/Users/HNolte/Documents/GitHub/mitocube-backend/resources/attributes/attributes.json")
 
-#
-if migrate:
-    DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
-    DB.attributes._utils_insert_from_file(file_path ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
-    DB.instrument_states._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
-    DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t") 
-    DB.maintenance_procedures._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/procedures.txt", sep="\t")
-    DB.symptoms._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/symptoms.txt", sep="\t")
 
-    if CTRL_PROTEOME_SETTINGS.add_control_proteome:
-        control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
-        #adding proteme details, will set is_updating to true
-        DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
-        DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
-        DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
 
 origins = [
+    "https://mitocube.age.mpg.de",
     "http://localhost:5000",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -213,4 +191,34 @@ app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_asset
 
 
 if __name__ == "__main__":
+    #parase arguments only when running this file directly, otherwise the arguments will be parsed when importing this file, which is not desired.
+    args = argparse.ArgumentParser(description="Migrate data from old json files to the database. ")
+
+    args.add_argument("--setup_database", action="store_true", help="Whether to run the migration scripts. This should only be set to true if you want to run the migration, otherwise it should be false, as the migration scripts are not idempotent. ")
+    args.add_argument("--genotypes ",  help="Path pointing to a genotype json file that can be used to populate the genotypes in the database. The file should be a json file")
+    args.add_argument("--migrate_submissions",  help="Path pointing to a submission folder that can be used to populate the submissions in the database. The folder should contain one folder per submission containg the files params.json and data.txt.", default=None)
+
+    args = args.parse_args()
+    setup_db_default = args.setup_database
+    migrate_submission_folder = args.migrate_submissions 
+    if migrate_submission_folder is not None:
+        import MigrateDatabase
+        
+        MigrateDatabase(path_to_submission_folder = migrate_submission_folder)
+    #
+    if setup_db_default:
+        DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
+        DB.attributes._utils_insert_from_file(file_path ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
+        DB.instrument_states._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
+        DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t") 
+        DB.maintenance_procedures._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/procedures.txt", sep="\t")
+        DB.symptoms._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/symptoms/symptoms.txt", sep="\t")
+
+        if CTRL_PROTEOME_SETTINGS.add_control_proteome:
+            control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
+            #adding proteme details, will set is_updating to true
+            DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
+            DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
+            DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+            
     uvicorn.run(app, port = 5002, proxy_headers=True)

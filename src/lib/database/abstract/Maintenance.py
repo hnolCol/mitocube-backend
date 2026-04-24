@@ -182,7 +182,7 @@ class MaintenanceProcedureABC(ABC):
 
 
     @abstractmethod
-    def _utils_insert_from_file(path_to_file : str, *args, **kwargs):
+    def _utils_insert_from_file(file_path : str, *args, **kwargs):
         """
         Handles the insertion of multiple maintenance entries using a file. 
         The arguments and kwargs should be passed to pandas.read_csv

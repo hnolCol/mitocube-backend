@@ -1,4 +1,5 @@
 import json
+import os
 from pydantic import BaseModel
 from typing import List, Optional, ForwardRef, Literal
 
@@ -134,11 +135,15 @@ import argparse
 
 class MigrateGenotypes:
 
-    def __init__(self):
+    def __init__(self, path_to_genotypes  :str):
         
         
+        if not os.path.exists(path_to_genotypes):
+            raise ValueError(f"Path to genotypes file does not exist: {path_to_genotypes}") 
         
-        with open(GENOTYPES_PATH) as f:
+        self.path_to_genotypes = path_to_genotypes 
+            
+        with open(path_to_genotypes) as f:
             genotypes = json.load(f)
 
         genotype_list = [g for g in genotypes if ONLY_LABEL is None or g["label"] in ONLY_LABEL]
@@ -162,6 +167,7 @@ class MigrateGenotypes:
                 
             model = InsertGeneticApplicationModel(
                 text=g["text"],
+                technical_text=g.get("text"),
                 description= "Genotype imported from old database, original label: " + label,
                 components=components
             )
