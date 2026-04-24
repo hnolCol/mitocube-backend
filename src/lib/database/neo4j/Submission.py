@@ -553,30 +553,32 @@ class Neo4JSubmissions(SubmissionsABC):
     def insert_comment(self, tag : str, comment : SubmissionCommentModel):
         ""         
         query = (
-            "MATCH (submission:Submission {tag : $tag}) "
-            "MATCH (user:User) "
-            "WHERE user.tag = $comment.user_tag "
-            "MERGE (comment: Comment {tag : $comment.tag}) "
-            "SET comment.content = $comment.content, comment.created_at = timestamp(), comment.user_tag = comment.user_tag "
+            "MATCH (submission:Submission {tag: $tag}) "
+            "MATCH (user:User {tag: $user_tag}) "
+            "CREATE (comment:Comment {tag: $comment_tag, content: $content, created_at: timestamp()}) "
             "MERGE (submission)-[:HAS]->(comment) "
-            "MERGE (user)-[r:CREATED]->(comment) "
-            "SET r.created_at = timestamp() "
+            "MERGE (user)-[:CREATED]->(comment) "
         )
-        try: 
-            self._driver.execute_query(query, tag = tag, comment = comment.model_dump(exclude_none=True))
-        except Exception as e:
-            print(e)
-            return False 
+        self._driver.execute_query(
+            query, routing_="w",
+            tag=tag, user_tag=comment.user_tag, comment_tag=comment.tag, content=comment.content
+        )
         
-   
-    
-    def get_comments(self, tag : str) -> List[SubmissionCommentModel]:
+        if comment.response_to:
+            reply_query = (
+                "MATCH (child:Comment {tag: $child_tag}) "
+                "MATCH (parent:Comment {tag: $parent_tag}) "
+                "MERGE (child)-[:RESPONSE_TO]->(parent) "
+            )
+            self._driver.execute_query(reply_query, routing_="w", child_tag=comment.tag, parent_tag=comment.response_to)
+
+    def get_comments(self, tag: str) -> List[SubmissionCommentModel]:
         "Returns the available comments for a given submission tag."
-        
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS]-(comment:Comment)-[r:CREATED]-(u:User) "
-            "RETURN {user_tag : u.tag, created_at : r.created_at, content : comment.content, tag : comment.tag} "
-            
+            "MATCH (submission:Submission {tag: $tag})-[:HAS]->(comment:Comment)<-[:CREATED]-(u:User) "
+            "OPTIONAL MATCH (comment)-[:RESPONSE_TO]->(parent:Comment) "
+            "RETURN {user_tag: u.tag, created_at: comment.created_at, content: comment.content, tag: comment.tag, response_to: parent.tag} "
+            "ORDER BY comment.created_at ASC"
         )
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return [SubmissionCommentModel(**c) for c in r ]
