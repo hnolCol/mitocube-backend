@@ -403,15 +403,19 @@ class Neo4JAnnotations(AnnotationsABC):
             " a.source = $source, "
             " a.text = $text, "
             " a.group_tag = $group_tag, "
-            " a.protein_tags = $protein_tags, "
             " a.modified_at = timestamp(), "
             " a.s = toLower($text)+' '+toLower(coalesce($description,'')) "
+            "WITH a "
+            "OPTIONAL MATCH (a)-[r:ANNOTATES]->() DELETE r "
+            "WITH a "
+            "UNWIND $protein_tags AS protein_tag "
+            "MATCH (p:Protein {tag: protein_tag}) "
+            "MERGE (a)-[:ANNOTATES]->(p) "
             "WITH a "
             "MATCH (u:User {tag: $user_tag}) "
             "CREATE (u)-[:MODIFIED_ANNOTATION {modified_at: timestamp()}]->(a) "
             "RETURN TRUE "
         )
-
         r = self._driver.execute_query( query,
                                         annotation_tag=annotation.tag,
                                         text=annotation.text,
@@ -425,7 +429,6 @@ class Neo4JAnnotations(AnnotationsABC):
                                         routing_="w",
                                         result_transformer_=Result.value,
                                     )
-        
         return r[0] if r else False
     
 

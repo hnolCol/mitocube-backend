@@ -69,7 +69,7 @@ def are_proteins_annotated_with(tag: str, protein_tags: str):
 
 
 @router.post("/", response_model=bool)
-def insert_annotation( annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
+def insert_annotation( annotation: AnnotationsModel, user: UserModel = Depends(get_user_from_token)):
 
     ok = DB.annotations.insert(annotation = annotation)
     if not ok:
@@ -109,7 +109,7 @@ def get_annotations_in_group(group_tag: str, limit: int = 20, user: UserModel = 
     return DB.annotation_groups.get_annotations(group_tag, limit=limit)
 
 @router.post("/groups/", response_model=bool)
-def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(is_user_admin)):
+def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(get_user_from_token)):
     ok = DB.annotation_groups.insert(annotation_group, user_tag=user.tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to insert annotation group")
@@ -126,7 +126,7 @@ def get_annotation_in_group_count( group_tag: str, user: UserModel = Depends(get
 
 
 @router.put("/{tag}", response_model=bool)
-def update_annotation(annotation: AnnotationsModel, user: UserModel = Depends(is_user_admin)):
+def update_annotation(annotation: AnnotationsModel, user: UserModel = Depends(get_user_from_token)):
     
     ok = DB.annotations.update_annotation( annotation=annotation, user_tag=user.tag)
     
@@ -137,7 +137,7 @@ def update_annotation(annotation: AnnotationsModel, user: UserModel = Depends(is
 
 
 @router.delete("/{tag}", response_model=bool)
-def delete_annotation(tag: str, user: UserModel = Depends(is_user_admin)):
+def delete_annotation(tag: str, user: UserModel = Depends(get_user_from_token)):
     
     if not DB.annotations.exists(tag):
         raise HTTPException(status_code=404, detail="Annotation not found")
