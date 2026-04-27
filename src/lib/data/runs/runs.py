@@ -395,7 +395,7 @@ class RunListCreator:
             n_runs=len(runs),
             n_plates=n_plates,
             dataset_label=self._dataset_label,
-            user_label=self._user.label,
+            user_tag=self._user.tag,
             )
 
     
@@ -404,7 +404,7 @@ if __name__ == "__main__":
     runsList = RunListCreator("abc",sample_list,
                    #aggregate_on="batch", 
                    n_fractions=2, 
-                   user_label="abac23",
+                   user_tag="abac23",
                    rows_first=False,
                    scramble=False,
                    fractionate=False, 

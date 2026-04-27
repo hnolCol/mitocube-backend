@@ -74,7 +74,7 @@ class RunListModel(BaseModel):
     The runlist model.
 
     """
-    user_label : str
+    # user_label : str
     created_at : float = Field(...,default_factory=get_time_stamp)
     user_tag : Optional[str] = None #user that created the run list 
     dataset_label : str 
@@ -87,12 +87,12 @@ class RunListModel(BaseModel):
     runs : List[AnalyticRunModel]
     aggregated_on : Optional[str] = None
     
-    @field_validator('user_tag', mode="after")
-    def check_user(cls, v : List[str]|str, field):
-        ""
-        if v is None:
+    # @field_validator('user_tag', mode="after")
+    # def check_user(cls, v : List[str]|str, field):
+    #     ""
+    #     if v is None:
             
-            return cls.user_label
+    #         return cls.user_tag
     
     
     

@@ -13,6 +13,7 @@ from config.models.submissions.submissions import DatasetSubmissionModel, Attrib
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
+from config.models.submissions.runs import RunListModel
 from config.enums.states import SubmissionStatesEnums
 
 
@@ -487,6 +488,30 @@ class SubmissionsABC(ABC):
         If the state does not exist, it is skipped and nothing happens.    """
     
     
+    @abstractmethod
+    def insert_runlist(self, submission_tag: str, runlist: RunListModel, user_tag: str) -> bool:
+        """Inserts a runlist for a given submission. If a runlist already exists for the submission, it is replaced with the new one.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag.
+        runlist : RunListModel
+            The runlist to insert.
+        user_tag : str
+            The user tag of the user inserting the runlist.
+
+        Returns
+        -------
+        bool
+            True if the runlist was inserted successfully, False otherwise.
+        """
+    @abstractmethod
+    def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
+        "Returns the runlist for a given submission tag. If no runlist is found, None is returned."
+
+
+
 class SubmissionFilterABC(ABC):
     
     

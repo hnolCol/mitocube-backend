@@ -843,3 +843,61 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
         })
     
     return result
+
+
+
+@router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags=["Runlist"])
+def create_submission_runlist(
+    submission_tag: str,
+    runlist_props: RunListRequestPropsModel,
+    user: UserModel = Depends(is_creator_of_submission_or_curator)
+):
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+
+    samples_df = DB.samples.get_sample_list(submission_tag=submission_tag)
+
+    if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in samples_df.columns:
+        raise HTTPException(status_code=400, detail="aggregate_on attribute tag not found.")
+
+    try:
+        runlist = RunListCreator(
+            dataset_label=submission_tag,
+            sample_list=samples_df,
+            user=user,
+            **runlist_props.model_dump()
+        ).create()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    DB.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
+
+    return RunListResponseModel(
+        **runlist.model_dump(),
+        user_email=user.email,
+        user_firstname=user.firstname,
+        user_lastname=user.lastname
+    )
+
+
+@router.get("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags=["Runlist"])
+def get_submission_runlist(
+    submission_tag: str,
+    user: UserModel = Depends(get_user_from_token)
+):
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+
+    runlist = DB.submissions.get_runlist(submission_tag=submission_tag)
+    if runlist is None:
+        raise HTTPException(status_code=404, detail="No runlist found.")
+
+    runlist_user = DB.users.get_user_by_tag(tag=runlist.user_tag)
+    user_email = runlist_user.email if runlist_user else ""
+    user_firstname = runlist_user.firstname if runlist_user else ""
+    user_lastname = runlist_user.lastname if runlist_user else ""
+
+    return RunListResponseModel(
+        **runlist.model_dump(),
+        user_email=user_email,
+        user_firstname=user_firstname,
+        user_lastname=user_lastname
+    )
