@@ -226,14 +226,14 @@ class ProteomesABC(ABC):
         
     @abstractmethod
     def insert_uniprot_proteome(self, 
-                                proteome_tag : List[str] = ["UP000005640"], 
+                                proteome_tags : List[str] = ["UP000005640"], 
                                 reviewed : bool = True, 
                                 user_tag : str = None) -> int:
         """Insert the data from the Uniprot Database for a reference proteome. 
 
         Parameters
         ----------
-        proteome_id : List[str], optional
+        proteome_tags : List[str], optional
             _description_, by default ["UP000005640"]
         reviewed : bool, optional
             _description_, by default True

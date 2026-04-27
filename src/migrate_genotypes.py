@@ -7,8 +7,7 @@ from lib.database.Database import Database
 import argparse
 DB = Database.DB()
 
-GENOTYPES_PATH = "/home/cloud/resources/genotypes/genotypes.json"
-USER_TAG = "kxWH7py3"
+
 ONLY_LABEL = None   # set to a label string to migrate only one, or None to migrate all
 
 
@@ -34,10 +33,7 @@ class InsertGeneticApplicationModel(BaseModel):
 
 # Tag mappings
 
-parser = argparse.ArgumentParser(description='Migrate genotypes from JSON file')
-parser.add_argument('--user-tag', default='kxWH7py3', help='User tag for database insertion')
-parser.add_argument('--genotypes-path', default='/home/cloud/resources/genotypes/genotypes.json', help='Path to genotypes JSON file')
-args = parser.parse_args()
+
 
 ZYGOSITY_MAP = {
     "(+/+)": "wt",
@@ -46,8 +42,7 @@ ZYGOSITY_MAP = {
     "(-/+)": "hetero",
 }
 
-GENOTYPES_PATH = args.genotypes_path
-USER_TAG = args.user_tag
+
 
 UNTARGETED_MUTATIONS = {"frameshift", "premstop"}
 
@@ -99,7 +94,7 @@ def build_mutation_attr(mut_tag, pos_data):
 def build_component(attr_block):
     protein_key  = attr_block["att_protein_coding_sequence"][0]["key"]
     eng_tag      = attr_block["att_gene_engineering"][0]["tag"]
-    method_tag   = attr_block["att_gene_editing_method"][0]["tag"]
+    method_tag   = attr_block["att_gene_editing_method"][0]["tag"] if "att_gene_editing_method" in attr_block else "att_gene_editing_method:crispr"
     raw_zyg      = attr_block["att_gene_zygosity"][0]["tag"]
     zygosity_tag = ZYGOSITY_MAP.get(raw_zyg, raw_zyg)
     mutations    = attr_block.get("att_protein_mutation", [])
@@ -120,6 +115,8 @@ def build_component(attr_block):
         tag="att_protein", type="attribute",
         children=[AttributeTree(tag=proteome_tag, type="trait", value=protein_key, children=[])]
     )
+    
+    print(protein_attr)
     return AttributeTree(
         tag="att_gene_engineering", type="attribute",
         children=[AttributeTree(
@@ -135,15 +132,17 @@ import argparse
 
 class MigrateGenotypes:
 
-    def __init__(self, path_to_genotypes  :str):
-        
+    def __init__(self, path_to_genotypes :str, fallback_user_tag : str):
+        self.fallback_user_tag = fallback_user_tag
         
         if not os.path.exists(path_to_genotypes):
             raise ValueError(f"Path to genotypes file does not exist: {path_to_genotypes}") 
         
         self.path_to_genotypes = path_to_genotypes 
             
-        with open(path_to_genotypes) as f:
+    def migrate(self):
+        
+        with open(self.path_to_genotypes) as f:
             genotypes = json.load(f)
 
         genotype_list = [g for g in genotypes if ONLY_LABEL is None or g["label"] in ONLY_LABEL]
@@ -162,9 +161,12 @@ class MigrateGenotypes:
                         for mut in mutations:
                             single_mut_block = {**block, "att_protein_mutation": [mut]}
                             components.append(build_component(single_mut_block))
-                except: 
+                except Exception as e: 
+                    print(f"Error building component for genotype {label}: {e}")
                     continue
-                
+            if len(components) == 0:
+                print(f"No valid components found for genotype {label}, skipping.")
+                continue
             model = InsertGeneticApplicationModel(
                 text=g["text"],
                 technical_text=g.get("text"),
@@ -172,13 +174,15 @@ class MigrateGenotypes:
                 components=components
             )
             genotype_tag = create_hierarchical_hash([c.model_dump() for c in model.components])
-            label_to_tag[label] = genotype_tag
+            
             try:
-                ok = DB.genotypes.insert(model, user_tag=USER_TAG)
+                ok = DB.genotypes.insert(model, user_tag=self.fallback_user_tag) #old DB had no user assignment for genotypes, so we assign to fallback user.
                 if ok:
                     print(f"Genotype {label} inserted successfully.")
                 else:
                     print(f"Genotype {label} already exists. Skipping.")
+                label_to_tag[label] = genotype_tag
+                
             except Exception as e:
                 print(f"Error inserting genotype {label}: {e}")
                 continue
@@ -186,6 +190,15 @@ class MigrateGenotypes:
         with open("label_to_tag.json", "w") as f:
             json.dump(label_to_tag, f, indent=2)
         print(f"Label to tag mapping saved to label_to_tag.json")
+        
+        return "label_to_tag.json"
 
 if __name__ == "__main__":
-    MigrateGenotypes()
+    parser = argparse.ArgumentParser(description='Migrate genotypes from JSON file')
+
+    parser.add_argument('--user-tag', default='kxWH7py3', help='User tag for database insertion')
+    parser.add_argument('--genotypes-path', default='/home/cloud/resources/genotypes/genotypes.json', help='Path to genotypes JSON file')
+    args = parser.parse_args()
+    GENOTYPES_PATH = args.genotypes_path
+    USER_TAG = args.user_tag
+    MigrateGenotypes(path_to_genotypes=GENOTYPES_PATH, fallback_user_tag=USER_TAG).migrate()

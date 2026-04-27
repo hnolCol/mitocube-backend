@@ -407,38 +407,57 @@ class Neo4JSubmissions(SubmissionsABC):
     #     print(r[0] if len(r) > 0 else 0)
     #     return r[0] if len(r) > 0 else 0
     
-    def insert_protein_quantifications(self, tag: str, quantifications: List[ProteinGroupQuantificationModel]) -> int:
+    def insert_protein_quantifications(self, tag: str, quantifications: List[ProteinGroupQuantificationModel], batch_size: int = 500) -> int:
         """
-        Inserts protein quantifications for a given submission.
+        Inserts protein quantifications for a given submission in batches.
         Removes existing quantifications for the submission before inserting new ones.
+        
+        Parameters
+        ----------
+        tag : str
+            The submission tag
+        quantifications : List[ProteinGroupQuantificationModel]
+            List of quantifications to insert
+        batch_size : int
+            Number of quantifications to process per batch (default: 1000)
+        
+        Returns
+        -------
+        int
+            Total number of inserted quantifications
         """
-
-        query = (
-            "MATCH (submission:Submission {tag: $tag}) "
-            "UNWIND $quantifications as quantification "
-
-            "MATCH (pg:ProteinGroup {tag: quantification.tag}) "
-            "MATCH (sample:Sample {tag: quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
+        
+        total_count = 0
+        quantifications_data = [x.model_dump() for x in quantifications]
+        
+        # Process in batches
+        for i in range(0, len(quantifications_data), batch_size):
+            batch = quantifications_data[i:i + batch_size]
             
-            # Delete any existing QUANTIFIED relationship for this submission between this sample and protein group
-            "OPTIONAL MATCH (sample)-[existing_q:QUANTIFIED {submission_tag: $tag}]->(pg) "
-            "DELETE existing_q "
+            query = (
+                "MATCH (submission:Submission {tag: $tag}) "
+                "UNWIND $quantifications as quantification "
+                "MATCH (pg:ProteinGroup {tag: quantification.tag}) "
+                "MATCH (sample:Sample {tag: quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
+                "OPTIONAL MATCH (sample)-[existing_q:QUANTIFIED {submission_tag: $tag}]->(pg) "
+                "DELETE existing_q "
+                "CREATE (sample)-[q:QUANTIFIED]->(pg) "
+                "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
+                "RETURN count(q) "
+            )
 
-            "CREATE (sample)-[q:QUANTIFIED]->(pg) "
-            "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
-            "RETURN count(q) "
-        )
-
-        # print("Deleting existing quantifications for submission:", tag)
-        r = self._driver.execute_query(
-            query,
-            routing_="w",
-            tag=tag,
-            quantifications=[x.model_dump() for x in quantifications],
-            result_transformer_=Result.value
-        )
-        # print(r[0] if len(r) > 0 else 0)
-        return r[0] if len(r) > 0 else 0
+            r = self._driver.execute_query(
+                query,
+                routing_="w",
+                tag=tag,
+                quantifications=batch,
+                result_transformer_=Result.value
+            )
+            
+            batch_count = r[0] if len(r) > 0 else 0
+            total_count += batch_count
+        
+        return total_count
 
 
     def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:

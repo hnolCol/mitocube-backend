@@ -3,7 +3,7 @@ from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-
+import os 
 import uvicorn
 
 ### import settings
@@ -195,30 +195,55 @@ if __name__ == "__main__":
     args = argparse.ArgumentParser(description="Migrate data from old json files to the database. ")
 
     args.add_argument("--setup_database", action="store_true", help="Whether to run the migration scripts. This should only be set to true if you want to run the migration, otherwise it should be false, as the migration scripts are not idempotent. ")
-    args.add_argument("--genotypes ",  help="Path pointing to a genotype json file that can be used to populate the genotypes in the database. The file should be a json file")
+    args.add_argument("--genotypes",  help="Path pointing to a genotype json file that can be used to populate the genotypes in the database. The file should be a json file")
     args.add_argument("--migrate_submissions",  help="Path pointing to a submission folder that can be used to populate the submissions in the database. The folder should contain one folder per submission containg the files params.json and data.txt.", default=None)
+    args.add_argument("--proteomes", help = "List of uniprot proteomes to be addded to the database, separated by comma. Example: UP000005640,UP000002311", default=None)
+    args.add_argument("--add_control_proteome", action="store_true", help="Whether to add the control proteome to the database. The control proteome is a collection of proteins that are used for testing and development purposes. It contains common proteins such as GFP and luciferase. This should only be set to true if you want to add the control proteome, otherwise it should be false, as the control proteome is not intended for production use. ")
+    args.add_argument("--resources_path", help="Path pointing to the resources folder that contains the json files for the migration. This should be a folder containing the files genotypes.json, users.json, and a folder data containing the submission folders. ", default="/home/cloud/resources/")
+
 
     args = args.parse_args()
     setup_db_default = args.setup_database
     migrate_submission_folder = args.migrate_submissions 
-    if migrate_submission_folder is not None:
-        import MigrateDatabase
-        
-        MigrateDatabase(path_to_submission_folder = migrate_submission_folder)
-    #
+    proteomes_to_add = args.proteomes 
+    lead_user = DB.users.get_lead_user() 
+    add_control_proteome = args.add_control_proteome
+    genotype_file = args.genotypes
     if setup_db_default:
-        DB.users._utils_migrate(path_to_user_data="/home/cloud/resources/users/users.json")
-        DB.attributes._utils_insert_from_file(file_path ="/home/cloud/mitocube-backend/resources/attributes/attributes.json")
-        DB.instrument_states._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/instrumentstates.txt", sep="\t")
-        DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/maintenancestates.txt", sep="\t") 
-        DB.maintenance_procedures._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/maintenance/procedures.txt", sep="\t")
-        DB.symptoms._utils_insert_from_file(file_path="/home/cloud/mitocube-backend/resources/symptoms/symptoms.txt", sep="\t")
+        #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
+        DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
+        #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
+        DB.users._utils_migrate(path_to_user_data=os.path.join(args.resources_path, "users/users.json")) 
+    if CTRL_PROTEOME_SETTINGS.add_control_proteome or add_control_proteome:
+        control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
+        #adding proteme details, will set is_updating to true
+        DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
+        DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl", user_tag = lead_user)
+        DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+            
+    if proteomes_to_add is not None:
+        print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
+        proteome_list = proteomes_to_add.split(",")
+        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=True, user_tag = lead_user)
+    if genotype_file is not None:
+        from migrate_genotypes import MigrateGenotypes 
+        genotype_mapper_file_path = MigrateGenotypes(path_to_genotypes=genotype_file, fallback_user_tag=lead_user).migrate()
+        
+    if migrate_submission_folder is not None:
+        if genotype_file is None:
+            print("No genotype file provided, gentoypes are likely to be missed..")
+        from MigrateDatabase import MigrateData 
+        MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
+        
+    if setup_db_default:
+        
+        DB.instrument_states._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/instrumentstates.txt"), sep="\t")
+        DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path=os.path.join(args.resources_path, "maintenance/maintenancestates.txt"), sep="\t") 
+        DB.maintenance_procedures._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/procedures.txt"), sep="\t")
+        DB.symptoms._utils_insert_from_file(file_path=os.path.join(args.resources_path, "symptoms/symptoms.txt"), sep="\t")
 
-        if CTRL_PROTEOME_SETTINGS.add_control_proteome:
-            control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
-            #adding proteme details, will set is_updating to true
-            DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
-            DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl")
-            DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+        #python3 src/app.py --setup_database --genotypes /Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589
+        #--resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/
+
             
     uvicorn.run(app, port = 5002, proxy_headers=True)

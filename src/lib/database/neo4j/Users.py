@@ -110,6 +110,24 @@ class Neo4JUser(UserABC):
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, limit = limit)
         return r 
     
+    def get_lead_user(self) -> str:
+        """Returns the tag of the lead user. The lead user is the first user that is created in the database. This method is used to assign ownership of submissions and genotypes to the lead user if no other user is specified.
+
+        Returns
+        -------
+        str
+            The tag of the lead user.
+        """
+        query = (
+            "MATCH (u:User) "
+            "WHERE u.is_lead_admin = True "
+            "RETURN u.tag "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        
+        if len(r) == 0: return None 
+        return r[0]
     
     def get_user_submission_views(self, tag : str, limit : int) -> List[str]:
         "Returns the submissions that have been viewed by the user."
