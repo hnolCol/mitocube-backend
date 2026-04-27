@@ -1,7 +1,7 @@
 
 
-
 import os
+import time 
 from typing import List, OrderedDict
 
 
@@ -15,8 +15,6 @@ import numpy as np
 from config.settings.metatexts import MetaTexts 
 import pandas as pd
 
-
-fall_back_user = "WX9r5zQJ"
 
 proteom_mapper = {
     "att_organism:UP000000589" : "proteome:UP000000589", #mouse 
@@ -44,20 +42,30 @@ time_to_att_duration = {
     "a":   "att_duration:a",   # A Year
 }
 
-def handle_knockdown(tags : List[str]):
+def handle_knockdown(tags : List[str], technique_trait_tag : str = "att_knockdown_technique:esirna"):
     "" 
     r = [] 
-    protein_tag = tags.split(":")[1]
-    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tag)
-    r = build_tree(attribute_tag = "att_knockdown_technique", trait_tags=["att_knockdown_technique:esirna"]) 
-    r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = protein_tag))
+    protein_tags = [t.split(":")[1] for t in tags]
+    print(f"Handling knockdown for protein tags: {protein_tags}")
+    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tags[0])
+    r = build_tree(attribute_tag = "att_knockdown_technique", trait_tags=[technique_trait_tag]) 
+    r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
     return r 
 
+def handle_batch(tags : List[str]):
+    "" 
+    values = [t.split(":")[1] for t in tags] 
+    return build_tree(attribute_tag="att_batch", trait_tags=["att_batch:string" for i in tags], value=values)
+
+def handle_clone_id(tags : List[str]):
+    "" 
+    values = [t.split(":")[1] for t in tags] 
+    return build_tree(attribute_tag="att_clone_id", trait_tags=["att_clone_id:string" for i in tags], value=values)
 
 def build_tree(attribute_tag, trait_tags : List[str], value = None):
         if attribute_tag in attr_update:
             attribute_tag = attr_update[attribute_tag]
-        return {"type" : "attribute", "tag" : attribute_tag, "children" : [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value} for trait_tag in trait_tags]}
+        return {"type" : "attribute", "tag" : attribute_tag, "children" : [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags)]}
 
 def get_tags_by_sample(samples_attrs : dict): 
     
@@ -108,7 +116,7 @@ def _build_duration_child_for_sample(sample_idx: int, time_data_by_key: dict):
                 }
     return None
 
-def build_sample_attributes(sample_attrs_input: dict):
+def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
     r = OrderedDict()
     
     time_data_by_key = {
@@ -125,9 +133,13 @@ def build_sample_attributes(sample_attrs_input: dict):
         
         tags_by_sample_idcs = [(sample_idx, [sample_attribute for sample_attribute, idcs in sample_attrs.items() if sample_idx in idcs]) for sample_idx in samples_idcs]
         for sampleIdx, sample_attribute_tags in tags_by_sample_idcs:
-            if attribute_tag == "att_knockdown":
-                for tag in sample_attribute_tags:
-                    r[sampleIdx].append(handle_knockdown(tag))
+            if attribute_tag == "att_knockdown":                
+                technique_trait_tag = dataset_attributes["att_knockdown_technique"][0] if "att_knockdown_technique" in dataset_attributes else "att_knockdown_technique:esirna"
+                r[sampleIdx].append(handle_knockdown(sample_attribute_tags, technique_trait_tag=technique_trait_tag))
+            elif attribute_tag == "att_batch":
+                r[sampleIdx].append(handle_batch(sample_attribute_tags))    
+            elif attribute_tag == "att_clone_id":
+                r[sampleIdx].append(handle_clone_id(sample_attribute_tags))
             elif attribute_tag == "att_compound" and time_data_by_key:
                 duration_child = _build_duration_child_for_sample(sampleIdx, time_data_by_key)
                 tree = {
@@ -152,9 +164,6 @@ def build_sample_attributes(sample_attrs_input: dict):
    
 def build_dataset_condition_applications(dataset_attributes : dict): 
     "" 
-    
-    
-    
     r = []
     for attribute_tag, trait_tags in dataset_attributes.items():
         r.append(build_tree(attribute_tag, trait_tags))
@@ -162,7 +171,7 @@ def build_dataset_condition_applications(dataset_attributes : dict):
         
 class MigrateData:
     
-    def __init__(self, path_to_submission_folder : str = None, genotype_labels_path : str = None):
+    def __init__(self, path_to_submission_folder : str = None, genotype_labels_path : str = None, fallback_user_tag : str = None):
         
         if not os.path.exists(path_to_submission_folder):
             raise ValueError(f"Path to submission folder does not exist: {path_to_submission_folder}")
@@ -171,8 +180,8 @@ class MigrateData:
             raise ValueError(f"Path to genotype labels file does not exist: {genotype_labels_path}")
         
         self.path_to_folder = path_to_submission_folder  #or "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/data"
-        self.dirList = [l for l in os.listdir(self.path_to_folder) if os.path.isdir(os.path.join(self.path_to_folder,l))] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
-
+        self.dirList = [l for l in os.listdir(self.path_to_folder) if os.path.isdir(os.path.join(self.path_to_folder,l)) ] # only migrate one submission for testing, remove the if condition to migrate all submissions."]
+        self.fallback_user_tag = fallback_user_tag # "user_lead" # if the user specified in the submission json file does not exist in the database, the submission will be assigned to this user. This should be the tag of an existing user in the database, ideally the lead user.
         self.genotype_labels_path = genotype_labels_path #or "/Users/PParsa/Documents/GitHub/mitocube-backend/label_to_tag.json"
 
         self.genotype_labels_to_tags = read_json(genotype_labels_path)
@@ -193,8 +202,7 @@ class MigrateData:
             #user_tag = jsonFile["user_label"] if DB.users.exists(tag=jsonFile["user_label"]) else fall_back_user
             user_tag = jsonFile.get("user_tag") or jsonFile.get("user_label")
             if not user_tag or not DB.users.exists(tag=user_tag):
-                user_tag = fall_back_user
-            sample_names = jsonFile["sample_names"]
+                user_tag = self.fallback_user_tag       
             sample_names = jsonFile["sample_names"]
             metatext = jsonFile["metatext"]
             meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
@@ -202,7 +210,7 @@ class MigrateData:
             genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"], self.genotype_labels_to_tags)
             dataset_attributes = build_dataset_condition_applications(jsonFile["dataset_attributes"])
 
-            sample_attributes = build_sample_attributes(jsonFile["samples_attributes"])
+            sample_attributes = build_sample_attributes(jsonFile["samples_attributes"], jsonFile["dataset_attributes"])
             timeline = jsonFile.get("timeline", {})
             timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": t.get("user_tag") or t.get("user_label"), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
             if not DB.submission_exists(tag = submission_tag):
@@ -262,11 +270,15 @@ class MigrateData:
                 ### upoad quantification data. 
                 if df is not None:
                     df_melt = df.reset_index(names="tag").melt(id_vars=["tag"], var_name="sample_tag", value_name="value").dropna(subset=["value"])
-                    
+                    print(df_melt)
+                    df_melt = df_melt.dropna(subset=["tag","value"])
+                    N = DB.protein_groups.insert_bulk(protein_groups=df_melt["tag"].unique().tolist())
                     DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**x) for x in df_melt.to_dict(orient="records")]) 
                     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
                     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
+                    time.sleep(1) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
+                    print(f"Quantification data for submission {submission_tag} inserted and processed successfully.")
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
       

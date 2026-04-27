@@ -252,6 +252,7 @@ class Neo4JSamples(SamplesABC):
             for c in attribute_tree.children:
                 #separate on first level children
                 updated_tree = AttributeTree(tag = attribute_tree.tag, type = attribute_tree.type, value = attribute_tree.value, children = [c])
+               # print(updated_tree, sample_tag)
                 tag = self._condition_applications.insert(condition_application=updated_tree)
                 ts.append(tag)
 

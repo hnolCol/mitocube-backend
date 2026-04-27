@@ -149,8 +149,8 @@ class FeatureRanking(object):
         pd.DataFrame
             DataFrame containing the computed metrics for each feature
         """
-        
         df_no_nan = df.dropna(subset=["value", "ca_tags"])
+        
         total_results = []
         for attribute_tag, df in df_no_nan.groupby("attribute_tag"):
         
@@ -267,10 +267,20 @@ class FeatureRanking(object):
             df_attribute.loc[:,"FDR"] = np.nan
             df_attribute.loc[:,"rank"] = df_attribute["score"].rank(ascending=False, method="min").values
             df_no_nan_attribute = df_attribute.dropna(subset=["p_value"])
+            # print(df_no_nan_attribute)
+            # print("???????????????????????????????????????????????????????????????????????", attribute_tag)
             p_adjusted = stats.false_discovery_control(df_no_nan_attribute["p_value"].values, method="bh")
-            df_attribute.loc[df_no_nan_attribute.index, "FDR"] = p_adjusted[1]
+            print(p_adjusted)
+            df_attribute.loc[df_no_nan_attribute.index, "FDR"] = p_adjusted
+            print(df_attribute)
             total_results.append(df_attribute)
-        df = pd.concat(total_results, ignore_index=True)
+        if len(total_results) > 1:
+            return pd.concat(total_results, ignore_index=True)
+        elif len(total_results) == 1:
+            return total_results[0]
+        print(total_results)
+        print("No valid data to compute metrics. Returning empty DataFrame.")
+        return pd.DataFrame()
             
         #df.loc[:,"FDR"] = df.groupby("attribute_tag")["p_value"].transform(lambda p: stats.false_discovery_control(p, method="fdr_bh")[1])
         #df.loc[:"rank"] = df.groupby("attribute_tag")["score"].rank(ascending=False, method="min")

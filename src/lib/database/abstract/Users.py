@@ -45,18 +45,6 @@ class UserABC(ABC):
         print(f"Migration of users completed. {N} users have been migrated.")                 
             
             
-        
-        
-    
-    @abstractmethod
-    def check(self) -> None:
-        "Check if users exists, if not create the lead account."
-    
-    
-    @abstractmethod
-    def get_tags(self, limit : int) -> List[str]:
-        ""
-    
     @abstractmethod 
     def add_user(self, user_props : UserModelForRegistration):
         ""
@@ -70,7 +58,22 @@ class UserABC(ABC):
         users : List[UserModel]
             The users to be added using the common pydantic UserModel. 
         """
-        
+    
+    @abstractmethod
+    def check(self) -> None:
+        "Check if users exists, if not create the lead account."
+    
+    
+    @abstractmethod
+    def get_tags(self, limit : int) -> List[str]:
+        ""
+    
+    
+    @abstractmethod
+    def get_lead_user(self) -> str:
+        "Returns the tag of the lead user. The lead user is the first user that is created in the database. This method is used to assign ownership of submissions and genotypes to the lead user if no other user is specified."
+    
+
     @abstractmethod
     def block_user_by_tag(self, tag : str) -> bool:
         ""
