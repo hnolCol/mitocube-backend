@@ -632,3 +632,51 @@ class Neo4JSamples(SamplesABC):
         )
         self._driver.execute_query(query, tag=tag, replicate=replicate, routing_="w")
         return True
+    
+    def get_sample_list(self, submission_tag: str) -> pd.DataFrame:
+        # Get all samples ordered by index
+        order_query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample) "
+            "RETURN s.text as sample_name, s.sample_index as sample_index "
+            "ORDER BY s.sample_index ASC "
+        )
+        order_df = self._driver.execute_query(
+            order_query, routing_="r",
+            result_transformer_=Result.to_df,
+            submission_tag=submission_tag
+        )
+        
+        # Get condition applications per sample
+        ca_query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample) "
+            "-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "RETURN s.text as sample_name, a.tag as attribute_tag, "
+            "collect(ca.tag) as condition_tags "
+        )
+        ca_df = self._driver.execute_query(
+            ca_query, routing_="r",
+            result_transformer_=Result.to_df,
+            submission_tag=submission_tag
+        )
+        
+        if ca_df.empty:
+            return pd.DataFrame(index=order_df["sample_name"].tolist())
+        
+        ca_df["condition_tags"] = ca_df["condition_tags"].apply(lambda x: " ".join(sorted(x)))
+        pivot = ca_df.pivot_table(
+            index="sample_name", 
+            columns="attribute_tag", 
+            values="condition_tags", 
+            aggfunc="first"
+        )
+        pivot.index.name = None
+        pivot.columns.name = None
+        # Strip attribute prefix from trait tags for cleaner run names
+        # e.g. "att_compound:dmso" -> "dmso"
+        for col in pivot.columns:
+            pivot[col] = pivot[col].apply(
+                lambda x: "_".join([t.split(":")[-1] for t in x.split(" ")]) if x else x
+            )
+        
+        # Reindex to include all samples in correct order, filling missing with empty string
+        return pivot.reindex(order_df["sample_name"].tolist(), fill_value="")

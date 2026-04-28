@@ -1,10 +1,12 @@
-from typing import Literal, List , Dict
+from typing import Literal, List , Dict, Optional
 from neo4j import Driver, Result 
 import uuid
 import pandas as pd 
 import datetime
 from config.models.searches import FulltextSearchResult
 from config.models.submissions.comments import SubmissionCommentModel
+from config.models.submissions.runs import RunListModel, AnalyticRunModel
+from lib.data.runs.runs import RunListCreator
 from lib.database.abstract.Submission import SubmissionFilterABC, SubmissionsABC, SubmissionSummaryABC
 from lib.database.abstract.Meta import MetaABC
 from lib.database.abstract.Attributes import AttributesABC
@@ -922,6 +924,98 @@ class Neo4JSubmissions(SubmissionsABC):
         return r
     
     
+
+    def insert_runlist(self, submission_tag: str, runlist: RunListModel, user_tag: str) -> bool:
+
+        rl_tag = get_random_string(N=10)
+        
+       
+        query = (
+            "MATCH (submission:Submission {tag: $submission_tag}) "
+            "WITH submission "
+            "MATCH (u:User {tag: $user_tag}) "
+            "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
+            "   dataset_label: $dataset_label, n_runs: $n_runs, n_plates: $n_plates, "
+            "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
+            "   fractionated: $fractionated, n_fractions: $n_fractions, "
+            "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
+            "MERGE (submission)-[:HAS_RUNLIST]->(rl) "
+            "MERGE (u)-[:CREATED]->(rl) "
+            "WITH rl "
+            "UNWIND $runs AS run "
+            "CREATE (r:Run {tag: randomUUID(), text: run.name, "
+            "   index: run.index, measurement_index: run.measurement_index, "
+            "   plate_index: run.plate_index, row_index: run.row_index, "
+            "   column_index: run.column_index, position_label: run.position_label, "
+            "   sample_index: run.index}) "
+            "MERGE (rl)-[:HAS_RUN]->(r) "
+        )
+        self._driver.execute_query(
+            query, routing_="w",
+            submission_tag=submission_tag,
+            user_tag=user_tag,
+            rl_tag=rl_tag,
+            dataset_label=runlist.dataset_label,
+            n_runs=runlist.n_runs,
+            n_plates=runlist.n_plates,
+            scrambled=runlist.scrambled,
+            scrambled_across_plates=runlist.scrambled_across_plates,
+            fractionated=runlist.fractionated,
+            n_fractions=runlist.n_fractions,
+            aggregated_on=runlist.aggregated_on,
+            runs=[r.model_dump() for r in runlist.runs]
+        )
+
+        # Link each Run to its Sample via sample_index
+        query_measures = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
+            "MATCH (rl)-[:HAS_RUN]->(r:Run) "
+            "MATCH (submission)-[:HAS_SAMPLE]->(s:Sample {sample_index: r.sample_index}) "
+            "MERGE (r)-[:MEASURES]->(s) "
+        )
+        self._driver.execute_query(
+            query_measures, routing_="w",
+            submission_tag=submission_tag,
+            rl_tag=rl_tag
+        )
+
+        # For pooled runs, also link aggregated samples
+        pooled_runs = [r for r in runlist.runs if len(r.aggregated_samples) > 0]
+        if pooled_runs:
+            query_pooled = (
+                "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
+                "MATCH (rl)-[:HAS_RUN]->(r:Run {index: $run_index}) "
+                "UNWIND $sample_indices AS sample_index "
+                "MATCH (submission)-[:HAS_SAMPLE]->(s:Sample {sample_index: sample_index}) "
+                "MERGE (r)-[:MEASURES]->(s) "
+            )
+            for run in pooled_runs:
+                self._driver.execute_query(
+                    query_pooled, routing_="w",
+                    submission_tag=submission_tag,
+                    rl_tag=rl_tag,
+                    run_index=run.index,
+                    sample_indices=run.aggregated_samples
+                )
+
+        return True
+
+    def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
+        query = (
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (rl)-[:HAS_RUN]->(r:Run) "
+            "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+            "RETURN rl{.*, user_tag: u.tag} as rl, collect(r{.*}) as runs "
+        )
+        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        if not r:
+            return None
+        row = r[0]
+        runs = sorted(
+            [AnalyticRunModel(**run, aggregated_samples=[]) for run in row["runs"]],
+            key=lambda x: x.measurement_index
+        )
+        return RunListModel(**row["rl"], runs=runs)
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver) -> None:

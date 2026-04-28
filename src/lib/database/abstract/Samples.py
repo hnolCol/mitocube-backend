@@ -245,3 +245,8 @@ class SamplesABC(ABC):
         bool
             True if the update was successful, False otherwise.
         """
+    
+    @abstractmethod
+    def get_sample_list(self, submission_tag: str) -> pd.DataFrame:
+        """Returns a DataFrame ready for RunListCreator.
+        Index = sample names (s.text), columns = attribute tags, values = condition application tag strings."""
