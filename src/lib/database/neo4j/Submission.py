@@ -924,7 +924,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "MERGE (u)-[:CREATED]->(rl) "
             "WITH rl "
             "UNWIND $runs AS run "
-            "CREATE (r:Run {tag: randomUUID(), name: run.name, label: run.label, "
+            "CREATE (r:Run {tag: randomUUID(), text: run.name, "
             "   index: run.index, measurement_index: run.measurement_index, "
             "   plate_index: run.plate_index, row_index: run.row_index, "
             "   column_index: run.column_index, position_label: run.position_label, "
