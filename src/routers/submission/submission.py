@@ -829,11 +829,12 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
         attributes = {}
         for ca in condition_apps:
             trait_tags = []
+            trees = []
             for ca_tag in ca.condition_application_tags:
                 tree = DB.condition_applications.get_tree(tag=ca_tag)
-                trait_tags.extend([node.trait_tag for node in tree])
             attributes[ca.attribute_tag] = trait_tags
-        
+                trees.extend([node.model_dump() for node in tree])
+            attributes[ca.attribute_tag] = trees
         result.append({
             "tag": sample_tag,
             "index": sample.get("index") if sample else None,
@@ -841,9 +842,9 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
             "attributes": attributes,
             "replicate": DB.samples.get_replicate(tag=sample_tag),
         })
-    
-    return result
 
+    print("full sample",result)
+    return result
 
 
 @router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags=["Runlist"])
@@ -864,20 +865,21 @@ def create_submission_runlist(
             dataset_label=submission_tag,
             sample_list=samples_df,
             user=user,
-            **runlist_props.model_dump()
+            **runlist_props.model_dump(exclude={"instrument_tag"})
         ).create()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+    runlist.instrument_tag = runlist_props.instrument_tag
     DB.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
 
     return RunListResponseModel(
         **runlist.model_dump(),
         user_email=user.email,
         user_firstname=user.firstname,
-        user_lastname=user.lastname
+        user_lastname=user.lastname,
+        instrument_text=runlist_props.instrument_tag
     )
-
 
 @router.get("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags=["Runlist"])
 def get_submission_runlist(
@@ -890,6 +892,8 @@ def get_submission_runlist(
     if runlist is None:
         raise HTTPException(status_code=404, detail="No runlist found.")
 
+    instrument_text = runlist.instrument_tag if runlist.instrument_tag else ""
+
     runlist_user = DB.users.get_user_by_tag(tag=runlist.user_tag)
     user_email = runlist_user.email if runlist_user else ""
     user_firstname = runlist_user.firstname if runlist_user else ""
@@ -899,5 +903,37 @@ def get_submission_runlist(
         **runlist.model_dump(),
         user_email=user_email,
         user_firstname=user_firstname,
-        user_lastname=user_lastname
+        user_lastname=user_lastname,
+        instrument_text=instrument_text
     )
+
+
+@router.get("/submissions/{submission_tag}/check", tags=["Submissions"])
+def check_submission(
+    submission_tag: str,
+    user: UserModel = Depends(get_user_from_token)
+):
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+    
+    state = DB.submissions.get_state(tag=submission_tag)
+    
+    mandatory_tags = DB.attributes.get(
+        attribute_groups="mandatory", 
+        min_state=state
+    )
+    
+    filled = DB.submissions.get_conditions_applications(
+        tag=submission_tag, 
+        group_by_attribute=True
+    )
+    filled_tags = set(item["attribute_tag"] for item in filled)
+    
+    missing_tags = [tag for tag in mandatory_tags if tag not in filled_tags]
+    missing = [{"tag": tag, "text": DB.attributes.attribute(tag=tag).text} for tag in missing_tags]
+
+    return {
+        "total": len(mandatory_tags),
+        "filled": len(mandatory_tags) - len(missing_tags),
+        "missing": missing,
+        "complete": len(missing_tags) == 0
+    }
