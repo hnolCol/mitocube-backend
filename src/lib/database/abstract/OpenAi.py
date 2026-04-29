@@ -100,13 +100,11 @@ class OpenAIClient(ABC):
                 boolIdx = df.loc[:,"Functional Category"] == "Unknown"
                 df = df.loc[~boolIdx] # remove unknowns, we will add them later, but we do not want to feed them back into the model.
             
-            print(df)
             df.dropna(subset=["PubmedIDs"], inplace=True) # we want to make sure that there is at least a pubmed id for the classification, otherwise we do not want to feed it back into the model.
             
             df_out = pd.concat([df_out, df], ignore_index=True).drop_duplicates(keep="first") # we want to keep the first classification, as it is more likely to be correct, but we do not want duplicates in the output.
 
             classes = df_out.to_dict(orient="records")
-            print(df_out)
         print(df_out)
         df_out.to_csv("functional_classification_output.csv", index=False, sep="\t")
         return classes

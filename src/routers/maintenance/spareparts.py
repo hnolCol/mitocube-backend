@@ -23,7 +23,6 @@ def find_spare_parts(search_string : str = None, limit : int = 20) -> List[str]:
     "Finds spare parts by a search_string and returns the tags. " 
     
     tags = DB.spareparts.find(search_string = search_string, limit = limit)
-    print(tags)
     return tags
     
 @router.get("/{tag}", response_model=SparepartResponseModel)
@@ -42,7 +41,6 @@ def get_text(tag : str) -> str:
 
     if not DB.spareparts.exists(tag):
         raise HTTPException(status_code=404, detail="Spare part not found.")
-    print(DB.spareparts.get_text(tag = tag))
     return DB.spareparts.get_text(tag = tag)
 
 @router.get("/{tag}/description")
@@ -88,14 +86,12 @@ def get_link(tag : str) -> str:
     if not DB.spareparts.exists(tag):
         raise HTTPException(status_code=404, detail="Spare part not found.")
 
-    print(DB.spareparts.get_link(tag = tag))
     return DB.spareparts.get_link(tag = tag)
 
 
 @router.post("/")
 def insert_sparepart(sparepart : dict, user : UserModel = Depends(is_user_admin)) -> bool:
     """Adds a new spare part in the database."""
-    print(sparepart)
     sparepart = SparepartInsertModel(**sparepart)  # Validate input data
     ok = DB.spareparts.insert(sparepart=sparepart, user_tag = user.tag)
     

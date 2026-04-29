@@ -84,7 +84,6 @@ class Neo4JNews(NewsABC):
         if limit is not None:
             query += "LIMIT $limit"
         r = self._driver.execute_query(query, routing_="r", limit=limit, result_transformer_=Result.value)
-        print(r)
         return r
     
     

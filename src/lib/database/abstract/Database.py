@@ -339,7 +339,6 @@ class DatabaseABC(ABC):
     
         cache_key = self.cache.calculate_key([tag,annotation_tag if annotation_tag is not None else "", ",".join(sample_tags) if sample_tags is not None and len(sample_tags) > 0 else "", str(use_sample_tags), level])
         if self.cache.exists(cache_key):
-            print("FROM CACHE??")
             return self.cache.get(cache_key)
         datatable = self.datasets.get_datatable(tag = tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=use_sample_tags, level=level)
         self.cache.insert(cache_key, datatable)

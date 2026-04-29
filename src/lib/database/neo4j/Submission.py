@@ -1,4 +1,5 @@
 from typing import Literal, List , Dict, Optional
+from unittest import result
 from neo4j import Driver, Result 
 import uuid
 import pandas as pd 
@@ -24,7 +25,17 @@ from services.random_generators import get_random_string
 import os 
 from lib.data.ranking.FeatureRanking import FeatureRanking
 import numpy as np
+from collections import defaultdict
+from itertools import islice
+import math
 
+def chunk_dict(d, size):
+    it = iter(d.items())
+    while True:
+        chunk = dict(islice(it, size))
+        if not chunk:
+            break
+        yield chunk
 class Neo4JSubmissions(SubmissionsABC):
 
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC, condition_applications : ConditionApplicationABC) -> None:
@@ -409,57 +420,70 @@ class Neo4JSubmissions(SubmissionsABC):
     #     print(r[0] if len(r) > 0 else 0)
     #     return r[0] if len(r) > 0 else 0
     
-    def insert_protein_quantifications(self, tag: str, quantifications: List[ProteinGroupQuantificationModel], batch_size: int = 500) -> int:
-        """
-        Inserts protein quantifications for a given submission in batches.
-        Removes existing quantifications for the submission before inserting new ones.
-        
-        Parameters
-        ----------
-        tag : str
-            The submission tag
-        quantifications : List[ProteinGroupQuantificationModel]
-            List of quantifications to insert
-        batch_size : int
-            Number of quantifications to process per batch (default: 1000)
-        
-        Returns
-        -------
-        int
-            Total number of inserted quantifications
-        """
-        
-        total_count = 0
+    def insert_protein_quantifications(
+        self,
+        tag: str,
+        quantifications: List[ProteinGroupQuantificationModel],
+        batch_size: int = 1000
+        ) -> int:
+
         quantifications_data = [x.model_dump() for x in quantifications]
-        
-        # Process in batches
-        for i in range(0, len(quantifications_data), batch_size):
-            batch = quantifications_data[i:i + batch_size]
-            
-            query = (
-                "MATCH (submission:Submission {tag: $tag}) "
-                "UNWIND $quantifications as quantification "
-                "MATCH (pg:ProteinGroup {tag: quantification.tag}) "
-                "MATCH (sample:Sample {tag: quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
-                "OPTIONAL MATCH (sample)-[existing_q:QUANTIFIED {submission_tag: $tag}]->(pg) "
-                "DELETE existing_q "
-                "CREATE (sample)-[q:QUANTIFIED]->(pg) "
-                "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
-                "RETURN count(q) "
+
+        # ---- 2. group by sample_tag ----
+        grouped = defaultdict(list)
+
+        for q in quantifications_data:
+            grouped[q["sample_tag"]].append(q)
+
+        # ---- 3. batch grouped data ----
+        total = 0
+
+        query = """
+        CALL () {
+            WITH $batch AS batch, $tag AS tag
+            UNWIND keys(batch) AS sample_tag
+
+            MATCH (submission:Submission {tag: tag})
+            MATCH (sample:Sample {tag: sample_tag})<-[:HAS_SAMPLE]-(submission)
+
+            WITH sample, batch[sample_tag] AS quantifications, tag
+
+            UNWIND quantifications AS q
+
+            MATCH (pg:ProteinGroup {tag: q.tag})
+
+            CREATE (sample)-[r:QUANTIFIED]->(pg)
+            SET r.value = q.value,
+                r.score = q.score,
+                r.submission_tag = tag,
+                r.created_at = timestamp()
+
+            RETURN count(r) AS created
+        } IN TRANSACTIONS OF 200 ROWS
+        RETURN sum(created) AS total
+        """
+
+        for batch in chunk_dict(grouped, batch_size):
+            result = self._driver.session().run(
+                query,
+                tag=tag,
+                batch=batch
             )
 
-            r = self._driver.execute_query(
-                query,
-                routing_="w",
-                tag=tag,
-                quantifications=batch,
-                result_transformer_=Result.value
-            )
-            
-            batch_count = r[0] if len(r) > 0 else 0
-            total_count += batch_count
-        
-        return total_count
+            record = result.single()
+            total += record["total"] if record else 0
+
+        return total
+
+        # result = self._driver.execute_query(
+        #     query,
+        #     routing_="w",
+        #     tag=tag,
+        #     quantifications=quantifications_data,
+        #     result_transformer_=Result.value
+        # )
+
+        # return result[0] if result else 0
 
 
     def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:
@@ -1226,7 +1250,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
     def filter_by_state(self, states : List[int], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
-        print(states)
         query = (
             # "MATCH (state:State ) "
             # "WHERE state.tag in $state "

@@ -1,27 +1,18 @@
 
-from neo4j import GraphDatabase, Driver, Result
+from neo4j import GraphDatabase, Driver
 
-from typing import List, Tuple, Any, Dict, Literal
-from lib.database.neo4j.Users import Neo4JUser
-from lib.database.neo4j.Meta import Neo4JMetaHandler
-from lib.database.abstract.Features import FeaturesABC 
+from typing import List, Dict
 
 from config.enums.states import SubmissionStatesEnums
 from config.enums.users.roles import UserRolesEnum
 from config.settings.db import get_db_settings
 
-
-
 from lib.database.neo4j.Features import Neo4JFeatures
-
 from services.json import read_json 
-from services.annotations.uniprot import download_proteome_annotations
-from services.encryption import create_password_hash
-from pydantic import BaseModel, SecretStr, Field, field_serializer, field_validator, model_serializer
-import inspect 
-from enum import Enum
-import time 
-import pandas as pd 
+
+from pydantic import BaseModel, field_validator, model_serializer
+
+
 import numpy as np 
 from random import randrange
 
@@ -117,6 +108,9 @@ constraints = [
     ConstraintModel(constrain_label  = "condition_value_tag",node_label = NodeLabelModel(label = "ConditionValue"), property_name = "tag"),
     ConstraintModel(constrain_label  = "external_service_tag",node_label = NodeLabelModel(label = "ExternalService"), property_name = "tag"),
     ConstraintModel(constrain_label  = "statistics_tag",node_label = NodeLabelModel(label = "Statistics"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "run_tag",node_label = NodeLabelModel(label = "Run"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "runlist_tag",node_label = NodeLabelModel(label = "RunList"), property_name = "tag")
+
 ]
 
 DB_SETTINGS = get_db_settings()

@@ -313,7 +313,7 @@ class Neo4JGenotype(GenotypeABC):
         return True
     
 
-    def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+    def insert(self, data : InsertGeneticApplicationModel,  user_tag : str, tag : str = None) -> bool:
         """Inserts a new genotype into the database.
 
         Parameters
@@ -322,6 +322,9 @@ class Neo4JGenotype(GenotypeABC):
             The genotype information to be inserted.
         user_tag : str
             The user who is inserting the genotype.
+        tag : str, optional
+            The tag of the genotype. If None, a new tag will be generated based on the components, by default None
+            Should only be used when migrating data.
         Returns
         -------
         bool
@@ -330,16 +333,6 @@ class Neo4JGenotype(GenotypeABC):
         def _is_feature(component : AttributeTree) -> bool:
             return component.type == "attribute" and component.tag == "att_protein"
 
-        # def _find_protein_tag(components : List[AttributeTree]) -> str:
-            
-        #     for component in components:
-        #         if _is_feature(component) and len(component.children) > 0:
-        #             #the value is actually in the children 
-        #             return component.children[0].value
-        #         if len(component.children) > 0:
-        #             return _find_protein_tag(component.children)
-
-        #     return None 
         def _find_protein_tag(components : List[AttributeTree]) -> str:
             
             for component in components:
@@ -353,19 +346,18 @@ class Neo4JGenotype(GenotypeABC):
 
         protein_tags = [_find_protein_tag([c]) for c in data.components]
         if len(protein_tags) == 0:
-            print(data)
             raise ValueError("No feature (protein tag) found in the genotype components.")
-
-        genotype_tag = create_hierarchical_hash([d.model_dump() for d in data.components])
-        if self.exists(genotype_tag):
+        if tag is None:
+            tag = create_hierarchical_hash([d.model_dump() for d in data.components])
+        if self.exists(tag):
             return False
 
         tags = []
         for attribute_tree in data.components:
-            tag = self._condition_applications.insert(condition_application=attribute_tree, extra_data_for_hash={"genotype_tag" : genotype_tag}) 
+            tag = self._condition_applications.insert(condition_application=attribute_tree, extra_data_for_hash={"genotype_tag" : tag}) 
             tags.append(tag)
 
-        self.insert_genotype(tag = genotype_tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
+        self.insert_genotype(tag = tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
                              protein_tags=[tag for tag in protein_tags if tag is not None])
         return True
 

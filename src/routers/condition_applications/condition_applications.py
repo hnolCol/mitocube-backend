@@ -76,7 +76,7 @@ def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token))
 
 
 @router.get("/{ca_tag}/text")
-def get_ca_name_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
+def get_ca_name_by_tag(ca_tag : str, handle_genotypes : bool = True, user : UserModel = Depends(get_user_from_token)) -> str:
     """Returns the text representation of the condition application by its tag. 
 
     Parameters
@@ -90,7 +90,8 @@ def get_ca_name_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_to
         The text representation of the condition application.
         
     """
-    
+    if handle_genotypes and DB.genotypes.exists(tag = ca_tag):
+        return DB.genotypes.get_text(tag = ca_tag)
     if not DB.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
     return DB.condition_applications.get_text(tag = ca_tag)    
 

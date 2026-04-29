@@ -110,13 +110,14 @@ def build_component(attr_block):
         children=[AttributeTree(tag=f"att_gene_editing_method:{method_tag}", type="trait", children=mutation_attrs)]
     )
     proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag=protein_key)  # check if protein exists, will raise exception if not
-    print(proteome_tag)
+    
+    print(proteome_tag) 
+    
     protein_attr = AttributeTree(
         tag="att_protein", type="attribute",
         children=[AttributeTree(tag=proteome_tag, type="trait", value=protein_key, children=[])]
     )
     
-    print(protein_attr)
     return AttributeTree(
         tag="att_gene_engineering", type="attribute",
         children=[AttributeTree(
@@ -167,6 +168,7 @@ class MigrateGenotypes:
             if len(components) == 0:
                 print(f"No valid components found for genotype {label}, skipping.")
                 continue
+            print(components)
             model = InsertGeneticApplicationModel(
                 text=g["text"],
                 technical_text=g.get("text"),
@@ -176,7 +178,7 @@ class MigrateGenotypes:
             genotype_tag = create_hierarchical_hash([c.model_dump() for c in model.components])
             
             try:
-                ok = DB.genotypes.insert(model, user_tag=self.fallback_user_tag) #old DB had no user assignment for genotypes, so we assign to fallback user.
+                ok = DB.genotypes.insert(model, user_tag=self.fallback_user_tag, tag = genotype_tag) #old DB had no user assignment for genotypes, so we assign to fallback user.
                 if ok:
                     print(f"Genotype {label} inserted successfully.")
                 else:
@@ -186,7 +188,7 @@ class MigrateGenotypes:
             except Exception as e:
                 print(f"Error inserting genotype {label}: {e}")
                 continue
-
+        print(b)
         with open("label_to_tag.json", "w") as f:
             json.dump(label_to_tag, f, indent=2)
         print(f"Label to tag mapping saved to label_to_tag.json")

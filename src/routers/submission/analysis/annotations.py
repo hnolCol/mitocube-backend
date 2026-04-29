@@ -101,14 +101,11 @@ def make_graph(graph_data : List[tuple] = None) -> nx.Graph:
 def get_annotation_network(submission_tag : str, annotation_group_tag : str = None, min_proteins : int = 0, user : UserModel = Depends(get_user_from_token)):
     "" 
     
-    print(annotation_group_tag)
     
     if not DB.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
-    print(DB.annotation_groups.exists(tag = annotation_group_tag))
     if DB.annotation_groups.exists(tag = annotation_group_tag):
         annotation_tags = DB.annotation_groups.get_annotations(group_tag = annotation_group_tag)
-        print(annotation_tags)
         graph_data = []
         for annotation_tag in annotation_tags:
             if DB.annotations.exists(tag = annotation_tag): 
@@ -117,8 +114,5 @@ def get_annotation_network(submission_tag : str, annotation_group_tag : str = No
                     #TO DO : add the annotation data to the network
                     protein_tags = DB.annotations.get_protein_tags(tag = annotation_tag)
                     graph_data.append((annotation_tag, protein_tags))
-        print(graph_data)
         G = make_graph(graph_data)
-        print(G)
-        print(nx_to_indexed_graph_with_layout(G))
         return nx_to_indexed_graph_with_layout(G)

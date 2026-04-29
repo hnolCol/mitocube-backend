@@ -27,14 +27,10 @@ class OneWayANOVA(DatasetStatistic):
         if dropna:
             datatable = datatable.dropna()
         if datatable.empty: raise ValueError("Nan filtering resulted in an empty datatable.")
-        print(grouped_sample_names,"GROUPED SAMPLE NAMES")
         data_for_test = [datatable.loc[:,column_names].values for column_names in grouped_sample_names]
-        print(data_for_test,"!!")
         #returns F-value and p-values
         F,p = f_oneway(*data_for_test,axis=1)
-        print(F,p)
         stats = pd.DataFrame({"F" : F, "p-value" : p}, columns=["F","p-value"], index = datatable.index)
-        print(stats)
         stats = stats.dropna(subset=["p-value"])
         if stats.empty : raise ValueError("All caluclated p-values were nan. Not enough samples/valid values?")
         stats.loc[:,"fdr"] = false_discovery_control(stats["p-value"].values)

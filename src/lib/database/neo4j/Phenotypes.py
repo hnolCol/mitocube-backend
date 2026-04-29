@@ -38,7 +38,6 @@ class Neo4JPhenotypes(PhenotypeABC):
                                        connect_tag = connect_tag,
                                        result_transformer_=Result.value)
         
-        print(r)
         
     def count(self) -> int:
         

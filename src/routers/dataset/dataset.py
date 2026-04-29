@@ -63,10 +63,8 @@ def get_dataset_qc(dataset_tag : str):
     
     datatable = DB.get_datatable(tag = dataset_tag)
     #db = MCDatabase.getDatabase()
-    print(dataset_tag)
     #dataset = db.getDataset(dataset_label)
     dataset_attributes = DB.meta.get_dataset_attributes(tag = dataset_tag)
-    print(dataset_attributes)
     
 
     
@@ -120,11 +118,6 @@ def get_dataset_params(dataset_tag : str, user : UserModel = Depends(get_user_fr
     if len(meta) == 1: return meta[0]
     return meta
     
-    # db = MCDatabase.getDatabase()
-    # dataset = get_dataset_from_database(db,dataset_tag)
-    # metadata : DatasetSubmissionModel = dataset.getMetaJson()
-    
-    # return map_tags_to_attribute_in_metadata(metadata)
 
 
 @router.get("/datasets/{dataset_tag}/meta/samples")

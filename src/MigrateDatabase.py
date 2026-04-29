@@ -46,7 +46,7 @@ def handle_knockdown(tags : List[str], technique_trait_tag : str = "att_knockdow
     "" 
     r = [] 
     protein_tags = [t.split(":")[1] for t in tags]
-    print(f"Handling knockdown for protein tags: {protein_tags}")
+   # print(f"Handling knockdown for protein tags: {protein_tags}")
     proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tags[0])
     r = build_tree(attribute_tag = "att_knockdown_technique", trait_tags=[technique_trait_tag]) 
     r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
@@ -205,6 +205,7 @@ class MigrateData:
                 user_tag = self.fallback_user_tag       
             sample_names = jsonFile["sample_names"]
             metatext = jsonFile["metatext"]
+            replicates = jsonFile["replicates"] 
             meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
             #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
             genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"], self.genotype_labels_to_tags)
@@ -250,7 +251,7 @@ class MigrateData:
                 
                 for idx,sample_name in enumerate(submission_insert_model.sample_names):
                  
-                    sample_tag = DB.samples.insert(submission_tag = submission_insert_model.tag, sample_name = sample_name, sample_index = idx, return_tag_if_exists=True, connect_if_exists=True)
+                    sample_tag = DB.samples.insert(submission_tag = submission_insert_model.tag, sample_name = sample_name, replicate= replicates[idx],  sample_index = idx, return_tag_if_exists=True, connect_if_exists=True)
                     if idx < len(submission_insert_model.samples_attributes):
                         sample_attributes = submission_insert_model.samples_attributes[idx] 
                         DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
@@ -272,8 +273,12 @@ class MigrateData:
                     df_melt = df.reset_index(names="tag").melt(id_vars=["tag"], var_name="sample_tag", value_name="value").dropna(subset=["value"])
                     print(df_melt)
                     df_melt = df_melt.dropna(subset=["tag","value"])
+                    df_melt["value"] = pd.to_numeric(df_melt["value"], errors="coerce")
+                    df_melt = df_melt[
+                        df_melt["value"].notna() & np.isfinite(df_melt["value"])
+                    ]
                     N = DB.protein_groups.insert_bulk(protein_groups=df_melt["tag"].unique().tolist())
-                    DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**x) for x in df_melt.to_dict(orient="records")]) 
+                    DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**x) for x in df_melt.to_dict(orient="records") ]) 
                     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
                     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)

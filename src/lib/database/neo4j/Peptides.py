@@ -233,7 +233,6 @@ class Neo4JPeptides(PeptidesABC):
             query += "LIMIT $limit "
         if provide_protein_info:
             r = self._driver.execute_query(query, search_string=search_string.upper(), limit=limit, result_transformer_=Result.values, routing_="r", submission_tag=submission_tag)
-            print(r)
             return [(ri[0], ri[1]) for ri in r]
         else:
             r = self._driver.execute_query(query, search_string=search_string.upper(), limit=limit, result_transformer_=Result.value, routing_="r", submission_tag=submission_tag)
@@ -481,7 +480,6 @@ class Neo4JPeptides(PeptidesABC):
                                     quantification_data=quantification_data.to_dict(orient="records"), 
                                     routing_="w", 
                                     result_transformer_=Result.value)  
-        print(r)
         return r[0] if len(r) > 0 else 0
     
     def set_qc_peptides(self, peptides: QCPeptidesModel, join : bool = True):

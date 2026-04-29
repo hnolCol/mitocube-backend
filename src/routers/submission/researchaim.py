@@ -22,7 +22,6 @@ def create_submission_metatext(submission_tag: str, user : UserModel = Depends(g
     if not DB.submissions.exists(tag = submission_tag):
         raise submission_tag_not_found
     research_aim_text = DB.submissions.get_research_aim(tag=submission_tag)
-    print(research_aim_text)
     if research_aim_text is None:
         raise HTTPException(status_code=404, detail="No research aim found for this submission.")   
     return research_aim_text

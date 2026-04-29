@@ -83,7 +83,6 @@ def get_instrument_state_durations(instrument_tag : str, timestamp_min : float =
 def get_fractional_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[dict]:
     "Returns the duration of all states for an instrument as a fraction of the total time." 
     fractions = DB.instrument_states.get_fractional_state_durations(instrument_tag=instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
-    print(fractions)
     return fractions
 
 @router.get("/{instrument_tag}/states") 

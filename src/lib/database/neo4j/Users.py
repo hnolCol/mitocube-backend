@@ -142,10 +142,10 @@ class Neo4JUser(UserABC):
         r = self._driver.execute_query(query, routing_="r", user_tag = tag, limit = limit, result_transformer_=Result.value)
         return r
     
-    def check(self) -> None:
-        self._check_user()    
+    def check(self, lead_tag: str = None) -> None:
+        self._check_user(lead_tag)    
     
-    def _check_user(self):
+    def _check_user(self, lead_tag: str = None) -> None:
         ""
         if self.count() == 0:
             auto_pw = get_random_string(10)
@@ -158,7 +158,7 @@ class Neo4JUser(UserABC):
                 institute=GENERAL_SETTINGS.lead_contact_institute,  
                 role=UserRolesEnum.ADMIN,
                 is_lead_admin=True,
-                tag=self.get_new_tag()  
+                tag=lead_tag  if lead_tag is not None else self.get_new_tag()
             )
       
             self.insert(user = lead_contact)

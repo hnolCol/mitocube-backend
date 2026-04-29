@@ -79,7 +79,7 @@ class SamplesABC(ABC):
         """
     
     @abstractmethod
-    def insert(self, submission_tag : str, sample_name : str, sample_index : int, return_tag_if_exists : bool = False, connect_if_exists : bool = False) -> str:
+    def insert(self, submission_tag : str, sample_name : str, sample_index : int, replicate: int = None, return_tag_if_exists : bool = False, connect_if_exists : bool = False) -> str:
         """Inserts a sample into the database.
         The tag will be generated automatically as a random UUID.
         Parameters

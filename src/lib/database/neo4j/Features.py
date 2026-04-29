@@ -582,44 +582,8 @@ class Neo4JFeatures(FeaturesABC):
         )
         
         r = self._driver.execute_query(query,tags=tags,routing_="r",result_transformer_=Result.data)
-        print(r)
         return r 
     
-    
-    def get_quant_stats(self, tags : List[str]) -> pd.DataFrame:
-        """Returns the general stats of a list of features by their tag. 
-        
-        This includes the following stats:
-        
-        - quantified_in (int): The number of datasets in which 
-        the protein has been quantified 
-        - total_number (int): The number of dataset of the same proteome
-        - abundance_quantiles (List[float]): The quantiles of the log2 intensity of the requested tag (n=3, 0.25, 0.5, 0.75 quantile)
-        - total_abundance_quantiles (List[float]) - The quantiles of all the datasets that used the same proteome (e.g. same organism) 
-        (n=4, min, 0.25, 0.5, 0.75, max). 
-
-        Parameters
-        ----------
-        tags : List[str]
-            The tags of the proteins/feature for which the quantification stats should be returned. 
-            If the protein is not in the database, it will simply be ignored. 
-        """
-        
-        query = (
-            "MATCH (p:Protein) "
-            "WHERE p.tag in $tags "
-            "MATCH (p)-[:IN_PROTEOME]->(av:AttributeValue) "
-            "MATCH (p)-[r_quant:QUANTIFIED_IN]->(d) "
-            "WITH p.tag as tag, count(r_quant) as quantified_in, count(d) as total_number, apoc.agg.percentiles(r_quant.avg_log2_abundance, [0.25,0.5,0.75]) as abundance_quantiles, "
-            "apoc.coll.zip(collect(r_quant.variance),collect(r_quant.max_variance_attribute)) as variances "
-            "MATCH (d:Dataset)-[:HAS_ATTRIBUTE_VALUE]-(av) "
-            "MATCH (d)<-[r_all:QUANTIFIED_IN]-(pp:Protein) "
-            "RETURN tag, quantified_in, total_number, abundance_quantiles, apoc.agg.percentiles(r_all.avg_log2_abundance, [0,0.25,0.5,0.75,1.0]) as total_abundance_quantiles, variances"
-        )
-        
-        
-        r = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.to_df)
-        print(r)
         
     def get_proteins_by_view(self, limit: int = 10, filter_tag : str = None) -> List[FeatureNeoModel]:
         

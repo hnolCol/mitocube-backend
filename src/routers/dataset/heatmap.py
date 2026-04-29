@@ -42,7 +42,6 @@ def get_dataset_heatmap(dataset_label : str,
     #TO DO add annotation check
     
     datatable = DB.datasets.get_datatable(tag = dataset_tag, annotation_tag = annotation_tag)
-    print(datatable)
     
     _, sample_map = DB.meta.get_sample_attributes_and_genotypes(dataset_tag)  
     
@@ -61,7 +60,6 @@ def get_dataset_heatmap(dataset_label : str,
     cluster_indices = OrderedDict([(cluster_idx,cluster_data.index.to_list()) for cluster_idx, cluster_data in grouped_clusters])
 
     ##annotate features 
-    #print(features)
     features = DB.features.get_protein_by_tags(stats_and_zscores.index.values.tolist())
     #join features to the stat results
     #consider adding the features as an extra -> may be used to select features from the heatmap to view the detailed proteomics

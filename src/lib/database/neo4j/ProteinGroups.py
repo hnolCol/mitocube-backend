@@ -142,7 +142,8 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         if submission_tag is not None:
             query += "WHERE submission.tag = $submission_tag "
         query += (    
-            "RETURN stats.tag as tag, a.tag as attribute_tag, stats.F as F, stats.rank as rank, stats.FDR as FDR, stats.exclusively_ca_tags  as exclusively_ca_tags, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.quantified_in_samples as quantified_in_samples, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.exclusively as exclusively, submission.tag as submission_tag "
+            "RETURN stats.tag as tag, a.tag as attribute_tag, stats.mean as mean, stats.F as F, stats.rank as rank, stats.FDR as FDR, stats.exclusively_ca_tags  "
+            "as exclusively_ca_tags, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.quantified_in_samples as quantified_in_samples, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.exclusively as exclusively, submission.tag as submission_tag "
             "ORDER BY stats.score DESC "
         )
         if limit is not None:

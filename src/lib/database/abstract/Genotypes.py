@@ -93,7 +93,7 @@ class GenotypeABC(ABC):
         """
     
     @abstractmethod
-    def insert(self, data : InsertGeneticApplicationModel, user_tag : str) -> bool:
+    def insert(self, data : InsertGeneticApplicationModel, user_tag : str, tag : str = None) -> bool:
         """Inserts a new genotype into the database.
         This method should be used to insert a genotype. The components will be created from here.
         Parameters
@@ -102,6 +102,9 @@ class GenotypeABC(ABC):
             The genotype information to be inserted.
         user_tag : str
             The user who is inserting the genotype.
+        tag : str, optional
+            The tag of the genotype. If None, a new tag will be generated based on the components, by default None
+            Should only be used when migrating data.
         Returns
         -------
         bool

@@ -163,9 +163,6 @@ def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel =
     genotype : GenotypeModel
         The defined genotype.
     """
-    print(genotype)
-    
-    
     
     ok = DB.genotypes.insert(genotype, user_tag = user.tag)
     if not ok:
@@ -183,7 +180,6 @@ def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserM
     genotype : InsertGeneticApplicationModel
         The updated genotype data.
     """
-    print(genotype)
     edit = DB.genotypes.edit(tag = tag, data = genotype, user_tag = user.tag)
 
     if not edit:

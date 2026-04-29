@@ -121,11 +121,9 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         di["value"] = quantified_value
         if append_condition_procedure:
             condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
-            print(condition_applications)
             if DB.submissions.has_genotypes(tag = submission_tag):
                 genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
                 condition_applications = condition_applications.join(genotypes, how="outer")
-                print(condition_applications,"after joining genotypes")
             for attribute_tag in condition_applications.columns:
                 # attribute_tag = ca.attribute_tag
                 # if attribute_tag is None:   
@@ -251,7 +249,6 @@ def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datas
         #
     #get minimal meta information 
     submission_meta = DB.meta.get(tags=submission_tags)
-    print(response_data)
     
     attributes = DB.attributes.get(tags = attribute_tags)
     attribute_values = DB.attributes.get_values(tags = attribute_value_tags)

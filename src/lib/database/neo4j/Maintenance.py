@@ -19,7 +19,6 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         """
         
         df = pd.read_csv(file_path, *args, **kwargs)
-        print(df)
         #check if the required columns are present
         if not all([col in df.columns for col in REQUIRED_COLUMNS]):
             raise ValueError(f"The file {file_path} does not contain all required columns: {REQUIRED_COLUMNS}")
@@ -178,7 +177,6 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
                 "costs : me.costs, maintenance_procedure_tags : maintenance_tags, symptom_tags : symptom_tags, instrument_state_tag : instrument_state_tag, external_service_tag : external_service_tag} ORDER BY me.created_at DESC ")
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag) 
-        print(r)
         if len(r) == 0:
             # If we have no results, we return None
             return None

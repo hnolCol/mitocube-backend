@@ -17,7 +17,6 @@ router = APIRouter(
 @router.get("")
 def get_time_line_events(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[TimelineModel]:
     ""
-    print(DB.timeline.get_timeline_by_submission_tag(submission_tag = submission_tag))
     return DB.timeline.get_timeline_by_submission_tag(submission_tag = submission_tag)
     
     

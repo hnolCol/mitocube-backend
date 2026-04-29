@@ -185,3 +185,4 @@ resources_/
 /env-m4
 /resources__
 functional_classification_output.csv
+label_to_tag.json

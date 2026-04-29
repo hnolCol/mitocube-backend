@@ -267,12 +267,9 @@ class FeatureRanking(object):
             df_attribute.loc[:,"FDR"] = np.nan
             df_attribute.loc[:,"rank"] = df_attribute["score"].rank(ascending=False, method="min").values
             df_no_nan_attribute = df_attribute.dropna(subset=["p_value"])
-            # print(df_no_nan_attribute)
-            # print("???????????????????????????????????????????????????????????????????????", attribute_tag)
+        
             p_adjusted = stats.false_discovery_control(df_no_nan_attribute["p_value"].values, method="bh")
-            print(p_adjusted)
             df_attribute.loc[df_no_nan_attribute.index, "FDR"] = p_adjusted
-            print(df_attribute)
             total_results.append(df_attribute)
         if len(total_results) > 1:
             return pd.concat(total_results, ignore_index=True)

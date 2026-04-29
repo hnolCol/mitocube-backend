@@ -147,7 +147,7 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 DB = Database.DB()
 
 #check for users, essentially, create admin user if no users exists with the defined admin email.
-DB.users.check()
+
 
 
 
@@ -210,6 +210,7 @@ if __name__ == "__main__":
     add_control_proteome = args.add_control_proteome
     genotype_file = args.genotypes
     if setup_db_default:
+        DB.users.check(lead_tag = "fOtsqZCP")
         #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
         DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
         #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
@@ -242,8 +243,7 @@ if __name__ == "__main__":
         DB.maintenance_procedures._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/procedures.txt"), sep="\t")
         DB.symptoms._utils_insert_from_file(file_path=os.path.join(args.resources_path, "symptoms/symptoms.txt"), sep="\t")
 
-        #python3 src/app.py --setup_database --genotypes /Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589
-        #--resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/
+        #python3 src/app.py --setup_database --genotypes /Users/hnolte/Documents/GitHub/mitocube-backend/resources/genotypes/genotypes.json --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/
 
             
     uvicorn.run(app, port = 5002, proxy_headers=True)

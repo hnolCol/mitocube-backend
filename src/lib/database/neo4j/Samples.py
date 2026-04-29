@@ -101,9 +101,7 @@ class Neo4JSamples(SamplesABC):
         query += (
             "RETURN count(s) as count "
         )
-            
-        print(query)
-        
+                    
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, genotype_tag = genotype_tag, trait_tag = trait_tag, submission_tag = submission_tag, protein_group_tag = protein_group_tag, instrument_tag = instrument_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
@@ -322,7 +320,6 @@ class Neo4JSamples(SamplesABC):
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.data, tag = tag)
-        print(r)
         return  r[0] if len(r) > 0 else None
 
 
@@ -335,7 +332,6 @@ class Neo4JSamples(SamplesABC):
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, sample_index = sample_index, submission_tag = submission_tag)
-        print(r)
         return  r[0] if len(r) > 0 else None
 
     def get_condition_applications_by_sample_for_submission(self, submission_tag : str, join : str = ";", pivot : bool = True, sort_ca_tags : bool = True, return_sample_index : bool = True) -> pd.DataFrame:

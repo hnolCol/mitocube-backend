@@ -66,13 +66,11 @@ class Neo4JQC(QCABC):
             "SET r_rt.rt = peptide.rt, r_rt.created_at = timestamp() "
         )
         
-        print(performance_run)
         
         r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value, 
                                        performance_run_props = performance_run.model_dump(exclude_none=True, exclude=["rt_peptides","group_attr"]),
                                        peptides = peptides,
                                        attribute_values = attribute_values)
-        print(r)
         
         return True 
     

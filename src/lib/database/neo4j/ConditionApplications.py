@@ -124,7 +124,6 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             Whether to add a separator after the item, by default False
         """
         t = ""
-        print(item, item.attribute_tag == "att_protein")
         if item.value is not None:
                 val = item.value
                 if isinstance(val, float):
@@ -139,7 +138,9 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                         t += f"{self._proteins.get_gene_name(item.value)}"
                 else:
                     t += f"{val}"
-        t += f"{self._attributes.get_trait_text(item.trait_tag)}"
+        if item.attribute_tag != "att_protein":
+            #this would add the proteome which appers to be clumpy.feature_tag}/data
+            t += f"{self._attributes.get_trait_text(item.trait_tag)}"
         if item.children is not None and len(item.children) > 0:
             t += " ("
             for n,c in enumerate(item.children):
@@ -324,8 +325,6 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             query += "LIMIT $limit "
 
         r = self._driver.execute_query( query_= query, routing_="r",  search_string = search_string, submission_tag=submission_tag, attribute_tag=attribute_tag, trait_tag=trait_tag, limit = limit, result_transformer_=Result.value)
-        print(r)
-        #print([ri["tag"] for ri in r[0]])
 
         return r
     

@@ -64,18 +64,13 @@ class MigrateScripts:
         
            # meta = DatasetSubmissionModel(**submission, tag = submission["label"])
             organisms = submission["dataset_attributes"]["att_organism"]
-            #print(organisms)
             submission["dataset_attributes"]["att_proteome"] = [o.replace("att_organism:","").replace("controls","ctrl") for o in organisms]
             del  submission["dataset_attributes"]["att_organism"] 
-            #print(submission["dataset_attributes"]["att_proteome"])
             
             d = DatasetSubmissionModel(**submission, tag = submission["label"], user_tag=submission["user_label"])
-            #print(d)
             self.submissions.insert(d)
-            print(has_data)
             if has_data:
                 data = pd.read_csv(data_file_path,sep="\t").set_index("Key")
-                print(data)
                 self.datasets.insert(data_table=data, tag=submission_tag)
             
             
