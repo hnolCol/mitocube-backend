@@ -55,17 +55,40 @@ def handle_knockdown(tags : List[str], technique_trait_tag : str = "att_knockdow
 def handle_batch(tags : List[str]):
     "" 
     values = [t.split(":")[1] for t in tags] 
-    return build_tree(attribute_tag="att_batch", trait_tags=["att_batch:string" for i in tags], value=values)
+    tree =  build_tree(attribute_tag="att_batch_type", trait_tags=["att_batch_type:quant"])
+    tree["children"][0]["children"].extend([build_tree(attribute_tag="att_batch", trait_tags=["att_batch:string"], value=v) for v in values])
+    return tree 
 
 def handle_clone_id(tags : List[str]):
     "" 
     values = [t.split(":")[1] for t in tags] 
-    return build_tree(attribute_tag="att_clone_id", trait_tags=["att_clone_id:string" for i in tags], value=values)
+    tree =  build_tree(attribute_tag="att_batch_type", trait_tags=["att_batch_type:clone"])
+    tree["children"][0]["children"].extend([build_tree(attribute_tag="att_batch", trait_tags=["att_batch:string"], value=v) for v in values])
+    return tree 
 
 def build_tree(attribute_tag, trait_tags : List[str], value = None):
         if attribute_tag in attr_update:
             attribute_tag = attr_update[attribute_tag]
-        return {"type" : "attribute", "tag" : attribute_tag, "children" : [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags)]}
+            
+        return {"type" : "attribute", "tag" : attribute_tag, "children" : 
+            [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags)]}
+
+
+def handle_centrifugation_pellet(tags : List[str]):
+    
+    tree = build_tree(attribute_tag="att_centrifugation", trait_tags=["att_centrifugation:pellet"])
+    for t in tags:
+        tree["children"][0]["children"].append(build_tree(attribute_tag="att_cent_acc", trait_tags=["att_cent_acc"], value=t.split(":")[1]))
+    print(f"Handling centrifugation with tags {tags}, resulting tree: {tree}")
+    return tree
+
+def handle_centrifugation_supernatant(tags : List[str]):
+    
+    tree = build_tree(attribute_tag="att_centrifugation", trait_tags=["att_centrifugation:supernatant"])
+    for t in tags:
+        tree["children"][0]["children"].append(build_tree(attribute_tag="att_cent_acc", trait_tags=["att_cent_acc"], value=t.split(":")[1]))
+    print(f"Handling centrifugation with tags {tags}, resulting tree: {tree}")
+    return tree
 
 def get_tags_by_sample(samples_attrs : dict): 
     
@@ -140,6 +163,10 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
                 r[sampleIdx].append(handle_batch(sample_attribute_tags))    
             elif attribute_tag == "att_clone_id":
                 r[sampleIdx].append(handle_clone_id(sample_attribute_tags))
+            elif attribute_tag == "att_centr_pellet":
+                r[sampleIdx].append(handle_centrifugation_pellet(sample_attribute_tags))
+            elif attribute_tag == "att_centr_supernatant":
+                r[sampleIdx].append(handle_centrifugation_supernatant(sample_attribute_tags))
             elif attribute_tag == "att_compound" and time_data_by_key:
                 duration_child = _build_duration_child_for_sample(sampleIdx, time_data_by_key)
                 tree = {
@@ -166,7 +193,17 @@ def build_dataset_condition_applications(dataset_attributes : dict):
     "" 
     r = []
     for attribute_tag, trait_tags in dataset_attributes.items():
-        r.append(build_tree(attribute_tag, trait_tags))
+        
+        if attribute_tag == "att_batch":
+            r.append(handle_batch(trait_tags))    
+        elif attribute_tag == "att_clone_id":
+            r.append(handle_clone_id(trait_tags))
+        elif attribute_tag == "att_centr_pellet":
+            r.append(handle_centrifugation_pellet(trait_tags))
+        elif attribute_tag == "att_centr_supernatant":
+            r.append(handle_centrifugation_supernatant(trait_tags))
+        else:
+            r.append(build_tree(attribute_tag, trait_tags))
     return r
         
 class MigrateData:
@@ -205,7 +242,6 @@ class MigrateData:
                 user_tag = self.fallback_user_tag       
             sample_names = jsonFile["sample_names"]
             metatext = jsonFile["metatext"]
-            replicates = jsonFile["replicates"] 
             meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
             #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
             genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"], self.genotype_labels_to_tags)
@@ -251,7 +287,7 @@ class MigrateData:
                 
                 for idx,sample_name in enumerate(submission_insert_model.sample_names):
                  
-                    sample_tag = DB.samples.insert(submission_tag = submission_insert_model.tag, sample_name = sample_name, replicate= replicates[idx],  sample_index = idx, return_tag_if_exists=True, connect_if_exists=True)
+                    sample_tag = DB.samples.insert(submission_tag = submission_insert_model.tag, sample_name = sample_name, replicate= submission_insert_model.replicates[idx],  sample_index = idx, return_tag_if_exists=True, connect_if_exists=True)
                     if idx < len(submission_insert_model.samples_attributes):
                         sample_attributes = submission_insert_model.samples_attributes[idx] 
                         DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
