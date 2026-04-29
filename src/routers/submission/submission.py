@@ -828,11 +828,9 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
         
         attributes = {}
         for ca in condition_apps:
-            trait_tags = []
             trees = []
             for ca_tag in ca.condition_application_tags:
                 tree = DB.condition_applications.get_tree(tag=ca_tag)
-            attributes[ca.attribute_tag] = trait_tags
                 trees.extend([node.model_dump() for node in tree])
             attributes[ca.attribute_tag] = trees
         result.append({
