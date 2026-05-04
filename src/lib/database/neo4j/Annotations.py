@@ -1,5 +1,6 @@
 import pandas as pd
 from typing import Optional,List, Dict
+import os
 
 from services.random_generators import get_random_string
 
@@ -180,7 +181,7 @@ class Neo4JAnnotations(AnnotationsABC):
     def __init__(self, driver: Driver) -> None:
         self._driver = driver
 
-    def _utils_insert_from_file(self, user_tag: str, file_path: str = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/annotations/MitoCarta/annotations.json") -> None:
+    def _utils_insert_from_file(self, user_tag: str, file_path: str, folder_path: str = "") -> None:
         """Inserts annotations from a config JSON file.
         Supports multiple groups, each with multiple annotation entries.
         Each annotation entry can be:
@@ -225,7 +226,7 @@ class Neo4JAnnotations(AnnotationsABC):
             print(f"  Annotation group '{ag['text']}' ({group_tag}) ready.")
 
             for entry in group_config["annotations"]:
-                data_path = entry["file_path"]
+                data_path = os.path.join(folder_path, entry["file_path"])
                 protein_col = entry["protein_tag_column"]
                 sheet_name = entry.get("sheet_name", None)
                 protein_delimiter = entry.get("protein_delimiter", None)
@@ -238,8 +239,10 @@ class Neo4JAnnotations(AnnotationsABC):
                     df = pd.read_csv(data_path, encoding=encoding, header=header)
                 elif data_path.endswith(".tsv") or data_path.endswith(".txt"):
                     df = pd.read_csv(data_path, sep="\t", encoding=encoding, header=header)
-                else:
+                elif data_path.endswith(".xlsx") or data_path.endswith(".xls"):
                     df = pd.read_excel(data_path, sheet_name=sheet_name, header=header)
+                else:
+                    raise TypeError(f"File type not supported: {data_path}")
 
                 # Pre-fetch existing proteins if we need to filter
                 existing_proteins = set()

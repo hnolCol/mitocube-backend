@@ -8,7 +8,7 @@
             },
             "annotations": [
                 {
-                    "file_path": "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/annotations/mitocarta_loc/loc_human_data.txt",
+                    "file_path": "MitoCarta/localization_mitocarta.txt",
                     "annotation_text_column": "annotation_text",
                     "protein_tag_column": "protein_tag"
                 }
@@ -24,19 +24,19 @@
                 {
                     "text": "Human MitoCarta3.0",
                     "description": "Human MitoCarta 3.0 mitochondrial proteome",
-                    "file_path": "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/annotations/MitoCarta/Human.MitoCarta3.0-2.txt",
+                    "file_path": "MitoCarta/Human.MitoCarta3.0-2.txt",
                     "protein_tag_column": "UniProt"
                 },
                 {
                     "text": "Mouse MitoCarta3.0",
                     "description": "Mouse MitoCarta 3.0 mitochondrial proteome",
-                    "file_path": "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/annotations/MitoCarta/Mouse.MitoCarta3.0.txt",
+                    "file_path": "MitoCarta/Mouse.MitoCarta3.0.txt",
                     "protein_tag_column": "UniProt"
                 },
                 {
                     "text": "MitoCoP",
                     "description": "Quantitative high-confidence human mitochondrial proteome (MitoCoP)",
-                    "file_path": "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/annotations/MitoCarta/MitoCop.txt",
+                    "file_path": "MitoCarta/MitoCop.txt",
                     "protein_tag_column": "Simplified protein IDs",
                     "protein_delimiter": ";",
                     "reviewed_filter": true,
@@ -47,3 +47,5 @@
         }
     ]
 }
+
+
