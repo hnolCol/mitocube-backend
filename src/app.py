@@ -215,6 +215,11 @@ if __name__ == "__main__":
         DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
         #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
         DB.users._utils_migrate(path_to_user_data=os.path.join(args.resources_path, "users/users.json")) 
+        DB.annotations._utils_insert_from_file(
+            file_path=os.path.join(args.resources_path, "annotations/MitoCarta/annotations.json"),
+            folder_path=os.path.join(args.resources_path, "annotations"),
+            user_tag=lead_user,
+        )
     if CTRL_PROTEOME_SETTINGS.add_control_proteome or add_control_proteome:
         control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
         #adding proteme details, will set is_updating to true
@@ -225,7 +230,7 @@ if __name__ == "__main__":
     if proteomes_to_add is not None:
         print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
         proteome_list = proteomes_to_add.split(",")
-        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=True, user_tag = lead_user)
+        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=False, user_tag = lead_user)
     if genotype_file is not None:
         from migrate_genotypes import MigrateGenotypes 
         genotype_mapper_file_path = MigrateGenotypes(path_to_genotypes=genotype_file, fallback_user_tag=lead_user).migrate()

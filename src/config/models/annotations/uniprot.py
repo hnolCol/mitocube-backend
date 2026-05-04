@@ -11,6 +11,7 @@ class API_UniprotAnnotationsModel(BaseModel):
     size : int = 500
     fields : List[str] = [
         "accession",
+        "reviewed",
         "protein_name",
         "gene_names",
         "gene_synonym",
