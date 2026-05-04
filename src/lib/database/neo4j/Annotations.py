@@ -1,7 +1,12 @@
 import pandas as pd
 from typing import Optional,List, Dict
 
+from services.random_generators import get_random_string
+
 from neo4j import Driver, Result
+
+from collections import defaultdict
+from services.json import read_json
 
 from config.models.annotations.annotations import ( AnnotationGroupsModel, AnnotationsModel )
 from lib.database.abstract.Annotations import ( AnnotationGroupsABC, AnnotationsABC )
@@ -174,6 +179,147 @@ class Neo4JAnnotations(AnnotationsABC):
 
     def __init__(self, driver: Driver) -> None:
         self._driver = driver
+
+    def _utils_insert_from_file(self, user_tag: str, file_path: str = "/Users/PParsa/Documents/GitHub/mitocube-backend/resources/annotations/MitoCarta/annotations.json") -> None:
+        """Inserts annotations from a config JSON file.
+        Supports multiple groups, each with multiple annotation entries.
+        Each annotation entry can be:
+        - Grouped by column: { "file_path": "...", "annotation_text_column": "...", "protein_tag_column": "..." }
+        - Fixed text: { "text": "...", "file_path": "...", "protein_tag_column": "..." }
+        Optional per entry:
+        - "protein_delimiter": ";" — splits multi-protein cells
+        - "reviewed_filter": true — for multi-protein cells, keeps only proteins that are reviewed in the DB
+        """
+        config = read_json(file_path)
+
+        if "groups" not in config:
+            raise ValueError("JSON file must have a 'groups' key.")
+
+        for group_config in config["groups"]:
+            ag = group_config["annotation_group"]
+
+            # Create annotation group
+            group_tag = get_random_string(5)
+            query = (
+                "MATCH (u:User {tag: $user_tag}) "
+                "MERGE (ag:AnnotationGroup {text: $text}) "
+                "ON CREATE "
+                "SET ag.tag = $tag, "
+                "    ag.description = $description, "
+                "    ag.source = $source, "
+                "    ag.created_at = timestamp(), "
+                "    ag.created_by = u.email "
+                "RETURN ag.tag "
+            )
+            r = self._driver.execute_query(
+                query,
+                tag=group_tag,
+                text=ag["text"],
+                description=ag.get("description", ""),
+                source=ag.get("source", ""),
+                user_tag=user_tag,
+                routing_="w",
+                result_transformer_=Result.value,
+            )
+            group_tag = r[0]
+            print(f"  Annotation group '{ag['text']}' ({group_tag}) ready.")
+
+            for entry in group_config["annotations"]:
+                data_path = entry["file_path"]
+                protein_col = entry["protein_tag_column"]
+                sheet_name = entry.get("sheet_name", None)
+                protein_delimiter = entry.get("protein_delimiter", None)
+                reviewed_filter = entry.get("reviewed_filter", False)
+
+                # Read data file
+                encoding = entry.get("encoding", "utf-8")
+                header = entry.get("header", 0)
+                if data_path.endswith(".csv"):
+                    df = pd.read_csv(data_path, encoding=encoding, header=header)
+                elif data_path.endswith(".tsv") or data_path.endswith(".txt"):
+                    df = pd.read_csv(data_path, sep="\t", encoding=encoding, header=header)
+                else:
+                    df = pd.read_excel(data_path, sheet_name=sheet_name, header=header)
+
+                # Pre-fetch existing proteins if we need to filter
+                existing_proteins = set()
+                if protein_delimiter and reviewed_filter:
+                    all_tags = set()
+                    for _, row in df.iterrows():
+                        val = row.get(protein_col)
+                        if pd.isna(val):
+                            continue
+                        for t in str(val).split(protein_delimiter):
+                            t = t.strip()
+                            if t:
+                                all_tags.add(t)
+                    query = (
+                            "UNWIND $tags AS tag "
+                            "MATCH (p:Protein {tag: tag}) "
+                            "WHERE p.reviewed = true "
+                            "RETURN p.tag"
+                        )
+                    r = self._driver.execute_query(
+                        query,
+                        tags=list(all_tags),
+                        routing_="r",
+                        result_transformer_=Result.value,
+                    )
+                    existing_proteins = set(r)
+                    print(f"    Found {len(existing_proteins)} existing proteins out of {len(all_tags)} total")
+
+                def resolve_proteins(value):
+                    if pd.isna(value):
+                        return []
+                    value = str(value).strip()
+                    if protein_delimiter and protein_delimiter in value:
+                        tags = [t.strip() for t in value.split(protein_delimiter) if t.strip()]
+                        if reviewed_filter:
+                            reviewed = [t for t in tags if t in existing_proteins]
+                            return reviewed if reviewed else [tags[0]]
+                        return tags
+                    else:
+                        return [value] if value else []
+
+                if "annotation_text_column" in entry:
+                    annotation_col = entry["annotation_text_column"]
+                    annotation_to_proteins = defaultdict(list)
+                    for _, row in df.iterrows():
+                        proteins = resolve_proteins(row.get(protein_col))
+                        if not proteins:
+                            continue
+                        ann_text = row.get(annotation_col)
+                        if pd.isna(ann_text):
+                            continue
+                        annotation_to_proteins[str(ann_text).strip()].extend(proteins)
+
+                    for ann_text, proteins in annotation_to_proteins.items():
+                        annotation = AnnotationsModel(
+                            text=ann_text,
+                            description=ann_text,
+                            group_tag=group_tag,
+                            protein_tags=proteins,
+                            source=ag.get("source", ""),
+                        )
+                        self.insert(annotation=annotation)
+                        print(f"    Inserted '{ann_text}' with {len(proteins)} proteins")
+
+                else:
+                    all_proteins = []
+                    for _, row in df.iterrows():
+                        all_proteins.extend(resolve_proteins(row.get(protein_col)))
+                    proteins = list(dict.fromkeys(all_proteins))
+                    annotation = AnnotationsModel(
+                        text=entry["text"],
+                        description=entry.get("description", entry["text"]),
+                        group_tag=group_tag,
+                        protein_tags=proteins,
+                        source=ag.get("source", ""),
+                    )
+                    self.insert(annotation=annotation)
+                    print(f" Inserted '{entry['text']}' with {len(proteins)} proteins")
+
+            print(f"  Done.")
 
     def exists(self, tag: str) -> bool:
 

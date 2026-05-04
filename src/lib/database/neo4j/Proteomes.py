@@ -283,6 +283,17 @@ class Neo4JProteomes(ProteomesABC):
         r = self._driver.execute_query(query_=query,routing_="r",result_transformer_=Result.value, tag=tag)
         if len(r) == 0: return 0
         return r[0]
+    
+    def is_reviewed(self, tag : str) -> bool:
+        "Returns if the proteome is reviewed. This is a field that is set when importing Uniprot proteomes and indicates if the proteome is reviewed in Uniprot."
+        query = (
+            "MATCH (proteome:Proteome {tag : $tag}) "
+            "RETURN proteome.reviewed "
+        )
+        r = self._driver.execute_query(query_=query,routing_="r",result_transformer_=Result.value, tag=tag)
+        if len(r) == 0: return False
+        return r[0] if r[0] is not None else False
+    
 
     def get_proteins(self, tag : str, limit : int = None) -> List[str]:
         "Returns the protein tags associated with a proteome."
@@ -388,9 +399,11 @@ class Neo4JProteomes(ProteomesABC):
         user_tag : str, optional
             The tag associated with a user, by default None
         """
-    
-        if any(column_name not in data.columns for column_name in ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version"]):
-            raise ValueError('Column names incomplete. Must have ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version"]')
+
+
+        data.loc[:,"Reviewed"] = data.loc[:,'Reviewed'] == "reviewed"
+        if any(column_name not in data.columns for column_name in ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version","Reviewed"]):
+            raise ValueError('Column names incomplete. Must have ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version","Reviewed"]')
         
         query = (
             "MERGE (proteome:Proteome {tag : $proteome_attribute_tag}) "
@@ -402,9 +415,9 @@ class Neo4JProteomes(ProteomesABC):
             "UNWIND $uniprot_features as row "
             "MERGE (protein:Protein {tag : row.Entry}) "
             "ON CREATE "
-            "   SET protein += {aa_length : row.Length, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_tag : $proteome_tag, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
+            "   SET protein += {aa_length : row.Length, reviewed : row.`Reviewed`, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_tag : $proteome_tag, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
             "ON MATCH "
-            "   SET protein.gene_names = row.`Gene Names`, protein.protein_name = row.`Protein names`, protein.gene_name = row.`Gene Names (primary)`, protein.aa_length = row.Length, protein.proteome_tag = $proteome_tag "
+            "   SET protein.gene_names = row.`Gene Names`, protein.reviewed = row.`Reviewed`, protein.protein_name = row.`Protein names`, protein.gene_name = row.`Gene Names (primary)`, protein.aa_length = row.Length, protein.proteome_tag = $proteome_tag "
             "WITH protein, proteome, row "
             "MERGE (protein)-[r:IN_PROTEOME]->(proteome) "
             "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
