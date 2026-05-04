@@ -41,7 +41,7 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
             "    ag.source = $source, "
             "    ag.url = $url, "
             "    ag.created_at = timestamp(), "
-            "    ag.created_by = u.email "
+            "    ag.created_by = u.tag "
             "RETURN TRUE"
         )
 
@@ -209,7 +209,13 @@ class Neo4JAnnotations(AnnotationsABC):
                 "    ag.description = $description, "
                 "    ag.source = $source, "
                 "    ag.created_at = timestamp(), "
-                "    ag.created_by = u.email "
+                "    ag.created_by = u.tag "
+                "ON MATCH "
+                "SET ag.tag = $tag, "
+                "    ag.description = $description, "
+                "    ag.source = $source, "
+                "    ag.modified_at = timestamp(), "
+                "    ag.modified_by = u.tag "
                 "RETURN ag.tag "
             )
             r = self._driver.execute_query(
