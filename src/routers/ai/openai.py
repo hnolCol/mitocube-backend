@@ -51,16 +51,19 @@ def generate_cypher_query(prompt: str, session_id: str = None, user: UserModel =
     session_messages = DB.cache.get(session_id) if DB.cache.exists(session_id) else [{"role": "system", "content": OPEN_AI_SETTINGS.system_information}]
 
     session_messages.append({"role": "user", "content": prompt, "return": True})
+    print(session_messages)
+    print(prompt)
     try:
         cypher_query = DB.openai.generate_cypher_query_for_prompt(prompt, session_messages=session_messages)
     except Exception as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Error generating cypher query: {e}")
 
 
     session_messages.append({"role": "assistant", "content": cypher_query})
 
     queries = [q.strip() for q in re.findall(r"```cypher(?:[^\n]*\n)?(.*?)```", cypher_query, flags=re.S) if q.strip()]
-    
+    print(queries)
     if len(queries) == 0:
         session_messages.append({"role": "assistant", "content": cypher_query, "return": True})
         DB.cache.insert(session_id,session_messages)

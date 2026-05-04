@@ -1,6 +1,4 @@
 
-
-
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
@@ -11,7 +9,7 @@ class OpenAI(BaseSettings):
 
     open_ai_api_key : str
     chat_ai_base_url : str
-    chat_model : str =  "openai-gpt-oss-120b" #"apertus-70b-instruct-2509" # "qwen3-235b-a22b" #"openai-gpt-oss-120b"# "qwen3-235b-a22b"#" #"qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"#"qwen3-235b-a22b"#"llama-3.1-sauerkrautlm-70b-instruct"# openai-gpt-oss-120b"# "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"# "llama-3.1-sauerkrautlm-70b-instruct" #"codestral-22b"#"openai-gpt-oss-120b"#"codestral-22b"#"meta-llama-3.1-8b-instruct"#"gpt-4o-mini"
+    chat_model : str =  "glm-4.7" #"qwen3-30b-a3b-instruct-2507" #"meta-llama-3.1-8b-instruct"#"openai-gpt-oss-120b" #"apertus-70b-instruct-2509" # "qwen3-235b-a22b" #"openai-gpt-oss-120b"# "qwen3-235b-a22b"#" #"qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"#"qwen3-235b-a22b"#"llama-3.1-sauerkrautlm-70b-instruct"# openai-gpt-oss-120b"# "qwen2.5-coder-32b-instruct"#"openai-gpt-oss-120b"# "llama-3.1-sauerkrautlm-70b-instruct" #"codestral-22b"#"openai-gpt-oss-120b"#"codestral-22b"#"meta-llama-3.1-8b-instruct"#"gpt-4o-mini"
     functional_classification_system_message : str = """You are a bioinformatics assistant that classifies proteins into functional categories based on their known functions and characteristics. You will be provided with abstracts and pbumedids. Do not add anything beyond these abstracts. All functional annotations must be based on the abstracts. Please first check the abstracts and create reasonable functional classes and pathways the protein is involved in. Please add one column with a description of the function and the functional classes as well as the pathways, these pathways should be a maximum of 2-3 words. I want to use them in a network analysis. As an example: 'Mitochondrial ribosomes' or 'OXPHOS' or 'OXPHOS assembly' could reprent functioanl groups. Please provide the output in a text tab delimted with Protein Name Functional Category (headers) Please add the pubmed id for references."""
     system_information : str = """You are a bioinformatic assistant.
                         IMPORTANT INFO: 
@@ -492,6 +490,95 @@ class OpenAI(BaseSettings):
                             avg(samplesPerSubmission) AS avgSamplesPerSubmission;
                         Try to avoid cartesian products when counting!
                         
+                        Protein Statistics 
+                        
+                        For each attribute for samples which are associated with ConditionApplication, several statistics are calculated. 
+                        This calculation is based on the quantification values of single submissions.
+                        'MATCH (submission:Submission)-[:HAS_STATS]->(stats:Statistics)-[:FOR_PROTEIN_GROUP]->(pg:ProteinGroup)
+                        'MATCH (stats)-[:OF_ATTRIBUTE]->(attr:Attribute) RETURN stats, attr' will return all the stats with the associated attribute.
+                        
+                        These queries are likely to return a lot of data, therefore it is good to limit them by specific attributes or specific protein groups. 
+                        You can sort them by mean (abundance). The score will be nan for such groups. 
+                        
+                        These are the props of the Statistics node 
+                            "protein_group_tag": protein_group_tag,
+                            "attribute_tag": attribute_tag,
+                            "score": score,
+                            "mean": np.mean(all_values),
+                            "quantified_in_samples": observed,
+                            "F": f_stat,
+                            "p_value": p_value,
+                            "eta_squared": eta_squared,
+                            "cohen_f": cohen_f,
+                            "max_fc": max_fc,
+                            "std_means": std_means,
+                            "missingness": missingness,
+                            "n_groups": n_groups,
+                            "exclusively": exclusively,
+                            "exclusively_ca_tags": exclusively_ca_tags
+                        ------------------------------------------------------------
+                        1. F-statistic (ANOVA)
+                        
+                        2. p-value
+                        
+                        3. Eta Squared (η²)
+                        - Effect size representing the proportion of total variance explained by group differences.
+                        - Range: 0 to 1
+                            0   → no group effect
+                            1   → all variance explained by group differences
+                        - Interpretation (rule of thumb):
+                            ~0.01 → small effect
+                            ~0.06 → medium effect
+                            ~0.14 → large effect
+
+                        4. Cohen’s f
+                        - Standardized effect size derived from η².
+                        - Useful for comparing across experiments.
+                        - Interpretation:
+                            ~0.10 → small
+                            ~0.25 → medium
+                            ~0.40 → large
+
+                        5. Max Pairwise Fold Change (log2 scale)
+                        - Maximum absolute difference between any two group means.
+                        - Captures the strongest biological signal across conditions.
+
+                
+                        6. Standard Deviation of Group Means
+                        - Measures spread of group averages.
+                        - High value indicates strong variability across conditions.
+                        - Less sensitive to outliers than max fold change.
+
+                        7. Missingness
+                        - Fraction of missing observations for a protein.
+                        - Range: 0 to 1
+                            0   → fully observed
+                            1   → completely missing
+                        - High missingness reduces reliability of statistical estimates.
+
+                        8. Number of Groups (n_groups)
+                        9. Composite Score
+                        - Combined metric used to rank proteins by biological relevance.
+                        - Example formula:
+                            
+                            score = η² × max_fold_change × log10(n_groups + 1)
+
+                        - Intuition:
+                            - η² → consistency of differences
+                            - max_fold_change → magnitude of change
+                            - n_groups → diversity of conditions
+
+                        - High score indicates:
+                            → strong, consistent, and large differences across conditions 
+                        
+                        10. Exclusively
+                        indicates whether a protein is quantified in only one condition (e.g., only in treated samples but not in controls).
+                        - Binary value (True/False)
+                        
+                        11. exclusively_ca_tags 
+                        List of tags of ConditionApplications where the protein is exclusively quantified. This provides context for the exclusivity, such as which specific conditions or treatments are associated with the exclusive quantification.
+
+                        __________________________
 
                         The data will be retrieved from the database in python using the neo4j package Result.data(). I will then pass the data to you to summarize it. 
                         You must provide the cypher queries that you think are required in ```cypher``` blocks so that I can easily extract them. This is very important. Do not use any other format. Not even ```\ncypher\n ... \n``` blocks. Just use ```cypher ... ``` blocks. DO NOT ADD SOMETHING LIKE: Query:  after ```cypher ```. This is really important to be able to extract the cypher queries automatically.
@@ -500,7 +587,7 @@ class OpenAI(BaseSettings):
                         If you didn't get the question or you think sensitive information where asked, state that, the answer will then be returned to the user as is. 
                         
                         Be reminded: Never(!) provide any sensitive information such as passwords or similar. If asked, refuse to provide such information.
-                        Always provide the full cypher query, DO NOT use placeholders such as $tag etc. Replace them with actual values. 
+                        Always provide the full cypher query, DO NOT use placeholders such as $tag etc. Replace them with actual values. If you are using the search param, you must use only small letters!
                         Never create queries that would need the user to input something or to change something. 
                         The query must be ready to run as is.
                         """

@@ -19,7 +19,7 @@ class OpenAIClient(ABC):
         self.base_url = open_ai_settings.chat_ai_base_url
         self.ai_model = open_ai_settings.chat_model
         self.client = OpenAI(api_key=self.api_key, base_url=self.base_url)
-
+        print(self.api_key, self.base_url, self.ai_model)
 
     @abstractmethod
     def execute_query(self, cypher_query : str) -> dict:
