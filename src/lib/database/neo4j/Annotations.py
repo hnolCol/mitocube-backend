@@ -244,6 +244,21 @@ class Neo4JAnnotations(AnnotationsABC):
                 else:
                     raise TypeError(f"File type not supported: {data_path}")
 
+                # Flatten multi-level columns if needed
+                if isinstance(df.columns, pd.MultiIndex):
+                    functional_header = entry.get("functional_header", None)
+                    if functional_header:
+                        # Forward-fill the top-level headers (handles merged cells)
+                        top_level = [col[0] if col[0] and not str(col[0]).startswith('Unnamed') else None for col in df.columns]
+                        filled_top = pd.Series(top_level).ffill().tolist()
+                        
+                        # Get all columns where filled top-level matches functional_header
+                        functional_cols = [df.columns[i][1] for i, header in enumerate(filled_top) if header == functional_header]
+                    # Flatten column names
+                    df.columns = [col[1] if isinstance(col, tuple) else col for col in df.columns]
+                else:
+                    functional_cols = None
+
                 # Pre-fetch existing proteins if we need to filter
                 existing_proteins = set()
                 if protein_delimiter and reviewed_filter:
@@ -284,17 +299,52 @@ class Neo4JAnnotations(AnnotationsABC):
                     else:
                         return [value] if value else []
 
-                if "annotation_text_column" in entry:
-                    annotation_col = entry["annotation_text_column"]
+                # Check if this is functional column mode
+                if functional_cols:
                     annotation_to_proteins = defaultdict(list)
                     for _, row in df.iterrows():
                         proteins = resolve_proteins(row.get(protein_col))
                         if not proteins:
                             continue
-                        ann_text = row.get(annotation_col)
-                        if pd.isna(ann_text):
+                        
+                        # Check each functional column
+                        for func_col in functional_cols:
+                            if row.get(func_col) == 1:
+                                annotation_to_proteins[func_col].extend(proteins)
+
+                    for ann_text, proteins in annotation_to_proteins.items():
+                        annotation = AnnotationsModel(
+                            text=ann_text,
+                            description=ann_text,
+                            group_tag=group_tag,
+                            protein_tags=list(set(proteins)),  # deduplicate
+                            source=ag.get("source", ""),
+                        )
+                        self.insert(annotation=annotation)
+                        print(f"    Inserted '{ann_text}' with {len(set(proteins))} proteins")
+
+                elif "annotation_text_column" in entry:
+                    annotation_col = entry["annotation_text_column"]
+                    annotation_delimiter = entry.get("annotation_delimiter", None)
+                    annotation_to_proteins = defaultdict(list)
+                    
+                    for _, row in df.iterrows():
+                        proteins = resolve_proteins(row.get(protein_col))
+                        if not proteins:
                             continue
-                        annotation_to_proteins[str(ann_text).strip()].extend(proteins)
+                        
+                        ann_texts = row.get(annotation_col)
+                        if pd.isna(ann_texts):
+                            continue
+                        
+                        # Split annotation texts if delimiter provided
+                        if annotation_delimiter and annotation_delimiter in str(ann_texts):
+                            ann_text_list = [t.strip() for t in str(ann_texts).split(annotation_delimiter) if t.strip()]
+                        else:
+                            ann_text_list = [str(ann_texts).strip()]
+                        
+                        for ann_text in ann_text_list:
+                            annotation_to_proteins[ann_text].extend(proteins)
 
                     for ann_text, proteins in annotation_to_proteins.items():
                         annotation = AnnotationsModel(

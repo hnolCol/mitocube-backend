@@ -44,6 +44,40 @@
                     "header": 1
                 }
             ]
+        },
+        {
+            "annotation_group": {
+                "text": "MitoCarta 3.0 Pathways",
+                "description": "Metabolic pathway annotations from MitoCarta 3.0",
+                "source": "Broad Institute"
+            },
+            "annotations": [
+                {
+                    "file_path": "MitoCarta/Human.MitoCarta3.0-2_Pathways.txt",
+                    "sheet_name": "A Human MitoCarta3.0",
+                    "annotation_text_column": "MitoCarta3.0_MitoPathways",
+                    "protein_tag_column": "UniProt",
+                    "annotation_delimiter": "|"
+                }
+            ]
+        },
+        {
+            "annotation_group": {
+                "text": "MitoCoP Functional Classification",
+                "description": "Functional annotations from MitoCoP",
+                "source": "MitoCoP"
+            },
+            "annotations": [
+                {
+                    "file_path": "MitoCarta/MitoCop.txt",
+                    "protein_tag_column": "Simplified protein IDs",
+                    "protein_delimiter": ";",
+                    "reviewed_filter": true,
+                    "encoding": "latin-1",
+                    "header": [0, 1],
+                    "functional_header": "Functional MitoCoP classification"
+                }
+            ]
         }
     ]
 }
