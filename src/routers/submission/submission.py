@@ -895,6 +895,19 @@ def get_submission_runlist(
         instrument_text=instrument_text
     )
 
+@router.delete("/submissions/{submission_tag}/runlist", tags=["Runlist"])
+def delete_submission_runlist(
+    submission_tag: str,
+    user: UserModel = Depends(is_creator_of_submission_or_curator)
+):
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+
+    ok = DB.submissions.delete_runlist(submission_tag=submission_tag)
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not delete runlist.")
+    
+    return True
+
 
 @router.get("/submissions/{submission_tag}/check", tags=["Submissions"])
 def check_submission(

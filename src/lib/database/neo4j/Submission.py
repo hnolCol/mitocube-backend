@@ -1044,6 +1044,18 @@ class Neo4JSubmissions(SubmissionsABC):
             key=lambda x: x.measurement_index
         )
         return RunListModel(**row["rl"], runs=runs)
+    
+    def delete_runlist(self, submission_tag: str) -> bool:
+        query = (
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "DETACH DELETE rl "
+        )
+        try:
+            self._driver.execute_query(query, routing_="w", tag=submission_tag)
+            return True
+        except Exception as e:
+            print(e)
+            return False
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver) -> None:

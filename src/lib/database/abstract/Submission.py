@@ -510,6 +510,10 @@ class SubmissionsABC(ABC):
     def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
         "Returns the runlist for a given submission tag. If no runlist is found, None is returned."
 
+    @abstractmethod
+    def delete_runlist(self, submission_tag: str) -> bool:
+        "Deletes the runlist for a given submission tag. Returns True if the runlist was deleted successfully, False otherwise."
+
 
 
 class SubmissionFilterABC(ABC):

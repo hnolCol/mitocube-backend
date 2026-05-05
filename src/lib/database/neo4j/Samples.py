@@ -1,5 +1,6 @@
 from typing import List, Dict
 from neo4j import Driver, Result
+from datetime import datetime
 
 from lib.database.abstract.Samples import SamplesABC
 from services.encryption import create_hierarchical_hash
@@ -655,8 +656,16 @@ class Neo4JSamples(SamplesABC):
             submission_tag=submission_tag
         )
         
+        # Add date prefix to sample names
+        today_string = datetime.today().strftime('%Y%m%d')
+        prefixed_sample_names = [
+            f"{today_string}_{name}" if not name.split('_')[0].isdigit() or len(name.split('_')[0]) != 8 
+            else name 
+            for name in order_df["sample_name"].tolist()
+        ]
+        
         if ca_df.empty:
-            return pd.DataFrame(index=order_df["sample_name"].tolist())
+            return pd.DataFrame(index=prefixed_sample_names)
         
         ca_df["condition_tags"] = ca_df["condition_tags"].apply(lambda x: " ".join(sorted(x)))
         pivot = ca_df.pivot_table(
@@ -668,11 +677,14 @@ class Neo4JSamples(SamplesABC):
         pivot.index.name = None
         pivot.columns.name = None
         # Strip attribute prefix from trait tags for cleaner run names
-        # e.g. "att_compound:dmso" -> "dmso"
         for col in pivot.columns:
             pivot[col] = pivot[col].apply(
                 lambda x: "_".join([t.split(":")[-1] for t in x.split(" ")]) if x else x
             )
         
-        # Reindex to include all samples in correct order, filling missing with empty string
-        return pivot.reindex(order_df["sample_name"].tolist(), fill_value="")
+        # Create mapping from old names to prefixed names
+        name_mapping = dict(zip(order_df["sample_name"].tolist(), prefixed_sample_names))
+        pivot = pivot.rename(index=name_mapping)
+        
+        # Reindex to include all samples in correct order
+        return pivot.reindex(prefixed_sample_names, fill_value="")
