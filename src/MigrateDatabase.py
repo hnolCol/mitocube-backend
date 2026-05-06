@@ -9,6 +9,7 @@ from lib.database.Database import Database
 from config.models.submissions.submissions import NewSubmissionModel
 from config.models.submissions.states import SubmissionStatesEnums
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel
+from config.models.submissions.runs import AnalyticRunModel, RunListModel
 
 from services.json import read_json
 import numpy as np
@@ -320,6 +321,43 @@ class MigrateData:
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
                     time.sleep(1) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
                     print(f"Quantification data for submission {submission_tag} inserted and processed successfully.")
+
+                ### migrate runlist if exists
+                if "runlist" in jsonFile and jsonFile["runlist"]:
+                    old_runlist = jsonFile["runlist"]
+                    runs = [AnalyticRunModel(**old_run) for old_run in old_runlist.get("runs", [])]
+                    
+                    # Check for instrument in runlist first, then fall back to dataset attributes
+                    instrument_tag = old_runlist.get("instrument_tag", None)
+                    
+                    if instrument_tag is None:
+                        # Check dataset attributes for instrument (att_ms)
+                        dataset_attributes = jsonFile.get("dataset_attributes", {})
+                        ms_instruments = dataset_attributes.get("att_ms", [])
+                        if ms_instruments and len(ms_instruments) > 0:
+                            # Use the first MS instrument found
+                            instrument_tag = ms_instruments[0]
+                    
+                    runlist_model = RunListModel(
+                        user_tag=old_runlist["user_tag"],
+                        dataset_label=old_runlist["dataset_label"],
+                        n_runs=old_runlist["n_runs"],
+                        n_plates=old_runlist["n_plates"],
+                        fractionated=old_runlist["fractionated"],
+                        n_fractions=old_runlist.get("n_fractions", 0),
+                        scrambled=old_runlist["scrambled"],
+                        scrambled_across_plates=old_runlist["scrambled_across_plates"],
+                        instrument_tag=instrument_tag,  # Can be None
+                        aggregated_on=old_runlist.get("aggregated_on", None),
+                        runs=runs
+                    )
+                    
+                    DB.submissions.insert_runlist(
+                        submission_tag=submission_tag,
+                        runlist=runlist_model,
+                        user_tag=self.fallback_user_tag
+                    )
+                    print(f"Runlist for submission {submission_tag} migrated successfully ({runlist_model.n_runs} runs).")
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
       

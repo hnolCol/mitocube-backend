@@ -327,7 +327,34 @@ class Neo4JInstruments(InstrumentsABC):
         
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, instrument_type = instrument_type)
         print(r,"GET INSTRUMENT TYPE!")
-        return r 
+        return r
+    
+    def get_types_text(self, limit: int = 50) -> List[dict]:
+        """Returns instrument type text"""
+        query = (
+            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) "
+            "WHERE ag.tag = 'instrumenttype' "
+            "RETURN {tag: a.tag, text: a.text} "
+            "LIMIT $limit"
+        )
+        return self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, limit=limit)
+
+    def get_text(self, instrument_type: str = None) -> List[dict]:
+        """Returns instruments text"""
+        query = (
+            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) "
+            "WHERE ag.tag = 'instrument' "
+        )
+        
+        if instrument_type is not None:
+            query += (
+                "AND EXISTS {(:AttributeGroup {tag : 'instrumenttype'})<-[:PART_OF]-"
+                "(a_type:Attribute)-[:IS_CHILD]->(a) WHERE a_type.tag = $instrument_type} "
+            )
+        
+        query += "MATCH (a)-[:HAS_TRAIT]->(t:Trait) RETURN {tag: t.tag, text: t.text} "
+        
+        return self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, instrument_type=instrument_type)
         
     def get_samples_by_instrument(self, tags: List[str]) -> Dict:
         ""
