@@ -78,14 +78,14 @@ constraints = [
     ConstraintModel(constrain_label  = "dataset_label",node_label = NodeLabelModel(label = "Dataset"),property_name ="tag"),
     ConstraintModel(constrain_label  = "submission_label",node_label = NodeLabelModel(label = "Submission"),property_name ="tag"),
     ConstraintModel(constrain_label  = "attribute_tag",node_label = NodeLabelModel(label = "Attribute"),property_name ="tag"),
-    ConstraintModel(constrain_label  = "attribute_value_tag",node_label = NodeLabelModel(label = "AttributeValue"),property_name ="tag"),
+    ConstraintModel(constrain_label  = "trait_tag",node_label = NodeLabelModel(label = "Trait"),property_name ="tag"),
     ConstraintModel(constrain_label  = "state_tag",node_label = NodeLabelModel(label = "State"),property_name ="tag"),
     ConstraintModel(constrain_label  = "user_tag",node_label = NodeLabelModel(label = "User"),property_name = ["tag","email"]),
     ConstraintModel(constrain_label  = "filter_tag",node_label = NodeLabelModel(label = "Filter"),property_name ="tag"),
     ConstraintModel(constrain_label  = "state_tag",node_label = NodeLabelModel(label = "State"),property_name ="tag"),
     ConstraintModel(constrain_label  = "user_role_tag",node_label = NodeLabelModel(label = "Role"),property_name ="tag"),
     ConstraintModel(constrain_label  = "query_tag",node_label = NodeLabelModel(label = "Query"),property_name ="tag"),
-    ConstraintModel(constrain_label  = "metatext_tag",node_label = NodeLabelModel(label = "Metatext"),property_name ="tag"), #meta text? 
+    ConstraintModel(constrain_label  = "metatext_tag",node_label = NodeLabelModel(label = "MetaText"),property_name ="tag"), #meta text? 
     ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag"),
     ConstraintModel(constrain_label  = "qc_tag",node_label = NodeLabelModel(label = "QCRun"),property_name ="tag"),
     ConstraintModel(constrain_label  = "peptide_tag",node_label = NodeLabelModel(label = "Peptide"),property_name ="tag"),

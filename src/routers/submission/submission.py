@@ -168,6 +168,12 @@ def check_submission_exists(submission_tag: str) -> bool:
     "Checks if a submission exists by its tag."
     return DB.submissions.exists(tag=submission_tag)    
 
+@router.get("/submissions/{submission_tag}/genotypes/exists")
+def check_submission_genotypes_exists(submission_tag: str) -> bool:
+    "Checks if genotypes are associated with a submission by its tag."
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+    return DB.submissions.has_genotypes(tag=submission_tag)
+
 
 @router.get("/submissions/{submission_tag}/title")
 def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:

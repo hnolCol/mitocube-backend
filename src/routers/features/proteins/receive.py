@@ -23,22 +23,21 @@ router = APIRouter(
 
 
 @router.get("/{tag}", summary="Returns the protein information model.")
-def bulk_insert_protein_features(tag: str, user: UserModel = Depends(get_user_from_token)) -> FeatureNeoModel:
+def get_protein_features(tag: str, user: UserModel = Depends(get_user_from_token)) -> FeatureNeoModel:
     """
-    Bulk insert of new protein features. Requires curator rights.
+    Returns the protein information model.
     
     Parameters
     ----------
-    search_string : str
-        The search string to find proteins.
-    limit : int, optional
-        The limit of proteins to return, by default None
+    tag : str
+        The tag of the protein to retrieve.
     user : UserModel, optional
-        The user that is extracted by the token, by default Depends(is_user_at_least_cur
+        The user that is extracted by the token, by default Depends(get_user_from_token)
     Returns
     -------
-    List[str]
-       Protein tags
+    FeatureNeoModel
+        The protein information model.
     """
+
     return DB.proteins.get(tag = tag)
     

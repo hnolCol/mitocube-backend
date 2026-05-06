@@ -52,6 +52,17 @@ def handle_knockdown(tags : List[str], technique_trait_tag : str = "att_knockdow
     r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
     return r 
 
+
+def handle_pulldown(tags : List[str]):
+    "" 
+    r = [] 
+    protein_tags = [t.split(":")[1] for t in tags]
+    print(f"Handling pulldown for protein tags: {protein_tags}")
+    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tags[0])
+    r = build_tree(attribute_tag = "att_pulldown", trait_tags=["att_pulldown:endog"]) 
+    r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
+    return r
+
 def handle_batch(tags : List[str]):
     "" 
     values = [t.split(":")[1] for t in tags] 

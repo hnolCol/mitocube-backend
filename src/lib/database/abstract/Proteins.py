@@ -42,13 +42,15 @@ class ProteinsABC(ABC):
         """
         
     @abstractmethod
-    def find(self, search_string : str = None, limit : int = 100) -> List[str]:
+    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = 100) -> List[str]:
         """Finds proteins by a search string.
 
         Parameters
         ----------
         search_string : str, optional
             The search string to use for finding proteins.
+        proteome_tags : List[str], optional
+            A list of proteome tags to filter the proteins by. If None, does not filter by proteome tags, by default None.
         limit : int, optional
             The maximum number of results to return, by default 100.
 

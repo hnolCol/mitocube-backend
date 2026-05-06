@@ -47,17 +47,24 @@ class Neo4JProteins(ProteinsABC):
         return r[0]
     
     
-    def find(self, search_string : str = None, limit : int = 100) -> List[str]:
+    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = 100) -> List[str]:
         ""
         query = "MATCH (p:Protein) "
         if search_string is not None:
-            query += "WHERE p.s CONTAINS toLower($search_string) "
+            query += "WHERE p.s CONTAINS $search_string "
+        if proteome_tags is not None and len(proteome_tags) > 0:
+            if search_string is not None:
+                query += "AND "
+            else:
+                query += "WHERE "
+            query += " p.proteome_tag IN $proteome_tags "
         query += (
             "RETURN p.tag as tag "
             "ORDER BY COUNT { (p)--() } DESC "
             "LIMIT $limit "
         )
-        r = self._driver.execute_query(query, search_string = search_string, limit = limit, routing_="r", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, search_string = search_string.lower() if search_string is not None else None, proteome_tags = proteome_tags, limit = limit, routing_="r", result_transformer_=Result.value)
+        print(r)
         return r
     
     def get(self, tag : str) -> FeatureNeoModel:

@@ -22,7 +22,7 @@ router = APIRouter(
 
 
 @router.get("/q", summary="Finds proteins by search query.")
-def bulk_insert_protein_features(search_string : str, limit : int = None, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def bulk_insert_protein_features(search_string : str, limit : int = None, proteome_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     """
     Bulk insert of new protein features. Requires curator rights.
     
@@ -39,5 +39,5 @@ def bulk_insert_protein_features(search_string : str, limit : int = None, user: 
     List[str]
        Protein tags
     """
-    return DB.proteins.find(search_string=search_string, limit=limit)
+    return DB.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param)
     
