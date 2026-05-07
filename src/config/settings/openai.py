@@ -44,13 +44,13 @@ class OpenAI(BaseSettings):
                         WHERE toLower(p.s) CONTAINS <search_string> //search string - PROTEIN NODE, not the ProteinGroup!
                         MATCH (pgTarget:ProteinGroup)-[:HAS_PROTEINS]->(p)
                         WITH pgTarget, collect(p.gene_name) AS gene_names, p,
-                            COUNT{(pgTarget)-[:HAS_PROTEINS]->(:Protein)} AS protCount
+                            COUNT{(pgTarget)-[:HAS_PROTEINS]->(:Protein)} AS protCount // NEVER USE SIZE, ONLY COUNT() AS SIZE CREATES A SYNTAX ERROR IN NEO4J 5.x
                         ORDER BY protCount ASC        // choose the group with the fewest proteins
                         LIMIT 1
                         
                         RETURN pgTarget.tag AS protein_group_tag, gene_names
                         
-                       This is very important, especially the COUNT syntax must be used like this to avoid syntax errors in neo4j 5.x! AGain do NOT use something like this: "ORDER BY size((pgTarget)-[:HAS_PROTEINS]->(:Protein)) ASC" since this creates a syntax error in neo4j 5.x. 
+                       This is very important, especially the COUNT syntax must be used like this to avoid syntax errors in neo4j 5.x! DO NOT use: "ORDER BY size((pgTarget)-[:HAS_PROTEINS]->(:Protein)) ASC" since this creates a syntax error in neo4j 5.x. 
                        Instead use "WITH pgTarget, COUNT {(pgTarget)-[:HAS_PROTEINS]->(:Protein)} AS protein_count ORDER BY protein_count ASC"
 
                         Do not(!) use something like this:

@@ -347,27 +347,29 @@ class MigrateData:
                         if ms_instruments and len(ms_instruments) > 0:
                             # Use the first MS instrument found
                             instrument_tag = ms_instruments[0]
-                    
-                    runlist_model = RunListModel(
-                        user_tag=old_runlist["user_label"],
-                        dataset_label=old_runlist["dataset_label"],
-                        n_runs=old_runlist["n_runs"],
-                        n_plates=old_runlist["n_plates"],
-                        fractionated=old_runlist["fractionated"],
-                        n_fractions=old_runlist.get("n_fractions", 0),
-                        scrambled=old_runlist["scrambled"],
-                        scrambled_across_plates=old_runlist["scrambled_across_plates"],
-                        instrument_tag=instrument_tag,  # Can be None
-                        aggregated_on=old_runlist.get("aggregated_on", None),
-                        runs=runs
-                    )
-                    
-                    DB.submissions.insert_runlist(
-                        submission_tag=submission_tag,
-                        runlist=runlist_model,
-                        user_tag=self.fallback_user_tag
-                    )
-                    print(f"Runlist for submission {submission_tag} migrated successfully ({runlist_model.n_runs} runs).")
+                    try:
+                        runlist_model = RunListModel(
+                            user_tag=old_runlist["user_label"] if "user_label" in old_runlist else self.fallback_user_tag,
+                            dataset_label=old_runlist["dataset_label"],
+                            n_runs=old_runlist["n_runs"],
+                            n_plates=old_runlist["n_plates"],
+                            fractionated=old_runlist["fractionated"],
+                            n_fractions=old_runlist.get("n_fractions", 0),
+                            scrambled=old_runlist["scrambled"],
+                            scrambled_across_plates=old_runlist["scrambled_across_plates"],
+                            instrument_tag=instrument_tag,  # Can be None
+                            aggregated_on=old_runlist.get("aggregated_on", None),
+                            runs=runs
+                        )
+                        
+                        DB.submissions.insert_runlist(
+                            submission_tag=submission_tag,
+                            runlist=runlist_model,
+                            user_tag=self.fallback_user_tag
+                        )
+                        print(f"Runlist for submission {submission_tag} migrated successfully ({runlist_model.n_runs} runs).")
+                    except Exception as e:
+                        print(f"Error migrating runlist for submission {submission_tag}: {e}")
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
       

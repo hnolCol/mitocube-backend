@@ -51,8 +51,7 @@ def generate_cypher_query(prompt: str, session_id: str = None, user: UserModel =
     session_messages = DB.cache.get(session_id) if DB.cache.exists(session_id) else [{"role": "system", "content": OPEN_AI_SETTINGS.system_information}]
 
     session_messages.append({"role": "user", "content": prompt, "return": True})
-    print(session_messages)
-    print(prompt)
+    
     try:
         cypher_query = DB.openai.generate_cypher_query_for_prompt(prompt, session_messages=session_messages)
     except Exception as e:

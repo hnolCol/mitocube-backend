@@ -3,7 +3,7 @@ from typing import Optional,List, Dict
 import os
 
 from services.random_generators import get_random_string
-
+from services.encryption import create_hierarchical_hash
 from neo4j import Driver, Result
 
 from collections import defaultdict
@@ -191,6 +191,8 @@ class Neo4JAnnotations(AnnotationsABC):
         - "protein_delimiter": ";" — splits multi-protein cells
         - "reviewed_filter": true — for multi-protein cells, keeps only proteins that are reviewed in the DB
         """
+# The code is attempting to print the value of the variable `user_tag`, but it seems that the variable
+# `user_tag` is not defined in the provided code snippet.
         print(user_tag)
         config = read_json(file_path)
 
@@ -200,20 +202,20 @@ class Neo4JAnnotations(AnnotationsABC):
 
         for group_config in config["groups"]:
             ag = group_config["annotation_group"]
-
+            group_tag = create_hierarchical_hash(ag)
             # Create annotation group
-            group_tag = get_random_string(5)
+            #group_tag = get_random_string(5)
             query = (
                 "MATCH (u:User {tag: $user_tag}) "
-                "MERGE (ag:AnnotationGroup {text: $text}) "
+                "MERGE (ag:AnnotationGroup {tag: $tag}) "
                 "ON CREATE "
-                "SET ag.tag = $tag, "
+                "SET ag.text = $text, "
                 "    ag.description = $description, "
                 "    ag.source = $source, "
                 "    ag.created_at = timestamp(), "
                 "    ag.created_by = u.tag "
                 "ON MATCH "
-                "SET ag.tag = $tag, "
+                "SET ag.text = $text, "
                 "    ag.description = $description, "
                 "    ag.source = $source, "
                 "    ag.modified_at = timestamp(), "

@@ -438,7 +438,6 @@ class Neo4JGenotype(GenotypeABC):
         def _find_protein_tag(components : List[AttributeTree]) -> str:
             t = []
             for component in components:
-                print(component, _is_feature(component), len(component.children))
                 if _is_feature(component) and len(component.children) > 0:
                     #the value is actually in the children 
                     t.append(component.children[0].value)

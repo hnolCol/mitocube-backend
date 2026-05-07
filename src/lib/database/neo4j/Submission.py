@@ -445,7 +445,7 @@ class Neo4JSubmissions(SubmissionsABC):
         CALL () {
             MATCH (submission:Submission {tag: $tag})
             
-            UNWIND qs as q
+            UNWIND $qs as q
             
             MATCH (sample:Sample {tag: q.sample_tag})<-[:HAS_SAMPLE]-(submission)
             MATCH (pg:ProteinGroup {tag: q.tag})
@@ -491,13 +491,39 @@ class Neo4JSubmissions(SubmissionsABC):
         
         
         query = (
-            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
-            "WITH sample, collect(q.value) AS values "
-            "WITH sample, apoc.coll.avg(values) AS mean, apoc.coll.stdev(values) AS stdev "
+            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample) "
             "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+
+            "WITH sample, "
+            "     avg(q.value) AS mean, "
+            "     stDev(q.value) AS stdev, "
+            "     collect(q) AS qs "
+            "WHERE stdev > 0 "
+
+            "UNWIND qs AS q "
             "SET q.z_score_sample = (q.value - mean) / stdev "
-            "RETURN count(q) "
+
+            "RETURN count(q) AS updated "
         )
+
+
+            #     query = (
+            # "MATCH (pg:ProteinGroup {tag: $tag})<-[:QUANTIFIED]-(sample:Sample)-[q:QUANTIFIED]->(pg) "
+
+            # "WITH pg, q, q.value AS value "
+
+            # "WITH pg, "
+            #     "avg(value) AS mean, "
+            #     "stDev(value) AS stdev, "
+            #     "collect({q: q, value: value}) AS rows "
+            # "WHERE stdev > 0 "
+
+            # "UNWIND rows AS row "
+            # "SET row.q.z_score_sample = (row.value - mean) / stdev "
+
+            # "RETURN size(rows) AS updated"
+            # )
+
 
         r = self._driver.execute_query(
             query,
@@ -508,18 +534,23 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else 0
 
 
-    def transform_quantification_to_zscore_along_protein_groups(self,tag : str) -> bool:
+    def transform_quantification_to_zscore_along_protein_groups(self, tag : str) -> bool:
         """
         Transforms the quantification values for a given submission to z-scores.
         """
         
         query = (
             "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
-            "WITH pg, collect(q.value) AS values "
-            "WITH pg, apoc.coll.avg(values) AS mean, apoc.coll.stdev(values) AS stdev WHERE stdev > 0 " #to avoid division by zero, if stdev is zero, z-score will be set to zero as well.
-            "MATCH (sample)-[q:QUANTIFIED]->(pg) "
-            "SET q.z_score_protein_group = (q.value - mean) / stdev "
-            "RETURN count(q) "
+            "CALL (pg, sample) { "
+                "MATCH (sample)-[q:QUANTIFIED]->(pg) "
+                "WITH avg(q.value) AS mean, stDev(q.value) AS stdev, collect(q) AS qs, pg "
+                "WHERE stdev > 0 "
+
+                "UNWIND qs AS q "
+                "SET q.z_score_protein_group = (q.value - mean) / stdev "
+                "RETURN count(*) AS updated "
+            "} "
+        "RETURN sum(updated)"
         )   
         r = self._driver.execute_query(
             query,
