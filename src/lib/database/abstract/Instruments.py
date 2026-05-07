@@ -59,13 +59,9 @@ class InstrumentsABC(ABC):
         """
     
     @abstractmethod
-    def get_types_text(self, limit: int = 50) -> List[dict]:
-        """Returns instrument type text"""
-        
-    @abstractmethod
-    def get_text(self, instrument_type: str = None) -> List[dict]:
-        """Returns instruments text"""
-        
+    def get_types(self, limit: int = 50) -> List[dict]:
+        """Returns all the instrument type tags with their display text"""
+
         
     @abstractmethod
     def get_samples_by_instrument(self, tags : List[str]) -> Dict:

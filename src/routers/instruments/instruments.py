@@ -23,27 +23,15 @@ router = APIRouter(
 
 DB = Database.DB()
 
-@router.get("")
-def get_instruments(type : str = None, user : UserModel = Depends(get_user_from_token)):
-    ""
-    return DB.instruments.get(instrument_type = type)
-    
-
 @router.get("/types")
-def get_instrument_type_tags(user : UserModel = Depends(get_user_from_token)) -> List[str]:
-    "Instruments are grouped by type."
+def get_instrument_type_tags(user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+    """Instruments are grouped by type."""
     return DB.instruments.get_types()
 
-
-@router.get("/types/text")
-def get_instrument_types_text(user: UserModel = Depends(get_user_from_token)) -> List[dict]:
-    """Get instrument types with display names"""
-    return DB.instruments.get_types_text()
-
-@router.get("/text")
-def get_instruments_text(type: str = None, user: UserModel = Depends(get_user_from_token)) -> List[dict]:
-    """Get instruments with display names"""
-    return DB.instruments.get_text(instrument_type=type)
+@router.get("")
+def get_instruments(type: str = None, user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+    """Get instruments with their display text, optionally filtered by type"""
+    return DB.instruments.get(instrument_type=type)
 
 @router.get("/permissions") 
 def get_instrument_permissions(user : UserModel = Depends(get_user_from_token)) -> List[str]:
