@@ -286,34 +286,27 @@ class Neo4JInstruments(InstrumentsABC):
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
         
-    def get_types(self, limit : int = 50) -> List[str]:
-        "Returns all the instrument type tags"
+    def get_types(self, limit: int = 50) -> List[dict]:
+        """Returns all the instrument type tags with their display text"""
         query = (
-            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) WHERE ag.tag = 'instrumenttype' RETURN a.tag LIMIT $limit"
+            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) "
+            "WHERE ag.tag = 'instrumenttype' "
+            "RETURN {tag: a.tag, text: a.text} "
+            "LIMIT $limit"
         )
         
-        instrument_types = self._driver.execute_query(query, routing_="r",result_transformer_=Result.value, limit = limit)
+        instrument_types = self._driver.execute_query(
+            query, 
+            routing_="r",
+            result_transformer_=Result.value, 
+            limit=limit
+        )
         
         return instrument_types
-        
-        
-    def get(self, instrument_type : str = None, tags: List[str] = None) -> List:
-        """An instrument is a trait of an attribute The attribute is in an AttributeGroup 'instrument'
-        In addition there are instrument types (e.g. mass spec type, lc type)
-        that group the instruments. 
-        Hence you can provide a type go get the list of instrument tags (Traits). 
-        If no instrument_type is provided, all instrument tags will be returned. 
 
-        Parameters
-        ----------
-        instrument_type : str, optional
-            _description_, by default None
-            
-        Returns
-        -------
-        List
-            Instrument tags
-        """
+
+    def get(self, instrument_type: str = None, tags: List[str] = None) -> List[dict]:
+        """Returns instruments with tag and text"""
         
         query = (
             "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) WHERE ag.tag = 'instrument' "
@@ -322,39 +315,16 @@ class Neo4JInstruments(InstrumentsABC):
         if instrument_type is not None:
             query += "AND EXISTS {(:AttributeGroup {tag : 'instrumenttype'})<-[:PART_OF]-(a_type:Attribute)-[:IS_CHILD]->(a) WHERE a_type.tag = $instrument_type} "
         
-        query += "MATCH (a)-[:HAS_TRAIT]->(t:Trait) RETURN t.tag "
-
-        
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, instrument_type = instrument_type)
-        print(r,"GET INSTRUMENT TYPE!")
-        return r
-    
-    def get_types_text(self, limit: int = 50) -> List[dict]:
-        """Returns instrument type text"""
-        query = (
-            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) "
-            "WHERE ag.tag = 'instrumenttype' "
-            "RETURN {tag: a.tag, text: a.text} "
-            "LIMIT $limit"
-        )
-        return self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, limit=limit)
-
-    def get_text(self, instrument_type: str = None) -> List[dict]:
-        """Returns instruments text"""
-        query = (
-            "MATCH (ag:AttributeGroup)<-[:PART_OF]-(a:Attribute) "
-            "WHERE ag.tag = 'instrument' "
-        )
-        
-        if instrument_type is not None:
-            query += (
-                "AND EXISTS {(:AttributeGroup {tag : 'instrumenttype'})<-[:PART_OF]-"
-                "(a_type:Attribute)-[:IS_CHILD]->(a) WHERE a_type.tag = $instrument_type} "
-            )
-        
         query += "MATCH (a)-[:HAS_TRAIT]->(t:Trait) RETURN {tag: t.tag, text: t.text} "
+
+        r = self._driver.execute_query(
+            query, 
+            routing_="r", 
+            result_transformer_=Result.value, 
+            instrument_type=instrument_type
+        )
         
-        return self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, instrument_type=instrument_type)
+        return r
         
     def get_samples_by_instrument(self, tags: List[str]) -> Dict:
         ""
