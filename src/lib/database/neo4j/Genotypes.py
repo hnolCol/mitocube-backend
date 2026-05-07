@@ -347,15 +347,17 @@ class Neo4JGenotype(GenotypeABC):
         protein_tags = [_find_protein_tag([c]) for c in data.components]
         if len(protein_tags) == 0:
             raise ValueError("No feature (protein tag) found in the genotype components.")
+       # if tag is None:
         if tag is None:
             tag = create_hierarchical_hash([d.model_dump() for d in data.components])
+            
         if self.exists(tag):
             return False
 
         tags = []
         for attribute_tree in data.components:
-            tag = self._condition_applications.insert(condition_application=attribute_tree, extra_data_for_hash={"genotype_tag" : tag}) 
-            tags.append(tag)
+            ca_tag = self._condition_applications.insert(condition_application=attribute_tree, extra_data_for_hash={"genotype_tag" : tag}) 
+            tags.append(ca_tag)
 
         self.insert_genotype(tag = tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
                              protein_tags=[tag for tag in protein_tags if tag is not None])

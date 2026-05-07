@@ -64,7 +64,7 @@ class Neo4JProteins(ProteinsABC):
             "LIMIT $limit "
         )
         r = self._driver.execute_query(query, search_string = search_string.lower() if search_string is not None else None, proteome_tags = proteome_tags, limit = limit, routing_="r", result_transformer_=Result.value)
-        print(r)
+
         return r
     
     def get(self, tag : str) -> FeatureNeoModel:

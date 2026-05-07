@@ -1,3 +1,0 @@
-details_source	https://www.uniprot.org/uniprotkb
-details_source_Date	2023-12-06
-proteom_id	UP000000589

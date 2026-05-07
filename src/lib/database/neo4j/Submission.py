@@ -4,6 +4,8 @@ from neo4j import Driver, Result
 import uuid
 import pandas as pd 
 import datetime
+
+from pydantic import BaseModel
 from config.models.searches import FulltextSearchResult
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.runs import RunListModel, AnalyticRunModel
@@ -424,50 +426,46 @@ class Neo4JSubmissions(SubmissionsABC):
         self,
         tag: str,
         quantifications: List[ProteinGroupQuantificationModel],
-        batch_size: int = 1000
+        batch_size: int = 600
         ) -> int:
 
         quantifications_data = [x.model_dump() for x in quantifications]
 
-        # ---- 2. group by sample_tag ----
-        grouped = defaultdict(list)
+        # class ProteinGroupQuantificationModel(BaseModel):
+        #         tag : str # Protein group tag 
+        #         sample_tag : str # Sample tag 
+        #     value : float  # Quantification value (intensity, such as LFQ, iBAQ, TMT, etc)
 
-        for q in quantifications_data:
-            grouped[q["sample_tag"]].append(q)
-
+        # class ProteinQuantificationBulkInsertModel(BaseModel):
+        #     quantifications: List[ProteinGroupQuantificationModel]
         # ---- 3. batch grouped data ----
         total = 0
 
         query = """
         CALL () {
-            WITH $batch AS batch, $tag AS tag
-            UNWIND keys(batch) AS sample_tag
-
-            MATCH (submission:Submission {tag: tag})
-            MATCH (sample:Sample {tag: sample_tag})<-[:HAS_SAMPLE]-(submission)
-
-            WITH sample, batch[sample_tag] AS quantifications, tag
-
-            UNWIND quantifications AS q
-
+            MATCH (submission:Submission {tag: $tag})
+            
+            UNWIND qs as q
+            
+            MATCH (sample:Sample {tag: q.sample_tag})<-[:HAS_SAMPLE]-(submission)
             MATCH (pg:ProteinGroup {tag: q.tag})
 
             CREATE (sample)-[r:QUANTIFIED]->(pg)
             SET r.value = q.value,
-                r.score = q.score,
-                r.submission_tag = tag,
-                r.created_at = timestamp()
-
+            r.created_at = timestamp()
             RETURN count(r) AS created
-        } IN TRANSACTIONS OF 200 ROWS
+            
+        } IN TRANSACTIONS OF 400 ROWS
+        
         RETURN sum(created) AS total
         """
-
-        for batch in chunk_dict(grouped, batch_size):
+        for i in range(0, len(quantifications_data), batch_size):
+            batch = quantifications_data[i:i+batch_size]
+        
             result = self._driver.session().run(
                 query,
                 tag=tag,
-                batch=batch
+                qs=batch
             )
 
             record = result.single()

@@ -10,6 +10,9 @@ DB = Database.DB()
 
 ONLY_LABEL = None   # set to a label string to migrate only one, or None to migrate all
 
+#  Migration 
+from services.encryption import create_hierarchical_hash
+import argparse
 
 # Inline models 
 
@@ -53,6 +56,7 @@ def build_position_attr(pos_data):
     if not pos_data:
         return None
     position_tag = pos_data.get("attribute_value", {}).get("tag")
+    position_tag = position_tag.split(":")[1] if position_tag and position_tag.startswith("att_protein_position:") else position_tag
     if not position_tag:
         return None
     aa_positions = pos_data.get("aa_position", [])
@@ -77,6 +81,7 @@ def build_position_attr(pos_data):
 
 
 def build_mutation_attr(mut_tag, pos_data):
+    mut_tag = mut_tag.split(":")[1] if mut_tag.startswith("att_protein_mutation:") else mut_tag
     position_attr = build_position_attr(pos_data) if pos_data else None
     trait_children = [position_attr] if position_attr else []
     if mut_tag in UNTARGETED_MUTATIONS:
@@ -96,18 +101,18 @@ def build_component(attr_block):
     eng_tag      = attr_block["att_gene_engineering"][0]["tag"]
     method_tag   = attr_block["att_gene_editing_method"][0]["tag"] if "att_gene_editing_method" in attr_block else "att_gene_editing_method:crispr"
     raw_zyg      = attr_block["att_gene_zygosity"][0]["tag"]
-    zygosity_tag = ZYGOSITY_MAP.get(raw_zyg, raw_zyg)
+    zygosity_tag = f"att_gene_zygosity:{ZYGOSITY_MAP.get(raw_zyg.split(':')[1], raw_zyg.split(':')[1])}"
     mutations    = attr_block.get("att_protein_mutation", [])
     positions    = attr_block.get("att_protein_position", {})
 
     zygosity_attr = AttributeTree(
         tag="att_gene_zygosity", type="attribute",
-        children=[AttributeTree(tag=f"att_gene_zygosity:{zygosity_tag}", type="trait", children=[])]
+        children=[AttributeTree(tag=zygosity_tag, type="trait", children=[])]
     )
     mutation_attrs = [build_mutation_attr(mut["tag"], positions.get(mut["tag"])) for mut in mutations]
     method_attr = AttributeTree(
         tag="att_gene_editing_method", type="attribute",
-        children=[AttributeTree(tag=f"att_gene_editing_method:{method_tag}", type="trait", children=mutation_attrs)]
+        children=[AttributeTree(tag=method_tag, type="trait", children=mutation_attrs)]
     )
     proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag=protein_key)  # check if protein exists, will raise exception if not
     
@@ -121,15 +126,11 @@ def build_component(attr_block):
     return AttributeTree(
         tag="att_gene_engineering", type="attribute",
         children=[AttributeTree(
-            tag=f"att_gene_engineering:{eng_tag}", type="trait",
+            tag=eng_tag, type="trait",
             children=[zygosity_attr, method_attr, protein_attr]
         )]
     )
 
-
-#  Migration 
-from services.encryption import create_hierarchical_hash
-import argparse
 
 class MigrateGenotypes:
 
@@ -176,7 +177,7 @@ class MigrateGenotypes:
                 components=components
             )
             genotype_tag = create_hierarchical_hash([c.model_dump() for c in model.components])
-            
+            print(genotype_tag)
             try:
                 ok = DB.genotypes.insert(model, user_tag=self.fallback_user_tag, tag = genotype_tag) #old DB had no user assignment for genotypes, so we assign to fallback user.
                 if ok:

@@ -191,10 +191,12 @@ class Neo4JAnnotations(AnnotationsABC):
         - "protein_delimiter": ";" — splits multi-protein cells
         - "reviewed_filter": true — for multi-protein cells, keeps only proteins that are reviewed in the DB
         """
+        print(user_tag)
         config = read_json(file_path)
 
         if "groups" not in config:
             raise ValueError("JSON file must have a 'groups' key.")
+
 
         for group_config in config["groups"]:
             ag = group_config["annotation_group"]
@@ -228,7 +230,8 @@ class Neo4JAnnotations(AnnotationsABC):
                 routing_="w",
                 result_transformer_=Result.value,
             )
-            group_tag = r[0]
+    
+            print(r, user_tag)
             print(f"  Annotation group '{ag['text']}' ({group_tag}) ready.")
 
             for entry in group_config["annotations"]:

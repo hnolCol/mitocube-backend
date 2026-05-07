@@ -319,7 +319,6 @@ class MigrateData:
                 ### upoad quantification data. 
                 if df is not None:
                     df_melt = df.reset_index(names="tag").melt(id_vars=["tag"], var_name="sample_tag", value_name="value").dropna(subset=["value"])
-                    print(df_melt)
                     df_melt = df_melt.dropna(subset=["tag","value"])
                     df_melt["value"] = pd.to_numeric(df_melt["value"], errors="coerce")
                     df_melt = df_melt[
@@ -330,7 +329,7 @@ class MigrateData:
                     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
                     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
-                    time.sleep(1) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
+                    time.sleep(0.3) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
                     print(f"Quantification data for submission {submission_tag} inserted and processed successfully.")
 
                 ### migrate runlist if exists
@@ -350,7 +349,7 @@ class MigrateData:
                             instrument_tag = ms_instruments[0]
                     
                     runlist_model = RunListModel(
-                        user_tag=old_runlist["user_tag"],
+                        user_tag=old_runlist["user_label"],
                         dataset_label=old_runlist["dataset_label"],
                         n_runs=old_runlist["n_runs"],
                         n_plates=old_runlist["n_plates"],
