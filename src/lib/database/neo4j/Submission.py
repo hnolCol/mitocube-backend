@@ -950,49 +950,87 @@ class Neo4JSubmissions(SubmissionsABC):
     
 
     def insert_runlist(self, submission_tag: str, runlist: RunListModel, user_tag: str) -> bool:
-
         rl_tag = get_random_string(N=10)
         
-       
-        query = (
-            "MATCH (submission:Submission {tag: $submission_tag}) "
-            "WITH submission "
-            "MATCH (u:User {tag: $user_tag}) "
-            "MATCH (inst:Trait {tag: $instrument_tag}) "
-            "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
-            "   dataset_label: $dataset_label, n_runs: $n_runs, n_plates: $n_plates, "
-            "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
-            "   fractionated: $fractionated, n_fractions: $n_fractions, "
-            "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
-            "MERGE (submission)-[:HAS_RUNLIST]->(rl) "
-            "MERGE (u)-[:CREATED]->(rl) "
-            "MERGE (rl)-[:MEASURED_BY]->(inst) "
-            "WITH rl "
-            "UNWIND $runs AS run "
-            "CREATE (r:Run {tag: randomUUID(), text: run.name, "
-            "   index: run.index, measurement_index: run.measurement_index, "
-            "   plate_index: run.plate_index, row_index: run.row_index, "
-            "   column_index: run.column_index, position_label: run.position_label, "
-            "   sample_index: run.index}) "
-            "MERGE (rl)-[:HAS_RUN]->(r) "
-        )
-        self._driver.execute_query(
-            query, routing_="w",
-            submission_tag=submission_tag,
-            user_tag=user_tag,
-            rl_tag=rl_tag,
-            instrument_tag=runlist.instrument_tag,
-            dataset_label=runlist.dataset_label,
-            n_runs=runlist.n_runs,
-            n_plates=runlist.n_plates,
-            scrambled=runlist.scrambled,
-            scrambled_across_plates=runlist.scrambled_across_plates,
-            fractionated=runlist.fractionated,
-            n_fractions=runlist.n_fractions,
-            aggregated_on=runlist.aggregated_on,
-            runs=[r.model_dump() for r in runlist.runs]
-        )
-
+        # Build the Cypher query based on whether an instrument relationship should be created or not
+        if runlist.instrument_tag is not None:
+            # Query WITH instrument relationship
+            query = (
+                "MATCH (submission:Submission {tag: $submission_tag}) "
+                "WITH submission "
+                "MATCH (u:User {tag: $user_tag}) "
+                "MATCH (inst:Trait {tag: $instrument_tag}) "
+                "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
+                "   dataset_label: $dataset_label, n_runs: $n_runs, n_plates: $n_plates, "
+                "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
+                "   fractionated: $fractionated, n_fractions: $n_fractions, "
+                "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
+                "MERGE (submission)-[:HAS_RUNLIST]->(rl) "
+                "MERGE (u)-[:CREATED]->(rl) "
+                "MERGE (rl)-[:MEASURED_BY]->(inst) "
+                "WITH rl "
+                "UNWIND $runs AS run "
+                "CREATE (r:Run {tag: randomUUID(), text: run.name, "
+                "   index: run.index, measurement_index: run.measurement_index, "
+                "   plate_index: run.plate_index, row_index: run.row_index, "
+                "   column_index: run.column_index, position_label: run.position_label, "
+                "   sample_index: run.index}) "
+                "MERGE (rl)-[:HAS_RUN]->(r) "
+            )
+            params = {
+                "submission_tag": submission_tag,
+                "user_tag": user_tag,
+                "rl_tag": rl_tag,
+                "instrument_tag": runlist.instrument_tag,
+                "dataset_label": runlist.dataset_label,
+                "n_runs": runlist.n_runs,
+                "n_plates": runlist.n_plates,
+                "scrambled": runlist.scrambled,
+                "scrambled_across_plates": runlist.scrambled_across_plates,
+                "fractionated": runlist.fractionated,
+                "n_fractions": runlist.n_fractions,
+                "aggregated_on": runlist.aggregated_on,
+                "runs": [r.model_dump() for r in runlist.runs]
+            }
+        else:
+            # Query WITHOUT instrument relationship
+            query = (
+                "MATCH (submission:Submission {tag: $submission_tag}) "
+                "WITH submission "
+                "MATCH (u:User {tag: $user_tag}) "
+                "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
+                "   dataset_label: $dataset_label, n_runs: $n_runs, n_plates: $n_plates, "
+                "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
+                "   fractionated: $fractionated, n_fractions: $n_fractions, "
+                "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
+                "MERGE (submission)-[:HAS_RUNLIST]->(rl) "
+                "MERGE (u)-[:CREATED]->(rl) "
+                "WITH rl "
+                "UNWIND $runs AS run "
+                "CREATE (r:Run {tag: randomUUID(), text: run.name, "
+                "   index: run.index, measurement_index: run.measurement_index, "
+                "   plate_index: run.plate_index, row_index: run.row_index, "
+                "   column_index: run.column_index, position_label: run.position_label, "
+                "   sample_index: run.index}) "
+                "MERGE (rl)-[:HAS_RUN]->(r) "
+            )
+            params = {
+                "submission_tag": submission_tag,
+                "user_tag": user_tag,
+                "rl_tag": rl_tag,
+                "dataset_label": runlist.dataset_label,
+                "n_runs": runlist.n_runs,
+                "n_plates": runlist.n_plates,
+                "scrambled": runlist.scrambled,
+                "scrambled_across_plates": runlist.scrambled_across_plates,
+                "fractionated": runlist.fractionated,
+                "n_fractions": runlist.n_fractions,
+                "aggregated_on": runlist.aggregated_on,
+                "runs": [r.model_dump() for r in runlist.runs]
+            }
+        
+        self._driver.execute_query(query, routing_="w", **params)
+        
         # Link each Run to its Sample via sample_index
         query_measures = (
             "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "

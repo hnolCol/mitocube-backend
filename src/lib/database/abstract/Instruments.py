@@ -57,6 +57,14 @@ class InstrumentsABC(ABC):
         List[InstrumentModel]
             
         """
+    
+    @abstractmethod
+    def get_types_text(self, limit: int = 50) -> List[dict]:
+        """Returns instrument type text"""
+        
+    @abstractmethod
+    def get_text(self, instrument_type: str = None) -> List[dict]:
+        """Returns instruments text"""
         
         
     @abstractmethod

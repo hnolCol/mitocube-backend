@@ -188,7 +188,7 @@ class MigrateGenotypes:
             except Exception as e:
                 print(f"Error inserting genotype {label}: {e}")
                 continue
-        print(b)
+
         with open("label_to_tag.json", "w") as f:
             json.dump(label_to_tag, f, indent=2)
         print(f"Label to tag mapping saved to label_to_tag.json")
