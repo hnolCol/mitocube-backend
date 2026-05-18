@@ -79,6 +79,7 @@ def get_submission_by_query(state : str|int = None,
                             limit : int = 20, 
                             ordered : bool = True,
                             group_by_state : bool = True,
+                            group_by_user : bool = False,
                             user : UserModel = Depends(get_user_from_token)
                             ) -> List[str]| Dict[str|int, List[str]]: 
     """Returns the submissions that match a given filter. 
@@ -140,6 +141,9 @@ def get_submission_by_query(state : str|int = None,
     if group_by_state:
         #group by state
         tags = DB.submission_filter.group_by_state(tags = tags)
+    if group_by_user:
+        #group by user
+        tags = DB.submission_filter.group_by_user(tags = tags)
     return tags 
     
 

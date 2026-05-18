@@ -316,13 +316,13 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0]
 
 
-    def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None) -> bool:
+    def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None, created_at : float = None) -> bool:
         ""
         if self.exists(tag):
             raise ValueError("Submission with this tag already exists. Use the update function to update the submission.")
         query = (
             "MERGE (submission:Submission {tag : $tag}) "
-            "SET submission.title = $title, submission.created_at = timestamp(), submission.user_tag = $user_tag "
+            "SET submission.title = $title, submission.created_at = coalesce($created_at, timestamp()), submission.user_tag = $user_tag "
             "WITH submission "
             "MATCH (u:User {tag : $user_tag}) "
             "MERGE (u)-[:CREATED]->(submission) "
@@ -332,7 +332,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "MERGE (submission)<-[:COLLABORATES]-(c) "
         )
         
-        self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators)
+        self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators, created_at = created_at)
         
     def insert_view(self, tag : str, user_tag : str) -> bool:
         "Inserts a view for a submission."
@@ -1246,7 +1246,43 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         r = self._driver.execute_query(query, tags = tags, routing_="r", database_="neo4j", result_transformer_=Result.data)
         return dict((ri.get("state_tag"),ri.get("submission_tags")) for ri in r)
     
+    def group_by_user(self, tags = None) -> Dict[str, List[str]]:
+        """Groups the submissions by their creator user and returns the counts of each user.
 
+        Parameters
+        ----------
+        tags : List[str]
+            The submission tags to use. If None, all tags in the database are used.
+            If tags is an empty list, an empty dictionary is returned.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary with the user tag as key and a list of submission tags as value.
+            The keys are the user tags and the values are lists of submission tags.
+            If no submissions are found, an empty dictionary is returned.
+            
+        Raises
+        ------
+        TypeError
+            If the tags parameter is not a list of strings or None.
+        """
+        
+        if tags is not None and not isinstance(tags, list):
+            raise TypeError("The tags parameter must be a list of strings or None.")
+        elif len(tags) == 0:
+            return {}
+        
+        query = "MATCH (u:User)-[:CREATED]->(submission:Submission) "
+        
+        if tags is not None:
+            query += "WHERE submission.tag in $tags "
+        
+        query += "RETURN u.tag AS user_tag, collect(submission.tag) AS submission_tags "
+
+        r = self._driver.execute_query(query, tags = tags, routing_="r", database_="neo4j", result_transformer_=Result.data)
+        return dict((ri.get("user_tag"),ri.get("submission_tags")) for ri in r) 
+    
 
     def filter_by_trait_tags(self, trait_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""

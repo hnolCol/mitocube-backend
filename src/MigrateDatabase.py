@@ -278,7 +278,8 @@ class MigrateData:
                 ok = DB.submissions.insert(tag = submission_insert_model.tag,
                         title = submission_insert_model.title,
                         user_tag = submission_insert_model.user_tag,
-                        collaborators = submission_insert_model.collaborators)
+                        collaborators = submission_insert_model.collaborators,
+                        created_at = metatext["created_on"] if "created_at" in metatext else None)
                 if ok: 
                     print("Submission inserted successfully.")
                 DB.submissions.insert_attributes(tag = submission_insert_model.tag, traits = submission_insert_model.dataset_attributes) 
