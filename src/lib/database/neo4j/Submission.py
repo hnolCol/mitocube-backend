@@ -1318,20 +1318,24 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return [ri.value() for ri in r] 
     
     def filter_by_genotype_tags(self, genotype_tag : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
-        ""
+        """Filters submissions by genotype tags through the Sample relationship."""
         query = (
-            "MATCH (g:Genotype) "
-            "WHERE g.tag in $genotype_tags "
-            "MATCH (g)<-[:HAS_GENOTYPE]-(submission:Submission) "
-            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "RETURN DISTINCT submission.tag "
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
+            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} "
+            "WITH submission, COLLECT(DISTINCT g.tag) AS genotype_tags "
+            "WHERE ALL(genotype_tag IN $genotype_tag WHERE genotype_tag IN genotype_tags) "
+            "WITH DISTINCT submission "
         )
+
         if ordered:
             query += "ORDER BY submission.created_at DESC "
-        query = self._add_limit(query,limit)
+
+        query += "RETURN submission.tag "
+
+        query = self._add_limit(query, limit)
+        r,_,_ = self._driver.execute_query(query, genotype_tag=genotype_tag, submission_tags = submission_tags, limit = limit)
         
-        r,_,_ = self._driver.execute_query(query, genotype_tags = genotype_tag, submission_tags = submission_tags, limit = limit)
-        return [ri.value() for ri in r] 
+        return [ri.value() for ri in r]
 
     def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
@@ -1408,14 +1412,77 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
  
         return tags 
     
+    def filter_by_condition_applications(
+        self, 
+        attribute_tag: List[str] = None,
+        trait_tag: List[str] = None,
+        submission_tags: List[str] = None, 
+        include_sample_ca : bool = False,
+        limit: int = None, 
+        ordered: bool = True
+    ) -> List[str]:
+        if include_sample_ca:
+        # Match submission-level AND sample-level CAs
+            query = (
+                "MATCH (submission:Submission) "
+                f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} "
+                "WHERE EXISTS { "
+                "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+            )
+            if attribute_tag is not None:
+                query += "  WHERE attr.tag IN $attribute_tag "
+            if trait_tag is not None:
+                query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
+            query += (
+                "} OR EXISTS { "
+                "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+            )
+            if attribute_tag is not None:
+                query += "  WHERE attr.tag IN $attribute_tag "
+            if trait_tag is not None:
+                query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
+            query += "} RETURN DISTINCT submission.tag AS submission_tag "
+        else:
+            # Only submission-level CAs
+            query = (
+                "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+                f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} "
+            )
+            
+            if trait_tag is not None:
+                query += (
+                    "MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) "
+                    "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags, COLLECT(DISTINCT trait.tag) AS trait_tags "
+                    "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
+                    "AND ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
+                    "RETURN DISTINCT submission.tag AS submission_tag "
+                )
+            else:
+                query += (
+                    "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags "
+                    "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
+                    "RETURN DISTINCT submission.tag AS submission_tag "
+                )
+        
+        if ordered:
+            query += "ORDER BY submission_tag DESC "
+        query = self._add_limit(query, limit)
+        
+        r = self._driver.execute_query(query, attribute_tag=attribute_tag, trait_tag=trait_tag, 
+                                    submission_tags=submission_tags, limit=limit, 
+                                    result_transformer_=Result.value)
+        return r
+            
     def find(self, 
             search_string : str = None,
             state : List[int] = None, 
             trait_tags : List[str] = None, 
             attribute_tag : List[str]= None, 
+            trait_tag : List[str] = None,
             user_tags : List[str] = None, 
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
+            include_sample_ca : bool = False,   
             ordered : bool = True,
             limit : int = 10) -> List[str]:
         """Returns a list of submission tags that match the given filters."""
@@ -1436,13 +1503,28 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tags,protein_tag]) else None
             tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_, ordered=ordered)
 
+        if attribute_tag is not None or trait_tag is not None:
+            limit_ = limit if all(attr is None for attr in [trait_tags, user_tags, protein_tag]) else None
+            tags = self.filter_by_condition_applications(
+                attribute_tag=attribute_tag,
+                trait_tag=trait_tag,
+                submission_tags=tags,
+                include_sample_ca= include_sample_ca,
+                limit=limit_,
+                ordered=ordered
+            )
+
         if trait_tags is not None:
             limit_ = limit if all(attr is None for attr in [attribute_tag,user_tags,protein_tag]) else None
             tags = self.filter_by_attribute_value_tags(trait_tags,submission_tags=tags,limit=limit_, ordered=ordered)
 
-        if attribute_tag is not None:
-            limit_ = limit if all(attr is None for attr in [user_tags,protein_tag]) else None
-            tags = self.filter_by_attribute_tags(attribute_tag,submission_tags=tags,limit=limit_, ordered=ordered)
+        # if attribute_tag is not None:
+        #     limit_ = limit if all(attr is None for attr in [user_tags,protein_tag]) else None
+        #     tags = self.filter_by_attribute_tags(attribute_tag,submission_tags=tags,limit=limit_, ordered=ordered)
+
+        # if trait_tag is not None:
+        #     limit_ = limit if all(attr is None for attr in [attribute_tag,user_tags,protein_tag]) else None
+        #     tags = self.filter_by_trait_tags(trait_tag,submission_tags=tags,limit=limit_, ordered=ordered)
 
         if user_tags is not None:
             limit_ = limit if protein_tag is None else None
