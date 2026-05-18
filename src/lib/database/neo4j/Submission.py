@@ -1381,28 +1381,52 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         attribute_tag: List[str] = None,
         trait_tag: List[str] = None,
         submission_tags: List[str] = None, 
+        include_sample_ca : bool = False,
         limit: int = None, 
         ordered: bool = True
     ) -> List[str]:
-        query = (
-            "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
-            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} "
-        )
-        
-        if trait_tag is not None:
-            query += (
-                "MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) "
-                "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags, COLLECT(DISTINCT trait.tag) AS trait_tags "
-                "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
-                "AND ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
-                "RETURN DISTINCT submission.tag AS submission_tag "
+        if include_sample_ca:
+        # Match submission-level AND sample-level CAs
+            query = (
+                "MATCH (submission:Submission) "
+                f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} "
+                "WHERE EXISTS { "
+                "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
             )
+            if attribute_tag is not None:
+                query += "  WHERE attr.tag IN $attribute_tag "
+            if trait_tag is not None:
+                query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
+            query += (
+                "} OR EXISTS { "
+                "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+            )
+            if attribute_tag is not None:
+                query += "  WHERE attr.tag IN $attribute_tag "
+            if trait_tag is not None:
+                query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
+            query += "} RETURN DISTINCT submission.tag AS submission_tag "
         else:
-            query += (
-                "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags "
-                "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
-                "RETURN DISTINCT submission.tag AS submission_tag "
+            # Only submission-level CAs
+            query = (
+                "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+                f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} "
             )
+            
+            if trait_tag is not None:
+                query += (
+                    "MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) "
+                    "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags, COLLECT(DISTINCT trait.tag) AS trait_tags "
+                    "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
+                    "AND ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
+                    "RETURN DISTINCT submission.tag AS submission_tag "
+                )
+            else:
+                query += (
+                    "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags "
+                    "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
+                    "RETURN DISTINCT submission.tag AS submission_tag "
+                )
         
         if ordered:
             query += "ORDER BY submission_tag DESC "
@@ -1422,6 +1446,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_tags : List[str] = None, 
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
+            include_sample_ca : bool = False,   
             ordered : bool = True,
             limit : int = 10) -> List[str]:
         """Returns a list of submission tags that match the given filters."""
@@ -1448,6 +1473,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 attribute_tag=attribute_tag,
                 trait_tag=trait_tag,
                 submission_tags=tags,
+                include_sample_ca= include_sample_ca,
                 limit=limit_,
                 ordered=ordered
             )

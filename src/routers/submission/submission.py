@@ -77,6 +77,7 @@ def get_submission_by_query(state : str|int = None,
                             trait_tag : str = None,
                             genotype_tag : str = None, 
                             user_tags : str = None,
+                            include_sample_ca : bool = False,
                             limit : int = 20, 
                             ordered : bool = True,
                             group_by_state : bool = True,
@@ -135,6 +136,7 @@ def get_submission_by_query(state : str|int = None,
             protein_tag=APIParamString(param=feature_key).param,
             user_tags=APIParamString(param=user_tags).param,
             genotype_tag = APIParamString(param=genotype_tag).param,
+            include_sample_ca = include_sample_ca,
             ordered = ordered,
             limit = limit
             )
@@ -957,6 +959,7 @@ def get_submission_query_count(
     attribute_tag : str = None, 
     genotype_tag : str = None, 
     user_tags : str = None,
+    include_sample_ca : bool = False,
     user : UserModel = Depends(get_user_from_token)
 ) -> Dict[str, int]:
     """Returns counts for submission queries.
@@ -980,6 +983,7 @@ def get_submission_query_count(
         protein_tag = APIParamString(param=feature_key).param,
         user_tags = APIParamString(param=user_tags).param,
         genotype_tag = APIParamString(param=genotype_tag).param,
+        include_sample_ca = include_sample_ca,
         ordered = False, 
         limit = None  
     )
