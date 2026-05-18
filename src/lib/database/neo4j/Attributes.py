@@ -921,7 +921,7 @@ class Neo4JAttributes(AttributesABC):
         if min_state is not None:
             where_clauses.append("EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag <= $min_state}")
         if attribute_groups is not None:
-            where_clauses.append("EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a)} WHERE ag.tag IN $attribute_groups")
+            where_clauses.append("EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups}")
 
         if where_clauses:
             query += "WHERE " + " AND ".join(where_clauses) + " "
