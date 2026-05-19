@@ -112,6 +112,17 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         ca = self.get(tag)
         return build_condition_application_tree(ca)
 
+    def get_trait(self, tag : str) -> str:
+        "Return the trait tag of the condition application. Only the first level trait is returned."
+        if not self.exists(tag):
+            return None
+        query = (
+            "MATCH (ca:ConditionApplication {tag : $ca_tag})-[:INSTANCE_OF]->(t:Trait) "
+            "RETURN t.tag "
+        )
+
+        r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
 
 
     def extract_ca_item(self, item : ConditionApplicationTreeModel, add_separator = False) -> str:
@@ -293,18 +304,33 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         """
         
         
-    def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
-        "Returns the tags of matching condition applications."
+    def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, protein_tags : List[str] = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
+        """Returns the tags of matching condition applications.
+        
+        If protein_tags given, all other filters are ignored. 
+        """
         
         query = "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(:Sample|Submission)"
-        if search_string is not None and search_string != "":
+        if protein_tags is not None and len(protein_tags) > 0: 
+            
+            query = (
+                "MATCH (ca:ConditionApplication)<-[:HAS_VALUE*0..]->(:ConditionValue)-[r:EFFECTS]->(p:Protein) "
+                "WHERE p.tag IN $protein_tags "
+                "WITH DISTINCT ca.tag AS tag, count(r) AS freq "
+            )
+            
+            
+        elif search_string is not None and search_string != "":
             
             query += ("MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
                       "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
                       "WITH ca, a, t, r WHERE t.s CONTAINS $search_string OR a.s CONTAINS $search_string")
             if samples_only:
                 query += " AND EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)} "
+        
+        
         else:
+            
             if samples_only:
                 if submission_tag is not None:
                     query += "WHERE EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "

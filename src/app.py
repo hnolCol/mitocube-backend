@@ -147,8 +147,8 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 DB = Database.DB()
 
 #check for users, essentially, create admin user if no users exists with the defined admin email.
-
-
+# r = DB.proteins.get_favorite_proteins(user_tag = "fOtsqZCP", annotation_tags=["ahsHe"]) #this is to check if the database connection works, and to initialize the database if it is not initialized yet. This is necessary to avoid issues with the first user creation, which requires a database connection.
+# print(r)
 
 
 origins = [

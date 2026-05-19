@@ -47,7 +47,7 @@ class Neo4JProteins(ProteinsABC):
         return r[0]
     
     
-    def find(self, search_string : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, limit : int = 100) -> List[str]:
+    def find(self, search_string : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, is_condition_value : bool = False, limit : int = 100) -> List[str]:
         ""
         where_conditions = []
         query = "MATCH (p:Protein) "
@@ -58,7 +58,8 @@ class Neo4JProteins(ProteinsABC):
             where_conditions.append("p.s CONTAINS $search_string")
         if proteome_tags is not None and len(proteome_tags) > 0:
             where_conditions.append("p.proteome_tag IN $proteome_tags")
-        
+        if is_condition_value:
+            where_conditions.append("EXISTS {(cv:ConditionValue)-[:EFFECTS]->(p)}")
         if where_conditions:
             query += "WHERE " + " AND ".join(where_conditions) + " "
         
@@ -82,7 +83,114 @@ class Neo4JProteins(ProteinsABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return FeatureNeoModel(**r[0])
   
-  
+    def get_favorite_proteins(self, submission_tags : List[str] = None, annotation_tags : List[str] = None, proteome_tags : List[str] = None, user_tag : str = None, limit : int = 40) -> List[str]:
+        ""
+        where_conditions = []
+        score_conditions = []
+
+        query = "MATCH (p:Protein) "
+
+        # -------------------------
+        # FILTER CONDITIONS
+        # -------------------------
+
+        if submission_tags:
+            where_conditions.append(
+                """
+                EXISTS {
+                    (p)<-[:HAS_PROTEINS]-(pg:ProteinGroup)
+                        <-[:QUANTIFIED]-(:Sample)
+                        <-[:HAS_SAMPLE]-(submission:Submission)
+                    WHERE submission.tag IN $submission_tags
+                }
+                """
+            )
+
+        if annotation_tags:
+            where_conditions.append(
+                """
+                EXISTS {
+                    (p)<-[:ANNOTATES]-(a:Annotation)
+                    WHERE a.tag IN $annotation_tags
+                }
+                """
+            )
+
+        if proteome_tags:
+            where_conditions.append(
+                """
+                EXISTS {
+                    (p)-[:IN_PROTEOME]->(pr:Proteome)
+                    WHERE pr.tag IN $proteome_tags
+                }
+                """
+            )
+
+        if where_conditions:
+            query += "WHERE " + " AND ".join(where_conditions) + " "
+
+        # -------------------------
+        # SCORE CONDITIONS
+        # -------------------------
+
+        if user_tag is not None:
+
+            score_conditions.append(
+                """
+                CASE
+                    WHEN EXISTS {
+                        (p)<-[:FAVOURS]-(:User {tag: $user_tag})
+                    }
+                    THEN 1 ELSE 0
+                END
+                """
+            )
+
+            score_conditions.append(
+                """
+                CASE
+                    WHEN EXISTS {
+                        (p)<-[:EFFECTS]-(:Genotype)
+                            <-[:CREATED]-(:User {tag: $user_tag})
+                    }
+                    THEN 1 ELSE 0
+                END
+                """
+            )
+
+        # -------------------------
+        # RETURN
+        # -------------------------
+
+        if score_conditions:
+            score_expression = " + ".join(score_conditions)
+        else:
+            score_expression = "0"
+
+        query += f"""
+        RETURN
+            p.tag AS tag,
+            ({score_expression}) AS condition_count
+        ORDER BY condition_count DESC
+        """
+
+        if limit is not None:
+            query += "LIMIT $limit"
+
+        r = self._driver.execute_query(
+            query,
+            submission_tags=submission_tags,
+            annotation_tags=annotation_tags,
+            user_tag=user_tag,
+            limit=limit,
+            routing_="r",
+            result_transformer_=Result.value
+        )
+
+        return r
+    
+    
+    
     def get_gene_name(self, tag : str) -> str:
         query = (
             "MATCH (p:Protein {tag : $tag}) "

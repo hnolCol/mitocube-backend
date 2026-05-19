@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 import pandas as pd 
 import numpy as np 
-from typing import List, Dict 
+from typing import List, Dict, OrderedDict, defaultdict
 
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationTreeResponseModel, ConditionApplicationTreeModel
@@ -21,7 +21,14 @@ router = APIRouter(
 
 
 @router.get("/q")
-def query_condition_applications(search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, sort_by_frequency : bool = True, limit : int = None, user : UserModel = Depends(get_user_from_token)):
+def query_condition_applications(search_string : str = None, 
+                                 samples_only : bool = True, 
+                                 protein_tags : str = None, 
+                                 submission_tag : str = None, 
+                                 attribute_tag : str = None, 
+                                 trait_tag : str = None, 
+                                 sort_by_frequency : bool = True, 
+                                 limit : int = None, user : UserModel = Depends(get_user_from_token)):
     """Query condition applications based on different criteria.
     
     Parameters
@@ -47,12 +54,53 @@ def query_condition_applications(search_string : str = None, samples_only : bool
         
     """
 
-    ca_tags = DB.condition_applications.find(search_string = search_string, samples_only = samples_only, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
+    ca_tags = DB.condition_applications.find(search_string = search_string, samples_only = samples_only, protein_tags = protein_tags, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
 
 
     return ca_tags
 
 
+
+@router.get("q/hierarchical")
+def ca_hierarchy(search_string : str,  user : UserModel = Depends(get_user_from_token)) -> List[Dict]:
+    
+    protein_tags = DB.proteins.find(search_string=search_string, is_condition_value=True)
+    ca_tags_with_protein_value = DB.condition_applications.find(protein_tags = protein_tags,sort_by_frequency = True)
+    ca_tags_by_search_string = DB.condition_applications.find(search_string = search_string, samples_only = False, sort_by_frequency = True)
+    ca_tags = ca_tags_with_protein_value + [ca_tag for ca_tag in ca_tags_by_search_string if ca_tag not in ca_tags_with_protein_value]
+    tree = defaultdict(lambda: defaultdict(list))
+
+    for ca in ca_tags:
+        attr = DB.condition_applications.get_attribute(ca)  # ideally pre-fetched
+        trait = DB.condition_applications.get_trait(ca)
+
+        tree[attr][trait].append(ca)
+    
+    result = [
+        {
+            "type": "attribute",
+            "tag": attr,
+            "children": [
+                {
+                    "type": "trait",
+                    "tag": trait,
+                    "children": ca_list
+                }
+                for trait, ca_list in traits.items()
+            ]
+        }
+        for attr, traits in tree.items()
+    ]
+    return result
+
+        
+        
+            
+            
+    
+    
+    
+ 
 @router.get("/{ca_tag}")
 def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[ConditionApplicationTreeResponseModel]:
     """Returns the condition application by its tag. 

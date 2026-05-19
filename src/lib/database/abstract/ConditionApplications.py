@@ -69,7 +69,9 @@ class ConditionApplicationABC(ABC):
     @abstractmethod
     def get_attribute(self, tag: str) -> str:
         "Return the attribute tag of the condition application. Only the first level attribute is returned."  
-    
+        
+        
+        
     @abstractmethod
     def get_tree(self, tag : str) -> ConditionApplicationTreeModel:
         """Returns a hierarchical tree representation of the condition application.
@@ -82,7 +84,11 @@ class ConditionApplicationABC(ABC):
     @abstractmethod
     def get_text(self, tag : str) -> str:
         "Return a human-readable text representation of the condition application."
-
+    
+    @abstractmethod
+    def get_trait(self, tag: str) -> str:
+        "Return the trait tag of the condition application. Only the first level trait is returned."  
+    
     @abstractmethod
     def insert(self, condition_application : AttributeTree, extra_data_for_hash : Dict = {}) -> bool:
         """Inserts a new condition application into the database.

@@ -42,7 +42,7 @@ class ProteinsABC(ABC):
         """
         
     @abstractmethod
-    def find(self, search_string : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, limit : int = 100) -> List[str]:
+    def find(self, search_string : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, limit : int = 100, is_condition_value : bool = False) -> List[str]:
         """Finds proteins by a search string.
 
         Parameters
@@ -77,6 +77,25 @@ class ProteinsABC(ABC):
             The protein model.
         """
         
+    @abstractmethod
+    def get_favorite_proteins(self, submission_tags : List[str] = None, annotation_tags : List[str] = None, user_tag : str = None, limit : int = 40) -> List[str]:
+        """Retrieves the most frequently quantified proteins across samples, optionally filtered by submission tags and annotation tags.
+
+        Parameters
+        ----------
+        submission_tags : List[str], optional
+            A list of submission tags to filter the proteins by (e.g. quantified in the given submission). If None, does not filter by submission tags, by default None.
+        annotation_tags : List[str], optional
+            A list of annotation tags to filter the proteins by. If None, does not filter by annotation tags, by default None.
+        limit : int, optional
+            The maximum number of results to return, by default 40.
+
+        Returns
+        -------
+        List[str]
+            A list of the most favorite protein tags that match the given criteria.
+        """    
+    
     @abstractmethod
     def get_gene_name(self, tag : str) -> str:
         """Retrieves the gene name of a protein by its tag.
