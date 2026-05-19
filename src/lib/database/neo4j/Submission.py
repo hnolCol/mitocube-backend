@@ -817,7 +817,14 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
     
-    
+    def get_proteomes(self, tag : str) -> List[str]:
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_APPLICATION]->(ca:ConditionApplication)<-[:OF_ATTRIBUTE]-(a:Attribute {tag : 'att_proteome'}) "
+            "MATCH (ca)-[:INSTANCE_OF]->(t:Trait)"
+            "RETURN t.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r
     
     def get_protein_group_quantification_count(self) -> pd.DataFrame:
         """Returns the number of protein group quantifications for each submission. 

@@ -47,23 +47,28 @@ class Neo4JProteins(ProteinsABC):
         return r[0]
     
     
-    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = 100) -> List[str]:
+    def find(self, search_string : str = None, submission_tags : List[str] = None, proteome_tags : List[str] = None, limit : int = 100) -> List[str]:
         ""
+        where_conditions = []
         query = "MATCH (p:Protein) "
+        
+        if submission_tags is not None and len(submission_tags) > 0:
+            where_conditions.append("EXISTS {(p)<-[:HAS_PROTEINS]-(pg:ProteinGroup)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission) WHERE submission.tag IN $submission_tags}")
         if search_string is not None:
-            query += "WHERE p.s CONTAINS $search_string "
+            where_conditions.append("p.s CONTAINS $search_string")
         if proteome_tags is not None and len(proteome_tags) > 0:
-            if search_string is not None:
-                query += "AND "
-            else:
-                query += "WHERE "
-            query += " p.proteome_tag IN $proteome_tags "
+            where_conditions.append("p.proteome_tag IN $proteome_tags")
+        
+        if where_conditions:
+            query += "WHERE " + " AND ".join(where_conditions) + " "
+        
         query += (
             "RETURN p.tag as tag "
             "ORDER BY COUNT { (p)--() } DESC "
-            "LIMIT $limit "
         )
-        r = self._driver.execute_query(query, search_string = search_string.lower() if search_string is not None else None, proteome_tags = proteome_tags, limit = limit, routing_="r", result_transformer_=Result.value)
+        if limit is not None:
+            query += "LIMIT $limit"
+        r = self._driver.execute_query(query, search_string = search_string.lower() if search_string is not None else None, proteome_tags = proteome_tags, submission_tags = submission_tags, limit = limit, routing_="r", result_transformer_=Result.value)
 
         return r
     

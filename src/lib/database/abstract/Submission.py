@@ -459,7 +459,20 @@ class SubmissionsABC(ABC):
         List[str]
             List of protein tags
         """
+    @abstractmethod
+    def get_proteomes(self, tag: str) -> List[str]:
+        """Returns the proteome tags that are associated with a submission. This can be used to filter the proteomes that are shown for a submission. Neo4J implementation.
 
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        List[str]
+            The proteome tags that are associated with the submission.
+        """
 
     @abstractmethod
     def edit_condition_applications(self, tag: str, attribute_trees: List[AttributeTree]) -> bool:

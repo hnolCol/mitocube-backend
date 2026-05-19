@@ -670,6 +670,12 @@ def update_submission(background_task : BackgroundTasks,
     return True
 
 
+@router.get("/submissions/{submission_tag}/proteomes")
+def get_submission_proteomes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    proteomes = DB.submissions.get_proteomes(tag=submission_tag)
+    return proteomes
+
+
 
 @router.get("/submissions/{submission_tag}/sampleattributes")
 def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
@@ -735,85 +741,6 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
     """
 
 
-
-
-# @router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
-# def get_dataset_runlist(submission_tag : str, runlist_props : RunListRequestPropsModel, user : UserModel = Depends(is_user_at_least_curator)): #
-#     """
-#     Creates a runlist for a specific dataset. 
-#     A run is defined as the actual run and the number can be different from the number samples since
-#     an online and or offline fractionation might be used. In addition, samples might be pooled when
-#     using TMT or SILAC based quantification. 
-
-#     Updates the submission model runlist parameter. 
-
-#     Parameters
-#     ----------
-#     submission_label : str 
-#         The label assigned to the submission. 
-#     runlist_props : RunlistRequestPropsModel 
-#         The properties how to create the runlist 
-#     user : UserModel
-#         The user which is extracted from the token information. The user cannot be submitted as a user model but
-#         is based on FastAPI Depends function. 
-
-#     Returns
-#     -------
-#     RunListResponseModel
-
-
-#     Raises
-#     ------
-#     HTTPException
-#         If there is a value error when creating the runlist. Please see for more information in the
-#         RunListCreator's create function. 
-
-#     """
-#     # db = MCDatabase.getDatabase()
-#     # attributes = MCAttributes.getAttributeDatabase()
-#     # attribute_values = attributes.getAttributeValues()
-#     # attribute_value_by_tag = dict(zip(attribute_values["tag"],attribute_values["value"]))
-#     # dataset = get_dataset_from_database(db,submission_label)
-    
-#     sample_idces, _ = dataset.getSamplesAttributes()
-    
-#     if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in sample_idces.columns: raise HTTPException(status_code=400,detail="Aggregate on sample attribute tag not found.")
-#     #extract the value of the sample attributes which is used to label the runnames. 
-#     for columnName in sample_idces.columns:
-#         sample_idces[columnName] = ["_".join([attrValueTag.split(":")[-1] for attrValueTag in sample_attrs.split(" ")]) for sample_attrs in sample_idces[columnName].values]
-#     try:
-#         runlist = RunListCreator(sample_list=sample_idces, 
-#                                  user = user,
-#                                  dataset_label=submission_label, 
-#                                  **runlist_props.model_dump()
-#                                  ).create()
-#         meta_data = dataset.getMetaJson().model_dump()
-#         #overwrite the json runlist. 
-#         meta_data["runlist"] = runlist
-#         #TODO: add a timeline entry
-#         updated_meta_data = DatasetSubmissionModel(**meta_data)
-#         dataset.write_json(updated_meta_data,update=True)
-#         response = RunListResponseModel(**runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
-#         return response 
-#     except ValueError as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-        
-    
-    
-    
-# @router.get("/submissions/{submission_label}/runlist", response_model=RunListResponseModel, tags = ["Runlist"])
-# def get_submission_runlist(submission_label : str, user : UserModel = Depends(get_user_from_token)) -> RunListResponseModel:
-#     db = MCDatabase.getDatabase()
-#     try: dataset = db.getDataset(label = submission_label) 
-#     except: raise tag_not_found
-#     metadata = dataset.getMetaJson()
-#     runlist = metadata.runlist
-#     if runlist is not None: 
-#         user_label = runlist.user_label 
-#         user_exists, user = UserDB.get_user_by_label(user_label)
-#         if user_exists:
-#             return RunListResponseModel(**metadata.runlist.model_dump(), user_email=user.email, user_firstname=user.firstname, user_lastname=user.lastname)
-#     raise HTTPException(status_code = 404, detail = "No runlist found.")
 
 
 

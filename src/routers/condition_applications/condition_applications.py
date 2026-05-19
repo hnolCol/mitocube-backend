@@ -49,6 +49,7 @@ def query_condition_applications(search_string : str = None, samples_only : bool
 
     ca_tags = DB.condition_applications.find(search_string = search_string, samples_only = samples_only, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
 
+
     return ca_tags
 
 

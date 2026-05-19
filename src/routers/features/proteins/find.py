@@ -22,7 +22,7 @@ router = APIRouter(
 
 
 @router.get("/q", summary="Finds proteins by search query.")
-def bulk_insert_protein_features(search_string : str, limit : int = None, proteome_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def bulk_insert_protein_features(search_string : str, limit : int = 50, submission_tags : str = None, proteome_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List[str]:
     """
     Bulk insert of new protein features. Requires curator rights.
     
@@ -32,6 +32,10 @@ def bulk_insert_protein_features(search_string : str, limit : int = None, proteo
         The search string to find proteins.
     limit : int, optional
         The limit of proteins to return, by default None
+    submission_tags : str, optional
+        Semicolon separated submission tags to filter the search (e.g. proteins quantified in specific submissions), by default None
+    proteome_tags : str, optional
+        Semicolon separated proteome tags to filter the search, by default None
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(is_user_at_least_cur
     Returns
@@ -39,5 +43,6 @@ def bulk_insert_protein_features(search_string : str, limit : int = None, proteo
     List[str]
        Protein tags
     """
-    return DB.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param)
+    print(submission_tags)
+    return DB.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param, submission_tags=APIParamString(param=submission_tags).param)
     

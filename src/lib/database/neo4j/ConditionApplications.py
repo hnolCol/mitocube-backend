@@ -83,6 +83,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                 "                   tag : n.tag, "
                 "                    trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
                 "                    attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0], "
+                "                    protein_tag : CASE WHEN [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0] = 'att_protein' THEN [(n)-[:EFFECTS]->(p:Protein) | p.tag][0] ELSE null END, "
                 "                    value : n.value      "           
                 "                    } "
                 "            ] "
@@ -184,7 +185,13 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         )
         if value is not None:
             query += "SET cv.value = $value "
-            
+        if attribute_tag == "att_protein" and value is not None:
+             query += (
+                "WITH ca,cv "
+                "MATCH (p:Protein {tag : $value}) "
+                "WITH ca,cv,p "
+                "MERGE (cv)-[:EFFECTS]->(p) "
+            )
         query += (
                 "WITH ca,cv "
                 "MERGE (a:Attribute {tag : $attribute_tag}) "
