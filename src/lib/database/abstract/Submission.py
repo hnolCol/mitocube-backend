@@ -603,6 +603,7 @@ class SubmissionFilterABC(ABC):
             state : List[int] = None, 
             trait_tags : List[str] = None, 
             attribute_tag : List[str]= None, 
+            ca_tags: List[str] = None,
             user_tag : List[str] = None, 
             protein_tag : List[str] = None, 
             genotype_tag : List[str] = None,
