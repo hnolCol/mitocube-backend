@@ -189,6 +189,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
     def insert_condition_value(self, parent_tag : str, attribute_tag : str, trait_tag : str, value : str|float|int = None, extra_data_for_hash : dict = {}) -> str:
         gcv_tag = create_hierarchical_hash(data = {"parent_tag" : parent_tag, "attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value, **extra_data_for_hash})         
         #gcv_tag = create_hierarchical_hash(data = {"attribute_tag" : attribute_tag, "trait_tag" : trait_tag, "value" : value, **extra_data_for_hash})
+        protein_tags = []
         query = (
             "MATCH (ca:ConditionApplication|ConditionValue {tag : $parent_tag}) "
             "MERGE (cv:ConditionValue {tag : $gcv_tag}) "
@@ -197,9 +198,10 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         if value is not None:
             query += "SET cv.value = $value "
         if attribute_tag == "att_protein" and value is not None:
+             protein_tags = value.split("||") if "||" in str(value) else [value]
              query += (
                 "WITH ca,cv "
-                "MATCH (p:Protein {tag : $value}) "
+                "MATCH (p:Protein) WHERE p.tag IN $protein_tags "
                 "WITH ca,cv,p "
                 "MERGE (cv)-[:EFFECTS]->(p) "
             )
@@ -214,7 +216,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                 "SET r.created_at = timestamp(), r.attribute_tag = $attribute_tag, r.trait_tag = $trait_tag"
             )
         
-        self._driver.execute_query(query, value = value, trait_tag = trait_tag, gcv_tag = gcv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag)
+        self._driver.execute_query(query, value = value, trait_tag = trait_tag, gcv_tag = gcv_tag, attribute_tag = attribute_tag, parent_tag = parent_tag, protein_tags = protein_tags, extra_data_for_hash = extra_data_for_hash, routing_="w", database_="neo4j")
 
         return gcv_tag
 
@@ -288,7 +290,23 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                 if len(child.get("children",[])) > 0:
                     self._handle_children(trait_node=child, parent_tag=hash_tag, extra_data_for_hash = extra_data_for_hash)     
         return hash_tag
-    
+
+    def has_value(self, tag: str) -> bool:
+        """Checks if the condition application has a value (i.e., is associated with a protein).
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the condition application to check.
+
+        Returns
+        -------
+        bool
+            True if the condition application has a value, False otherwise.
+        """
+        self._has_values(tag)
+
+
     def delete(self, tag: str) -> bool:
         """Deletes a condition application from the database.
 
@@ -306,31 +324,39 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         
     def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, protein_tags : List[str] = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
         """Returns the tags of matching condition applications.
-        
         If protein_tags given, all other filters are ignored. 
         """
         
-        query = "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(:Sample|Submission)"
         if protein_tags is not None and len(protein_tags) > 0: 
-            
             query = (
-                "MATCH (ca:ConditionApplication)<-[:HAS_VALUE*0..]->(:ConditionValue)-[r:EFFECTS]->(p:Protein) "
+                "MATCH (ca:ConditionApplication)-[:HAS_VALUE*0..]->(cv:ConditionValue)-[r:EFFECTS]->(p:Protein) "
                 "WHERE p.tag IN $protein_tags "
-                "WITH DISTINCT ca.tag AS tag, count(r) AS freq "
+                "RETURN ca.tag AS tag, count(r) AS freq "
             )
+            if sort_by_frequency:
+                query += "ORDER BY freq DESC "
+            if limit is not None:
+                query += "LIMIT $limit "
             
-            
-        elif search_string is not None and search_string != "":
-            
-            query += ("MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
-                      "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
-                      "WITH ca, a, t, r WHERE t.s CONTAINS $search_string OR a.s CONTAINS $search_string")
+            r = self._driver.execute_query(
+                query_=query, routing_="r",
+                protein_tags=protein_tags, limit=limit,
+                result_transformer_=Result.value
+            )
+            return r
+        
+        query = "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(:Sample|Submission) "
+        
+        if search_string is not None and search_string != "":
+            query += (
+                "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
+                "WITH ca, a, t, r WHERE toLower(t.s) CONTAINS toLower($search_string) OR toLower(a.s) CONTAINS toLower($search_string) "
+            )
             if samples_only:
                 query += " AND EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)} "
         
-        
         else:
-            
             if samples_only:
                 if submission_tag is not None:
                     query += "WHERE EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
@@ -357,9 +383,11 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         if limit is not None:
             query += "LIMIT $limit "
 
-        r = self._driver.execute_query( query_= query, routing_="r",  search_string = search_string, submission_tag=submission_tag, attribute_tag=attribute_tag, trait_tag=trait_tag, limit = limit, result_transformer_=Result.value)
+        r = self._driver.execute_query(
+            query_=query, routing_="r",
+            search_string=search_string, submission_tag=submission_tag,
+            attribute_tag=attribute_tag, trait_tag=trait_tag,
+            limit=limit, result_transformer_=Result.value
+        )
 
         return r
-    
-
-    

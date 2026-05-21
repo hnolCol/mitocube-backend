@@ -59,13 +59,12 @@ def query_condition_applications(search_string : str = None,
 
     return ca_tags
 
-
-
-@router.get("q/hierarchical")
-def ca_hierarchy(search_string : str,  user : UserModel = Depends(get_user_from_token)) -> List[Dict]:
-    
+@router.get("/q/hierarchy")
+def ca_hierarchy(search_string : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[Dict]:
+    ca_tags_with_protein_value = []
     protein_tags = DB.proteins.find(search_string=search_string, is_condition_value=True)
-    ca_tags_with_protein_value = DB.condition_applications.find(protein_tags = protein_tags,sort_by_frequency = True)
+    if len(protein_tags) > 0:
+        ca_tags_with_protein_value = DB.condition_applications.find(protein_tags = protein_tags,sort_by_frequency = True)
     ca_tags_by_search_string = DB.condition_applications.find(search_string = search_string, samples_only = False, sort_by_frequency = True)
     ca_tags = ca_tags_with_protein_value + [ca_tag for ca_tag in ca_tags_by_search_string if ca_tag not in ca_tags_with_protein_value]
     tree = defaultdict(lambda: defaultdict(list))
@@ -91,6 +90,8 @@ def ca_hierarchy(search_string : str,  user : UserModel = Depends(get_user_from_
         }
         for attr, traits in tree.items()
     ]
+
+    print(result)
     return result
 
         
@@ -122,7 +123,24 @@ def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token))
     return build_condition_application_tree(ca)
 
 
+ 
+@router.get("/{ca_tag}/value_exists")
+def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+    """Returns if the condition application has a condition value. 
 
+    Parameters
+    ----------
+    ca_tag : str
+        The tag associated with the condition application w
+
+    Returns
+    -------
+    bool
+        Condition Value exists for the condition application or not.
+        
+    """
+    if not DB.condition_applications.exists(tag = ca_tag): return False
+    return DB.condition_applications.has_value(tag = ca_tag)
 
 @router.get("/{ca_tag}/text")
 def get_ca_name_by_tag(ca_tag : str, handle_genotypes : bool = True, user : UserModel = Depends(get_user_from_token)) -> str:

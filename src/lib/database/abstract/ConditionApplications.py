@@ -105,6 +105,21 @@ class ConditionApplicationABC(ABC):
         """
 
     @abstractmethod
+    def has_value(self, tag: str) -> bool:
+        """Checks if the condition application has a value (i.e., is associated with a protein).
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the condition application to check.
+
+        Returns
+        -------
+        bool
+            True if the condition application has a value, False otherwise.
+        """
+
+    @abstractmethod
     def delete(self, tag: str) -> bool:
         """Deletes a condition application from the database.
 
