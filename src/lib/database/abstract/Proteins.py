@@ -110,3 +110,55 @@ class ProteinsABC(ABC):
         str
             The gene name of the protein
         """
+        
+    @abstractmethod
+    def set_favorite_protein(self, protein_tag : str, user_tag : str) -> bool:
+        """Indicates that a user favors a specific protein.
+
+        Parameters
+        ----------
+        protein_tag : str
+            The tag of the protein to favor.
+        user_tag : str
+            The tag of the user who favors the protein.
+
+        Returns
+        -------
+        bool
+            Indicates whether the protein was successfully favored.
+        """
+    @abstractmethod
+    def is_protein_favorite(self, protein_tag : str, user_tag : str) -> bool:
+        """Checks if a protein is favored by a specific user.
+
+        Parameters
+        ----------
+        protein_tag : str
+            The tag of the protein to check.
+        user_tag : str
+            The tag of the user to check.
+
+        Returns
+        -------
+        bool
+            True if the protein is favored by the user, False otherwise.
+        """
+        pass
+
+    @abstractmethod
+    def remove_favorite_protein(self, protein_tag : str, user_tag : str) -> bool:
+        """Removes a protein from a user's favorites.
+
+        Parameters
+        ----------
+        protein_tag : str
+            The tag of the protein to remove from favorites.
+        user_tag : str
+            The tag of the user whose favorite is to be removed.
+
+        Returns
+        -------
+        bool
+            True if the protein was successfully removed from favorites, False otherwise.
+        """
+        pass

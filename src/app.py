@@ -38,6 +38,7 @@ from routers.features import features
 from routers.features.protein_groups import protein_groups
 from routers.features.proteins import find as protein_find
 from routers.features.proteins import receive as protein_receive
+from routers.features.proteins import favorite as protein_favorite
 from routers.features import correlations as feature_correlation
 from routers.genotypes import permissions as genotype_permissions
 from routers.genotypes import genotypes
@@ -81,6 +82,7 @@ import argparse
 #the order of these matters for the functioning of the routes
 router_sources = [dataset,
                   protein_groups,
+                  protein_favorite,
                   protein_find,
                   protein_receive,
                   submissions_permissions, 
@@ -147,8 +149,8 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 DB = Database.DB()
 
 #check for users, essentially, create admin user if no users exists with the defined admin email.
-# r = DB.proteins.get_favorite_proteins(user_tag = "fOtsqZCP", annotation_tags=["ahsHe"]) #this is to check if the database connection works, and to initialize the database if it is not initialized yet. This is necessary to avoid issues with the first user creation, which requires a database connection.
-# print(r)
+r = DB.proteins.get_favorite_proteins(user_tag = "fOtsqZCP") #this is to check if the database connection works, and to initialize the database if it is not initialized yet. This is necessary to avoid issues with the first user creation, which requires a database connection.
+print(r)
 
 
 origins = [
@@ -210,13 +212,24 @@ if __name__ == "__main__":
     genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
 
     lead_user_tag = args.lead_user_tag
+    
     if setup_db_default:
+        
         DB.users.check(lead_tag = lead_user_tag)
         lead_user = DB.users.get_lead_user() 
         #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
         DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
         #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
         DB.users._utils_migrate(path_to_user_data=os.path.join(args.resources_path, "users/users.json")) 
+       
+       ##setting up some maintenance related information, such as instrument states, maintenance states, procedures, symptoms, and spare parts. This is necessary for the maintenance module to function properly.
+        
+        DB.instrument_states._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/instrumentstates.txt"), sep="\t")
+        DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path=os.path.join(args.resources_path, "maintenance/maintenancestates.txt"), sep="\t") 
+        DB.maintenance_procedures._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/procedures.txt"), sep="\t")
+        DB.symptoms._utils_insert_from_file(file_path=os.path.join(args.resources_path, "symptoms/symptoms.txt"), sep="\t")
+        DB.spareparts._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/spareparts.txt"), sep="\t")
+        
         
     if CTRL_PROTEOME_SETTINGS.add_control_proteome or add_control_proteome:
         control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
@@ -248,13 +261,7 @@ if __name__ == "__main__":
         from MigrateDatabase import MigrateData 
         MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
         
-    if setup_db_default:
-        
-        DB.instrument_states._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/instrumentstates.txt"), sep="\t")
-        DB.maintenance_events._utils_insert_maintenance_state_from_file(file_path=os.path.join(args.resources_path, "maintenance/maintenancestates.txt"), sep="\t") 
-        DB.maintenance_procedures._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/procedures.txt"), sep="\t")
-        DB.symptoms._utils_insert_from_file(file_path=os.path.join(args.resources_path, "symptoms/symptoms.txt"), sep="\t")
-
+    
         #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP
 
             

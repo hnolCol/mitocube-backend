@@ -4,12 +4,12 @@ from scipy.stats import fisher_exact
 
 from lib.database.Database import Database
 
-from config.models.annotations.annotations import ( AnnotationGroupsModel, AnnotationsModel)
+from config.models.annotations.annotations import ( AnnotationGroupsInsertModel, AnnotationGroupsModel, AnnotationsModel)
 from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroups,  Neo4JAnnotations)
 
 from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_admin
-
+from services.encryption import create_hierarchical_hash
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
 import numpy as np
@@ -109,8 +109,10 @@ def get_annotations_in_group(group_tag: str, limit: int = 20, user: UserModel = 
     return DB.annotation_groups.get_annotations(group_tag, limit=limit)
 
 @router.post("/groups/", response_model=bool)
-def insert_annotation_group( annotation_group: AnnotationGroupsModel, user: UserModel = Depends(get_user_from_token)):
-    ok = DB.annotation_groups.insert(annotation_group, user_tag=user.tag)
+def insert_annotation_group( annotation_group: AnnotationGroupsInsertModel, user: UserModel = Depends(get_user_from_token)):
+    tag = create_hierarchical_hash(annotation_group.model_dump(exclude_none=True))
+    annotation_group_with_tag = AnnotationGroupsModel(**annotation_group.model_dump(exclude_none=True), tag=tag)
+    ok = DB.annotation_groups.insert(annotation_group_with_tag, user_tag=user.tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to insert annotation group")
 

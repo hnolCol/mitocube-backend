@@ -85,6 +85,15 @@ class Neo4JGenotype(GenotypeABC):
         
         self._driver.execute_query(query, genotypes = genotype_props, user_tag = user_tag, routing_="w",  database_="neo4j")
         
+    def count(self) -> int:
+        "Counts the number of genotypes in the database."
+        query = (
+            "MATCH (g:Genotype) "
+            "RETURN count(g) AS genotype_count"    
+        )
+        r = self._driver.execute_query(query, result_transformer_=Result.value)
+        return r[0]
+    
     def exists(self, tag : str) -> bool:
         "Checks if a genotype with the given tag exists in the database."
         query = (

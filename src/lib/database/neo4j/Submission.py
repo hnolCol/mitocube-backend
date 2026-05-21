@@ -318,6 +318,7 @@ class Neo4JSubmissions(SubmissionsABC):
 
     def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None, created_at : float = None) -> bool:
         ""
+        print("CREATED AT:", created_at, "??")
         if self.exists(tag):
             raise ValueError("Submission with this tag already exists. Use the update function to update the submission.")
         query = (

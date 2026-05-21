@@ -193,7 +193,6 @@ class Neo4JAnnotations(AnnotationsABC):
         """
 # The code is attempting to print the value of the variable `user_tag`, but it seems that the variable
 # `user_tag` is not defined in the provided code snippet.
-        print(user_tag)
         config = read_json(file_path)
 
         if "groups" not in config:

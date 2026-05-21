@@ -31,7 +31,8 @@ DB = Database.DB()
 
 
 attr_update = {
-    "att_organism" : "att_proteome"
+    "att_organism" : "att_proteome",
+    "att_gender" : "att_sex"
 }
 
 time_to_att_duration = {
@@ -64,6 +65,7 @@ def handle_pulldown(tags : List[str]):
     r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
     return r
 
+
 def handle_batch(tags : List[str]):
     "" 
     values = [t.split(":")[1] for t in tags] 
@@ -79,11 +81,14 @@ def handle_clone_id(tags : List[str]):
     return tree 
 
 def build_tree(attribute_tag, trait_tags : List[str], value = None):
+        update_attr = False
         if attribute_tag in attr_update:
+            attribute_tag_old = attribute_tag
             attribute_tag = attr_update[attribute_tag]
+            update_attr = True
             
         return {"type" : "attribute", "tag" : attribute_tag, "children" : 
-            [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags)]}
+            [{"type" : "trait", "tag" : trait_tag.replace(attribute_tag_old, attribute_tag) if update_attr and attribute_tag != "att_proteome" else trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags)]}
 
 
 def handle_centrifugation_pellet(tags : List[str]):
@@ -262,6 +267,7 @@ class MigrateData:
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"], jsonFile["dataset_attributes"])
             timeline = jsonFile.get("timeline", {})
             timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": t.get("user_tag") or t.get("user_label"), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
+            print(timeline_to_insert)
             if not DB.submission_exists(tag = submission_tag):
                 submission_insert_model = NewSubmissionModel(tag = submission_tag,
                                                              user_tag= user_tag,
@@ -279,7 +285,7 @@ class MigrateData:
                         title = submission_insert_model.title,
                         user_tag = submission_insert_model.user_tag,
                         collaborators = submission_insert_model.collaborators,
-                        created_at = metatext["created_on"] if "created_at" in metatext else None)
+                        created_at = jsonFile["created_on"] * 1000 if "created_on" in jsonFile else None)
                 if ok: 
                     print("Submission inserted successfully.")
                 DB.submissions.insert_attributes(tag = submission_insert_model.tag, traits = submission_insert_model.dataset_attributes) 

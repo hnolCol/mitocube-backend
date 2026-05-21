@@ -6,18 +6,24 @@ from datetime import datetime
 
 
 
-class AnnotationGroupsModel(BaseModel):
+
+class AnnotationGroupsInsertModel(BaseModel):
+    """
+    Model for inserting annotation groups. 
+    """
+    # tag: str = Field(..., min_length=5, max_length=5, default_factory=lambda: get_random_string(5))
+    text: str
+    description: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
+
+class AnnotationGroupsModel(AnnotationGroupsInsertModel):
     """
     Groups annotations into categories
     (e.g. mitochondrial proteome annotations).
     """
-
-    tag : str = Field(..., min_length=5, max_length=5, default_factory=lambda : get_random_string(5))
-    text: str 
-    description: Optional[str] = None
-    source: Optional[str] = None
-    url: Optional[str] = None
-    created_at: datetime = Field(default_factory= datetime.now)
+    tag : str
+    created_at: Optional[float] = None # timestamp
     created_by: Optional[str] = None # user tag
 
     class Config:

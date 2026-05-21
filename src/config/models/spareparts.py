@@ -27,6 +27,11 @@ class SparepartModel(SparepartBaseModel):
         if isinstance(v,str): return v 
         return " ".join([str(s).lower() for s in v if s is not None])
     
+    @field_serializer("link")
+    def serialize_url(self, url: AnyUrl):
+        if url is None:
+            return ""
+        return str(url)
 class SparepartInsertModel(SparepartBaseModel):
     tag : str = Field(...,min_length=8, max_length=8, default_factory=lambda : get_random_string(8))
     

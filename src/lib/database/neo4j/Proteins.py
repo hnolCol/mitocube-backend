@@ -24,7 +24,7 @@ class Neo4JProteins(ProteinsABC):
         if quantified:
             query = (
                 "MATCH (p:Protein) "
-                "WHERE EXISTS {(p:Protein)<-[:QUANTIFIED]->(:Sample)}"
+                "WHERE EXISTS {(p:Protein)<-[:HAS_PROTEINS]-(pg:ProteinGroup)<-[:QUANTIFIED]-(:Sample)}"
                 "RETURN count(p) " 
             )
             
@@ -134,14 +134,14 @@ class Neo4JProteins(ProteinsABC):
         # -------------------------
 
         if user_tag is not None:
-
+            #favouring this condition with a high score to ensure that favored proteins are ranked higher than non-favored ones, even if they don't meet any of the other criteria
             score_conditions.append(
                 """
                 CASE
                     WHEN EXISTS {
                         (p)<-[:FAVOURS]-(:User {tag: $user_tag})
                     }
-                    THEN 1 ELSE 0
+                    THEN 5 ELSE 0
                 END
                 """
             )
@@ -198,3 +198,35 @@ class Neo4JProteins(ProteinsABC):
         )
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return r[0] if len(r) > 0 else None
+    
+    
+    def is_protein_favorite(self, protein_tag : str, user_tag : str) -> bool:
+        ""
+        query = (
+            "MATCH (p:Protein {tag: $protein_tag}) "
+            "RETURN EXISTS {(p)<-[:FAVOURS]-(:User {tag: $user_tag})} AS is_favorite"
+        )
+        r = self._driver.execute_query(query, protein_tag=protein_tag, user_tag=user_tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+    
+    def set_favorite_protein(self, protein_tag : str, user_tag : str) -> bool:
+        ""
+        query = (
+            "MATCH (p:Protein {tag: $protein_tag}) "
+            "MERGE (u:User {tag: $user_tag}) "
+            "MERGE (u)-[f:FAVOURS]->(p) "
+            "SET f.created_at = timestamp() "
+            "RETURN f"
+        )
+        r = self._driver.execute_query(query, protein_tag=protein_tag, user_tag=user_tag, routing_="w", result_transformer_=Result.value)
+        return len(r) > 0 and r[0] is not None
+    
+    def remove_favorite_protein(self, protein_tag : str, user_tag : str) -> bool:
+        ""
+        query = (
+            "MATCH (u:User {tag: $user_tag})-[f:FAVOURS]->(p:Protein {tag: $protein_tag}) "
+            "DELETE f "
+            "RETURN COUNT(f) AS deleted_count"
+        )
+        r = self._driver.execute_query(query, protein_tag=protein_tag, user_tag=user_tag, routing_="w", result_transformer_=Result.value)
+        return r[0] > 0 if len(r) > 0 else False

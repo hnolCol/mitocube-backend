@@ -30,6 +30,9 @@ class GenotypeABC(ABC):
             _description_
         """
         
+    @abstractmethod
+    def count(self) -> int:
+        "Counts the number of genotypes in the database."
 
     @abstractmethod
     def exists(self, tag : str) -> bool:

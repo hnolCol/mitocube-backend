@@ -95,8 +95,8 @@ def generate_cypher_query(prompt: str, session_id: str = None, user: UserModel =
         session_messages.append({"role": "assistant", "content": "All queries failed to execute.", "return": True})
         DB.cache.insert(session_id,session_messages)
         return {"response": "All queries failed to execute.", "session_id": session_id, "session_messages": [msg for msg in session_messages if "return" in msg and msg["return"]]}
-    
-    response = DB.openai.digest_query_data(data = ds, cypher_query=cypher_query, session_messages = session_messages)
+    print("PASSED TO OPENAI FOR DIGESTION: ", [{"role": "assistant", "content": cypher_query},{"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."}])
+    response = DB.openai.digest_query_data(data = ds, cypher_query=cypher_query, session_messages = [{"role": "assistant", "content": cypher_query},{"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."}] )
     session_messages.append({"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."})
     session_messages.append({"role": "assistant", "content": response, "return": True})
     

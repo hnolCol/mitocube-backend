@@ -65,10 +65,13 @@ def get_dataset_volcano(submission_tag : str,
         raise HTTPException(status_code=400, detail="Left and right condition application tags must be different.")
     
     condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+    print(DB.submissions.has_genotypes(tag = submission_tag))
+    print(condition_applications)
     if DB.submissions.has_genotypes(tag = submission_tag):
         genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
         condition_applications = condition_applications.join(genotypes, how="outer")
-        
+    
+    print(condition_applications)
     if DB.genotypes.exists(tag = ca_tag_left):
         attribute_tag = "att_genotype"
     else:
@@ -80,9 +83,12 @@ def get_dataset_volcano(submission_tag : str,
     # if within_trait_tag is not None:
     sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index
     sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
-
-    ca_left_text = DB.condition_applications.get_text(ca_tag_left)
-    ca_right_text = DB.condition_applications.get_text(ca_tag_right)
+    print(attribute_tag)
+    if attribute_tag == "att_genotype":
+        print("GENOTYPE texts")
+        print(DB.genotypes.get_text(ca_tag_left), DB.genotypes.get_text(ca_tag_right))
+    ca_left_text = DB.condition_applications.get_text(ca_tag_left) if attribute_tag != "att_genotype" else DB.genotypes.get_text(ca_tag_left)
+    ca_right_text = DB.condition_applications.get_text(ca_tag_right) if attribute_tag != "att_genotype" else DB.genotypes.get_text(ca_tag_right)
 
     sample_tags = sample_tags_left.to_list() + sample_tags_right.to_list()
     suffix = f"{ca_left_text} vs. {ca_right_text}" 

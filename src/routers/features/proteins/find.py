@@ -44,26 +44,4 @@ def bulk_insert_protein_features(search_string : str, limit : int = 50, submissi
        Protein tags
     """
     return DB.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param, submission_tags=APIParamString(param=submission_tags).param)
-    
 
-
-
-@router.get("/favorites", summary="Returns the overall favorite proteins.")
-def get_favorite_proteins(submission_tags : str = None, annotation_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List[str]:
-    """
-    Returns the overall favorite proteins. This is based on how often a protein is quantified across all submissions.
-    
-    Parameters
-    ----------
-    submission_tags : str, optional
-        Semicolon separated submission tags to filter the search (e.g. proteins quantified in specific submissions), by default None
-    annotation_tags : str, optional
-        Semicolon separated annotation tags to filter the search (e.g. proteins that are annotated with specific annotations), by default None
-    user : UserModel, optional
-        The user that is extracted by the token, by default Depends(get_user_from_token)
-    Returns
-    -------
-    List[str]
-        A list of favorite protein tags.
-    """
-    return DB.proteins.get_favorite_proteins(submission_tags=APIParamString(param=submission_tags).param, annotation_tags=APIParamString(param=annotation_tags).param)
