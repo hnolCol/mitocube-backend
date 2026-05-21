@@ -201,16 +201,17 @@ if __name__ == "__main__":
     args.add_argument("--add_control_proteome", action="store_true", help="Whether to add the control proteome to the database. The control proteome is a collection of proteins that are used for testing and development purposes. It contains common proteins such as GFP and luciferase. This should only be set to true if you want to add the control proteome, otherwise it should be false, as the control proteome is not intended for production use. ")
     args.add_argument("--resources_path", help="Path pointing to the resources folder that contains the json files for the migration. This should be a folder containing the files genotypes.json, users.json, and a folder data containing the submission folders. ", default="/home/cloud/resources/")
     args.add_argument("--lead_user_tag", help="Tag of the lead user in the database. This user will be used for certain operations that require a lead user.", default=None) #"fOtsqZCP"
+    args.add_argument("--users", help="Path to users.", default=None) #"fOtsqZCP"
 
 
     args = args.parse_args()
     setup_db_default = args.setup_database
     migrate_submission_folder = args.migrate_submissions 
     proteomes_to_add = args.proteomes 
+    user_path = args.users
     lead_user = DB.users.get_lead_user() 
     add_control_proteome = args.add_control_proteome
     genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
-
     lead_user_tag = args.lead_user_tag
     
     if setup_db_default:
@@ -220,8 +221,10 @@ if __name__ == "__main__":
         #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
         DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
         #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
-        DB.users._utils_migrate(path_to_user_data=os.path.join(args.resources_path, "users/users.json")) 
-       
+        if os.path.exists(user_path):
+            DB.users._utils_migrate(path_to_user_data=user_path) 
+        else:
+            ValueError(f"User path {user_path} does not exist, cannot migrate users. Please provide a valid path to the users.json file. ")
        ##setting up some maintenance related information, such as instrument states, maintenance states, procedures, symptoms, and spare parts. This is necessary for the maintenance module to function properly.
         
         DB.instrument_states._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/instrumentstates.txt"), sep="\t")
@@ -263,6 +266,8 @@ if __name__ == "__main__":
         
     
         #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP
+        #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
+        #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
 
             
     uvicorn.run(app, port = 5002, proxy_headers=True)

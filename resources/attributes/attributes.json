@@ -5497,6 +5497,16 @@
             "ols": null
         },
         {
+            "value": "decitabine",
+            "attribute_tag": "att_compound",
+            "tag": "att_compound:decitabine",
+            "keyword": "decitabine",
+            "text": "Decitabine",
+            "description": "Decitabine (i.e., 5-aza-2\u2032-deoxycytidine), sold under the brand name Dacogen among others, acts as a nucleic acid synthesis inhibitor",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
             "value": "microenvironment",
             "attribute_tag": "att_compound",
             "tag": "att_compound:microenvironment",
