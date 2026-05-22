@@ -199,16 +199,17 @@ if __name__ == "__main__":
     args.add_argument("--resources_path", help="Path pointing to the resources folder that contains the json files for the migration. This should be a folder containing the files genotypes.json, users.json, and a folder data containing the submission folders. ", default="/home/cloud/resources/")
     args.add_argument("--lead_user_tag", help="Tag of the lead user in the database. This user will be used for certain operations that require a lead user.", default=None) #"fOtsqZCP"
     args.add_argument("--users", help="Path to users.", default=None) #"fOtsqZCP"
-    args.add_argument("--mitocarte_annotations", help="Whether to add the mitocarta annotations to the database. This should only be set to true if you want to add the mitocarta annotations, otherwise it should be false, as the mitocarta annotations are not intended for production use. ", action="store_true")
-
+    args.add_argument("--mitocarta_annotations", help="Whether to add the mitocarta annotations to the database. This should only be set to true if you want to add the mitocarta annotations, otherwise it should be false, as the mitocarta annotations are not intended for production use. ", action="store_true")
+    args.add_argument("--reviewed_proteins_only", help="Whether to only add reviewed proteins from uniprot when adding proteomes. This should only be set to true if you want to only add reviewed proteins, otherwise it should be false, as adding unreviewed proteins can be useful for certain use cases. ", action="store_true")
     args = args.parse_args()
     setup_db_default = args.setup_database
     migrate_submission_folder = args.migrate_submissions 
     proteomes_to_add = args.proteomes 
     user_path = args.users
-    add_mitocarta_annotations = args.mitocarte_annotations
+    add_mitocarta_annotations = args.mitocarta_annotations
     lead_user = DB.users.get_lead_user() 
     add_control_proteome = args.add_control_proteome
+    reviewed_proteins_only = args.reviewed_proteins_only
     
     lead_user_tag = args.lead_user_tag
     
@@ -242,7 +243,7 @@ if __name__ == "__main__":
         if proteomes_to_add is not None:
             print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
             proteome_list = proteomes_to_add.split(",")
-            DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=False, user_tag = lead_user)
+            DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=reviewed_proteins_only, user_tag = lead_user)
         
         if setup_db_default and add_mitocarta_annotations:
             
@@ -266,7 +267,7 @@ if __name__ == "__main__":
             #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
             #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
             #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
-            #python3 src/app.py --setup_database --mitocarte_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
+            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
 
             
     uvicorn.run(app, port = 5002, proxy_headers=True)
