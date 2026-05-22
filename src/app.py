@@ -148,9 +148,6 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
 
-#check for users, essentially, create admin user if no users exists with the defined admin email.
-r = DB.proteins.get_favorite_proteins(user_tag = "fOtsqZCP") #this is to check if the database connection works, and to initialize the database if it is not initialized yet. This is necessary to avoid issues with the first user creation, which requires a database connection.
-print(r)
 
 
 origins = [
@@ -202,22 +199,21 @@ if __name__ == "__main__":
     args.add_argument("--resources_path", help="Path pointing to the resources folder that contains the json files for the migration. This should be a folder containing the files genotypes.json, users.json, and a folder data containing the submission folders. ", default="/home/cloud/resources/")
     args.add_argument("--lead_user_tag", help="Tag of the lead user in the database. This user will be used for certain operations that require a lead user.", default=None) #"fOtsqZCP"
     args.add_argument("--users", help="Path to users.", default=None) #"fOtsqZCP"
-
+    args.add_argument("--mitocarte_annotations", help="Whether to add the mitocarta annotations to the database. This should only be set to true if you want to add the mitocarta annotations, otherwise it should be false, as the mitocarta annotations are not intended for production use. ", action="store_true")
 
     args = args.parse_args()
     setup_db_default = args.setup_database
     migrate_submission_folder = args.migrate_submissions 
     proteomes_to_add = args.proteomes 
     user_path = args.users
-    print(user_path)
-    print(os.path.exists(user_path))
+    add_mitocarta_annotations = args.mitocarte_annotations
     lead_user = DB.users.get_lead_user() 
     add_control_proteome = args.add_control_proteome
-    genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
+    
     lead_user_tag = args.lead_user_tag
     
     if setup_db_default:
-        
+        genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
         DB.users.check(lead_tag = lead_user_tag)
         lead_user = DB.users.get_lead_user() 
         #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
@@ -236,40 +232,43 @@ if __name__ == "__main__":
         DB.spareparts._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/spareparts.txt"), sep="\t")
         
         
-    if CTRL_PROTEOME_SETTINGS.add_control_proteome or add_control_proteome:
-        control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
-        #adding proteme details, will set is_updating to true
-        DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
-        DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl", user_tag = lead_user)
-        DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+        if CTRL_PROTEOME_SETTINGS.add_control_proteome or add_control_proteome:
+            control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
+            #adding proteme details, will set is_updating to true
+            DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
+            DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl", user_tag = lead_user)
+            DB.proteomes.set_updating(tag="ctrl", updating=False) #reset updating.
+                
+        if proteomes_to_add is not None:
+            print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
+            proteome_list = proteomes_to_add.split(",")
+            DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=False, user_tag = lead_user)
+        
+        if setup_db_default and add_mitocarta_annotations:
             
-    if proteomes_to_add is not None:
-        print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
-        proteome_list = proteomes_to_add.split(",")
-        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=False, user_tag = lead_user)
-    
-    if setup_db_default:
+            DB.annotations._utils_insert_from_file(
+                file_path=os.path.join(args.resources_path, "annotations/MitoCarta/annotations.json"),
+                folder_path=os.path.join(args.resources_path, "annotations"),
+                user_tag=lead_user,
+            )    
         
-        DB.annotations._utils_insert_from_file(
-            file_path=os.path.join(args.resources_path, "annotations/MitoCarta/annotations.json"),
-            folder_path=os.path.join(args.resources_path, "annotations"),
-            user_tag=lead_user,
-        )    
-    
-    if genotype_file is not None:
-        from migrate_genotypes import MigrateGenotypes 
-        genotype_mapper_file_path = MigrateGenotypes(path_to_genotypes=genotype_file, fallback_user_tag=lead_user).migrate()
-        print(genotype_mapper_file_path)
-    if migrate_submission_folder is not None:
-        if genotype_file is None:
-            print("No genotype file provided, gentoypes are likely to be missed..")
-        from MigrateDatabase import MigrateData 
-        MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
+        if genotype_file is not None:
+            from migrate_genotypes import MigrateGenotypes 
+            genotype_mapper_file_path = MigrateGenotypes(path_to_genotypes=genotype_file, fallback_user_tag=lead_user).migrate()
+            print(genotype_mapper_file_path)
+        if migrate_submission_folder is not None:
+            if genotype_file is None:
+                print("No genotype file provided, gentoypes are likely to be missed..")
+            from MigrateDatabase import MigrateData 
+            MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
+            
         
-    
-        #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
-        #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
-        #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/users/users.json
+            #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
+            #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
+            #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
+            #python3 src/app.py --setup_database --mitocarte_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
 
             
     uvicorn.run(app, port = 5002, proxy_headers=True)
+
+

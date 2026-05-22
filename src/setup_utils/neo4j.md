@@ -565,3 +565,19 @@ Always leave RAM available for:
 - Background services
 
 ---
+
+
+
+
+sudo docker run -d \
+    --name neo4j-server \
+    -p 7474:7474 -p 7687:7687 \
+    -v ~/neo4j/data:/data \
+    -v ~/neo4j/plugins:/plugins \
+    -v ~/neo4j/logs:/logs \
+    -v ~/neo4j/import:/import \
+    --env NEO4J_AUTH=neo4j/<pw> \
+    --env NEO4J_PLUGINS='["apoc", "graph-data-science"]' \
+    --env NEO4J_dbms_security_procedures_unrestricted=apoc.\*,gds.\* \
+    --env NEO4J_dbms_security_procedures_allowlist=apoc.\*,gds.\* \
+    neo4j:5.26.26
