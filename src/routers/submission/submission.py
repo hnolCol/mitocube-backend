@@ -243,6 +243,12 @@ def get_states(user : UserModel = Depends(get_user_from_token)):
     """"""
     return DB.submissions.get_states()
 
+@router.get("/submissions/{submission_tag}/state/history")
+def get_submission_state_history(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[Dict]:
+    """Returns the complete state change history for a submission."""
+    if not DB.submissions.exists(tag=submission_tag):
+        raise tag_not_found
+    return DB.submissions.get_state_history(tag=submission_tag)
 
 @router.get("/submissions/{submission_tag}/users")
 def get_users_associated_with_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:

@@ -213,6 +213,10 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def get_states(self) -> List[int]:
         "Returns the available submission states in the database."
+
+    @abstractmethod
+    def get_state_history(self, tag: str) -> List[Dict]:
+        """Returns the complete state change history for a submission ordered by timestamp."""
         
     @abstractmethod
     def get_creator(self, tag : str) -> str| None:

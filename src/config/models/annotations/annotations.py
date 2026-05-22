@@ -23,6 +23,10 @@ class AnnotationGroupsModel(AnnotationGroupsInsertModel):
     (e.g. mitochondrial proteome annotations).
     """
     tag : str
+    text: str
+    description: Optional[str] = None
+    source: Optional[str] = None
+    url: Optional[str] = None
     created_at: Optional[float] = None # timestamp
     created_by: Optional[str] = None # user tag
 

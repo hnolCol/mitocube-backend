@@ -119,7 +119,21 @@ class AnnotationGroupsABC(ABC):
             Number of annotations.
         """
         
+    @abstractmethod
+    def edit_annotation_group(self, annotationgroup: AnnotationGroupsModel, user_tag: str) -> bool:
+        """
+        Update an existing annotation group.
 
+        Parameters
+        ----------
+        annotationgroup : AnnotationGroupsModel
+            Updated annotation group data.
+
+        Returns
+        -------
+        bool
+            True if update was successful.
+        """
 
 class AnnotationsABC(ABC):
     """
