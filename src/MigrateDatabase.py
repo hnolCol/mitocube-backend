@@ -118,26 +118,6 @@ def build_tree(attribute_tag, trait_tags : List[str], value = None):
         return {"type" : "attribute", "tag" : attribute_tag, "children" : 
             [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags) if isinstance(trait_tag,str)]}
 
-# def handle_digestion(dataset_attributes : dict):
-#     "" 
-#     protease_tags  = dataset_attributes.get("att_protease", [])
-#     att_digestion_time_tags = dataset_attributes.get("att_digestion_time", None)
-#     att_digestion_time = att_digestion_time_tags[0].split(":")[-1] if att_digestion_time_tags is not None else None
-#     att_digestion_volume_tags = dataset_attributes.get("att_digestion_volume", None)
-#     att_digestion_volume = att_digestion_volume_tags[0].split(":")[-1] if att_digestion_volume_tags is not None else None 
-#     att_digestion_time_tags = dataset_attributes.get("att_digestion_time_unit", None)
-#     att_digestion_time = att_digestion_time_tags[0].split(":")[-1] if att_digestion_time_tags is not None else None 
-#     print(protease_tags, att_digestion_time)
-    
-    
-#     if "att_digestion_enzyme" in dataset_attributes:
-#         enzyme_tags = dataset_attributes["att_digestion_enzyme"]
-#         tree = build_tree(attribute_tag="att_digestion", trait_tags=["att_digestion:enzyme"])
-#         for enzyme_tag in enzyme_tags:
-#             tree["children"][0]["children"].append(build_tree(attribute_tag="att_enzyme", trait_tags=["att_enzyme"], value=enzyme_tag.split(":")[1]))
-#         return tree
-#     else:
-#         return None
 
 
 def handle_centrifugation_pellet(tags : List[str]):
@@ -247,7 +227,7 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
             elif attribute_tag == "att_centr_pellet":
                 r[sampleIdx].append(handle_centrifugation_pellet(sample_attribute_tags))
             elif attribute_tag == "att_mouse_id":
-                r[sampleIdx].append(handle_centrifugation_pellet(sample_attribute_tags))
+                r[sampleIdx].append(handle_mouse_id(sample_attribute_tags))
             elif attribute_tag == "att_centr_supernatant":
                 r[sampleIdx].append(handle_centrifugation_supernatant(sample_attribute_tags))
             elif attribute_tag == "att_compound" and time_data_by_key:
@@ -328,17 +308,19 @@ def build_ms_attributes(dataset_attributes: dict):
                 dia_tree = build_tree(attribute_tag="att_numspectra", trait_tags=["att_numspectra:diawindows"], value=dia_windows[0].split(":")[1])
                 acquisition_tree["children"][0]["children"].append(dia_tree)
                 dataset_attributes.pop("att_diawindows")
+                
+            collision_energy = dataset_attributes.get("att_collision_energy", None)
+            if collision_energy is not None and len(collision_energy) > 0:
+                ce_tree = build_tree(attribute_tag="att_collision_energy", trait_tags=["att_collision_energy:nce"], value=[ce.split(":")[1] for ce in collision_energy])
+                acquisition_tree["children"][0]["children"].append(ce_tree)
+                dataset_attributes.pop("att_collision_energy")
+            ms_instrument_tree["children"][0]["children"].append(acquisition_tree)
 
     return dataset_attributes, T
 
 def build_gradient_attributes(dataset_attributes: dict):
         
-        # att_lc_gradient		att_duration
-        
-        # "att_lc_gradient_length": [
-        #     "att_lc_gradient_length:120"
-        # ],
-        # "att_lc_flo
+
     gradient_length_tags = dataset_attributes.get("att_lc_gradient_length", None)
     if gradient_length_tags is None:
         return dataset_attributes, None
@@ -561,8 +543,8 @@ class MigrateData:
         return self.fallback_user_tag
     def run(self):
 
-        for submission_tag in self.dirList:
-            print("Starting migration for submission:", submission_tag)
+        for i, submission_tag in enumerate(self.dirList):
+            print("Starting migration for submission:", submission_tag, (i+1), "out of", len(self.dirList))
             df = None
             jsonFile = read_json(os.path.join(self.path_to_folder,submission_tag,"params.json"))
             path_to_quant = os.path.join(self.path_to_folder,submission_tag,"data.txt") 

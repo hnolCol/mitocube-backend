@@ -406,22 +406,57 @@ class Neo4JProteomes(ProteomesABC):
             raise ValueError('Column names incomplete. Must have ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version","Reviewed"]')
         
         query = (
-            "MERGE (proteome:Proteome {tag : $proteome_attribute_tag}) "
-            "ON CREATE "
-            "SET proteome.created_at = timestamp(), proteome.user_tag = $user_tag "
-            "ON MATCH "
-            "SET proteome.modified_at = timestamp(), proteome.user_tag = $user_tag "
+            # "MERGE (proteome:Proteome {tag : $proteome_attribute_tag}) "
+            # "ON CREATE "
+            # "SET proteome.created_at = timestamp(), proteome.user_tag = $user_tag "
+            # "ON MATCH "
+            # "SET proteome.modified_at = timestamp(), proteome.user_tag = $user_tag "
+            # "WITH proteome "
+            # "UNWIND $uniprot_features as row "
+            # "MERGE (protein:Protein {tag : row.Entry}) "
+            # "ON CREATE "
+            # "   SET protein += {aa_length : row.Length, reviewed : row.`Reviewed`, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_tag : $proteome_tag, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
+            # "ON MATCH "
+            # "   SET protein.gene_names = row.`Gene Names`, protein.reviewed = row.`Reviewed`, protein.protein_name = row.`Protein names`, protein.gene_name = row.`Gene Names (primary)`, protein.aa_length = row.Length, protein.proteome_tag = $proteome_tag "
+            # "WITH protein, proteome, row "
+            # "MERGE (protein)-[r:IN_PROTEOME]->(proteome) "
+            # "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
+            # "MERGE (protein)-[:HAS_SEQUENCE]-(sequence) "
+            "MERGE (proteome:Proteome {tag: $proteome_attribute_tag}) "
+            "ON CREATE SET "
+            "    proteome.created_at = timestamp(), "
+            "    proteome.user_tag = $user_tag "
+            "ON MATCH SET "
+            "    proteome.modified_at = timestamp(), "
+            "    proteome.user_tag = $user_tag "
+
             "WITH proteome "
-            "UNWIND $uniprot_features as row "
-            "MERGE (protein:Protein {tag : row.Entry}) "
-            "ON CREATE "
-            "   SET protein += {aa_length : row.Length, reviewed : row.`Reviewed`, gene_name : row.`Gene Names (primary)`, gene_names : row.`Gene Names`, protein_name : row.`Protein names`, created_at : timestamp(), proteome_tag : $proteome_tag, s : toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`), viewed : 0} "
-            "ON MATCH "
-            "   SET protein.gene_names = row.`Gene Names`, protein.reviewed = row.`Reviewed`, protein.protein_name = row.`Protein names`, protein.gene_name = row.`Gene Names (primary)`, protein.aa_length = row.Length, protein.proteome_tag = $proteome_tag "
-            "WITH protein, proteome, row "
-            "MERGE (protein)-[r:IN_PROTEOME]->(proteome) "
-            "MERGE (sequence:Sequence {content : row.Sequence, version : row.`Sequence version`}) "
-            "MERGE (protein)-[:HAS_SEQUENCE]-(sequence) "
+            "UNWIND $uniprot_features AS row "
+
+            "MERGE (protein:Protein {tag: row.Entry}) "
+            "ON CREATE SET "
+            "    protein.created_at = timestamp(), "
+            "    protein.viewed = 0 "
+
+            "SET "
+            "    protein.aa_length = row.Length, "
+            "    protein.reviewed = row.`Reviewed`, "
+            "    protein.gene_name = row.`Gene Names (primary)`, "
+            "    protein.gene_names = row.`Gene Names`, "
+            "    protein.protein_name = row.`Protein names`, "
+            "    protein.proteome_tag = $proteome_tag, "
+            "    protein.s = toLower(row.`Gene Names`)+' '+toLower(row.Entry)+' '+toLower(row.`Protein names`) "
+
+            "MERGE (protein)-[:IN_PROTEOME]->(proteome) "
+
+            "WITH protein, row "
+
+            "MERGE (sequence:Sequence { "
+            "    content: row.Sequence, "
+            "    version: row.`Sequence version` "
+            "}) "
+            
+            "MERGE (protein)-[:HAS_SEQUENCE]->(sequence) "
             
         )
         self._driver.execute_query(query, 

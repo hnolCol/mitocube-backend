@@ -25,7 +25,7 @@
         {
             "tag": "att_acquisition",
             "requires": null,
-            "children": "att_ms1_resolution|att_ms2_resolution|att_collision_energy|att_masstocharge|att_numspectra",
+            "children": "att_ms1_resolution|att_ms2_resolution|att_collision_energy|att_masstocharge|att_numspectra|att_isolation_width",
             "text": "Acquisition",
             "abbr": null,
             "priority": 680,
@@ -1327,7 +1327,7 @@
             "text": "Isolation Width",
             "abbr": null,
             "priority": 500,
-            "allow_input": false,
+            "allow_input": true,
             "has_features_value": false,
             "group_tag": "ms",
             "min_state": 2,
@@ -5431,6 +5431,16 @@
             "ols": null
         },
         {
+            "value": "ethbr",
+            "attribute_tag": "att_compound",
+            "tag": "att_compound:ethbr",
+            "keyword": "ethbr",
+            "text": "EtBr",
+            "description": "Ethidium bromide\u00a0(or\u00a0homidium bromide,[2]\u00a0chloride salt\u00a0homidium chloride)[3][4]\u00a0is an\u00a0intercalating\u00a0agent commonly used as a\u00a0fluorescent tag\u00a0(nucleic acid\u00a0stain) in\u00a0molecular biology\u00a0laboratories for techniques such as\u00a0agarose gel electrophoresis. It is commonly abbreviated as\u00a0EtBr.",
+            "priority": 550.0,
+            "ols": null
+        },
+        {
             "value": "microenvironment",
             "attribute_tag": "att_compound",
             "tag": "att_compound:microenvironment",
@@ -7291,22 +7301,22 @@
             "ols": null
         },
         {
-            "value": "14dia",
+            "value": "da",
             "attribute_tag": "att_isolation_width",
-            "tag": "att_isolation_width:14dia",
+            "tag": "att_isolation_width:da",
             "keyword": null,
-            "text": 14,
-            "description": "Isolation width (DIA)",
+            "text": "Da",
+            "description": "Dalton",
             "priority": 500.0,
             "ols": null
         },
         {
-            "value": "onepointfour",
+            "value": "th",
             "attribute_tag": "att_isolation_width",
-            "tag": "att_isolation_width:onepointfour",
+            "tag": "att_isolation_width:th",
             "keyword": null,
-            "text": 1.4,
-            "description": "Isolation width (DDA) of 1.4 Th",
+            "text": "Th",
+            "description": "Thomsen (m/z)",
             "priority": 500.0,
             "ols": null
         },
