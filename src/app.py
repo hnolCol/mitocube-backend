@@ -246,7 +246,7 @@ if __name__ == "__main__":
     if proteomes_to_add is not None:
         print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
         proteome_list = proteomes_to_add.split(",")
-        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=True, user_tag = lead_user)
+        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=False, user_tag = lead_user)
     
     if setup_db_default:
         
