@@ -209,6 +209,8 @@ if __name__ == "__main__":
     migrate_submission_folder = args.migrate_submissions 
     proteomes_to_add = args.proteomes 
     user_path = args.users
+    print(user_path)
+    print(os.path.exists(user_path))
     lead_user = DB.users.get_lead_user() 
     add_control_proteome = args.add_control_proteome
     genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
@@ -244,7 +246,7 @@ if __name__ == "__main__":
     if proteomes_to_add is not None:
         print("Adding proteomes: " + proteomes_to_add + " from Uniprot. This may take a while... If they exist already, they will be updated. ")
         proteome_list = proteomes_to_add.split(",")
-        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=False, user_tag = lead_user)
+        DB.proteomes.insert_uniprot_proteome(proteome_tags=proteome_list, reviewed=True, user_tag = lead_user)
     
     if setup_db_default:
         
@@ -265,9 +267,9 @@ if __name__ == "__main__":
         MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
         
     
-        #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP
+        #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
         #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
-        #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
+        #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/users/users.json
 
             
     uvicorn.run(app, port = 5002, proxy_headers=True)

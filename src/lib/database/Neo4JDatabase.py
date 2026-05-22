@@ -81,7 +81,7 @@ constraints = [
     ConstraintModel(constrain_label  = "trait_tag",node_label = NodeLabelModel(label = "Trait"),property_name ="tag"),
     ConstraintModel(constrain_label  = "state_tag",node_label = NodeLabelModel(label = "State"),property_name ="tag"),
     ConstraintModel(constrain_label  = "user_tag",node_label = NodeLabelModel(label = "User"),property_name = ["tag","email"]),
-    ConstraintModel(constrain_label  = "filter_tag",node_label = NodeLabelModel(label = "Filter"),property_name ="tag"),
+    #ConstraintModel(constrain_label  = "filter_tag",node_label = NodeLabelModel(label = "Filter"),property_name ="tag"),
     ConstraintModel(constrain_label  = "state_tag",node_label = NodeLabelModel(label = "State"),property_name ="tag"),
     ConstraintModel(constrain_label  = "user_role_tag",node_label = NodeLabelModel(label = "Role"),property_name ="tag"),
     ConstraintModel(constrain_label  = "query_tag",node_label = NodeLabelModel(label = "Query"),property_name ="tag"),
@@ -90,8 +90,8 @@ constraints = [
     ConstraintModel(constrain_label  = "qc_tag",node_label = NodeLabelModel(label = "QCRun"),property_name ="tag"),
     ConstraintModel(constrain_label  = "peptide_tag",node_label = NodeLabelModel(label = "Peptide"),property_name ="tag"),
     ConstraintModel(constrain_label  = "news_tag",node_label = NodeLabelModel(label = "News"),property_name ="tag"),
-    ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag"),
-    ConstraintModel(constrain_label  = "timeline_tag",node_label = NodeLabelModel(label = "Timeline"),property_name ="tag"),
+    # ConstraintModel(constrain_label  = "unit_tag",node_label = NodeLabelModel(label = "Unit"),property_name ="tag"),
+    # ConstraintModel(constrain_label  = "timeline_tag",node_label = NodeLabelModel(label = "Timeline"),property_name ="tag"),
     ConstraintModel(constrain_label  = "research_group_tag",node_label = NodeLabelModel(label = "ResearchGroup"),property_name = "tag"),
     ConstraintModel(constrain_label  = "phenotype_tag",node_label = NodeLabelModel(label = "Phenotype"),property_name = "tag"),
     ConstraintModel(constrain_label  = "comment_tag",node_label = NodeLabelModel(label = "Comment"),property_name = "tag"),
@@ -109,7 +109,10 @@ constraints = [
     ConstraintModel(constrain_label  = "external_service_tag",node_label = NodeLabelModel(label = "ExternalService"), property_name = "tag"),
     ConstraintModel(constrain_label  = "statistics_tag",node_label = NodeLabelModel(label = "Statistics"), property_name = "tag"),
     ConstraintModel(constrain_label  = "run_tag",node_label = NodeLabelModel(label = "Run"), property_name = "tag"),
-    ConstraintModel(constrain_label  = "runlist_tag",node_label = NodeLabelModel(label = "RunList"), property_name = "tag")
+    ConstraintModel(constrain_label  = "runlist_tag",node_label = NodeLabelModel(label = "RunList"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "annotation_tag",node_label = NodeLabelModel(label = "Annotation"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "annotation_group_tag",node_label = NodeLabelModel(label = "AnnotationGroup"), property_name = "tag")
+
 
 ]
 

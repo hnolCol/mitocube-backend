@@ -25,7 +25,7 @@
         {
             "tag": "att_acquisition",
             "requires": null,
-            "children": "att_masstocharge|att_numspectra",
+            "children": "att_ms1_resolution|att_ms2_resolution|att_collision_energy|att_masstocharge|att_numspectra",
             "text": "Acquisition",
             "abbr": null,
             "priority": 680,
@@ -403,7 +403,7 @@
             "text": "Collision Energy [%]",
             "abbr": null,
             "priority": 500,
-            "allow_input": false,
+            "allow_input": true,
             "has_features_value": false,
             "group_tag": "ms",
             "min_state": 2,
@@ -573,7 +573,7 @@
             "instrumenttype": null
         },
         {
-            "tag": "att_fraction",
+            "tag": "att_centrifugation_fraction",
             "requires": null,
             "children": null,
             "text": "Differential centrifugation fraction",
@@ -597,7 +597,7 @@
         {
             "tag": "att_digestion_method",
             "requires": null,
-            "children": "att_duration|att_termperature|att_volume|att_protease|att_digestion_vessel",
+            "children": "att_mass|att_duration|att_termperature|att_volume|att_protease|att_digestion_vessel",
             "text": "Digestion Method",
             "abbr": null,
             "priority": 500,
@@ -861,7 +861,7 @@
         {
             "tag": "att_faims_cv",
             "requires": "att_interface:faims",
-            "children": "att_voltage",
+            "children": null,
             "text": "FAIMS Compensation Voltage ",
             "abbr": null,
             "priority": 500,
@@ -882,7 +882,7 @@
         },
         {
             "tag": "att_faims_gasflow",
-            "requires": "att_interface:faims",
+            "requires": "att_ms_interface:faims",
             "children": null,
             "text": "FAIMS Gas flow",
             "abbr": null,
@@ -904,8 +904,8 @@
         },
         {
             "tag": "att_faims_inner_temp",
-            "requires": "att_interface:faims",
-            "children": "att_temperature",
+            "requires": "att_ms_interface:faims",
+            "children": null,
             "text": "FAIMS Inner Electrode Temp",
             "abbr": null,
             "priority": 500,
@@ -926,8 +926,8 @@
         },
         {
             "tag": "att_faims_outer_temp",
-            "requires": "att_interface:faims",
-            "children": "att_temperature",
+            "requires": "att_ms_interface:faims",
+            "children": null,
             "text": "FAIMS Outer Electrode Temp",
             "abbr": null,
             "priority": 500,
@@ -1411,7 +1411,7 @@
         {
             "tag": "att_lc_gradient",
             "requires": null,
-            "children": "att_duration",
+            "children": "att_duration|att_flow_rate",
             "text": "LC Gradient Type",
             "abbr": null,
             "priority": 600,
@@ -1565,7 +1565,7 @@
         {
             "tag": "att_ms",
             "requires": null,
-            "children": "att_acquisition",
+            "children": "att_rf_level|att_acquisition",
             "text": "Mass Spectrometer",
             "abbr": null,
             "priority": 710,
@@ -1849,28 +1849,6 @@
             "instrumenttype": null
         },
         {
-            "tag": "att_ms1_resolution",
-            "requires": null,
-            "children": "att_arbitrary",
-            "text": "MS1 Resolution",
-            "abbr": null,
-            "priority": 500,
-            "allow_input": false,
-            "has_features_value": false,
-            "group_tag": "ms",
-            "min_state": 2,
-            "attribute_group": "filter|dataset|sample",
-            "mandatory_for_active": null,
-            "allow_as_filter": "filter",
-            "allow_for_user": null,
-            "allow_for_genotype": null,
-            "allow_for_qc": null,
-            "allow_for_dataset": "dataset",
-            "allow_for_measurement": "sample",
-            "instrument": null,
-            "instrumenttype": null
-        },
-        {
             "tag": "att_ms1_mz_start",
             "requires": null,
             "children": null,
@@ -1919,28 +1897,6 @@
             "requires": null,
             "children": null,
             "text": "MS2 End",
-            "abbr": null,
-            "priority": 500,
-            "allow_input": false,
-            "has_features_value": false,
-            "group_tag": "ms",
-            "min_state": 2,
-            "attribute_group": "filter|dataset|sample",
-            "mandatory_for_active": null,
-            "allow_as_filter": "filter",
-            "allow_for_user": null,
-            "allow_for_genotype": null,
-            "allow_for_qc": null,
-            "allow_for_dataset": "dataset",
-            "allow_for_measurement": "sample",
-            "instrument": null,
-            "instrumenttype": null
-        },
-        {
-            "tag": "att_ms2_resolution",
-            "requires": null,
-            "children": "att_arbitrary",
-            "text": "MS2 Resolution",
             "abbr": null,
             "priority": 500,
             "allow_input": false,
@@ -2996,7 +2952,7 @@
             "tag": "att_mass",
             "requires": null,
             "children": null,
-            "text": "Total mass",
+            "text": "Mass",
             "abbr": "m",
             "priority": 500,
             "allow_input": true,
@@ -3121,6 +3077,94 @@
             "allow_for_qc": null,
             "allow_for_dataset": null,
             "allow_for_measurement": null,
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_rf_level",
+            "requires": "att_ms:eclips|att_ms:exploris240|att_ms:exploris480|att_ms:qex|att_ms:qexplus",
+            "children": null,
+            "text": "RF Funnel Level",
+            "abbr": "RF",
+            "priority": 500,
+            "allow_input": true,
+            "has_features_value": false,
+            "group_tag": "unit",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_ms1_resolution",
+            "requires": null,
+            "children": null,
+            "text": "MS1 Spectra Resolution",
+            "abbr": "RF",
+            "priority": 600,
+            "allow_input": true,
+            "has_features_value": false,
+            "group_tag": "unit",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_ms2_resolution",
+            "requires": null,
+            "children": null,
+            "text": "MS2 Spectra Resolution",
+            "abbr": "RF",
+            "priority": 600,
+            "allow_input": true,
+            "has_features_value": false,
+            "group_tag": "unit",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_digestion_vessel",
+            "requires": null,
+            "children": null,
+            "text": "Digestion Vessel",
+            "abbr": null,
+            "priority": 600,
+            "allow_input": false,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
             "instrument": null,
             "instrumenttype": null
         }
@@ -4997,131 +5041,11 @@
             "ols": null
         },
         {
-            "value": "75um",
-            "attribute_tag": "att_column_inner_diameter",
-            "tag": "att_column_inner_diameter:75um",
-            "keyword": null,
-            "text": 75,
-            "description": "75 \u00b5m inner column diameter",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "15cm",
-            "attribute_tag": "att_column_length",
-            "tag": "att_column_length:15cm",
-            "keyword": "15cm",
-            "text": 15,
-            "description": "15 cm column length",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "30cm",
-            "attribute_tag": "att_column_length",
-            "tag": "att_column_length:30cm",
-            "keyword": "30cm",
-            "text": 30,
-            "description": "30 cm column length",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "50cm",
-            "attribute_tag": "att_column_length",
-            "tag": "att_column_length:50cm",
-            "keyword": "50cm",
-            "text": 50,
-            "description": "50 cm column length",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "5cm",
-            "attribute_tag": "att_column_length",
-            "tag": "att_column_length:5cm",
-            "keyword": "5cm",
-            "text": 5,
-            "description": "5 cm column length",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "40cm",
-            "attribute_tag": "att_column_length",
-            "tag": "att_column_length:40cm",
-            "keyword": 40,
-            "text": 40,
-            "description": "40 cm column length",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "60cm",
-            "attribute_tag": "att_column_length",
-            "tag": "att_column_length:60cm",
-            "keyword": "60cm",
-            "text": 60,
-            "description": "60 cm column length",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "40c",
-            "attribute_tag": "att_column_oven_temp",
-            "tag": "att_column_oven_temp:40c",
-            "keyword": null,
-            "text": 40,
-            "description": "The column was kept at 40\u00b0C during the complete gradient time.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "50c",
-            "attribute_tag": "att_column_oven_temp",
-            "tag": "att_column_oven_temp:50c",
-            "keyword": null,
-            "text": 50,
-            "description": "The column was kept at 50\u00b0C during the complete gradient time.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "55c",
-            "attribute_tag": "att_column_oven_temp",
-            "tag": "att_column_oven_temp:55c",
-            "keyword": null,
-            "text": 55,
-            "description": "The column was kept at 55\u00b0C during the complete gradient time.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "170nm",
-            "attribute_tag": "att_column_particle_size",
-            "tag": "att_column_particle_size:170nm",
-            "keyword": null,
-            "text": 1.7,
-            "description": "1.7 \u00b5m particle size",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "270nm",
-            "attribute_tag": "att_column_particle_size",
-            "tag": "att_column_particle_size:270nm",
-            "keyword": null,
-            "text": 2.7,
-            "description": "2.7 \u00b5m particle size",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
             "value": "c18",
             "attribute_tag": "att_column_stat_phase",
             "tag": "att_column_stat_phase:c18",
             "keyword": null,
-            "text": "C18 Stat. Phase",
+            "text": "C18",
             "description": "C18 stationary phase",
             "priority": 500.0,
             "ols": null
@@ -5131,7 +5055,7 @@
             "attribute_tag": "att_column_stat_phase",
             "tag": "att_column_stat_phase:c8",
             "keyword": null,
-            "text": "C8 Stat. Phase",
+            "text": "C8",
             "description": "C8 stationary phase",
             "priority": 500.0,
             "ols": null
@@ -6417,56 +6341,6 @@
             "ols": null
         },
         {
-            "value": "23c",
-            "attribute_tag": "att_digestion_temp",
-            "tag": "att_digestion_temp:23c",
-            "keyword": null,
-            "text": "23 \u00b0C",
-            "description": "Digestion of proteins performed at 23 \u00b0C.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "37c",
-            "attribute_tag": "att_digestion_temp",
-            "tag": "att_digestion_temp:37c",
-            "keyword": null,
-            "text": "37 \u00b0C",
-            "description": "Digestion of proteins performed at 37\u00b0C.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "12h",
-            "attribute_tag": "att_digestion_time",
-            "tag": "att_digestion_time:12h",
-            "keyword": null,
-            "text": "12 h",
-            "description": "Digestion time of 12 h.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "16h",
-            "attribute_tag": "att_digestion_time",
-            "tag": "att_digestion_time:16h",
-            "keyword": null,
-            "text": "16 h",
-            "description": "Digestion time of 16 h.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "8h",
-            "attribute_tag": "att_digestion_time",
-            "tag": "att_digestion_time:8h",
-            "keyword": null,
-            "text": "8 h",
-            "description": "Digestion time of 8 h.",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
             "value": "384well_plate",
             "attribute_tag": "att_digestion_vessel",
             "tag": "att_digestion_vessel:384well_plate",
@@ -6997,126 +6871,6 @@
             "ols": null
         },
         {
-            "value": "100c",
-            "attribute_tag": "att_faims_inner_temp",
-            "tag": "att_faims_inner_temp:100c",
-            "keyword": null,
-            "text": 100,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "95c",
-            "attribute_tag": "att_faims_inner_temp",
-            "tag": "att_faims_inner_temp:95c",
-            "keyword": null,
-            "text": 95,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "96c",
-            "attribute_tag": "att_faims_inner_temp",
-            "tag": "att_faims_inner_temp:96c",
-            "keyword": null,
-            "text": 96,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "97c",
-            "attribute_tag": "att_faims_inner_temp",
-            "tag": "att_faims_inner_temp:97c",
-            "keyword": null,
-            "text": 97,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "98c",
-            "attribute_tag": "att_faims_inner_temp",
-            "tag": "att_faims_inner_temp:98c",
-            "keyword": null,
-            "text": 98,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "99c",
-            "attribute_tag": "att_faims_inner_temp",
-            "tag": "att_faims_inner_temp:99c",
-            "keyword": null,
-            "text": 99,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "100c",
-            "attribute_tag": "att_faims_outer_temp",
-            "tag": "att_faims_outer_temp:100c",
-            "keyword": null,
-            "text": 100,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "95c",
-            "attribute_tag": "att_faims_outer_temp",
-            "tag": "att_faims_outer_temp:95c",
-            "keyword": null,
-            "text": 95,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "96c",
-            "attribute_tag": "att_faims_outer_temp",
-            "tag": "att_faims_outer_temp:96c",
-            "keyword": null,
-            "text": 96,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "97c",
-            "attribute_tag": "att_faims_outer_temp",
-            "tag": "att_faims_outer_temp:97c",
-            "keyword": null,
-            "text": 97,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "98c",
-            "attribute_tag": "att_faims_outer_temp",
-            "tag": "att_faims_outer_temp:98c",
-            "keyword": null,
-            "text": 98,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "99c",
-            "attribute_tag": "att_faims_outer_temp",
-            "tag": "att_faims_outer_temp:99c",
-            "keyword": null,
-            "text": 99,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
             "value": "bal",
             "attribute_tag": "att_fluid",
             "tag": "att_fluid:bal",
@@ -7508,8 +7262,8 @@
         },
         {
             "value": "male",
-            "attribute_tag": "att_gender",
-            "tag": "att_gender:male",
+            "attribute_tag": "att_sex",
+            "tag": "att_sex:male",
             "keyword": null,
             "text": "Male",
             "description": "Male",
@@ -7518,8 +7272,8 @@
         },
         {
             "value": "female",
-            "attribute_tag": "att_gender",
-            "tag": "att_gender:female",
+            "attribute_tag": "att_sex",
+            "tag": "att_sex:female",
             "keyword": null,
             "text": "Female",
             "description": "Female",
@@ -7603,46 +7357,6 @@
             "keyword": "sirna",
             "text": "siRNA",
             "description": "siRNA based gene expression knock down by RNA interference",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "185nlmin",
-            "attribute_tag": "att_lc_flow_rate",
-            "tag": "att_lc_flow_rate:185nlmin",
-            "keyword": null,
-            "text": 185,
-            "description": "185 nL/min",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "200nlmin",
-            "attribute_tag": "att_lc_flow_rate",
-            "tag": "att_lc_flow_rate:200nlmin",
-            "keyword": null,
-            "text": 200,
-            "description": "200 nL/min",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "250nlmin",
-            "attribute_tag": "att_lc_flow_rate",
-            "tag": "att_lc_flow_rate:250nlmin",
-            "keyword": null,
-            "text": 250,
-            "description": "250 nL/min",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "500nlmin",
-            "attribute_tag": "att_lc_flow_rate",
-            "tag": "att_lc_flow_rate:500nlmin",
-            "keyword": null,
-            "text": 500,
-            "description": "500 nL/min",
             "priority": 500.0,
             "ols": null
         },
@@ -9761,7 +9475,7 @@
             "attribute_tag": "att_ms_interface",
             "tag": "att_ms_interface:faims",
             "keyword": null,
-            "text": "Faims",
+            "text": "FAIMS",
             "description": "FAIMS module attached to the mass spectrometer. Please specify the CV value",
             "priority": 500.0,
             "ols": null
@@ -9771,8 +9485,18 @@
             "attribute_tag": "att_ms_interface",
             "tag": "att_ms_interface:no_interface",
             "keyword": null,
-            "text": null,
+            "text": "No interface installed/active",
             "description": "No special interface in front of the mass spectrometer.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "none",
+            "attribute_tag": "att_ms_interface",
+            "tag": "att_ms_interface:none",
+            "keyword": null,
+            "text": null,
+            "description": "None.",
             "priority": 500.0,
             "ols": null
         },
@@ -13207,16 +12931,6 @@
             "ols": null
         },
         {
-            "value": -45,
-            "attribute_tag": "att_faims_cv",
-            "tag": "att_faims_cv:-45",
-            "keyword": null,
-            "text": -45,
-            "description": null,
-            "priority": 500.0,
-            "ols": null
-        },
-        {
             "value": "input",
             "attribute_tag": "att_enrich_frac",
             "tag": "att_enrich_frac:input",
@@ -15977,7 +15691,7 @@
             "ols": null
         },
         {
-            "value": "V",
+            "value": "v",
             "attribute_tag": "att_voltage",
             "tag": "att_voltage:V",
             "keyword": null,
@@ -15987,7 +15701,7 @@
             "ols": null
         },
         {
-            "value": "kV",
+            "value": "kv",
             "attribute_tag": "att_voltage",
             "tag": "att_voltage:kV",
             "keyword": null,
@@ -16067,7 +15781,7 @@
             "ols": null
         },
         {
-            "value": "\u00b5L",
+            "value": "ul",
             "attribute_tag": "att_volume",
             "tag": "att_volume:\u00b5L",
             "keyword": null,
@@ -16077,7 +15791,7 @@
             "ols": null
         },
         {
-            "value": "nL",
+            "value": "nlpermin",
             "attribute_tag": "att_volume",
             "tag": "att_volume:nL",
             "keyword": null,
@@ -16712,7 +16426,7 @@
             "tag": "att_batch:id",
             "keyword": null,
             "text": "ID",
-            "description": "Batch identifier",
+            "description": "Batch/Mouse identifier",
             "priority": 500.0,
             "ols": null
         },
@@ -17197,6 +16911,16 @@
             "ols": null
         },
         {
+            "value": "mouseid",
+            "attribute_tag": "att_batch_type",
+            "tag": "att_batch_type:mouseid",
+            "keyword": null,
+            "text": "Mouse ID",
+            "description": "The mouse ID",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
             "value": "stem_cell_differentiation",
             "attribute_tag": "att_cell_diff",
             "tag": "att_cell_diff:stem_cell_differentiation",
@@ -17274,6 +16998,166 @@
             "text": "Cancerous differentiation",
             "description": "Loss or disruption of normal differentiation patterns, often seen in cancer cells",
             "priority": 700.0,
+            "ols": null
+        },
+        {
+            "value": "in_cell_culture",
+            "attribute_tag": "att_protein_treatment",
+            "tag": "att_protein_treatment:in_cell_culture",
+            "keyword": null,
+            "text": "cell culture",
+            "description": "Added to the medium",
+            "priority": 400.0,
+            "ols": null
+        },
+        {
+            "value": "in_vivo",
+            "attribute_tag": "att_protein_treatment",
+            "tag": "att_protein_treatment:in_vivo",
+            "keyword": null,
+            "text": "in vivo",
+            "description": "Injected in vivo",
+            "priority": 400.0,
+            "ols": null
+        },
+        {
+            "value": "son",
+            "attribute_tag": "att_column_oven",
+            "tag": "att_column_oven:son",
+            "keyword": null,
+            "text": "Sonation",
+            "description": "Sonation column oven",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": "none",
+            "attribute_tag": "att_column_oven",
+            "tag": "att_column_oven:none",
+            "keyword": null,
+            "text": null,
+            "description": "No column oven installed. No temperature control.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "perc",
+            "attribute_tag": "att_rf_level",
+            "tag": "att_rf_level:perc",
+            "keyword": null,
+            "text": "%",
+            "description": "Percentage of maximum. A value of 45 means the lens is running at 45% of its maximum factory-calibrated RF power. This is the setting in the Tune software.",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": "vpp",
+            "attribute_tag": "att_rf_level",
+            "tag": "att_rf_level:vpp",
+            "keyword": null,
+            "text": "Vp-p",
+            "description": "Volts Peak-to-Peak. An RF amplitude of 45 Vp-p means the voltage rapidly oscillates between +22.5 V and 22.5V.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "v",
+            "attribute_tag": "att_faims_cv",
+            "tag": "att_faims_cv:v",
+            "keyword": null,
+            "text": "CV",
+            "description": "FAIMS compensation voltage.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "lmin",
+            "attribute_tag": "att_faims_gasflow",
+            "tag": "att_faims_gasflow:lmin",
+            "keyword": null,
+            "text": "L/min",
+            "description": "Gasflow set to the FAIMS device",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "c",
+            "attribute_tag": "att_faims_inner_temp",
+            "tag": "att_faims_inner_temp:c",
+            "keyword": null,
+            "text": "C",
+            "description": "Termperature value set to the inner electrode of the FAIMS device",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "c",
+            "attribute_tag": "att_faims_outer_temp",
+            "tag": "att_faims_outer_temp:c",
+            "keyword": null,
+            "text": "C",
+            "description": "Termperature value set to the outer electrode of the FAIMS device",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": 200,
+            "attribute_tag": "att_ms1_resolution",
+            "tag": "att_ms1_resolution:200",
+            "keyword": null,
+            "text": "(at 200m/z)",
+            "description": "Resolution (at 200 m/z)",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": 200,
+            "attribute_tag": "att_ms2_resolution",
+            "tag": "att_ms2_resolution:200",
+            "keyword": null,
+            "text": "(at 200m/z)",
+            "description": "Resolution (at 200 m/z)",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": 400,
+            "attribute_tag": "att_ms1_resolution",
+            "tag": "att_ms1_resolution:400",
+            "keyword": null,
+            "text": "(at 400m/z)",
+            "description": "Resolution (at 400 m/z)",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": 400,
+            "attribute_tag": "att_ms2_resolution",
+            "tag": "att_ms2_resolution:400",
+            "keyword": null,
+            "text": "(at 400m/z)",
+            "description": "Resolution (at 400 m/z)",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "nce",
+            "attribute_tag": "att_collision_energy",
+            "tag": "att_collision_energy:nce",
+            "keyword": null,
+            "text": "NCE",
+            "description": "Normalized collision energy",
+            "priority": 550.0,
+            "ols": null
+        },
+        {
+            "value": "v",
+            "attribute_tag": "att_collision_energy",
+            "tag": "att_collision_energy:v",
+            "keyword": null,
+            "text": "V",
+            "description": "Voltage applied",
+            "priority": 500.0,
             "ols": null
         }
     ]

@@ -32,7 +32,12 @@ DB = Database.DB()
 
 attr_update = {
     "att_organism" : "att_proteome",
-    "att_gender" : "att_sex"
+    "att_gender" : "att_sex",
+    "att_ms_name" : "att_ms",
+    "att_ms" : "att_ms_type",
+    'att_lc_system' : "att_lc_system_type",
+    'att_lc_system_name' : "att_lc",
+    'att_fraction' : 'att_centrifugation_fraction'
 }
 
 time_to_att_duration = {
@@ -54,6 +59,25 @@ def handle_knockdown(tags : List[str], technique_trait_tag : str = "att_knockdow
     r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
     return r 
 
+def handle_gender(tags : List[str]):
+    "" 
+    
+    return build_tree(attribute_tag="att_sex", trait_tags=[t.replace("att_gender:", "att_sex:") for t in tags])
+
+def handle_protein_treatment(tags : List[str]):
+    "" 
+    r = [] 
+    protein_tags = [t.split(":")[1] for t in tags]
+    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tags[0])
+    r = build_tree(attribute_tag = "att_protein_treatment", trait_tags=["att_protein_treatment:in_vivo"]) 
+    r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
+    return r 
+
+def handle_mouse_id(tags : List[str]):
+    values = [t.split(":")[1] for t in tags] 
+    tree =  build_tree(attribute_tag="att_batch_type", trait_tags=["att_batch_type:mouseid"])
+    tree["children"][0]["children"].extend([build_tree(attribute_tag="att_batch", trait_tags=["att_batch:id"], value=v) for v in values])
+    return tree 
 
 def handle_pulldown(tags : List[str]):
     "" 
@@ -85,10 +109,35 @@ def build_tree(attribute_tag, trait_tags : List[str], value = None):
         if attribute_tag in attr_update:
             attribute_tag_old = attribute_tag
             attribute_tag = attr_update[attribute_tag]
-            update_attr = True
             
+            if attribute_tag == "att_proteome":
+                trait_tags = [t.split(":")[-1] for t in trait_tags]
+            else:
+                [trait_tag.replace(attribute_tag_old, attribute_tag) if update_attr else trait_tag for trait_tag in trait_tags]
+        
         return {"type" : "attribute", "tag" : attribute_tag, "children" : 
-            [{"type" : "trait", "tag" : trait_tag.replace(attribute_tag_old, attribute_tag) if update_attr and attribute_tag != "att_proteome" else trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags)]}
+            [{"type" : "trait", "tag" : trait_tag, "children" : [], "value" : value[idx] if isinstance(value, list) else value } for idx, trait_tag in enumerate(trait_tags) if isinstance(trait_tag,str)]}
+
+# def handle_digestion(dataset_attributes : dict):
+#     "" 
+#     protease_tags  = dataset_attributes.get("att_protease", [])
+#     att_digestion_time_tags = dataset_attributes.get("att_digestion_time", None)
+#     att_digestion_time = att_digestion_time_tags[0].split(":")[-1] if att_digestion_time_tags is not None else None
+#     att_digestion_volume_tags = dataset_attributes.get("att_digestion_volume", None)
+#     att_digestion_volume = att_digestion_volume_tags[0].split(":")[-1] if att_digestion_volume_tags is not None else None 
+#     att_digestion_time_tags = dataset_attributes.get("att_digestion_time_unit", None)
+#     att_digestion_time = att_digestion_time_tags[0].split(":")[-1] if att_digestion_time_tags is not None else None 
+#     print(protease_tags, att_digestion_time)
+    
+    
+#     if "att_digestion_enzyme" in dataset_attributes:
+#         enzyme_tags = dataset_attributes["att_digestion_enzyme"]
+#         tree = build_tree(attribute_tag="att_digestion", trait_tags=["att_digestion:enzyme"])
+#         for enzyme_tag in enzyme_tags:
+#             tree["children"][0]["children"].append(build_tree(attribute_tag="att_enzyme", trait_tags=["att_enzyme"], value=enzyme_tag.split(":")[1]))
+#         return tree
+#     else:
+#         return None
 
 
 def handle_centrifugation_pellet(tags : List[str]):
@@ -107,9 +156,18 @@ def handle_centrifugation_supernatant(tags : List[str]):
     print(f"Handling centrifugation with tags {tags}, resulting tree: {tree}")
     return tree
 
+def handle_poi(tags : List[str]):
+    
+    r = [] 
+    protein_tags = [t.split(":")[1] for t in tags]
+    protein_tags = [p if p != "P40313" else "IGGCTR" for p in protein_tags]
+    proteome_tag = DB.proteomes.get_proteome_by_protein_tag(protein_tag = protein_tags[0])
+    r = build_tree(attribute_tag = "att_pulldown", trait_tags=["att_pulldown:endog"]) 
+    r["children"][0]["children"].append(build_tree(attribute_tag="att_protein", trait_tags=[proteome_tag], value = "||".join(protein_tags)))
+    return r
+
 def get_tags_by_sample(samples_attrs : dict): 
     
-   
     samples_idcs = np.sort(np.unique(np.concatenate([np.array(indices) for indices in samples_attrs.values()])))
     return [[tag for tag, indices in samples_attrs.items() if sample_idx in indices] for sample_idx in samples_idcs]
    
@@ -178,9 +236,17 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
                 r[sampleIdx].append(handle_knockdown(sample_attribute_tags, technique_trait_tag=technique_trait_tag))
             elif attribute_tag == "att_batch":
                 r[sampleIdx].append(handle_batch(sample_attribute_tags))    
-            elif attribute_tag == "att_clone_id":
+            elif attribute_tag == "att_protein_treatment":
+                r[sampleIdx].append(handle_protein_treatment(sample_attribute_tags))
+            elif attribute_tag == "att_gender":
+                r[sampleIdx].append(handle_gender(sample_attribute_tags))
+            elif attribute_tag == "att_pulldown":
+                r[sampleIdx].append(handle_pulldown(sample_attribute_tags))
+            elif attribute_tag == "att_cloneid":
                 r[sampleIdx].append(handle_clone_id(sample_attribute_tags))
             elif attribute_tag == "att_centr_pellet":
+                r[sampleIdx].append(handle_centrifugation_pellet(sample_attribute_tags))
+            elif attribute_tag == "att_mouse_id":
                 r[sampleIdx].append(handle_centrifugation_pellet(sample_attribute_tags))
             elif attribute_tag == "att_centr_supernatant":
                 r[sampleIdx].append(handle_centrifugation_supernatant(sample_attribute_tags))
@@ -206,9 +272,244 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
     
     return list(r.values())
    
+   
+def build_column_oven(dataset_attributes: dict):
+    r = [] 
+    
+    oven_tags = dataset_attributes.get("att_column_oven_temp", None)
+    if oven_tags is None:
+        return dataset_attributes, None
+    T = build_tree(attribute_tag="att_column_oven", trait_tags=["att_column_oven:son"])
+    if oven_tags is not None:
+        O = build_tree(attribute_tag="att_temperature", trait_tags=["att_temperature:celc"])
+        dataset_attributes.pop("att_column_oven_temp")
+    
+    T["children"][0]["children"].append(O)
+        
+    return dataset_attributes, T
+
+def build_ms_attributes(dataset_attributes: dict):
+
+    
+    ms_type = dataset_attributes.get("att_ms", None)
+    if ms_type is None:
+        return dataset_attributes, None
+    T = build_tree(attribute_tag="att_ms_type", trait_tags=[t.replace("att_ms","att_ms_type") for t in ms_type], value=None)
+    dataset_attributes.pop("att_ms")
+    
+    ms_instrument = dataset_attributes.get("att_ms_name", None)
+    if ms_instrument is not None and len(ms_instrument) > 0:
+        ms_instrument_tree = build_tree(attribute_tag="att_ms", trait_tags=[t.replace("att_ms_name","att_ms") for t in ms_instrument], value=None)
+        
+        rf_level_tags = dataset_attributes.get("att_rf_level", None)
+        if rf_level_tags is not None and len(rf_level_tags) > 0:
+             rf_level_tree = build_tree(attribute_tag="att_rf_level", trait_tags=["att_rf_level:perc"], value=rf_level_tags[0].split(":")[1].replace("%", ""))
+             ms_instrument_tree["children"][0]["children"].append(rf_level_tree)
+             dataset_attributes.pop("att_rf_level") 
+       
+        acquisition = dataset_attributes.get("att_acquisition", None)
+        if acquisition is not None and len(acquisition) > 0:
+            acquisition_tree = build_tree(attribute_tag="att_acquisition", trait_tags=acquisition, value=None)
+            
+            ms1_tags = dataset_attributes.get("att_ms1_resolution", None)
+            if ms1_tags is not None and len(ms1_tags) > 0:
+                ms1_tree = build_tree(attribute_tag="att_ms1_resolution", trait_tags=["att_ms1_resolution:200"], value=ms1_tags[0].split(":")[1].lower().replace("res", ""))
+                acquisition_tree["children"][0]["children"].append(ms1_tree)
+                dataset_attributes.pop("att_ms1_resolution")
+            
+            ms2_tags = dataset_attributes.get("att_ms2_resolution", None)
+            if ms2_tags is not None and len(ms2_tags) > 0:
+                ms2_tree = build_tree(attribute_tag="att_ms2_resolution", trait_tags=["att_ms2_resolution:200"], value=ms2_tags[0].split(":")[1].lower().replace("res", ""))
+                acquisition_tree["children"][0]["children"].append(ms2_tree)
+                dataset_attributes.pop("att_ms2_resolution")    
+                
+            dia_windows = dataset_attributes.get("att_diawindows", None)
+            if dia_windows is not None and len(dia_windows) > 0:
+                dia_tree = build_tree(attribute_tag="att_numspectra", trait_tags=["att_numspectra:diawindows"], value=dia_windows[0].split(":")[1])
+                acquisition_tree["children"][0]["children"].append(dia_tree)
+                dataset_attributes.pop("att_diawindows")
+
+    return dataset_attributes, T
+
+def build_gradient_attributes(dataset_attributes: dict):
+        
+        # att_lc_gradient		att_duration
+        
+        # "att_lc_gradient_length": [
+        #     "att_lc_gradient_length:120"
+        # ],
+        # "att_lc_flo
+    gradient_length_tags = dataset_attributes.get("att_lc_gradient_length", None)
+    if gradient_length_tags is None:
+        return dataset_attributes, None
+    T = build_tree(attribute_tag="att_lc_gradient", trait_tags=["att_lc_gradient:binary"])
+    time = gradient_length_tags[0].split(":")[1] if gradient_length_tags is not None else None
+    if time is not None and len(time) > 0:
+        gradient_length_tree = build_tree(attribute_tag="att_duration", trait_tags=["att_duration:min"], value=time)
+        T["children"][0]["children"].append(gradient_length_tree)
+        dataset_attributes.pop("att_lc_gradient_length")
+        
+    flow_rate = dataset_attributes.get("att_lc_flow_rate", None)#"att_lc_flow_rate:185nlmin
+    
+    if flow_rate is not None and len(flow_rate) > 0:
+        flow_rate_tree = build_tree(attribute_tag="att_flow_rate", trait_tags=["att_flow_rate:nlpermin"], value=flow_rate[0].split(":")[1].lower().replace("nlmin", ""))
+        T["children"][0]["children"].append(flow_rate_tree)
+        dataset_attributes.pop("att_lc_flow_rate")
+    return dataset_attributes, T
+
+def build_column_attributes(dataset_attributes: dict):
+    r = [] 
+
+    column_type = dataset_attributes.get("att_column_type",None)
+    if column_type is None:
+        return dataset_attributes, None
+    T = build_tree(attribute_tag="att_column_type", trait_tags=column_type)
+    children = []
+    dataset_attributes.pop("att_column_type")
+#att_length|att_outer_diameter|att_inner_diameter|att_particle_size|att_pore_size|att_column_stat_phase
+    L = dataset_attributes.get("att_column_length", None)
+    if L is not None and len(L) > 0:
+        L_tree = build_tree(attribute_tag="att_length", trait_tags=["att_length:cm"], value=L[0].split(":")[1].replace("cm", ""))
+        children.append(L_tree)
+        dataset_attributes.pop("att_column_length")
+    id = dataset_attributes.get("att_column_inner_diameter", None)
+    if id is not None and len(id) > 0:
+        id_tree = build_tree(attribute_tag="att_inner_diameter", trait_tags=["att_inner_diameter:µm"], value=id[0].split(":")[1].replace("µm", "").replace("um", ""))
+        children.append(id_tree)
+        dataset_attributes.pop("att_column_inner_diameter")
+    
+    od = dataset_attributes.get("att_column_outer_diameter", None)
+    if od is not None and len(od) > 0:
+        od_tree = build_tree(attribute_tag="att_outer_diameter", trait_tags=["att_outer_diameter:µm"], value=od[0].split(":")[1].replace("µm", "").replace("um", ""))
+        children.append(od_tree)
+        dataset_attributes.pop("att_column_outer_diameter")
+    pc = dataset_attributes.get("att_column_particle_size", None)
+    if pc is not None and len(pc) > 0:
+        pc_tree = build_tree(attribute_tag="att_particle_size", trait_tags=["att_particle_size:µm"], value=pc[0].split(":")[1].replace("µm", "").replace("nm", "").replace("um", ""))
+        children.append(pc_tree)
+        dataset_attributes.pop("att_column_particle_size")
+    stat_phase = dataset_attributes.get("att_column_stat_phase", None)
+    if stat_phase is not None:
+        stat_phase_tree = build_tree(attribute_tag="att_column_stat_phase", trait_tags=["att_column_stat_phase:c18"], value=None)
+        children.append(stat_phase_tree)
+        dataset_attributes.pop("att_column_stat_phase")
+    T["children"][0]["children"] = children
+    
+    return dataset_attributes, T
+    
+def build_spray_attributes(dataset_attributes: dict):
+    
+    spray_tags = dataset_attributes.get("att_ms_ionsource", None)
+    if spray_tags is None:
+        return dataset_attributes, None
+    T = build_tree(attribute_tag="att_ms_ionsource", trait_tags=spray_tags ) 
+    
+    voltage = dataset_attributes.get("att_spray_voltage", None) 
+    if voltage is not None and len(voltage) > 0:
+        voltage_tree = build_tree(attribute_tag="att_voltage", trait_tags=["att_voltage:kv"], value=voltage[0].split(":")[1].lower().replace("kv", ""))
+        T["children"][0]["children"].append(voltage_tree)
+        dataset_attributes.pop("att_spray_voltage")
+    temp = dataset_attributes.get("att_cap_temp", None)
+    if temp is not None and len(temp) > 0:
+        temp_tree = build_tree(attribute_tag="att_temperature", trait_tags=["att_temperature:celc"], value=temp[0].split(":")[1].replace("c", ""))
+        T["children"][0]["children"].append(temp_tree)
+        dataset_attributes.pop("att_cap_temp")
+
+    return dataset_attributes, T
+
+def build_digestion_attributes(dataset_attributes: dict):
+    #att_digestion_method		att_duration|att_termperature|att_volume|att_protease|att_digestion_vessel
+    digestion_method = dataset_attributes.get("att_digestion_method",None)
+    if digestion_method is None:
+        return dataset_attributes, None 
+    if len(digestion_method) == 0:
+        digestion_method = ["att_digestion_method:sp3"]
+    T = build_tree(attribute_tag="att_digestion_method", trait_tags=digestion_method)
+    children = [] 
+    
+#     'att_digestion_temp' from dataset attributes not found in database, skipping.
+# WARNING: attribute 'att_digestion_time' from dataset attributes not found in database, skipping.
+# WARNING: attribute 'att_digestion_vessel' from dataset attributes not found in database, skipping.
+# WARNING: attribute 'att_digestion_volume' from dataset attributes not found in database, skipping.
+
+    temp = dataset_attributes.get("att_digestion_temp", None)
+    if temp is not None and len(temp) > 0:
+        temp_tree = build_tree(attribute_tag="att_temperature", trait_tags=["att_temperature:celc"], value=temp[0].split(":")[1].replace("c", ""))
+        children.append(temp_tree)
+        dataset_attributes.pop("att_digestion_temp")
+    time = dataset_attributes.get("att_digestion_time", None)
+    if time is not None and len(time) > 0:
+        time_tree = build_tree(attribute_tag="att_duration", trait_tags=["att_duration:h"], value="16")
+        children.append(time_tree)
+        dataset_attributes.pop("att_digestion_time")
+    vessel = dataset_attributes.get("att_digestion_vessel", None)
+    if vessel is not None and len(vessel) > 0:
+        vessel_tree = build_tree(attribute_tag="att_digestion_vessel", trait_tags=vessel)
+        children.append(vessel_tree)
+        dataset_attributes.pop("att_digestion_vessel")
+    volume = dataset_attributes.get("att_digestion_volume", None)
+    if volume is not None and len(volume) > 0:
+        volume_tree = build_tree(attribute_tag="att_volume", trait_tags=["att_volume:ul"], value=volume[0].split(":")[1].lower().replace("µl", "").replace("ul", ""))
+        children.append(volume_tree)
+        dataset_attributes.pop("att_digestion_volume")
+    protease = dataset_attributes.get("att_protease", None)
+    if protease is not None and len(protease) > 0:    
+        protease_tree = build_tree(attribute_tag="att_protease", trait_tags=protease)
+        children.append(protease_tree)
+        dataset_attributes.pop("att_protease")
+        
+    mass = dataset_attributes.get("att_protein_input", None)
+    if mass is not None and len(mass) > 0:
+        mass_tree = build_tree(attribute_tag="att_mass", trait_tags=["att_mass:µg"], value=mass[0].split(":")[1].lower().replace("µg", "").replace("ug", ""))
+        children.append(mass_tree)
+        dataset_attributes.pop("att_protein_input")
+        
+    T["children"][0]["children"] = children
+    return dataset_attributes, T
+
+def build_faims(dataset_attributes : dict):
+    
+    interface_tags = dataset_attributes.get("att_ms_interface", None)
+    if interface_tags is None:
+        return dataset_attributes, None
+    T = build_tree(attribute_tag="att_ms_interface", trait_tags=interface_tags)
+    is_faims = any(t.endswith("faims") for t in interface_tags)
+    dataset_attributes.pop("att_ms_interface")
+    if not is_faims:
+        return dataset_attributes, T
+    cv = dataset_attributes.get("att_faims_cv", None)
+    if cv is not None and len(cv) > 0:
+        cv_tree = build_tree(attribute_tag="att_faims_cv", trait_tags=["att_faims_cv:v"], value=cv[0].split(":")[1].replace("v", ""))
+        T["children"][0]["children"].append(cv_tree)
+        dataset_attributes.pop("att_faims_cv")
+    gasflow = dataset_attributes.get("att_faims_gasflow", None)
+    if gasflow is not None and len(gasflow) > 0:
+        gasflow_tree = build_tree(attribute_tag="att_faims_gasflow", trait_tags=["att_faims_gasflow:lmin"], value=gasflow[0].split(":")[1].lower().replace("mlmin", "").replace("ml/min", ""))
+        T["children"][0]["children"].append(gasflow_tree)
+        dataset_attributes.pop("att_faims_gasflow")
+    inner_temp = dataset_attributes.get("att_faims_inner_temp", None)
+    if inner_temp is not None and len(inner_temp) > 0:
+        inner_temp_tree = build_tree(attribute_tag="att_faims_inner_temp", trait_tags=["att_faims_inner_temp:c"], value=inner_temp[0].split(":")[1].lower().replace("c", ""))
+        T["children"][0]["children"].append(inner_temp_tree)
+        dataset_attributes.pop("att_faims_inner_temp")
+    outer_temp = dataset_attributes.get("att_faims_outer_temp", None)
+    if outer_temp is not None and len(outer_temp) > 0:
+        outer_temp_tree = build_tree(attribute_tag="att_faims_outer_temp", trait_tags=["att_faims_outer_temp:c"], value=outer_temp[0].split(":")[1].lower().replace("c", ""))
+        T["children"][0]["children"].append(outer_temp_tree)
+        dataset_attributes.pop("att_faims_outer_temp")
+    return dataset_attributes, T
+
+        
+        
 def build_dataset_condition_applications(dataset_attributes : dict): 
     "" 
     r = []
+    
+    for func in [build_ms_attributes, build_gradient_attributes, build_column_oven, build_digestion_attributes, build_column_attributes, build_spray_attributes, build_faims]:
+        dataset_attributes, T = func(dataset_attributes)
+        if T is not None:
+            r.append(T)
+    
     for attribute_tag, trait_tags in dataset_attributes.items():
         
         if attribute_tag == "att_batch":
@@ -220,7 +521,17 @@ def build_dataset_condition_applications(dataset_attributes : dict):
         elif attribute_tag == "att_centr_supernatant":
             r.append(handle_centrifugation_supernatant(trait_tags))
         else:
-            r.append(build_tree(attribute_tag, trait_tags))
+            if attribute_tag in attr_update or DB.attributes.exists(tag=attribute_tag):
+                if not attribute_tag in attr_update:
+                    checked_trait_tags = [t for t in trait_tags if DB.attributes.exists(trait=t)]
+                else:
+                    checked_trait_tags = trait_tags
+                if len(checked_trait_tags) < len(trait_tags):
+                    print(f"WARNING: for attribute '{attribute_tag}', some trait tags were not found in the database and will be skipped. Provided trait tags: {trait_tags}, found trait tags: {checked_trait_tags}")
+                if len(checked_trait_tags) > 0:
+                    r.append(build_tree(attribute_tag, checked_trait_tags))
+            else:
+                print(f"WARNING: attribute '{attribute_tag}' from dataset attributes not found in database, skipping.")
     return r
         
 class MigrateData:
@@ -243,9 +554,15 @@ class MigrateData:
         print(f"Found submission folders: {self.dirList}")
         print("Execute run() to start the migration.")
         
+    def get_user(self, user_string : List[str]) -> str:
+        for user_str in user_string:
+            if user_str is not None and DB.users.exists(tag=user_str):
+                return user_str
+        return self.fallback_user_tag
     def run(self):
 
         for submission_tag in self.dirList:
+            print("Starting migration for submission:", submission_tag)
             df = None
             jsonFile = read_json(os.path.join(self.path_to_folder,submission_tag,"params.json"))
             path_to_quant = os.path.join(self.path_to_folder,submission_tag,"data.txt") 
@@ -266,9 +583,10 @@ class MigrateData:
 
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"], jsonFile["dataset_attributes"])
             timeline = jsonFile.get("timeline", {})
-            timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": t.get("user_tag") or t.get("user_label"), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
+            timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": self.get_user([t.get("user_tag") , t.get("user_label")]), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
             print(timeline_to_insert)
             if not DB.submission_exists(tag = submission_tag):
+                
                 submission_insert_model = NewSubmissionModel(tag = submission_tag,
                                                              user_tag= user_tag,
                                                             title=jsonFile.get("title", ""), 
@@ -280,6 +598,8 @@ class MigrateData:
                                                             genotypes=genotype_tags, 
                                                             samples_attributes=sample_attributes,
                                                             dataset_attributes=dataset_attributes)
+                
+                    
         
                 ok = DB.submissions.insert(tag = submission_insert_model.tag,
                         title = submission_insert_model.title,
@@ -380,5 +700,7 @@ class MigrateData:
             else:
                 print(f"Submission {submission_tag} already exists. Skipping.")
       
+
+
 
 

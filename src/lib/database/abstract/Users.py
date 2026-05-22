@@ -18,6 +18,7 @@ class UserABC(ABC):
     
     
         users = read_json(path_to_user_data)
+        print(users)
         N = 0
         for u in users:
             if self.exists(u["label"]):
