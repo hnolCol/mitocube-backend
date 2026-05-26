@@ -170,6 +170,16 @@ def update_annotation_group_from_url(group_tag: str, user: UserModel = Depends(i
 
     return True
 
+@router.put("/groups/{group_tag}", response_model=bool)
+def edit_annotation_group(annotationgroup: AnnotationGroupsModel, user: UserModel = Depends(is_user_admin)):
+    
+    ok = DB.annotation_groups.edit_annotation_group(annotationgroup=annotationgroup, user_tag=user.tag)
+
+    if not ok:
+        raise HTTPException(status_code=500, detail="Could not update annotation group.")
+    
+    return ok
+
 
 
 @router.get("/analysis/fisher", response_model=List[Dict])

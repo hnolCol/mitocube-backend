@@ -518,11 +518,11 @@ class Neo4JGenotype(GenotypeABC):
         """
 
         query = (
-        "MATCH (g:Genotype {tag: $tag})-[r]->(s:Sample) "
-        "RETURN count(r) AS count"
-    )
+            "MATCH (s:Sample)-[:HAS_GENOTYPE]->(g:Genotype {tag: $tag}) " 
+            "RETURN count(s) AS count"
+        )
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
-        return r if r else None
+        return r[0] if r else 0
 
 
     # def delete(self, tag) -> bool:

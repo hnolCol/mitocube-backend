@@ -177,6 +177,36 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         if len(r) == 0: raise ValueError("No state found or submission does not exist.")
         return r[0]
+
+    def get_state_history(self, tag: str) -> List[Dict]:
+        """Returns the complete state change history for a submission ordered by timestamp.
+        
+        Parameters
+        ----------
+        tag : str
+            The submission tag
+            
+        Returns
+        -------
+        List[Dict]
+            List of state changes with keys:
+            - state_tag: the state tag
+            - state_name: the state name  
+            - created_at: timestamp of the state change
+            - user_firstname: first name of user who made the change
+            - user_lastname: last name of user who made the change
+        """
+        query = (
+            "MATCH (submission:Submission {tag: $tag})-[r:IN_STATE]->(state:State) "
+            "WHERE r.created_at IS NOT NULL "
+            "OPTIONAL MATCH (u:User {tag: r.user_tag}) "
+            "RETURN state.tag AS state_tag, state.s AS state_name, "
+            "r.created_at AS created_at, "
+            "u.firstname AS user_firstname, u.lastname AS user_lastname "
+            "ORDER BY r.created_at ASC"
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
+        return r
     
     def get_title(self, tag : str) -> str:
         ""

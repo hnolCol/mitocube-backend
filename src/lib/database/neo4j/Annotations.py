@@ -142,37 +142,35 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
 
         return r[0] if r else 0
     
-    # def update(self, annotationgroup: AnnotationGroupsModel, user_tag: str) -> bool:
-    #     """Updates an existing annotation group."""
+    def edit_annotation_group(self, annotationgroup: AnnotationGroupsModel, user_tag: str) -> bool:
+        """Updates an existing annotation group."""
 
-    #     query = (
-    #         "MATCH (ag:AnnotationGroup {tag: $tag}) "
-    #         "SET "
-    #         " ag.text = $text, "
-    #         " ag.description = $description, "
-    #         " ag.species = $species, "
-    #         " ag.source = $source, "
-    #         " ag.url = $url, "
-    #         " ag.modified_at = timestamp() "
-    #         "WITH ag "
-    #         "MATCH (u:User {tag: $user_tag}) "
-    #         "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(ag) "
-    #         "RETURN TRUE "
-    #     )
+        query = (
+            "MATCH (ag:AnnotationGroup {tag: $tag}) "
+            "SET "
+            " ag.text = $text, "
+            " ag.description = $description, "
+            " ag.source = $source, "
+            " ag.url = $url, "
+            " ag.modified_at = timestamp() "
+            "WITH ag "
+            "MATCH (u:User {tag: $user_tag}) "
+            "CREATE (u)-[:MODIFIED {modified_at: timestamp()}]->(ag) "
+            "RETURN TRUE "
+        )
 
-    #     r = self._driver.execute_query( query,
-    #                                     tag=annotationgroup.tag,
-    #                                     text=annotationgroup.text,
-    #                                     description=annotationgroup.description,
-    #                                     species=annotationgroup.species,
-    #                                     source=annotationgroup.source,
-    #                                     url=annotationgroup.url,
-    #                                     user_tag=user_tag,
-    #                                     routing_="w",
-    #                                     result_transformer_=Result.value,
-    #                                 )
+        r = self._driver.execute_query( query,
+                                        tag=annotationgroup.tag,
+                                        text=annotationgroup.text,
+                                        description=annotationgroup.description,
+                                        source=annotationgroup.source,
+                                        url=annotationgroup.url,
+                                        user_tag=user_tag,
+                                        routing_="w",
+                                        result_transformer_=Result.value,
+                                    )
         
-    #     return r[0] if r else False
+        return r[0] if r else False
 
 
 

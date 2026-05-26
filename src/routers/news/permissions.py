@@ -24,7 +24,7 @@ def get_news_permissions(user: UserModel = Depends(get_user_from_token)) -> Perm
     
     return PermissionResponseModel(
         user_tag= user.tag,
-        create= user.role > UserRolesEnum.CURATOR,
-        edit= user.role > UserRolesEnum.CURATOR,
-        delete= user.role > UserRolesEnum.CURATOR,
+        create= user.role >= UserRolesEnum.CURATOR,
+        edit= user.role >= UserRolesEnum.CURATOR,
+        delete= user.role >= UserRolesEnum.CURATOR,
     )
