@@ -89,7 +89,32 @@ def get_news_by_tag(news_tag : str, user : UserModel = Depends(get_user_from_tok
     if not DB.news.exists(tag = news_tag): raise HTTPException(status_code=404, detail="News item not found.")
     return DB.news.get(tag = news_tag)
 
-
+@router.put("/{news_tag}", summary="Update a news item. Requires at least curator rights.")
+def update_news_item( news_tag: str,  news_update: NewsModel, user: UserModel = Depends(is_user_at_least_curator)) -> NewsModel:
+    """Updates an existing news item.
+    Parameters
+    ----------
+    news_tag : str
+        The tag of the news item to update
+    news_update : NewsModel
+        The updated news data
+    user : UserModel
+        The authenticated user (must be at least curator)
+    Returns
+    -------
+    NewsModel
+        The updated news item
+    """
+    if not DB.news.exists(tag=news_tag):
+        raise HTTPException(status_code=404, detail="News item not found.")
+    
+    news_update.tag = news_tag
+    success = DB.news.update(news=news_update)
+    
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to update news item.")
+    
+    return DB.news.get(tag=news_tag)
 
 @router.delete("/{news_tag}", summary="Delete a news item. Requires at least curator rights.")
 def delete_news_item(news_tag: str, user: UserModel = Depends(is_user_at_least_curator)) -> bool:

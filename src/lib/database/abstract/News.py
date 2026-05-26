@@ -52,6 +52,23 @@ class NewsABC(ABC):
         """
         
     @abstractmethod
+    def find(self, limit : int = None, order : Literal["desc","asc"] = "desc") -> List[str]:
+        """
+        Finds the latest news items, returns their tags. Limit can be set to restrict the number of items returned.
+        Parameters
+        ----------
+        limit : int, optional
+            The maximum number of news items to return, by default None
+        order : Literal["desc","asc"], optional
+            The order in which to return the news items, by default "desc"  
+            
+        Returns
+        -------
+        List[str]
+            A list of news item tags.
+        """
+
+    @abstractmethod
     def insert(self, news : NewsModel) -> bool:
         """Adds a news to the news pool. 
 
@@ -65,7 +82,20 @@ class NewsABC(ABC):
         bool
             _description_
         """
-        
+
+    @abstractmethod
+    def update(self, news: NewsModel) -> bool:
+        """Updates an existing news item.
+        Parameters
+        ----------
+        news : NewsModel
+            The news item with updated data.
+        Returns
+        -------
+        bool
+            True if update was successful.
+        """
+                
     @abstractmethod
     def delete(self, tag : str) -> bool:
         """Deletes a specific news by its tag. 
@@ -81,20 +111,6 @@ class NewsABC(ABC):
             If the deletion was successful. 
         """
         
-    @abstractmethod
-    def update(self, news : NewsModel) -> bool:
-        """Updates a news content. 
-
-        Parameters
-        ----------
-        news : News
-            _description_
-
-        Returns
-        -------
-        bool
-            _description_
-        """
         
     
     
