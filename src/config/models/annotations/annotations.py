@@ -48,6 +48,7 @@ class AnnotationsModel(BaseModel):
     pubmed_id: Optional[str] = None
     source:  Optional[str] = None
     protein_tags: Optional[List[str]] = []
+    submission_tags: List[str] = []
     group_tag: str
 
     @field_validator("protein_tags", mode="before")

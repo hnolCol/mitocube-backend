@@ -429,27 +429,42 @@ class Neo4JAnnotations(AnnotationsABC):
                                         publication=annotation.publication,
                                         pubmed_id=annotation.pubmed_id,
                                         source=annotation.source,
-                                        protein_tags=annotation.protein_tags,
+                                        protein_tags=annotation.protein_tags or [],
                                         group_tag=annotation.group_tag,
                                         routing_="w",
                                         result_transformer_=Result.value,
                                     )
-        
-        return r[0] if r else False
 
+        if annotation.submission_tags:
+            submission_query = (
+                "MATCH (a:Annotation {tag: $tag}) "
+                "UNWIND $submission_tags AS sub_tag "
+                "MATCH (s:Submission {tag: sub_tag}) "
+                "MERGE (a)-[:BASED_ON]->(s) "
+                "RETURN TRUE"
+            )
+            self._driver.execute_query(submission_query,
+                                        tag=annotation.tag,
+                                        submission_tags=annotation.submission_tags,
+                                        routing_="w",
+                                        result_transformer_=Result.value,
+                                    )
+
+        return r[0] if r else False
 
     def get(self, tag: str) -> AnnotationsModel:
 
         query = (
             "MATCH (ag:AnnotationGroup)-[:HAS_ANNOTATION]->(a:Annotation {tag: $tag}) "
             "OPTIONAL MATCH (a)-[:ANNOTATES]->(p:Protein) "
+            "OPTIONAL MATCH (a)-[:BASED_ON]->(s:Submission) "   
             "RETURN "
             " properties(a) AS a_props, "
             " ag.tag AS group_tag, "
-            " collect(p.tag) AS protein_tags "
+            " collect(DISTINCT p.tag) AS protein_tags, "
+            " collect(DISTINCT s.tag) AS submission_tags "       
         )
-        
-        r = self._driver.execute_query( query,
+        r = self._driver.execute_query(query,
                                         tag=tag,
                                         routing_="r",
                                         result_transformer_=Result.data,
@@ -461,7 +476,8 @@ class Neo4JAnnotations(AnnotationsABC):
         data = r[0]["a_props"]
         data["group_tag"] = r[0]["group_tag"]
         data["protein_tags"] = r[0]["protein_tags"]
-        
+        data["submission_tags"] = r[0]["submission_tags"]   
+
         return AnnotationsModel(**data)
 
     def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:
@@ -531,18 +547,33 @@ class Neo4JAnnotations(AnnotationsABC):
 
         return r[0] if r else 0
 
-    def get_protein_tags(self, tag: str) -> List[str]:
-
-        query = (
-            "MATCH (:Annotation {tag: $tag})-[:ANNOTATES]->(p:Protein) "
-            "RETURN p.tag"
-        )
-
-        r = self._driver.execute_query( query,
-                                        tag=tag,
-                                        routing_="r",
-                                        result_transformer_=Result.value,
-                                    )
+    def get_protein_tags(self, tag: str, submission_tag: Optional[str] = None) -> List[str]:
+        """Get proteins for annotation, optionally filtered by submission."""
+        
+        if submission_tag:
+            query = (
+                "MATCH (s:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:HAS_PROTEIN]->(p:Protein) "
+                "MATCH (:Annotation {tag: $tag})-[:ANNOTATES]->(p) "
+                "RETURN DISTINCT p.tag"
+            )
+            r = self._driver.execute_query(
+                query,
+                tag=tag,
+                submission_tag=submission_tag,
+                routing_="r",
+                result_transformer_=Result.value,
+            )
+        else:
+            query = (
+                "MATCH (:Annotation {tag: $tag})-[:ANNOTATES]->(p:Protein) "
+                "RETURN p.tag"
+            )
+            r = self._driver.execute_query(
+                query,
+                tag=tag,
+                routing_="r",
+                result_transformer_=Result.value,
+            )
         
         return r
     
@@ -615,27 +646,46 @@ class Neo4JAnnotations(AnnotationsABC):
             "WITH a "
             "OPTIONAL MATCH (a)-[r:ANNOTATES]->() DELETE r "
             "WITH a "
+            "OPTIONAL MATCH (a)-[rb:BASED_ON]->() DELETE rb "
+            "WITH a "
             "UNWIND $protein_tags AS protein_tag "
             "MATCH (p:Protein {tag: protein_tag}) "
             "MERGE (a)-[:ANNOTATES]->(p) "
-            "WITH a "
+            "WITH DISTINCT a "
             "MATCH (u:User {tag: $user_tag}) "
             "CREATE (u)-[:MODIFIED_ANNOTATION {modified_at: timestamp()}]->(a) "
             "RETURN TRUE "
         )
-        r = self._driver.execute_query( query,
+
+        r = self._driver.execute_query(query,
                                         annotation_tag=annotation.tag,
                                         text=annotation.text,
                                         description=annotation.description,
                                         publication=annotation.publication,
                                         pubmed_id=annotation.pubmed_id,
                                         source=annotation.source,
-                                        protein_tags=annotation.protein_tags,
+                                        protein_tags=annotation.protein_tags or [],
                                         group_tag=annotation.group_tag,
                                         user_tag=user_tag,
                                         routing_="w",
                                         result_transformer_=Result.value,
                                     )
+
+        if annotation.submission_tags:
+            submission_query = (
+                "MATCH (a:Annotation {tag: $annotation_tag}) "
+                "UNWIND $submission_tags AS sub_tag "
+                "MATCH (s:Submission {tag: sub_tag}) "
+                "MERGE (a)-[:BASED_ON]->(s) "
+                "RETURN TRUE"
+            )
+            self._driver.execute_query(submission_query,
+                                        annotation_tag=annotation.tag,
+                                        submission_tags=annotation.submission_tags,
+                                        routing_="w",
+                                        result_transformer_=Result.value,
+                                    )
+
         return r[0] if r else False
     
 
