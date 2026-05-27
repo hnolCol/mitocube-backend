@@ -322,7 +322,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         """
         
         
-    def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, protein_tags : List[str] = None, sort_by_frequency : bool = True, limit : int = None) -> List[str]:
+    def find(self, search_string : str = None, samples_only : bool = True, submission_tag : str = None, attribute_tag : str = None, trait_tag : str = None, protein_tags : List[str] = None, sort_by_frequency : bool = True, limit : int = None, exclude_attribute_group : List[str] = None) -> List[str]:
         """Returns the tags of matching condition applications.
         If protein_tags given, all other filters are ignored. 
         """
@@ -331,8 +331,17 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             query = (
                 "MATCH (ca:ConditionApplication)-[:HAS_VALUE*0..]->(cv:ConditionValue)-[r:EFFECTS]->(p:Protein) "
                 "WHERE p.tag IN $protein_tags "
-                "RETURN ca.tag AS tag, count(r) AS freq "
             )
+            if exclude_attribute_group is not None and len(exclude_attribute_group) > 0:
+                query += (
+                    "AND NOT EXISTS { "
+                    "  (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                    "  WHERE a.tag IN $exclude_attribute_group "
+                    "} "
+                )
+            
+            query += "RETURN ca.tag AS tag, count(r) AS freq "
+            
             if sort_by_frequency:
                 query += "ORDER BY freq DESC "
             if limit is not None:
@@ -340,22 +349,41 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             
             r = self._driver.execute_query(
                 query_=query, routing_="r",
-                protein_tags=protein_tags, limit=limit,
+                protein_tags=protein_tags, 
+                exclude_attribute_group=exclude_attribute_group,
+                limit=limit,
                 result_transformer_=Result.value
             )
             return r
         
         query = "MATCH (ca:ConditionApplication)<-[r:HAS_APPLICATION]-(:Sample|Submission) "
         
+        if exclude_attribute_group is not None and len(exclude_attribute_group) > 0:
+            query += (
+                "WHERE NOT EXISTS { "
+                "  (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                "  WHERE a.group_tag IN $exclude_attribute_group "
+                "} "
+            )
+            where_added = True
+        else:
+            where_added = False
+
         if search_string is not None and search_string != "":
             query += (
                 "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
                 "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
                 "WITH ca, a, t, r WHERE toLower(t.s) CONTAINS toLower($search_string) OR toLower(a.s) CONTAINS toLower($search_string) "
             )
+            if where_added:
+                query += "WITH ca, a, t, r WHERE toLower(t.s) CONTAINS toLower($search_string) OR toLower(a.s) CONTAINS toLower($search_string) "
+            else:
+                query += "WITH ca, a, t, r WHERE toLower(t.s) CONTAINS toLower($search_string) OR toLower(a.s) CONTAINS toLower($search_string) "
+            
             if samples_only:
                 query += " AND EXISTS {(ca)<-[:HAS_APPLICATION]-(s:Sample)} "
         
+            
         else:
             if samples_only:
                 if submission_tag is not None:
@@ -387,6 +415,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             query_=query, routing_="r",
             search_string=search_string, submission_tag=submission_tag,
             attribute_tag=attribute_tag, trait_tag=trait_tag,
+             exclude_attribute_group=exclude_attribute_group,
             limit=limit, result_transformer_=Result.value
         )
 

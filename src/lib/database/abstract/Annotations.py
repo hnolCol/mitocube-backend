@@ -249,7 +249,7 @@ class AnnotationsABC(ABC):
         
 
     @abstractmethod
-    def get_protein_tags(self, tag: str) -> List[str]:
+    def get_protein_tags(self, tag: str, submission_tag: Optional[str] = None) -> List[str]:
         """
         Get protein identifiers belonging to an annotation.
 

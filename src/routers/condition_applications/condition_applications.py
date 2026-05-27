@@ -60,12 +60,25 @@ def query_condition_applications(search_string : str = None,
     return ca_tags
 
 @router.get("/q/hierarchy")
-def ca_hierarchy(search_string : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[Dict]:
+def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group: str = None, user: UserModel = Depends(get_user_from_token)) -> List[Dict]:
+    
     ca_tags_with_protein_value = []
     protein_tags = DB.proteins.find(search_string=search_string, is_condition_value=True)
+    
+    exclude_list = exclude_attribute_group.split(",") if exclude_attribute_group else None
+    
     if len(protein_tags) > 0:
-        ca_tags_with_protein_value = DB.condition_applications.find(protein_tags = protein_tags,sort_by_frequency = True)
-    ca_tags_by_search_string = DB.condition_applications.find(search_string = search_string, samples_only = False, sort_by_frequency = True)
+        ca_tags_with_protein_value = DB.condition_applications.find( protein_tags=protein_tags, 
+                                                                    sort_by_frequency=True,
+                                                                    exclude_attribute_group=exclude_list 
+                                                                )
+    
+    ca_tags_by_search_string = DB.condition_applications.find( search_string=search_string, 
+                                                                samples_only=False, 
+                                                                sort_by_frequency=True,
+                                                                exclude_attribute_group=exclude_list 
+                                                            )
+    
     ca_tags = ca_tags_with_protein_value + [ca_tag for ca_tag in ca_tags_by_search_string if ca_tag not in ca_tags_with_protein_value]
     tree = defaultdict(lambda: defaultdict(list))
 
