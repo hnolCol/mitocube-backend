@@ -71,7 +71,6 @@ def get_submission_tag(user : UserModel = Depends(get_user_from_token)):
 @router.get("/submissions/q")
 def get_submission_by_query(state : str|int = None,
                             search_string : str = None,
-                            feature_key : str = None, 
                             trait_tags : str = None, 
                             attribute_tag : str = None, 
                             trait_tag : str = None,
@@ -85,6 +84,7 @@ def get_submission_by_query(state : str|int = None,
                             ordered : bool = True,
                             group_by_state : bool = True,
                             group_by_user : bool = False,
+                            group_by_date : bool = False,
                             user : UserModel = Depends(get_user_from_token)
                             ) -> List[str]| Dict[str|int, List[str]]: 
     """Returns the submissions that match a given filter. 
@@ -136,7 +136,6 @@ def get_submission_by_query(state : str|int = None,
             trait_tag=APIParamString(param=trait_tag).param,
             trait_tags=APIParamString(param=trait_tags).param,
             ca_tags=APIParamString(param=ca_tags).param,
-            protein_tag=APIParamString(param=feature_key).param,
             user_tags=APIParamString(param=user_tags).param,
             genotype_tag = APIParamString(param=genotype_tag).param,
             include_sample_ca = include_sample_ca,
@@ -145,13 +144,17 @@ def get_submission_by_query(state : str|int = None,
             ordered = ordered,
             limit = limit
             )
-    
+    if len(tags) == 0 and any([group_by_date,group_by_state,group_by_user]):
+        return {}
     if group_by_state:
         #group by state
         tags = DB.submission_filter.group_by_state(tags = tags)
-    if group_by_user:
+    elif group_by_user:
         #group by user
         tags = DB.submission_filter.group_by_user(tags = tags)
+    elif group_by_date:
+        #group by date
+        tags = DB.submission_filter.group_by_date(tags = tags)
     return tags 
     
 
@@ -782,7 +785,6 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
             "replicate": DB.samples.get_replicate(tag=sample_tag),
         })
 
-    print("full sample",result)
     return result
 
 
@@ -895,12 +897,12 @@ def check_submission(
 def get_submission_query_count(
     state : str|int = None,
     search_string : str = None,
-    feature_key : str = None, 
     trait_tags : str = None, 
     ca_tags : str = None,
     attribute_tag : str = None, 
     genotype_tag : str = None, 
     user_tags : str = None,
+    protein_tags : str = None,
     include_sample_ca : bool = False,
     ca_search_string : str = None,
     user : UserModel = Depends(get_user_from_token)
@@ -924,9 +926,9 @@ def get_submission_query_count(
         attribute_tag = APIParamString(param=attribute_tag).param,
         trait_tags = APIParamString(param=trait_tags).param,
         ca_tags = APIParamString(param=ca_tags).param,
-        protein_tag = APIParamString(param=feature_key).param,
         user_tags = APIParamString(param=user_tags).param,
         genotype_tag = APIParamString(param=genotype_tag).param,
+        protein_tags = APIParamString(param=protein_tags).param,
         include_sample_ca = include_sample_ca,
         ca_search_string = ca_search_string,
         ordered = False, 

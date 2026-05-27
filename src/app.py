@@ -149,7 +149,6 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 DB = Database.DB()
 
 
-
 origins = [
     "https://mitocube.age.mpg.de",
     "http://localhost:5000",
@@ -264,7 +263,7 @@ if __name__ == "__main__":
             MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
             
         
-            #python3 src/app.py --setup_database  --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
+            #python3 src/app.py --setup_database  --reviewed_proteins_only --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
             #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
             #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
             #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json

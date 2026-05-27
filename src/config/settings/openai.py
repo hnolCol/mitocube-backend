@@ -84,7 +84,7 @@ class OpenAI(BaseSettings):
                             | HAS_STATS            | Submission        | Statistics          | —                   |
                             | FOR_PROTEIN_GROUP    | Statistics        | ProteinGroup        | —                   |
                             | OF_ATTRIBUTE         | Statistics        | Attribute           | —                   |
-
+                            | FAVOURS              | User              | Protein             | —                   |
                             ---
 
                             ## Critical Syntax Rules (Neo4j 5.x)

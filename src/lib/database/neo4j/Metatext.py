@@ -57,8 +57,8 @@ class Neo4JMetaText(MetaTextABC):
         
         query = (
             "MATCH (m:MetaText {tag : $tag}) "
-            "MATCH (m)-[:CREATED]-(u:User) "
-            "OPTIONAL MATCH (m)-[:UPDATED]-(u2:User) "
+            "MATCH (m)<-[:CREATED]-(u:User) "
+            "OPTIONAL MATCH (m)<-[:UPDATED]-(u2:User) "
             "RETURN {title: m.title, text: m.text, tag: m.tag, created_at: m.created_at, updated_at : m.updated_at, created_by: u.tag, updated_by: u2.tag} as metatext"
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)

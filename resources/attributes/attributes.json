@@ -3167,6 +3167,50 @@
             "allow_for_measurement": "sample",
             "instrument": null,
             "instrumenttype": null
+        },
+        {
+            "tag": "att_irradiance_type",
+            "requires": null,
+            "children": "att_irradiation_strength|att_duration",
+            "text": "Irradiance",
+            "abbr": null,
+            "priority": 800,
+            "allow_input": false,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_irradiation_strength",
+            "requires": null,
+            "children": null,
+            "text": "Strength",
+            "abbr": null,
+            "priority": 750,
+            "allow_input": true,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
         }
     ],
     "traits": [
@@ -17168,6 +17212,66 @@
             "text": "V",
             "description": "Voltage applied",
             "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "dosimetry",
+            "attribute_tag": "att_irradiance_type",
+            "tag": "att_irradiance_type:dosimetry",
+            "keyword": null,
+            "text": "Dosimetry",
+            "description": "Ionizing Radiation. This measures radiation exposure and the amount of energy absorbed by living tissue or other materials",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": "electromagnetic",
+            "attribute_tag": "att_irradiance_type",
+            "tag": "att_irradiance_type:electromagnetic",
+            "keyword": null,
+            "text": "Irradiance",
+            "description": "Electromagnetic & Solar Radiation",
+            "priority": 550.0,
+            "ols": null
+        },
+        {
+            "value": "sievert",
+            "attribute_tag": "att_irradiation_strength",
+            "tag": "att_irradiation_strength:sievert",
+            "keyword": null,
+            "text": "Sv",
+            "description": "Sievert",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "gray",
+            "attribute_tag": "att_irradiation_strength",
+            "tag": "att_irradiation_strength:gray",
+            "keyword": null,
+            "text": "Gy",
+            "description": "Gray",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "rad",
+            "attribute_tag": "att_irradiation_strength",
+            "tag": "att_irradiation_strength:rad",
+            "keyword": null,
+            "text": "rad",
+            "description": "100rad = 1Gray",
+            "priority": 300.0,
+            "ols": null
+        },
+        {
+            "value": "rem",
+            "attribute_tag": "att_irradiation_strength",
+            "tag": "att_irradiation_strength:rem",
+            "keyword": null,
+            "text": "rem",
+            "description": "100rem = Sv",
+            "priority": 250.0,
             "ols": null
         }
     ]

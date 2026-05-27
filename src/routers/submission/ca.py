@@ -39,10 +39,9 @@ router = APIRouter(
     )
 
 @router.get("/{submission_tag}/ca")
-def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
+def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, group_by_min_state : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
     "Return the condition applications for a given submission."
-    print(APIParamString(param=attribute_tags).param,"ATTRIBUTE_TAGGS")
-    return DB.submissions.get_conditions_applications(submission_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=group_by_attribute)
+    return DB.submissions.get_conditions_applications(submission_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=group_by_attribute, group_by_min_state=group_by_min_state)
 
 
 @router.get("/{submission_tag}/ca/attributes")
@@ -50,7 +49,6 @@ def get_submission_condition_application_attributes(submission_tag: str, include
     "Return the condition application attributes for a given submission."
     ca_tags = DB.submissions.get_conditions_applications(submission_tag, group_by_attribute=False)
     attribute_tags = [DB.condition_applications.get_attribute(ca_tag) for ca_tag in ca_tags]
-    print("SAKING FOR CA ATTRIBUTES", DB.submissions.has_genotypes(tag = submission_tag))
     if include_genotypes and DB.submissions.has_genotypes(tag = submission_tag):
         attribute_tags = ["att_genotype"] + attribute_tags
     return [attr_tag for attr_tag in attribute_tags if attr_tag is not None]

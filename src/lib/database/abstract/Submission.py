@@ -95,7 +95,7 @@ class SubmissionsABC(ABC):
         "Sets the title of the submission."
     
     @abstractmethod
-    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
+    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False, group_by_min_state : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]:
         """Returns the condition application tag for the submission by its tag.
         
         Parameters
@@ -105,7 +105,9 @@ class SubmissionsABC(ABC):
         attribute_tag : str, optional
             The attribute tag to filter condition applications, by default None
         group_by_attribute : bool, optional
-            If True, the condition applications are grouped by attribute, by default False  
+            If True, the condition applications are grouped by attribute, by default False
+        group_by_min_state : bool, optional
+            If True, the condition applications are grouped by their minimum state, by default False
         Returns
         -------
         List[str]|List[Dict]
@@ -601,6 +603,28 @@ class SubmissionFilterABC(ABC):
         Dict[str, List[str]]
             A dictionary where the keys are the state tags and the values are the submission tags associated with the state. 
         """
+    @abstractmethod
+    def group_by_date(self, tags = None) -> Dict[str, List[str]]:
+        """Groups the submissions by their creation date and returns the counts of each date.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The submission tags to use. If None, all tags in the database are used.
+            If tags is an empty list, an empty dictionary is returned.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary with the creation date as key and a list of submission tags as value.
+            The keys are the creation dates and the values are lists of submission tags.
+            If no submissions are found, an empty dictionary is returned.
+            
+        Raises
+        ------
+        TypeError
+            If the tags parameter is not a list of strings or None.
+        """
     
     @abstractmethod
     def find(self,
@@ -609,7 +633,7 @@ class SubmissionFilterABC(ABC):
             attribute_tag : List[str]= None, 
             ca_tags: List[str] = None,
             user_tag : List[str] = None, 
-            protein_tag : List[str] = None, 
+            protein_tags : List[str] = None, 
             genotype_tag : List[str] = None,
             ordered : bool = True,
             search_string : str = None,
@@ -627,7 +651,7 @@ class SubmissionFilterABC(ABC):
             _description_, by default None
         user_tag : List[str], optional
             _description_, by default None
-        protein_tag : List[str], optional
+        protein_tags : List[str], optional
             _description_, by default None
         genotype_tag : List[str], optional
             _description_, by default None

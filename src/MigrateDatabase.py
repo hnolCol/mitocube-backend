@@ -2,7 +2,7 @@
 
 import os
 import time 
-from typing import List, OrderedDict
+from typing import Dict, List, OrderedDict
 
 
 from lib.database.Database import Database
@@ -125,7 +125,6 @@ def handle_centrifugation_pellet(tags : List[str]):
     tree = build_tree(attribute_tag="att_centrifugation", trait_tags=["att_centrifugation:pellet"])
     for t in tags:
         tree["children"][0]["children"].append(build_tree(attribute_tag="att_cent_acc", trait_tags=["att_cent_acc"], value=t.split(":")[1]))
-    print(f"Handling centrifugation with tags {tags}, resulting tree: {tree}")
     return tree
 
 def handle_centrifugation_supernatant(tags : List[str]):
@@ -133,7 +132,6 @@ def handle_centrifugation_supernatant(tags : List[str]):
     tree = build_tree(attribute_tag="att_centrifugation", trait_tags=["att_centrifugation:supernatant"])
     for t in tags:
         tree["children"][0]["children"].append(build_tree(attribute_tag="att_cent_acc", trait_tags=["att_cent_acc"], value=t.split(":")[1]))
-    print(f"Handling centrifugation with tags {tags}, resulting tree: {tree}")
     return tree
 
 def handle_poi(tags : List[str]):
@@ -204,6 +202,7 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
     }
     
     for attribute_tag, sample_attrs in sample_attrs_input.items():
+        print(attribute_tag, sample_attrs)
         if len(r) == 0:
             samples_idcs = np.sort(np.unique(np.concatenate([np.array(indices) for indices in sample_attrs.values()])))
             for idx in samples_idcs:
@@ -230,6 +229,9 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
                 r[sampleIdx].append(handle_mouse_id(sample_attribute_tags))
             elif attribute_tag == "att_centr_supernatant":
                 r[sampleIdx].append(handle_centrifugation_supernatant(sample_attribute_tags))
+            elif attribute_tag == "att_radiation_senescence":
+                print("HERE?")
+                r[sampleIdx].append(handle_radiation_senescence(sample_attribute_tags, sampleIdx=sampleIdx, time_data_by_key=time_data_by_key))
             elif attribute_tag == "att_compound" and time_data_by_key:
                 duration_child = _build_duration_child_for_sample(sampleIdx, time_data_by_key)
                 tree = {
@@ -339,6 +341,23 @@ def build_gradient_attributes(dataset_attributes: dict):
         dataset_attributes.pop("att_lc_flow_rate")
     return dataset_attributes, T
 
+def handle_radiation_senescence(tags: List[str], sampleIdx : int, time_data_by_key : Dict = None):
+    
+    T = build_tree(attribute_tag="att_irradiance_type", trait_tags=["att_irradiance_type:dosimetry"])
+    value = tags[0].split(":")[1] if len(tags) > 0 else None
+    if value is not None:
+        if value == "ctrl":
+            T["children"][0]["children"].append(build_tree(attribute_tag="att_irradiation_strength", trait_tags=["att_irradiation_strength:gray"], value="0"))
+        else:
+            T["children"][0]["children"].append(build_tree(attribute_tag="att_irradiation_strength", trait_tags=["att_irradiation_strength:gray"], value=value))
+            
+    if time_data_by_key is not None:
+        duration_child = _build_duration_child_for_sample(sample_idx=sampleIdx, time_data_by_key=time_data_by_key)
+        if duration_child is not None:
+            T["children"][0]["children"].append(duration_child)
+    print(T)
+    return T
+
 def build_column_attributes(dataset_attributes: dict):
     r = [] 
 
@@ -399,6 +418,8 @@ def build_spray_attributes(dataset_attributes: dict):
 
     return dataset_attributes, T
 
+
+
 def build_digestion_attributes(dataset_attributes: dict):
     #att_digestion_method		att_duration|att_termperature|att_volume|att_protease|att_digestion_vessel
     digestion_method = dataset_attributes.get("att_digestion_method",None)
@@ -453,10 +474,18 @@ def build_faims(dataset_attributes : dict):
     
     interface_tags = dataset_attributes.get("att_ms_interface", None)
     if interface_tags is None:
-        return dataset_attributes, None
+        if (any(s in dataset_attributes for s in ["att_faims_cv", "att_faims_inner_temp", "att_faims_outer_temp"])):
+            print("WARNING: FAIMS CV, gas flow, or temperature attributes found without FAIMS interface attribute, adding FAIMS-related attributes.")
+            interface_tags = ["att_ms_interface:faims"]
+            is_faims = True
+        else:
+            return dataset_attributes, None
+    else: 
+        is_faims = any(t.endswith("faims") for t in interface_tags)
     T = build_tree(attribute_tag="att_ms_interface", trait_tags=interface_tags)
-    is_faims = any(t.endswith("faims") for t in interface_tags)
-    dataset_attributes.pop("att_ms_interface")
+    
+    if "att_ms_interface" in dataset_attributes:
+        dataset_attributes.pop("att_ms_interface")
     if not is_faims:
         return dataset_attributes, T
     cv = dataset_attributes.get("att_faims_cv", None)
@@ -481,7 +510,26 @@ def build_faims(dataset_attributes : dict):
         dataset_attributes.pop("att_faims_outer_temp")
     return dataset_attributes, T
 
-        
+# WARNING: for attribute 'att_faims_outer_temp', some trait tags were not found in the database and will be skipped. Provided trait tags: ['att_faims_outer_temp:90'], found trait tags: []
+# WARNING: for attribute 'att_faims_cv', some trait tags were not found in the database and will be skipped. Provided trait tags: ['att_faims_cv:-45'], found trait tags: []
+# WARNING: for attribute 'att_faims_inner_temp', some trait tags were not found in the database and will be skipped. Provided trait tags: ['att_faims_inner_temp:100c'], 
+        #        ],
+        # "att_ms": [
+        #     "att_ms:exploris480"
+        # ],
+        # "att_faims_outer_temp": [
+        #     "att_faims_outer_temp:90"
+        # ],
+        # "att_faims_cv": [
+        #     "att_faims_cv:-45"
+        # ],
+        # "att_faims_inner_temp": [
+        #     "att_faims_inner_temp:100c"
+        # ],
+        # "att_ms_name": [
+        #     "att_ms_name:expl480"
+        # ],
+        # "att_ms_ionsource": [
         
 def build_dataset_condition_applications(dataset_attributes : dict): 
     "" 
@@ -566,7 +614,6 @@ class MigrateData:
             sample_attributes = build_sample_attributes(jsonFile["samples_attributes"], jsonFile["dataset_attributes"])
             timeline = jsonFile.get("timeline", {})
             timeline_to_insert = [{"created_at" : t["created_on"] * 1000, "user_tag": self.get_user([t.get("user_tag") , t.get("user_label")]), "state": t["state"]} for t in timeline.get("entries", [])] #timeline was previous in python timestamp, but in js frontend we use milliseconds, so we need to convert it by multiplying with 1000.
-            print(timeline_to_insert)
             if not DB.submission_exists(tag = submission_tag):
                 
                 submission_insert_model = NewSubmissionModel(tag = submission_tag,
@@ -638,7 +685,7 @@ class MigrateData:
                     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
                     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
-                    time.sleep(0.3) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
+                    time.sleep(0.05) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
                     print(f"Quantification data for submission {submission_tag} inserted and processed successfully.")
 
                 ### migrate runlist if exists
