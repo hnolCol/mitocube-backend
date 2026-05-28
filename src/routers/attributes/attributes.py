@@ -194,7 +194,11 @@ def get_trait(trait_tag : str, include_input : bool = False, submission_tag : st
 @router.get("/traits/{trait_tag}/text")
 def get_trait_text(trait_tag : str) -> str:
     "Returns the text associated with a trait tag"
+    if not DB.attributes.exists(trait=trait_tag):
+        raise HTTPException(status_code=404, detail="Trait not found")
     trait_text = DB.attributes.get_trait_text(tag = trait_tag)
+    if trait_text is None:
+        raise HTTPException(status_code=404, detail="Trait text not found")
     return trait_text
 
 

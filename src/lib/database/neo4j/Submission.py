@@ -20,7 +20,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import AttributeTree,  NewSubmissionModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
 from config.exceptions.Proteome import ProteomeNotFoundError
-from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
+from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
 from config.models.submissions.metatexts import MetaTextInsertModel
 from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
@@ -259,7 +259,7 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else None
 
 
-    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False, group_by_min_state : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]: #TODO: make Dict a pydanitc model
+    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False, group_by_min_state : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]: #TODO: make Dict a pydanitc model
         """Returns the condition application tag for the submission by its tag. """
 
         query =  "MATCH (submission:Submission {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) " 
@@ -268,13 +268,16 @@ class Neo4JSubmissions(SubmissionsABC):
         if group_by_attribute:
             query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) RETURN a.tag, collect(condition.tag) "
         elif group_by_min_state:
-            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute)-[:REQUIRES_STATE]->(state:State) RETURN state.tag, collect(condition.tag) ORDER BY a.priority"
+            query += ("MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute)-[:REQUIRES_STATE]->(state:State) ORDER BY a.priority DESC "
+                      "RETURN state.tag, collect(condition.tag) ")
         else:
             query += "RETURN collect(condition.tag) "
             
-        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, result_transformer_=Result.values if group_by_attribute else Result.value)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, result_transformer_=Result.values if group_by_attribute or group_by_min_state else Result.value)
         if group_by_attribute:
-            return [{"attribute_tag" : ri[0], "condition_application_tags" : ri[1]} for ri in r]
+            return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
+        if group_by_min_state:
+            return [ConditionApplicationStateModel(state_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
         return r[0] if len(r) > 0 else []
 
 

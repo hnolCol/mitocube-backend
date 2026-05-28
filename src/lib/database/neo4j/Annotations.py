@@ -74,37 +74,88 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         return AnnotationGroupsModel(**r[0])
 
     
-    def find( self, search_string: Optional[str] = None,  protein_tag: Optional[str] = None, search_in_annotations : bool = False, return_annotations : bool = False, limit : int = None) -> List[str]:
+    def find( self, search_string: Optional[str] = None,  protein_tag: Optional[str] = None, search_in_annotations : bool = False, return_annotations : bool = False, submission_tags : Optional[List[str]] = None, limit : int = None) -> List[str]:
 
         query = "MATCH (ag:AnnotationGroup) "
-        
+
+        where_clauses = []
+
+        # Protein filter
         if protein_tag:
-            query += "MATCH (ag)-[:HAS_ANNOTATION]->(a:Annotation)-[:ANNOTATES]->(:Protein {tag: $protein_tag}) "
-        
+            where_clauses.append("""
+            EXISTS {
+                MATCH (ag)-[:HAS_ANNOTATION]->(:Annotation)-[:ANNOTATES]->
+                    (:Protein {tag: $protein_tag})
+            }
+            """)
+
+        # Submission filter
+        if submission_tags:
+            where_clauses.append("""
+            EXISTS {
+                MATCH (ag)-[:HAS_ANNOTATION]->(:Annotation)-[:ANNOTATES]->(p:Protein)
+                    <-[:HAS_PROTEINS]-(pg:ProteinGroup)
+                    <-[:QUANTIFIED]-(:Sample)
+                    <-[:HAS_SAMPLE]-(submission:Submission)
+                WHERE submission.tag IN $submission_tags
+            }
+            """)
+
+        # Search filter
         if search_string:
-            
+
             if not search_in_annotations:
-                query += "WHERE toLower(ag.text) CONTAINS toLower($search_string) "
-            else:
-            
-                query += (
-                    "MATCH (ag)-[:HAS_ANNOTATION]->(a:Annotation) "
-                    "WHERE (toLower(a.description) CONTAINS toLower($search_string) "
-                    "OR toLower(a.text) CONTAINS toLower($search_string)) OR (toLower(ag.text) CONTAINS toLower($search_string) OR toLower(ag.description) CONTAINS toLower($search_string)) "
-                    "WITH collect(a.tag) as annotation_tags, ag "
+
+                where_clauses.append("""
+                (
+                    toLower(ag.text) CONTAINS toLower($search_string)
+                    OR toLower(ag.description) CONTAINS toLower($search_string)
                 )
+                """)
 
+            else:
+
+                where_clauses.append("""
+                (
+                    toLower(ag.text) CONTAINS toLower($search_string)
+                    OR toLower(ag.description) CONTAINS toLower($search_string)
+
+                    OR EXISTS {
+                        MATCH (ag)-[:HAS_ANNOTATION]->(a:Annotation)
+                        WHERE
+                            toLower(a.text) CONTAINS toLower($search_string)
+                            OR toLower(a.description) CONTAINS toLower($search_string)
+                    }
+                )
+                """)
+
+        # Assemble WHERE
+        if where_clauses:
+            query += "WHERE " + " AND ".join(where_clauses) + " "
+
+        # Optional annotation expansion only when needed
         if return_annotations:
-            query += "RETURN {group_tag : ag.tag, annotation_tags : annotation_tags}"
 
-        query += "RETURN ag.tag"
-        
+            query += """
+            OPTIONAL MATCH (ag)-[:HAS_ANNOTATION]->(a:Annotation)
+
+            RETURN {
+                group_tag: ag.tag,
+                annotation_tags: collect(DISTINCT a.tag)
+            } AS result
+            """
+
+        else:
+
+            query += "RETURN ag.tag AS tag "
+
         if limit is not None:
-            query += " LIMIT $limit"
+            query += "LIMIT $limit"
 
         r = self._driver.execute_query( query,
                                         search_string=search_string,
                                         protein_tag=protein_tag,
+                                        submission_tags=submission_tags,
                                         routing_="r",
                                         result_transformer_=Result.value,
                                     )
@@ -480,33 +531,31 @@ class Neo4JAnnotations(AnnotationsABC):
 
         return AnnotationsModel(**data)
 
-    def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:
+    def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, submission_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:
 
-        
+        where_clauses = []
         query = (
                 "MATCH (ag:AnnotationGroup)-[:HAS_ANNOTATION]->(a:Annotation) "
             )
+        
+        
         if group_tags is not None:
             query += "WHERE ag.tag IN $group_tags "
                 
+        if submission_tags is not None:
+            where_clauses.append("""EXISTS {
+                (a)-[:ANNOTATES]->(:Protein)<-[:HAS_PROTEINS]-(pg:ProteinGroup)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(s:Submission)
+                WHERE s.tag IN $submission_tags
+            }""")
         if protein_tags is not None:
-            
-            if group_tags is not None:
-                query += "AND "
-            else:
-                query += "WHERE "
-            
-            query = (
-                "EXISTS {(a)-[:ANNOTATES]->(p:Protein) WHERE p.tag in $protein_tags} "
-            )
+            where_clauses.append("EXISTS {(a)-[:ANNOTATES]->(p:Protein) WHERE p.tag in $protein_tags} ")
+                
 
         if search_string is not None and search_string != "":
-            if protein_tags is not None or group_tags is not None:
-                query += "AND "
-            else:
-                query += "WHERE "
-            query += "a.s CONTAINS $search_string "
-            
+
+            where_clauses.append("toLower(a.text) CONTAINS $search_string ")
+        
+        query += "WHERE " + " AND ".join(where_clauses) + " " if where_clauses else ""
         if group_by_group:
             query += "RETURN ag.tag, a.tag "
         else: 
@@ -515,10 +564,12 @@ class Neo4JAnnotations(AnnotationsABC):
         if limit is not None:
             query += "LIMIT $limit"
         
+        print(query, search_string, group_tags, protein_tags, submission_tags, limit)
         r = self._driver.execute_query( query,
                                         group_tags=group_tags,
                                         protein_tags=protein_tags,
                                         limit=limit,
+                                        submission_tags=submission_tags,
                                         search_string=search_string.strip().lower() if search_string else None,
                                         routing_="r",
                                         result_transformer_=Result.values,

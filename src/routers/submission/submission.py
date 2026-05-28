@@ -880,7 +880,7 @@ def check_submission(
         tag=submission_tag, 
         group_by_attribute=True
     )
-    filled_tags = set(item["attribute_tag"] for item in filled)
+    filled_tags = set(item.attribute_tag for item in filled)
     
     missing_tags = [tag for tag in mandatory_tags if tag not in filled_tags]
     missing = [{"tag": tag, "text": DB.attributes.attribute(tag=tag).text} for tag in missing_tags]

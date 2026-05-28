@@ -28,10 +28,11 @@ router = APIRouter(
 
 
 @router.get("/q")
-def find_feature_by_query(search_string : str = None, submission_tag : str = None, include_types : str = None, exclude_types : str = None, limit : int = 30):
+def find_feature_by_query(search_string : str = None, submission_tag : str = None, include_types : str = None, exclude_types : str = None, limit : int = 30, sort_by_stat : str = None, annotation_tags : str = None, user : UserModel = Depends(get_user_from_token)):
 
     include_types = APIParamString(param=include_types).param
     exclude_types = APIParamString(param=exclude_types).param
+    annotation_tags = APIParamString(param=annotation_tags).param
 
     if include_types is not None:
         if any([t not in ["protein_groups","peptides"] for t in include_types]):
@@ -50,8 +51,7 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     peptides = []
     pg_peptides = {}
     if "protein_groups" in include_types:
-        
-        pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag)
+        pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag, sort_by_stat_attribute=sort_by_stat, annotation_tags=annotation_tags)
     if "peptides" in include_types:
         
         peptides = DB.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)

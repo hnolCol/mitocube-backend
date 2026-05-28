@@ -147,7 +147,8 @@ ROOT_PATH = get_absolute_path_to_dir(__file__)
 CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 DB = Database.DB()
-
+DB.protein_groups.find(submission_tag="Sqv8OUK759", search_string="AFG3L2")
+DB.protein_groups.find(submission_tag="Sqv8OUK759", sort_by_stat_attribute="att_irradiance_type")
 
 origins = [
     "https://mitocube.age.mpg.de",

@@ -192,6 +192,11 @@ def _build_duration_child_for_sample(sample_idx: int, time_data_by_key: dict):
                 }
     return None
 
+def handle_fraction(tags : List[str]):
+    tree = build_tree(attribute_tag="att_spatial_fraction", trait_tags=[f"att_spatial_fraction:{t.split(':')[1]}" for t in tags])
+    print(tree)
+    return tree
+
 def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
     r = OrderedDict()
     
@@ -227,10 +232,11 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
                 r[sampleIdx].append(handle_centrifugation_pellet(sample_attribute_tags))
             elif attribute_tag == "att_mouse_id":
                 r[sampleIdx].append(handle_mouse_id(sample_attribute_tags))
+            elif attribute_tag == "att_fraction":
+                r[sampleIdx].append(handle_fraction(sample_attribute_tags))
             elif attribute_tag == "att_centr_supernatant":
                 r[sampleIdx].append(handle_centrifugation_supernatant(sample_attribute_tags))
             elif attribute_tag == "att_radiation_senescence":
-                print("HERE?")
                 r[sampleIdx].append(handle_radiation_senescence(sample_attribute_tags, sampleIdx=sampleIdx, time_data_by_key=time_data_by_key))
             elif attribute_tag == "att_compound" and time_data_by_key:
                 duration_child = _build_duration_child_for_sample(sampleIdx, time_data_by_key)
@@ -428,6 +434,7 @@ def build_digestion_attributes(dataset_attributes: dict):
     if len(digestion_method) == 0:
         digestion_method = ["att_digestion_method:sp3"]
     T = build_tree(attribute_tag="att_digestion_method", trait_tags=digestion_method)
+    dataset_attributes.pop("att_digestion_method")
     children = [] 
     
 #     'att_digestion_temp' from dataset attributes not found in database, skipping.

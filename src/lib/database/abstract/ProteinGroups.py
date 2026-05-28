@@ -60,7 +60,7 @@ class ProteinGroupsABC(ABC):
         
         
     @abstractmethod
-    def find(self, search_string : str = None, submission_tag : str = None, limit : int = None) -> List[str]:
+    def find(self, search_string : str = None, submission_tag : str = None, sort_by_stat_attribute : str = None, limit : int = None, annotation_tags : List[str] = None) -> List[str]:
         """Finds all protein group tags matching the search string.
 
         Parameters
@@ -69,8 +69,12 @@ class ProteinGroupsABC(ABC):
             The search string to match against protein group tags.
         submission_tag : str, optional
             If provided, only protein groups associated with the given submission are returned, by default None
+        sort_by_stat_attribute : str, optional
+            If provided, sorts the results by the given statistical attribute, by default None
         limit : int, optional
             If provided, limits the number of results returned, by default None
+        annotation_tags : List[str], optional
+            If provided, filters the results by the given annotation tags, by default None
 
         Returns
         -------

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.Database import Database
 from config.models.user import UserModel
 from config.models.attributes import AttributeTree
-from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
+from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
 from services.random_generators import get_random_string
 from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
@@ -39,7 +39,7 @@ router = APIRouter(
     )
 
 @router.get("/{submission_tag}/ca")
-def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, group_by_min_state : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]:
+def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, group_by_min_state : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]:
     "Return the condition applications for a given submission."
     return DB.submissions.get_conditions_applications(submission_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=group_by_attribute, group_by_min_state=group_by_min_state)
 

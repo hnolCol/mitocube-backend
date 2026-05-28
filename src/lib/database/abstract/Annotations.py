@@ -209,7 +209,8 @@ class AnnotationsABC(ABC):
             True if an annotation with the given text exists in the group.
         """
     @abstractmethod
-    def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:        """
+    def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, submission_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:        
+        """
         Find annotations.
 
         Parameters
@@ -220,6 +221,8 @@ class AnnotationsABC(ABC):
             Search within specific annotation groups
         protein_tags : Optional[List[str]]
             Search to annotations containing these proteins.
+        submission_tags : Optional[List[str]]
+            Search within specific submissions
         limit : Optional[int]
             Limit the number of results.
         group_by_group : bool

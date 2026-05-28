@@ -21,12 +21,13 @@ router = APIRouter(
 )
 
 @router.get("/q", response_model=List[str]|List[Dict])
-def find_annotations(search_string: Optional[str] = None, group_tags: Optional[str] = None, protein_tags: Optional[str] = None, limit : int = None, group_by_group: bool = False, user: UserModel = Depends(get_user_from_token)):
+def find_annotations(search_string: Optional[str] = None, group_tags: Optional[str] = None, protein_tags: Optional[str] = None, limit : int = None, group_by_group: bool = False, submission_tags: Optional[str] = None, user: UserModel = Depends(get_user_from_token)):
     "Finds annotations matching the search criteria."
     #TODO add submission tags here  and in find only return if protein is quantified in submission and in that annotation group.
     tags = DB.annotations.find(search_string=search_string, 
                                group_tags=APIParamString(param = group_tags).param,  #transforms string with semicolon into list
                                protein_tags=APIParamString(param = protein_tags).param,  #transforms string with semicolon into list
+                               submission_tags=APIParamString(param = submission_tags).param,  #transforms string with semicolon into list
                                limit=limit, 
                                group_by_group=group_by_group)
     return tags
