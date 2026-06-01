@@ -96,15 +96,17 @@ class Neo4JProteinGroups(ProteinGroupsABC):
 
             
         if sort_by_stat_attribute is not None and submission_tag is not None:
-             query += (
-                "MATCH (pg)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics) "
+            query += "MATCH (pg)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics) "
+            if submission_tag is not None:
+                query += "WHERE EXISTS {(stats)<-[:HAS_STATS]-(submission:Submission {tag : $submission_tag})} "
+            query += (
                 "MATCH (stats)-[:OF_ATTRIBUTE]->(a:Attribute) "
                 "WHERE a.tag = $sort_by_stat_attribute "
                 "RETURN pg.tag AS tag, stats.score AS score "
                 "ORDER BY score DESC "
              )
         else:
-            query += "RETURN pg.tag AS tag " 
+            query += "RETURN DISTINCT pg.tag AS tag " 
 
         if limit is not None:
             query += "LIMIT $limit"

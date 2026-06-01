@@ -523,12 +523,11 @@ class Neo4JAnnotations(AnnotationsABC):
                                     
         if not r:
             raise Exception("Annotation not found")
-        
         data = r[0]["a_props"]
         data["group_tag"] = r[0]["group_tag"]
         data["protein_tags"] = r[0]["protein_tags"]
         data["submission_tags"] = r[0]["submission_tags"]   
-
+        
         return AnnotationsModel(**data)
 
     def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, submission_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:

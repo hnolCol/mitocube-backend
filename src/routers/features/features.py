@@ -52,6 +52,8 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     pg_peptides = {}
     if "protein_groups" in include_types:
         pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag, sort_by_stat_attribute=sort_by_stat, annotation_tags=annotation_tags)
+    
+        print(pgs_search_result)
     if "peptides" in include_types:
         
         peptides = DB.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)
