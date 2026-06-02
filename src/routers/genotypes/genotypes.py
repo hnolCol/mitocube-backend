@@ -247,3 +247,8 @@ def genotype_condition_applications_data(tag: str, user: UserModel = Depends(get
     data = DB.genotypes.get_condition_application_data(tag=tag)
     return data
 
+
+@router.get("/genotypes/{genotype_tag}/creator")
+def get_genotype_creator(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> str | None:
+    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    return DB.genotypes.get_creator(tag=genotype_tag)
