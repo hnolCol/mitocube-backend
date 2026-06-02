@@ -628,22 +628,15 @@ class Neo4JAnnotations(AnnotationsABC):
         
         return r
     
-    def get_text(self, group_tag: str, text: str) -> bool:
-        query = (
-            "MATCH (a:Annotation {group_tag: $group_tag}) "
-            "WHERE toLower(a.text) = toLower($text) "
-            "RETURN count(a) > 0 AS exists"
-        )
-
+    def get_text(self, tag: str) -> str:
+        query = "MATCH (a:Annotation {tag: $tag}) RETURN a.text AS text"
         result = self._driver.execute_query(
-                query,
-                group_tag=group_tag,
-                text=text,
-                result_transformer_=lambda r: r.single()["exists"],
-            )
-
-        return bool(result)
-
+            query,
+            tag=tag,
+            result_transformer_=lambda r: r.single()
+        )
+        return result["text"] if result else None
+    
     def isin(self, tag: str, protein_tags: List[str]) -> pd.Series:
 
         query = (

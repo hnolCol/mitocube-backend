@@ -192,21 +192,9 @@ class AnnotationsABC(ABC):
         """
         
     @abstractmethod
-    def get_text(self, group_tag: str, text: str) -> bool:
+    def get_text(self, tag: str) -> str:
         """
-        Check if an annotation with the given text exists in the group.
-
-        Parameters
-        ----------
-        group_tag : str
-            Annotation group tag.
-        text : str
-            Annotation text.
-
-        Returns
-        -------
-        bool
-            True if an annotation with the given text exists in the group.
+        Get annotation text by its tag.
         """
     @abstractmethod
     def find(self, search_string: Optional[str] = None, group_tags: Optional[List[str]] = None,  protein_tags: Optional[List[str]] = None, submission_tags: Optional[List[str]] = None, limit: Optional[int] = None, group_by_group = False) -> List[str]:        

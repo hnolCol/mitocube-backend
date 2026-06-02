@@ -199,3 +199,19 @@ class GenotypeABC(ABC):
             A list of condition application data associated with the genotype.
         """
 
+
+    @abstractmethod
+    def get_creator(self, tag: str) -> str | None:
+        """Gets the creator of the genotype.
+
+        Parameters
+        ----------
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        str | None
+            The user tag of the creator of the genotype, or None if not found.
+        """
+

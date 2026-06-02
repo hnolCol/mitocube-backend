@@ -613,3 +613,11 @@ class Neo4JGenotype(GenotypeABC):
 
         ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
         return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]
+
+    def get_creator(self, tag: str) -> str | None:
+        query = (
+            "MATCH (u:User)-[:CREATED]->(g:Genotype {tag: $tag}) "
+            "RETURN u.firstname + ' ' + u.lastname AS name"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if r else None
