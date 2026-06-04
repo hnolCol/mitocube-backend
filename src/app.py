@@ -267,7 +267,8 @@ if __name__ == "__main__":
             #python3 src/app.py --setup_database  --reviewed_proteins_only --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
             #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
             #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
-            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
+            
+            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589,UP000002311 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
 
             
     uvicorn.run(app, port = 5002, proxy_headers=True)
