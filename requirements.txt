@@ -46,7 +46,7 @@ pypdf==6.1.0
 python-dateutil==2.8.2
 python-dotenv==1.0.0
 python-jose==3.3.0
-python-multipart==0.0.6
+python-multipart==0.0.27
 pytz==2025.2
 requests==2.31.0
 rsa==4.9
