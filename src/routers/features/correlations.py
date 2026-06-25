@@ -17,7 +17,15 @@ router = APIRouter(
     tags=["Proteins","Correlations"]
     )
 @router.get("/{tag}/correlations") 
-def get_protein_correlations(tag: str, annotation_tags : str = None, min_data_points : int = 2, limit : int = None, direction : Literal["both", "positive", "negative"] = "both", fdr : float = 0.05, user: UserModel = Depends(get_user_from_token))-> List[dict]:
+def get_protein_correlations(tag: str, 
+                             metrics : Literal["raw", "z_score_sample","z_score_protein_group", "log2_fc_vs_mean"] = "raw",
+                             annotation_tags : str = None, 
+                             min_data_points : int = 2, 
+                             limit : int = None, 
+                             direction : Literal["both", "positive", "negative"] = "both", 
+                             fdr : float = 0.05, 
+                             ca_tags : str = None,
+                             user: UserModel = Depends(get_user_from_token))-> List[dict]:
     """
     Returns the correlation of a given protein tag with all other proteins across all samples. 
     The correlation is computed using Pearson correlation and includes the p-value for the correlation.
@@ -28,7 +36,6 @@ def get_protein_correlations(tag: str, annotation_tags : str = None, min_data_po
 
     if annotation_tags is not None:
         annotation_tags = APIParamString(param=annotation_tags).param
-        print(annotation_tags,"IN TAGS!")
         for annotation_tag in annotation_tags:
             if DB.annotations.exists(tag=annotation_tag) is False:
                 raise HTTPException(status_code=404, detail=f"Annotation {annotation_tag} not found")
@@ -38,7 +45,12 @@ def get_protein_correlations(tag: str, annotation_tags : str = None, min_data_po
     
     if min_data_points > DB.samples.count(has_protein_quantification=True):
         raise HTTPException(status_code=400, detail=f"min_data_points cannot be greater than the number of samples with protein quantification ({DB.samples.count(has_protein_quantification=True)})")
-    r = DB.features.get_correlated_features(tag = tag, annotation_tags=annotation_tags, direction=direction, min_data_points=min_data_points, limit=limit)
+    
+    submission_tags = DB.submission_filter.find(protein_tags=[tag], ca_tags=APIParamString(param=ca_tags).param if ca_tags is not None else None)
+    if submission_tags is not None and len(submission_tags) == 0:
+        return []
+
+    r = DB.features.get_correlated_features(tag = tag, metrics = metrics, submission_tags=submission_tags, annotation_tags=annotation_tags, direction=direction, min_data_points=min_data_points, limit=limit)
     r["index"] = range(len(r.index))
     r = r.dropna(subset=["t","N"])
     if r.empty:

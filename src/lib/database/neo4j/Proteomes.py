@@ -353,13 +353,18 @@ class Neo4JProteomes(ProteomesABC):
         for proteome_tag in proteome_tags:
             if self.exists(tag=proteome_tag) and self.is_updating(tag=proteome_tag):
                 raise ValueError(f"The proteome with tag {proteome_tag} is currently updating. Please try again later.")
-            N += download_proteome_annotations(uniprotKB_URL,
+            try:
+                N += download_proteome_annotations(uniprotKB_URL,
                                                 proteome_tags= [proteome_tag],
                                                 chunc_callback=self.handle_uniprot_chunc, 
                                                 add_proteome_callback=self.add_proteome_details, 
                                                 reviewed = reviewed,
                                                 user_tag = user_tag)
-            self.set_updating(tag=proteome_tag, updating=False)
+            except Exception as e:
+                self.set_updating(tag=proteome_tag, updating=False)
+                raise e
+            finally:
+                self.set_updating(tag=proteome_tag, updating=False)
         return N 
         
     def handle_uniprot_chunc(self,data : pd.DataFrame, proteome_tag : str, user_tag : str = None):
@@ -401,7 +406,7 @@ class Neo4JProteomes(ProteomesABC):
         """
 
 
-        data.loc[:,"Reviewed"] = data.loc[:,'Reviewed'] == "reviewed"
+        data["Reviewed"].eq("reviewed").astype(bool)
         if any(column_name not in data.columns for column_name in ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version","Reviewed"]):
             raise ValueError('Column names incomplete. Must have ["Length","Gene Names","Entry","Sequence","Protein names","Gene Names (primary)","Sequence version","Reviewed"]')
         

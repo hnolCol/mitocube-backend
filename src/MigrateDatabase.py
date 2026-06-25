@@ -49,6 +49,34 @@ time_to_att_duration = {
     "a":   "att_duration:a",   # A Year
 }
 
+
+brain_regions = ["cerebrum",
+"frontal_lobe",
+"prefrontal_cortex",
+"motor_cortex",
+"brocas_area",
+"parietal_lobe",
+"somatosensory_cortex",
+"temporal_lobe",
+"wernickes_area",
+"hippocampus",
+"amygdala",
+"occipital_lobe",
+"visual_cortex",
+"cerebellum",
+"brain_stem",
+"medulla_oblongata",
+"pons",
+"midbrain",
+"thalamus",
+"hypothalamus",
+"basal_ganglia",
+"corpus_callosum",
+"insula",
+"cingulate_cortex",
+"olfactory_bulb"]
+
+
 def handle_knockdown(tags : List[str], technique_trait_tag : str = "att_knockdown_technique:esirna"):
     "" 
     r = [] 
@@ -192,9 +220,18 @@ def _build_duration_child_for_sample(sample_idx: int, time_data_by_key: dict):
                 }
     return None
 
+
+def handle_brain_region(tags : List[str]):
+    t = tags[0].split(":")[1] 
+    if t in brain_regions:
+        tree = build_tree(attribute_tag="att_organ", trait_tags=["att_organ:brain"])
+        tree["children"][0]["children"].extend([build_tree(attribute_tag="att_brain_region", trait_tags=["att_brain_region"], value=t.split(":")[1]) for t in tags])
+    else:
+        tree = build_tree(attribute_tag="att_organ", trait_tags=tags)
+    return tree
+
 def handle_fraction(tags : List[str]):
     tree = build_tree(attribute_tag="att_spatial_fraction", trait_tags=[f"att_spatial_fraction:{t.split(':')[1]}" for t in tags])
-    print(tree)
     return tree
 
 def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
@@ -236,6 +273,8 @@ def build_sample_attributes(sample_attrs_input: dict, dataset_attributes: dict):
                 r[sampleIdx].append(handle_fraction(sample_attribute_tags))
             elif attribute_tag == "att_centr_supernatant":
                 r[sampleIdx].append(handle_centrifugation_supernatant(sample_attribute_tags))
+            elif attribute_tag == "att_organ":
+                r[sampleIdx].append(handle_brain_region(sample_attribute_tags))
             elif attribute_tag == "att_radiation_senescence":
                 r[sampleIdx].append(handle_radiation_senescence(sample_attribute_tags, sampleIdx=sampleIdx, time_data_by_key=time_data_by_key))
             elif attribute_tag == "att_compound" and time_data_by_key:
@@ -557,6 +596,8 @@ def build_dataset_condition_applications(dataset_attributes : dict):
             r.append(handle_centrifugation_pellet(trait_tags))
         elif attribute_tag == "att_centr_supernatant":
             r.append(handle_centrifugation_supernatant(trait_tags))
+        elif attribute_tag == "att_organ" and any(t.endswith("brain") for t in trait_tags):
+            r.append(handle_brain_region(trait_tags))
         else:
             if attribute_tag in attr_update or DB.attributes.exists(tag=attribute_tag):
                 if not attribute_tag in attr_update:
@@ -613,7 +654,7 @@ class MigrateData:
                 user_tag = self.fallback_user_tag       
             sample_names = jsonFile["sample_names"]
             metatext = jsonFile["metatext"]
-            meta_text = {k: v for k, v in jsonFile["metatext"].items() if k != "research_aim"}
+            meta_text = {k: v for k, v in jsonFile["metatext"].items() if "research_aim" not in k}
             #genotype_tags = get_tags_by_sample(jsonFile["samples_genotypes"]) if len(jsonFile["samples_genotypes"]) > 0 else []
             genotype_tags = map_genotype_labels_to_tags(jsonFile["samples_genotypes"], self.genotype_labels_to_tags)
             dataset_attributes = build_dataset_condition_applications(jsonFile["dataset_attributes"])
@@ -691,6 +732,7 @@ class MigrateData:
                     DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**x) for x in df_melt.to_dict(orient="records") ]) 
                     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
                     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+                    DB.submissions.transform_quantification_to_log2(tag = submission_tag)
                     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
                     time.sleep(0.05) # to avoid overwhelming the database with too many requests in a short time, especially when migrating multiple submissions. Adjust the sleep duration as needed based on the size of the data and the performance of the database.
                     print(f"Quantification data for submission {submission_tag} inserted and processed successfully.")

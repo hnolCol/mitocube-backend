@@ -1,7 +1,7 @@
 import time
 
 from datetime import datetime 
-from typing import List, Dict, Optional, Union, Literal, Any, ForwardRef
+from typing import List, Dict, Optional, Union
 from pydantic import AnyUrl
 from pydantic import BaseModel 
 from pydantic import Field
@@ -10,16 +10,15 @@ from pydantic import field_serializer
 
 from config.models.user import PublicUser
 from config.models.attributes import AttributeModel, AttributeValueModel, AttributeTree
-from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
+from config.models.submissions.timeline import TimeLineModel
 from config.models.submissions.runs import RunListModel
 
-from config.models.genotype import GenotypeModel, MinimalGenotypeModel
+from config.models.genotype import GenotypeModel
 from config.models.annotations.feature import FeatureModel
-from config.models.feature import FeatureNeoModel
 
 from config.settings.metatexts import MetaTexts
 from config.enums.states import SubmissionStatesEnums
-from config.enums.units import UnitsEnum
+
 
 from services.random_generators import get_random_string
 

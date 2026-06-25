@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+langchain>=1.2
+langgraph>=1.1
+langgraph-checkpoint-sqlite
+langchain-anthropic
+langchain-openai
+pydantic>=2

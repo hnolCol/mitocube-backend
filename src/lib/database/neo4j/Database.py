@@ -67,15 +67,16 @@ class MCNeo4JDatabase(DatabaseABC):
         self.timeline = Neo4JTimeline(driver=self.connection.driver)
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.phenotypes = Neo4JPhenotypes(driver = self.connection.driver)
-        self.samples = Neo4JSamples(driver=self.connection.driver, condition_applications=self.condition_applications)
+        self.annotations = Neo4JAnnotations(driver=self.connection.driver)
+        self.annotation_groups = Neo4JAnnotationGroups(driver=self.connection.driver)
+        self.samples = Neo4JSamples(driver=self.connection.driver, condition_applications=self.condition_applications, annotations=self.annotations, genotypes=self.genotypes)
         self.peptides = Neo4JPeptides(driver = self.connection.driver, samples=self.samples)
         self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
         self.maintenance_events = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.external_service = Neo4JExternalServices(driver=self.connection.driver)
         self.symptoms = Neo4jSymptoms(driver=self.connection.driver)
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
-        self.annotations = Neo4JAnnotations(driver=self.connection.driver)
-        self.annotation_groups = Neo4JAnnotationGroups(driver=self.connection.driver)
+        
         
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
         

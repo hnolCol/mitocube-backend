@@ -51,6 +51,7 @@ class Neo4JFeatures(FeaturesABC):
        
     def get_correlated_features(self, 
                                 tag : str,
+                                metrics : Literal["raw", "z_score_sample","z_score_protein_group", "log2_fc_vs_mean"] = "raw",
                                 annotation_tags : List[str] = None,  
                                 submission_tags : List[str] = None,
                                 direction : Literal["positive","negative","both"] = "both", 
@@ -79,53 +80,183 @@ class Neo4JFeatures(FeaturesABC):
         
         annotation_tags_exists = annotation_tags is not None and len(annotation_tags) > 0
         submission_tags_exists = submission_tags is not None and len(submission_tags) > 0
-        if feature_type == "protein_group":   
-            query = "MATCH (p_target:ProteinGroup {tag : $tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:ProteinGroup) "
-        elif feature_type == "peptide":
-            query = "MATCH (p_target:Peptide {tag : $tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:Peptide) "
         
-        if submission_tags_exists or annotation_tags_exists:
-            query += "WHERE "
+        # if feature_type == "protein_group":   
+        #     query = "MATCH (p_target:ProteinGroup {tag : $tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:ProteinGroup) "
+        # elif feature_type == "peptide":
+        #     query = "MATCH (p_target:Peptide {tag : $tag})<-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->(p:Peptide) "
         
-        if annotation_tags_exists:
-            if feature_type == "protein_group":
-                query += "EXISTS {(p)-[:HAS_PROTEINS]->(protein:Protein)<-[:ANNOTATES]-(annotation:Annotation) WHERE annotation.tag in $annotation_tags} "
+        # if submission_tags_exists or annotation_tags_exists:
+        #     query += "WHERE "
         
-        if submission_tags_exists:
-            if annotation_tags_exists:
-                query += " AND "    
-            query += " EXISTS {(s)<-[:HAS_SAMPLE]-(submission:Submission) WHERE submission.tag in $submission_tags} "
+        # if annotation_tags_exists:
+        #     if feature_type == "protein_group":
+        #         query += "EXISTS {(p)-[:HAS_PROTEINS]->(protein:Protein)<-[:ANNOTATES]-(annotation:Annotation) WHERE annotation.tag in $annotation_tags} "
         
-        query += (
-            "WITH collect(rp2.value) as x, collect(rp1.value) as y, p "
-            "WITH apoc.coll.zip(x, y) AS pairs, apoc.coll.avg(x) AS meanX, apoc.coll.avg(y) AS meanY, x ,y, p "
-            "WHERE size(x) > $min_data_points - 1 AND size(y) > $min_data_points - 1 "
-            "WITH "
-            "   [p IN pairs | (p[0] - meanX) * (p[1] - meanY)] AS products, "
-            "   [v IN x | (v - meanX)^2] AS xSquaredDiffs, "
-            "   [v IN y | (v - meanY)^2] AS ySquaredDiffs, p, size(pairs) as N "
-            "WITH "
-            "    apoc.coll.sum(products) / "
-            "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
-        )
-        if direction == "negative":
+        # if submission_tags_exists:
+        #     if annotation_tags_exists:
+        #         query += " AND "    
+        #     query += " EXISTS {(s)<-[:HAS_SAMPLE]-(submission:Submission) WHERE submission.tag in $submission_tags} "
+        
+        # if metrics == "raw":
+        #     query += "WITH collect(rp2.value) as x, collect(rp1.value) as y, p "
+        # elif metrics == "z_score_sample":
+        #     query += "WITH collect(rp2.z_score_sample) as x, collect(rp1.z_score_sample) as y, p "
+        # elif metrics == "z_score_protein_group":
+        #     query += "WITH collect(rp2.z_score_protein_group) as x, collect(rp1.z_score_protein_group) as y, p "
+        
+        # query += (
+        #     "WITH apoc.coll.zip(x, y) AS pairs, apoc.coll.avg(x) AS meanX, apoc.coll.avg(y) AS meanY, x ,y, p "
+        #     "WHERE size(x) > $min_data_points - 1 AND size(y) > $min_data_points - 1 "
+        #     "WITH "
+        #     "   [p IN pairs | (p[0] - meanX) * (p[1] - meanY)] AS products, "
+        #     "   [v IN x | (v - meanX)^2] AS xSquaredDiffs, "
+        #     "   [v IN y | (v - meanY)^2] AS ySquaredDiffs, p, size(pairs) as N "
+        #     "WITH "
+        #     "    apoc.coll.sum(products) / "
+        #     "   (SQRT(apoc.coll.sum(xSquaredDiffs)) * SQRT(apoc.coll.sum(ySquaredDiffs))) AS pearson, p, N "
+        # )
+        # if direction == "negative":
             
-            query += "WHERE pearson < 0 "
+        #     query += "WHERE pearson < 0 "
         
-        elif direction == "positive":
+        # elif direction == "positive":
             
-            query += "WHERE pearson > 0 "
+        #     query += "WHERE pearson > 0 "
         
-        query +=  "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
-        if limit is not None:
-            if direction == "both": 
-                query += "ORDER BY abs(pearson) DESC LIMIT $limit "
+        # query +=  "RETURN p.tag as tag, round(pearson,2) as pearson, N as N,  pearson * SQRT(N-2) / SQRT(1-pearson^2) as t " 
+        # if limit is not None:
+        #     if direction == "both": 
+        #         query += "ORDER BY abs(pearson) DESC LIMIT $limit "
             
-            elif direction == "negative":
-                query += "ORDER BY pearson ASC LIMIT $limit "
-            elif direction == "positive":
-                query += "ORDER BY pearson DESC LIMIT $limit "    
+        #     elif direction == "negative":
+        #         query += "ORDER BY pearson ASC LIMIT $limit "
+        #     elif direction == "positive":
+        #         query += "ORDER BY pearson DESC LIMIT $limit "    
                 
+        
+        LABELS = {
+        "protein_group": "ProteinGroup",
+        "peptide": "Peptide",
+        }
+
+        METRICS = {
+            "raw": "value",
+            "z_score_sample": "z_score_sample",
+            "z_score_protein_group": "z_score_protein_group",
+            "log2_fc_vs_mean": "log2_fc_vs_mean"
+        }
+
+        if feature_type not in LABELS:
+            raise ValueError(
+                f"Unsupported feature_type '{feature_type}'. "
+                f"Expected one of: {list(LABELS.keys())}"
+            )
+
+        if metrics not in METRICS:
+            raise ValueError(
+                f"Unsupported metrics '{metrics}'. "
+                f"Expected one of: {list(METRICS.keys())}"
+            )
+
+        if direction not in {"both", "positive", "negative"}:
+            raise ValueError(
+                f"Unsupported direction '{direction}'. "
+                "Expected 'both', 'positive', or 'negative'."
+            )
+
+        label = LABELS[feature_type]
+        metric_property = METRICS[metrics]
+
+        query = f"""
+        MATCH (p_target:{label} {{tag: $tag}})
+            <-[rp1:QUANTIFIED]-(s:Sample)-[rp2:QUANTIFIED]->
+            (p:{label})
+        WHERE p <> p_target
+        """
+
+        where_clauses = []
+
+        if annotation_tags_exists and feature_type == "protein_group":
+            where_clauses.append("""
+            EXISTS {
+                (p)-[:HAS_PROTEINS]->(:Protein)
+                    <-[:ANNOTATES]-(annotation:Annotation)
+                WHERE annotation.tag IN $annotation_tags
+            }
+            """)
+
+        if submission_tags_exists:
+            where_clauses.append("""
+            EXISTS {
+                (s)<-[:HAS_SAMPLE]-(submission:Submission)
+                WHERE submission.tag IN $submission_tags
+            }
+            """)
+
+        if where_clauses:
+            query += "\nAND " + "\nAND ".join(where_clauses)
+
+        query += f"""
+        WITH
+            p,
+            rp1.{metric_property} AS y,
+            rp2.{metric_property} AS x
+
+        WHERE x IS NOT NULL
+        AND y IS NOT NULL
+
+        WITH
+            p,
+            count(*) AS N,
+            sum(x) AS sumX,
+            sum(y) AS sumY,
+            sum(x * y) AS sumXY,
+            sum(x * x) AS sumX2,
+            sum(y * y) AS sumY2
+
+        WHERE N >= $min_data_points
+
+        WITH
+            p,
+            N,
+            (
+                (N * sumXY - sumX * sumY)
+                /
+                sqrt(
+                    (N * sumX2 - sumX * sumX)
+                    *
+                    (N * sumY2 - sumY * sumY)
+                )
+            ) AS pearson
+
+        WHERE pearson IS NOT NULL
+        """
+
+        if direction == "positive":
+            query += "\nAND pearson > 0"
+
+        elif direction == "negative":
+            query += "\nAND pearson < 0"
+
+        query += """
+        RETURN
+            p.tag AS tag,
+            round(pearson, 2) AS pearson,
+            N AS N,
+            pearson * sqrt(N - 2) / sqrt(1 - pearson^2) AS t
+        """
+
+        if limit is not None:
+            if direction == "both":
+                query += "\nORDER BY abs(pearson) DESC"
+            elif direction == "positive":
+                query += "\nORDER BY pearson DESC"
+            else:
+                query += "\nORDER BY pearson ASC"
+
+            query += "\nLIMIT $limit"
+    
         r = self._driver.execute_query(query, 
                                        routing_="r", 
                                        result_transformer_=Result.to_df, 
@@ -135,7 +266,6 @@ class Neo4JFeatures(FeaturesABC):
                                        limit = limit, 
                                        tag = tag)
         return r 
-    
     
     def count_samples_quantifying_protein(self, tags : List[str]) -> pd.DataFrame:
         
@@ -438,7 +568,7 @@ class Neo4JFeatures(FeaturesABC):
         
         return r 
     
-    def get_quantification_per_sample(self, tag : str, submission_tags : List[str] = None) -> pd.DataFrame:
+    def get_quantification_per_sample(self, tag : str, submission_tags : List[str] = None, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> pd.DataFrame:
         """Returns the quantification values for a feature per sample. 
 
         Parameters
@@ -464,7 +594,15 @@ class Neo4JFeatures(FeaturesABC):
         )
         if submission_tags is not None and len(submission_tags) > 0:
             query += "WHERE submission.tag in $submission_tags "
-        query += "RETURN r.value as value, s.sample_index as sample_index, submission.tag as submission_tag, s.tag as sample_tag, f.tag as tag "
+        if metrics == "raw":
+            query += "RETURN r.value as value, "
+        elif metrics == "z_score_sample":
+            query += "RETURN r.z_score_sample as value, "
+        elif metrics == "z_score_protein_group":
+            query += "RETURN r.z_score_protein_group as value, "
+        elif metrics == "log2_fc_vs_mean":
+            query += "RETURN r.log2_fc_vs_mean as value, "
+        query += " s.sample_index as sample_index, submission.tag as submission_tag, s.tag as sample_tag, f.tag as tag "
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag, submission_tags = submission_tags)
         return r
     

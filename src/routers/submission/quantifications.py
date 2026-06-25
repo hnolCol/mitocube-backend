@@ -5,7 +5,10 @@ from config.models.submissions.quantifications import ProteinGroupQuantification
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token, is_user_at_least_curator
 from typing import Dict, List, Literal
-import numpy as np 
+import numpy as np
+
+from config.models.calculations.quantile import QuantileModel
+
 DB = Database.DB()
 
 router = APIRouter(
@@ -93,7 +96,7 @@ def insert_protein_quantifications(
     """
 
     if DB.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise submission_tag_not_found
 
     ##first check if all proteins exist
     N = DB.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
@@ -104,7 +107,7 @@ def insert_protein_quantifications(
         DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
         DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
         DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
-
+        DB.submissions.transform_quantification_to_log2(tag = submission_tag)
     return num_quantifications
 
 
@@ -127,7 +130,7 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     """
 
     if DB.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise submission_tag_not_found
     
     ok = DB.submissions.remove_multiple_comparison_metrices(tag = submission_tag)
     if not ok:
@@ -161,6 +164,71 @@ def insert_precursor_quantifications(
     """
 
     if DB.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+        raise submission_tag_not_found
 
     return DB.submissions.insert_precursor_quantifications(submission_tag=submission_tag, quantifications=quantifications)
+
+
+
+
+@router.get("/{submission_tag}/quantifications/distribution", summary="Get the distribution of quantification values for a given submission and quantification type.")
+def get_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> QuantileModel:
+    """     
+    Get the distribution of quantification values for a given submission and quantification type.
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission.  
+    quantification_type : Literal["proteins","protein_groups","precursors"]
+        The type of quantifications to get the distribution for.
+    annotation_tag : str, optional
+        The tag of the annotation, by default None
+    user : UserModel, optional
+        The user that is extracted by the token, by default Depends(get_user_from_token)
+    Returns
+    -------
+    Dict[str, QuantileModel]
+        A dictionary where the keys are quantification identifiers and the values are QuantileModel instances representing the distribution of quantification values.
+    """
+    
+    if not DB.submission_exists(tag=submission_tag): 
+        raise submission_tag_not_found
+    if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
+        raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
+    return DB.submissions.get_quantification_distribution(submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+
+
+
+
+@router.post("/{submission_tag}/quantifications/test/distribution", summary="Calculate the distribtion based on a test (e.g. log2FC)")
+def calculate_test_quantification_distribution(submission_tag : str,  
+                                               testParam : Dict, 
+                                               quantification_type : Literal["protein_groups","precursors"] = "protein_groups", 
+                                               annotation_tag : str = None,
+                                               user : UserModel = Depends(get_user_from_token)) -> Dict:
+    """     
+    Calculate the distribution of quantification values for a given submission and quantification type based on a test (e.g. log2FC). This can be used to calculate the distribution for specific subsets of the data (e.g. only for significantly regulated protein groups).
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission.  
+    quantification_type : Literal["proteins","protein_groups","precursors"]
+        The type of quantifications to get the distribution for.
+    """
+    #  submission_tag=submission_tag, 
+    #             ca_tag_left=testParam["ca_tag_left"],
+    #             ca_tag_right=testParam["ca_tag_right"], 
+    #             within_attribute_tags=testParam.get("within_attribute_tags", None), 
+    #             within_ca_tags=testParam.get("within_ca_tags", None), 
+    #             annotation_tag=testParam.get("annotation_tag", None)
+    
+    if not DB.submission_exists(tag=submission_tag): 
+        raise submission_tag_not_found
+    if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
+        raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
+    
+    return DB.samples.calculate_test_quantification_distribution(submission_tag=submission_tag, testParam=testParam, quantification_type=quantification_type, annotation_tag=annotation_tag)
+    
+    

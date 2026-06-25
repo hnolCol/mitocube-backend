@@ -556,7 +556,7 @@
             "children": "att_passage",
             "text": "Cellline",
             "abbr": null,
-            "priority": 600,
+            "priority": 1000,
             "allow_input": false,
             "has_features_value": false,
             "group_tag": "sample_description",
@@ -793,10 +793,10 @@
             "instrumenttype": null
         },
         {
-            "tag": "att_detergent",
-            "requires": null,
+            "tag": "att_detergent_sol",
+            "requires": "att_lysis_method:chemical",
             "children": "att_concentration",
-            "text": "Detergent",
+            "text": "Protein denaturants and solubilizers",
             "abbr": null,
             "priority": 450,
             "allow_input": false,
@@ -1301,7 +1301,7 @@
         {
             "tag": "att_knockdown_technique",
             "requires": null,
-            "children": "att_duration|att_concentration|att_protein|att_grna",
+            "children": "att_duration|att_concentration|att_protein|att_grna|att_si_rna",
             "text": "Gene Knockdown Technique",
             "abbr": null,
             "priority": 800,
@@ -1309,7 +1309,7 @@
             "has_features_value": false,
             "group_tag": "Expression Alteration",
             "min_state": 0,
-            "attribute_group": "filter|dataset|sample",
+            "attribute_group": "filter|sample",
             "mandatory_for_active": null,
             "allow_as_filter": "filter",
             "allow_for_user": null,
@@ -1366,7 +1366,7 @@
         },
         {
             "tag": "att_heart_compartment",
-            "requires": null,
+            "requires": "att_organ:heart",
             "children": null,
             "text": "Heart Compartment",
             "abbr": null,
@@ -1697,16 +1697,16 @@
         {
             "tag": "att_lysis_method",
             "requires": null,
-            "children": "att_lysis_buffer",
+            "children": "att_detergent_sol",
             "text": "Lysis Method",
             "abbr": null,
-            "priority": 500,
+            "priority": 700,
             "allow_input": false,
             "has_features_value": false,
             "group_tag": "lysis",
             "min_state": 1,
-            "attribute_group": "filter|dataset|sample",
-            "mandatory_for_active": null,
+            "attribute_group": "mandatory|filter|dataset|sample",
+            "mandatory_for_active": "mandatory",
             "allow_as_filter": "filter",
             "allow_for_user": null,
             "allow_for_genotype": null,
@@ -1895,7 +1895,7 @@
         {
             "tag": "att_mouse_line",
             "requires": null,
-            "children": "att_age",
+            "children": "att_age|att_sex",
             "text": "Mouse Line",
             "abbr": null,
             "priority": 659,
@@ -2070,7 +2070,7 @@
         },
         {
             "tag": "att_muscle",
-            "requires": null,
+            "requires": "att_organ:skmuscle",
             "children": null,
             "text": "Muscle Type",
             "abbr": null,
@@ -2203,10 +2203,10 @@
         {
             "tag": "att_organ",
             "requires": null,
-            "children": null,
+            "children": "att_brain_region|att_heart_compartment|att_muscle",
             "text": "Organ",
             "abbr": null,
-            "priority": 500,
+            "priority": 900,
             "allow_input": false,
             "has_features_value": false,
             "group_tag": "sample_description",
@@ -2885,7 +2885,7 @@
         {
             "tag": "att_tissue",
             "requires": null,
-            "children": null,
+            "children": "att_heart_compartment",
             "text": "Tissue",
             "abbr": null,
             "priority": 500,
@@ -3255,6 +3255,50 @@
             "allow_for_measurement": "sample",
             "instrument": null,
             "instrumenttype": null
+        },
+        {
+            "tag": "att_brain_region",
+            "requires": "att_organ:brain",
+            "children": null,
+            "text": "Brain Region",
+            "abbr": null,
+            "priority": 500,
+            "allow_input": false,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_sirna_sequence",
+            "requires": "att_knockdown_technique:siRNA",
+            "children": null,
+            "text": "siRNA",
+            "abbr": null,
+            "priority": 500,
+            "allow_input": true,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
         }
     ],
     "traits": [
@@ -3486,6 +3530,26 @@
             "text": "Valine",
             "description": "Valine\u00a0(Val/V) MW (Da):117,15 C5H11NO2",
             "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "ctrl",
+            "attribute_tag": "att_aa",
+            "tag": "att_aa:ctrl",
+            "keyword": "ctrl",
+            "text": "control",
+            "description": "Control (no supplementation, or H2O)",
+            "priority": 550.0,
+            "ols": null
+        },
+        {
+            "value": "neaa",
+            "attribute_tag": "att_aa",
+            "tag": "att_aa:neaa",
+            "keyword": "neaa",
+            "text": "NEAA",
+            "description": "Non essential amino acid mix (Alanine, Arginine, Asparagine, Aspartic Acid, Cysteine, Glutamic Acid, Glutamine, Glycine, Proline, Serine, and Tyrosine)",
+            "priority": 540.0,
             "ols": null
         },
         {
@@ -6250,8 +6314,8 @@
         },
         {
             "value": "chaps",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:chaps",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:chaps",
             "keyword": null,
             "text": "CHAPS",
             "description": "CHAPS is a zwitterionic detergent that is especially well suited for protecting the native state of proteins.",
@@ -6260,8 +6324,8 @@
         },
         {
             "value": "dmm",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:dmm",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:dmm",
             "keyword": null,
             "text": "DMM",
             "description": "n-Dodecyl-\u03b2-D-Maltoside is especially useful for solubilizing membrane proteins to preserve their activity.",
@@ -6270,8 +6334,8 @@
         },
         {
             "value": "np40",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:np40",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:np40",
             "keyword": null,
             "text": "NP-40",
             "description": "NP-40 is a nonionic polyoxyethylene surfactant that is most frequently used as a component of cell lysis buffers.",
@@ -6280,8 +6344,8 @@
         },
         {
             "value": "og",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:og",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:og",
             "keyword": null,
             "text": "OG",
             "description": "octyl-beta-Glucoside is a nonionic detergent that has been widely used for membrane protein solubilization.",
@@ -6290,8 +6354,8 @@
         },
         {
             "value": "otg",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:otg",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:otg",
             "keyword": null,
             "text": "OTG",
             "description": "Octylthioglucoside is a low-MW nonionic detergent that is effective for cell lysis and nondenaturing protein solubilization. It is resistant to beta-D-glucoside glucohydrolase degradation.",
@@ -6300,8 +6364,8 @@
         },
         {
             "value": "sds",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:sds",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:sds",
             "keyword": null,
             "text": "SDS",
             "description": "Sodium dodecyl sulfate (SDS) is a popular anionic detergent for routine protein electrophoresis and cell lysis methods.\u00a0",
@@ -6310,8 +6374,8 @@
         },
         {
             "value": "tritonx100",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:tritonx100",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:tritonx100",
             "keyword": null,
             "text": "Triton X-100",
             "description": "Triton X-100 is most frequently used as a component of cell lysis buffers or other solutions intended to extract and solubilize proteins.",
@@ -6320,8 +6384,8 @@
         },
         {
             "value": "tween20",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:tween20",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:tween20",
             "keyword": null,
             "text": "Tween20",
             "description": "Tween20 nonionic detergent",
@@ -6330,11 +6394,21 @@
         },
         {
             "value": "tween80",
-            "attribute_tag": "att_detergent",
-            "tag": "att_detergent:tween80",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:tween80",
             "keyword": null,
             "text": "Tween80",
             "description": "Tween80 nonionic detergent",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "urea",
+            "attribute_tag": "att_detergent_sol",
+            "tag": "att_detergent_sol:urea",
+            "keyword": null,
+            "text": "Urea",
+            "description": "Non-surfactant chaotropic agent",
             "priority": 500.0,
             "ols": null
         },
@@ -7233,7 +7307,7 @@
             "attribute_tag": "att_spatial_fraction",
             "tag": "att_spatial_fraction:100k",
             "keyword": "100k",
-            "text": "100K",
+            "text": "100k",
             "description": "Pellet of a 100K centrifugation step.",
             "priority": 500.0,
             "ols": null
@@ -7814,7 +7888,7 @@
             "tag": "att_lysis_method:dounce",
             "keyword": null,
             "text": "Douncer Lysis ",
-            "description": "Douncer 10 strokes",
+            "description": "Douncer Strokes",
             "priority": 500.0,
             "ols": null
         },
@@ -10619,26 +10693,6 @@
             "ols": null
         },
         {
-            "value": "cerebellum",
-            "attribute_tag": "att_organ",
-            "tag": "att_organ:cerebellum",
-            "keyword": "cerebellum",
-            "text": "Cerebellum",
-            "description": "Cerebellum",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "cerebrum",
-            "attribute_tag": "att_organ",
-            "tag": "att_organ:cerebrum",
-            "keyword": "cerebrum",
-            "text": "Cerebrum",
-            "description": "Cerebrum",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
             "value": "ear",
             "attribute_tag": "att_organ",
             "tag": "att_organ:ear",
@@ -10695,16 +10749,6 @@
             "keyword": "heart",
             "text": "Heart",
             "description": "Heart",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "hypothalamus",
-            "attribute_tag": "att_organ",
-            "tag": "att_organ:hypothalamus",
-            "keyword": "hypothalamus",
-            "text": "Hypothalamus",
-            "description": "Hypothalamus",
             "priority": 500.0,
             "ols": null
         },
@@ -10775,16 +10819,6 @@
             "keyword": "mesentery",
             "text": "Mesentery",
             "description": "Mesentery",
-            "priority": 500.0,
-            "ols": null
-        },
-        {
-            "value": "midbrain",
-            "attribute_tag": "att_organ",
-            "tag": "att_organ:midbrain",
-            "keyword": "midbrain",
-            "text": "Midbrain",
-            "description": "Midbrain",
             "priority": 500.0,
             "ols": null
         },
@@ -12890,8 +12924,8 @@
         },
         {
             "value": "leftatrium",
-            "attribute_tag": "att_heart",
-            "tag": "att_heart:leftatrium",
+            "attribute_tag": "att_heart_compartment",
+            "tag": "att_heart_compartment:leftatrium",
             "keyword": null,
             "text": "Left atrium",
             "description": "Left atrium:\u00a0one of the four chambers of the heart. The left atrium receives blood full of oxygen from the lungs and then empties the blood into the left ventricle.",
@@ -12900,8 +12934,8 @@
         },
         {
             "value": "rightatrium",
-            "attribute_tag": "att_heart",
-            "tag": "att_heart:rightatrium",
+            "attribute_tag": "att_heart_compartment",
+            "tag": "att_heart_compartment:rightatrium",
             "keyword": null,
             "text": "Right atrium",
             "description": "Right atrium:\u00a0one of the four chambers of the heart. The right atrium receives blood low in oxygen from the body and then empties the blood into the right ventricle.",
@@ -12910,8 +12944,8 @@
         },
         {
             "value": "leftventri",
-            "attribute_tag": "att_heart",
-            "tag": "att_heart:leftventri",
+            "attribute_tag": "att_heart_compartment",
+            "tag": "att_heart_compartment:leftventri",
             "keyword": null,
             "text": "Left ventricle",
             "description": "A\u00a0ventricle\u00a0is one of two large chambers located toward the bottom of the\u00a0heart\u00a0that collect and expel\u00a0blood\u00a0towards the peripheral beds within the body and lungs.\u00a0",
@@ -12920,8 +12954,8 @@
         },
         {
             "value": "rightventri",
-            "attribute_tag": "att_heart",
-            "tag": "att_heart:rightventri",
+            "attribute_tag": "att_heart_compartment",
+            "tag": "att_heart_compartment:rightventri",
             "keyword": null,
             "text": "Right ventricle",
             "description": "A\u00a0ventricle\u00a0is one of two large chambers located toward the bottom of the\u00a0heart\u00a0that collect and expel\u00a0blood\u00a0towards the peripheral beds within the body and lungs.\u00a0",
@@ -15941,7 +15975,7 @@
         {
             "value": "ul",
             "attribute_tag": "att_volume",
-            "tag": "att_volume:\u00b5L",
+            "tag": "att_volume:ul",
             "keyword": null,
             "text": "\u00b5L",
             "description": "microlitre",
@@ -15949,12 +15983,22 @@
             "ols": null
         },
         {
-            "value": "nlpermin",
+            "value": "nl",
             "attribute_tag": "att_volume",
-            "tag": "att_volume:nL",
+            "tag": "att_volume:nl",
             "keyword": null,
             "text": "nL",
             "description": "nanolitre",
+            "priority": 550.0,
+            "ols": null
+        },
+        {
+            "value": "ml",
+            "attribute_tag": "att_volume",
+            "tag": "att_volume:ml",
+            "keyword": null,
+            "text": "nL",
+            "description": "milliliter",
             "priority": 550.0,
             "ols": null
         },
@@ -17376,6 +17420,256 @@
             "text": "rem",
             "description": "100rem = Sv",
             "priority": 250.0,
+            "ols": null
+        },
+        {
+            "value": "cerebrum",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:cerebrum",
+            "keyword": null,
+            "text": "Cerebrum",
+            "description": "Largest part of the brain; divided into two hemispheres and responsible for higher functions including thought, memory, language, and voluntary movement",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "frontal_lobe",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:frontal_lobe",
+            "keyword": null,
+            "text": "Frontal lobe",
+            "description": "Controls executive functions, decision-making, voluntary movement, and personality",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "prefrontal_cortex",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:prefrontal_cortex",
+            "keyword": null,
+            "text": "Prefrontal cortex",
+            "description": "Involved in planning, impulse control, working memory, and social behaviour",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "motor_cortex",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:motor_cortex",
+            "keyword": null,
+            "text": "Motor cortex",
+            "description": "Sends signals to muscles to control voluntary body movements",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "brocas_area",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:brocas_area",
+            "keyword": null,
+            "text": "Broca's area",
+            "description": "Located in the left frontal lobe; responsible for speech production and language processing",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "parietal_lobe",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:parietal_lobe",
+            "keyword": null,
+            "text": "Parietal lobe",
+            "description": "Processes sensory information such as touch, temperature, pain, and spatial awareness",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "somatosensory_cortex",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:somatosensory_cortex",
+            "keyword": null,
+            "text": "Somatosensory cortex",
+            "description": "Receives and interprets tactile and proprioceptive signals from the body",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "temporal_lobe",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:temporal_lobe",
+            "keyword": null,
+            "text": "Temporal lobe",
+            "description": "Processes auditory information, memory, and language comprehension",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "wernickes_area",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:wernickes_area",
+            "keyword": null,
+            "text": "Wernicke's area",
+            "description": "Located in the left temporal lobe; essential for understanding spoken and written language",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "hippocampus",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:hippocampus",
+            "keyword": null,
+            "text": "Hippocampus",
+            "description": "Critical for forming new memories and spatial navigation",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "amygdala",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:amygdala",
+            "keyword": null,
+            "text": "Amygdala",
+            "description": "Processes emotions, especially fear and threat responses; involved in emotional memory",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "occipital_lobe",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:occipital_lobe",
+            "keyword": null,
+            "text": "Occipital lobe",
+            "description": "Primary visual processing centre; interprets colour, shape, and motion",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "visual_cortex",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:visual_cortex",
+            "keyword": null,
+            "text": "Visual cortex",
+            "description": "Located in the occipital lobe; receives and processes signals from the eyes",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "cerebellum",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:cerebellum",
+            "keyword": null,
+            "text": "Cerebellum",
+            "description": "Coordinates movement, balance, and fine motor control; involved in motor learning",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": "brain_stem",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:brain_stem",
+            "keyword": null,
+            "text": "Brain stem",
+            "description": "Controls vital automatic functions such as breathing, heart rate, and sleep-wake cycles",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "medulla_oblongata",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:medulla_oblongata",
+            "keyword": null,
+            "text": "Medulla oblongata",
+            "description": "Part of the brain stem; regulates breathing, blood pressure, and heart rate",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "pons",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:pons",
+            "keyword": null,
+            "text": "Pons",
+            "description": "Relays signals between the cerebellum and cortex; involved in sleep and facial movement",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "midbrain",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:midbrain",
+            "keyword": null,
+            "text": "Midbrain",
+            "description": "Involved in vision, hearing, eye movement, and relaying motor and sensory signals",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "thalamus",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:thalamus",
+            "keyword": null,
+            "text": "Thalamus",
+            "description": "Acts as a relay station, routing sensory and motor signals to the cortex",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "hypothalamus",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:hypothalamus",
+            "keyword": null,
+            "text": "Hypothalamus",
+            "description": "Regulates hunger, thirst, body temperature, hormones, and the circadian rhythm",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "basal_ganglia",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:basal_ganglia",
+            "keyword": null,
+            "text": "Basal ganglia",
+            "description": "Involved in movement coordination, habit formation, and reward processing",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "corpus_callosum",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:corpus_callosum",
+            "keyword": null,
+            "text": "Corpus callosum",
+            "description": "Bundle of nerve fibres connecting the left and right cerebral hemispheres",
+            "priority": 600.0,
+            "ols": null
+        },
+        {
+            "value": "insula",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:insula",
+            "keyword": null,
+            "text": "Insula",
+            "description": "Involved in self-awareness, interoception, empathy, and pain perception",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "cingulate_cortex",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:cingulate_cortex",
+            "keyword": null,
+            "text": "Cingulate cortex",
+            "description": "Plays a role in emotion regulation, attention, and conflict monitoring",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "olfactory_bulb",
+            "attribute_tag": "att_brain_region",
+            "tag": "att_brain_region:olfactory_bulb",
+            "keyword": null,
+            "text": "Olfactory bulb",
+            "description": "Processes smell signals sent from the nose to the brain",
+            "priority": 500.0,
             "ols": null
         }
     ]

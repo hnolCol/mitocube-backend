@@ -36,7 +36,7 @@ class MetaTexts(BaseSettings):
         "metatext:lcms" : "Please add information about the LC-MS/MS method."
         }
     required : Dict[str,bool] = {
-        "metatext:research_aim" : True,
+        "metatext:research_aim" : False, #changed from old version, as in neo4j the research aim is exta
         "metatext:experimental_procedure" : True,
         "metatext:add_info" : False,
         "metatext:protein_digestion" : True,

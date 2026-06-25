@@ -15,6 +15,7 @@ from config.models.submissions.quantifications import ProteinGroupQuantification
 from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationTreeModel
 from config.models.submissions.runs import RunListModel
 from config.enums.states import SubmissionStatesEnums
+from config.models.calculations.quantile import QuantileModel
 
 
 class SubmissionSummaryABC(ABC):
@@ -64,7 +65,8 @@ class SubmissionsABC(ABC):
     def contains(self, tag : str) -> bool:
         "Alias for exists()."
         self.exists(tag)
-    
+        
+   
     @abstractmethod
     def exists(self, tag : str) -> bool:
         """Checks if the given tag is associated with a 
@@ -121,7 +123,10 @@ class SubmissionsABC(ABC):
             ```
             If group_by_attribute is False, a list of condition application tags (str) is returned.
         """
-
+    @abstractmethod
+    def get_defined_attributes(self, tag : str) -> List[str]:
+        """Returns a list of all defined attribute tags for a given submission. E.g. all attributes that are defined for a submission, this does not include attributes that are not defined for the submission. This is useful to see which attributes are defined for a submission and which are not."""
+         
     @abstractmethod
     def has_genotypes(self, tag : str) -> bool:
         """Checks if the submission has genotypes associated with it."""
@@ -284,6 +289,11 @@ class SubmissionsABC(ABC):
             A dictionary with submission tags as keys and the number of protein group quantifications as values.
         """
     
+    
+    @abstractmethod
+    def get_quantification_distribution(self, submission_tag : str, quantification_type : Literal["proteins","protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+        """Returns the distribution of quantification values for a given submission and quantification type. The distribution is represented as a QuantileModel instance."""
+    
     @abstractmethod
     def insert(self, tag : str, title : str, user_tag : str, collaborators : List[str] = None) -> bool:
         """Adds a new submission to the database. 
@@ -375,7 +385,9 @@ class SubmissionsABC(ABC):
         Transforms the quantification values for a given submission to z-scores.
         """
         
-
+    @abstractmethod
+    def transform_quantification_to_log2(self, tag : str) -> bool:
+        "" 
         
     @abstractmethod  
     def insert_research_aim(self, tag : str, research_aim : str, user_tag : str) -> bool:
@@ -628,15 +640,19 @@ class SubmissionFilterABC(ABC):
     
     @abstractmethod
     def find(self,
+            search_string : str = None,
             state : List[int] = None, 
             trait_tags : List[str] = None, 
             attribute_tag : List[str]= None, 
+            trait_tag : List[str] = None,
             ca_tags: List[str] = None,
-            user_tag : List[str] = None, 
-            protein_tags : List[str] = None, 
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None, 
             genotype_tag : List[str] = None,
+            include_sample_ca : bool = False,   
             ordered : bool = True,
-            search_string : str = None,
+            ca_match_all : bool = True,
             limit : int = 10) -> List[str]:
         """Returns the submission tags that match the filtering. 
         The filtering is performed using the AND operator throughout. 

@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import ORJSONResponse
+
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +19,8 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 # f, AnnotationDatabase
 # from lib.database.ABCDatabase import MCAttributes
 from lib.database.Database import Database
-# 
+
+from lib.ai.agent.runtime import runtime
 
 # 
 ### import services
@@ -72,8 +75,7 @@ from routers.condition_applications import condition_applications
 from routers.ai import openai
 from routers.stats import submissions as submission_stats
 # from routers import play  # route to test things during development ###########################################################
-
-from services.json import read_json
+from lib.ai.agent.runtime import lifespan
 import pandas as pd
 import argparse 
 
@@ -139,17 +141,19 @@ router_sources = [dataset,
                   heatmap
 ]
     
-# router_sources = [dataset, submission, attributes, token, user, features, info, annotations, play] ###########################################################
 
 GENERAL_SETTINGS = get_general_settings()
 DB_SETTINGS = get_db_settings()
 ROOT_PATH = get_absolute_path_to_dir(__file__)
 CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
-DB = Database.DB()
-DB.protein_groups.find(submission_tag="Sqv8OUK759", search_string="AFG3L2")
-DB.protein_groups.find(submission_tag="Sqv8OUK759", sort_by_stat_attribute="att_irradiance_type")
 
+
+DB = Database.DB()
+
+
+print(DB.annotation_groups.test_variance_enrichment(attribute_tag="att_compound", submission_tags=["LOGtC9tNC13b"]))
+print("SUBMISSION START", DB.submissions.get_state(tag="LOGtC9tNC13b"), DB.submissions.get_creator(tag="Sqv8OUK759"), DB.submissions.get_research_aim(tag="LOGtC9tNC13b"))
 origins = [
     "https://mitocube.age.mpg.de",
     "http://localhost:5000",
@@ -162,6 +166,7 @@ app = FastAPI(
     title=GENERAL_SETTINGS.app_name,
     version=GENERAL_SETTINGS.version,
     description=GENERAL_SETTINGS.description,
+    lifespan=lifespan,
     redoc_url="/api/doc",
     default_response_class=ORJSONResponse)
 
@@ -212,18 +217,20 @@ if __name__ == "__main__":
     reviewed_proteins_only = args.reviewed_proteins_only
     
     lead_user_tag = args.lead_user_tag
-    
+    print(proteomes_to_add,"???")
     if setup_db_default:
-        genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
+        
         DB.users.check(lead_tag = lead_user_tag)
         lead_user = DB.users.get_lead_user() 
+        
+        genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
         #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
         DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
         #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
         if os.path.exists(user_path):
             DB.users._utils_migrate(path_to_user_data=user_path) 
         else:
-            ValueError(f"User path {user_path} does not exist, cannot migrate users. Please provide a valid path to the users.json file. ")
+            raise ValueError(f"User path {user_path} does not exist, cannot migrate users. Please provide a valid path to the users.json file. ")
        ##setting up some maintenance related information, such as instrument states, maintenance states, procedures, symptoms, and spare parts. This is necessary for the maintenance module to function properly.
         
         DB.instrument_states._utils_insert_from_file(file_path=os.path.join(args.resources_path, "maintenance/instrumentstates.txt"), sep="\t")
@@ -264,7 +271,7 @@ if __name__ == "__main__":
             MigrateData (path_to_submission_folder = migrate_submission_folder, genotype_labels_path=genotype_mapper_file_path, fallback_user_tag = lead_user).run()
             
         
-            #python3 src/app.py --setup_database  --reviewed_proteins_only --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json
+            #python3 src/app.py --setup_database  --reviewed_proteins_only --migrate_submissions /Users/hnolte/Documents/GitHub/mitocube-backend/resources/data --proteomes UP000005640,UP000000589 --resources_path /Users/hnolte/Documents/GitHub/mitocube-backend/resources/ --lead_user_tag fOtsqZCP --users /Users/hnolte/Desktop/resources/users/users.json --reviewed_proteins_only
             #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
             #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
             

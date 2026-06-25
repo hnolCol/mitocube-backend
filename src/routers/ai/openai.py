@@ -1,4 +1,7 @@
-import time 
+import time
+from unittest import result
+from httpcore import request
+from typing_extensions import runtime 
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Body, HTTPException
 
@@ -12,9 +15,12 @@ from typing import Dict, Literal
 from services.random_generators import get_random_string
 
 from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publications
-
+from langchain_core.messages import AIMessage
 from lib.database.Database import Database
 import re
+
+from lib.ai.agent.agent import ChatRequest
+from lib.ai.agent.runtime import runtime
 DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()
@@ -24,6 +30,8 @@ router = APIRouter(
     prefix="/api/ai/openai",
     tags=["OpenAI", "ChatGPT"]
     )
+
+
 
 
 
@@ -44,65 +52,99 @@ def generate_literate_search(feature_tag: str, user: UserModel = Depends(get_use
 
 
 @router.get("/cypher", response_description="Generates a cypher query for a given prompt.")
-def generate_cypher_query(prompt: str, session_id: str = None, user: UserModel = Depends(get_user_from_token)) -> Dict:
+async def generate_cypher_query(prompt: str, session_id: str = None, user: UserModel = Depends(get_user_from_token)) -> Dict:
+    
     if session_id is None:
         session_id = f"open_ai_chat_user_{user.tag}_{get_random_string()}"
-    #if session id is given in the cache, load the messages. 
-    session_messages = DB.cache.get(session_id) if DB.cache.exists(session_id) else [{"role": "system", "content": OPEN_AI_SETTINGS.system_information}]
-
-    session_messages.append({"role": "user", "content": prompt, "return": True})
     
-    try:
-        cypher_query = DB.openai.generate_cypher_query_for_prompt(prompt, session_messages=session_messages)
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=f"Error generating cypher query: {e}")
+    config = {"configurable": {"thread_id": session_id}}
+    print(runtime.agent)
+    result = await runtime.agent.ainvoke(
+        {"messages": [{"role": "user", "content": prompt}]},
+        config=config,
+    )
 
 
-    session_messages.append({"role": "assistant", "content": cypher_query})
+    messages = result["messages"]
+    last_ai_message = next(
+        (m for m in reversed(messages) if isinstance(m, AIMessage)), None
+    )
+    reply = last_ai_message.content if last_ai_message else ""
 
-    queries = [q.strip() for q in re.findall(r"```cypher(?:[^\n]*\n)?(.*?)```", cypher_query, flags=re.S) if q.strip()]
-    print(queries)
-    if len(queries) == 0:
-        session_messages.append({"role": "assistant", "content": cypher_query, "return": True})
-        DB.cache.insert(session_id,session_messages)
-        return {"response": f"{cypher_query}. No database valid query.", "session_id": session_id, "session_messages": [msg for msg in session_messages if "return" in msg and msg["return"]]}
-    print(f"Generated {len(queries)} cypher queries.")
-    for q in queries:
-        print(f"Query: {q}")
-    ds = []
-    for q in queries:
-        try:
-            d = DB.openai.execute_query(q)
-            ds.append(d)
-        except Exception as e:
-            #try to fix the query. 
-            print(f"Error executing query '{q}': {e}. Trying a again")
-            new_prompt =  f"I received an error with this Neo4J v 5.26 prompt {q}. The error returned was this: {e}. Do not change the name of the relationships. Return the fixed cypher query in a ```cypher``` block."
-            fixed_query = DB.openai.generate_cypher_query_for_prompt(new_prompt, temp = 0.5) #session messages not needed here?
-            #save the messages to store them.
-            fixed_queries = [q.strip() for q in re.findall(r"```cypher(?:[^\n]*\n)?(.*?)```", fixed_query, flags=re.S) if q.strip()]
-            print("FIXED QUERY: ", fixed_query)
-            session_messages.append({"role": "user", "content": new_prompt})
-            session_messages.append({"role": "assistant", "content": fixed_query})
-            try:
-                for q in fixed_queries:
-                    d = DB.openai.execute_query(q)
-                ds.append(d)
-            except Exception as e2:
-                print(f"Second attempt failed for query '{q}': {e2}. Skipping.")
-    if len(ds) == 0:
-        session_messages.append({"role": "assistant", "content": "All queries failed to execute.", "return": True})
-        DB.cache.insert(session_id,session_messages)
-        return {"response": "All queries failed to execute.", "session_id": session_id, "session_messages": [msg for msg in session_messages if "return" in msg and msg["return"]]}
-    print("PASSED TO OPENAI FOR DIGESTION: ", [{"role": "assistant", "content": cypher_query},{"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."}])
-    response = DB.openai.digest_query_data(data = ds, cypher_query=cypher_query, session_messages = [{"role": "assistant", "content": cypher_query},{"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."}] )
-    session_messages.append({"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."})
-    session_messages.append({"role": "assistant", "content": response, "return": True})
+    tool_calls = [
+        call["name"]
+        for m in messages
+        if isinstance(m, AIMessage)
+        for call in (m.tool_calls or [])
+    ]
+    print("TOOL CALLS: ", tool_calls)
+    print(result)
+    print("Agent initialized and test message processed. ")
     
-    DB.cache.insert(session_id,session_messages)
+    print(reply)
+    
+    return {"response" : reply, "session_id": session_id, "session_messages": [{"role" : "user", "content": prompt}, {"role" : "assistant", "content": reply}]}
+    
+    
+    
+    # if session_id is None:
+    #     session_id = f"open_ai_chat_user_{user.tag}_{get_random_string()}"
+    # #if session id is given in the cache, load the messages. 
+    # session_messages = DB.cache.get(session_id) if DB.cache.exists(session_id) else [{"role": "system", "content": OPEN_AI_SETTINGS.system_information}]
 
-    return {"response" : response, "session_id": session_id, "session_messages": [msg for msg in session_messages if "return" in msg and msg["return"]]}
+    # session_messages.append({"role": "user", "content": prompt, "return": True})
+    
+    # try:
+    #     cypher_query = DB.openai.generate_cypher_query_for_prompt(prompt, session_messages=session_messages)
+    # except Exception as e:
+    #     print(e)
+    #     raise HTTPException(status_code=500, detail=f"Error generating cypher query: {e}")
+
+
+    # session_messages.append({"role": "assistant", "content": cypher_query})
+
+    # queries = [q.strip() for q in re.findall(r"```cypher(?:[^\n]*\n)?(.*?)```", cypher_query, flags=re.S) if q.strip()]
+    # print(queries)
+    # if len(queries) == 0:
+    #     session_messages.append({"role": "assistant", "content": cypher_query, "return": True})
+    #     DB.cache.insert(session_id,session_messages)
+    #     return {"response": f"{cypher_query}. No database valid query.", "session_id": session_id, "session_messages": [msg for msg in session_messages if "return" in msg and msg["return"]]}
+    # print(f"Generated {len(queries)} cypher queries.")
+    # for q in queries:
+    #     print(f"Query: {q}")
+    # ds = []
+    # for q in queries:
+    #     try:
+    #         d = DB.openai.execute_query(q)
+    #         ds.append(d)
+    #     except Exception as e:
+    #         #try to fix the query. 
+    #         print(f"Error executing query '{q}': {e}. Trying a again")
+    #         new_prompt =  f"I received an error with this Neo4J v 5.26 prompt {q}. The error returned was this: {e}. Do not change the name of the relationships. Return the fixed cypher query in a ```cypher``` block."
+    #         fixed_query = DB.openai.generate_cypher_query_for_prompt(new_prompt, temp = 0.5) #session messages not needed here?
+    #         #save the messages to store them.
+    #         fixed_queries = [q.strip() for q in re.findall(r"```cypher(?:[^\n]*\n)?(.*?)```", fixed_query, flags=re.S) if q.strip()]
+    #         print("FIXED QUERY: ", fixed_query)
+    #         session_messages.append({"role": "user", "content": new_prompt})
+    #         session_messages.append({"role": "assistant", "content": fixed_query})
+    #         try:
+    #             for q in fixed_queries:
+    #                 d = DB.openai.execute_query(q)
+    #             ds.append(d)
+    #         except Exception as e2:
+    #             print(f"Second attempt failed for query '{q}': {e2}. Skipping.")
+    # if len(ds) == 0:
+    #     session_messages.append({"role": "assistant", "content": "All queries failed to execute.", "return": True})
+    #     DB.cache.insert(session_id,session_messages)
+    #     return {"response": "All queries failed to execute.", "session_id": session_id, "session_messages": [msg for msg in session_messages if "return" in msg and msg["return"]]}
+    # print("PASSED TO OPENAI FOR DIGESTION: ", [{"role": "assistant", "content": cypher_query},{"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."}])
+    # response = DB.openai.digest_query_data(data = ds, cypher_query=cypher_query, session_messages = [{"role": "assistant", "content": cypher_query},{"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."}] )
+    # session_messages.append({"role": "user", "content": f"Here is the data from Neo4j:\n{ds}\n\nPlease summarize or analyze it.The original cypher query was: {cypher_query}."})
+    # session_messages.append({"role": "assistant", "content": response, "return": True})
+    
+    # DB.cache.insert(session_id,session_messages)
+
+    # 
 
 
 

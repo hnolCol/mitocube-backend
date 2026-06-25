@@ -20,7 +20,6 @@ class OneWayANOVA(DatasetStatistic):
         ##just for prototyping, TODO: remove, take simply the first sample attribute
         if sample_attribute_tag  not in mapped_sample_index.columns:
             sample_attribute_tag = mapped_sample_index.columns[0]
-        #sample_attributes = self._metadata.samples_attributes
         
         grouped_samples = mapped_sample_index.groupby(by=sample_attribute_tag)
         grouped_sample_names = [group_data.index for _, group_data in grouped_samples]

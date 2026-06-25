@@ -1,9 +1,10 @@
 from abc import abstractmethod, ABC 
-from typing import List, Dict
+from typing import List, Dict, Literal
 import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleModel
 from config.models.attributes import AttributeTree
+from config.models.calculations.quantile import QuantileModel
 
 class SamplesABC(ABC):
     def __init__(self) -> None:
@@ -58,6 +59,10 @@ class SamplesABC(ABC):
         int
             The number of quantified protein groups for the given sample.
         """
+    @abstractmethod
+    def calculate_test_quantification_distribution(self, submission_tag : str, testParam : Dict, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+        """Calculates the quantification distribution for a given submission and quantification type based on a statistical test. This is used to calculate the distribution for the test results in the volcano plot."""
+        
         
     @abstractmethod
     def get(self, tag : str) -> SampleModel:
@@ -160,7 +165,7 @@ class SamplesABC(ABC):
 
 
     @abstractmethod
-    def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float|None: 
+    def get_quantified_data_for_feature(self, tag : str, feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> float|None: 
         """Get the quantified data for a given sample and feature.
         A feature may be protein group or peptide. Returns None if no data is found.
         """
