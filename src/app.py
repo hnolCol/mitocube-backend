@@ -74,6 +74,12 @@ from routers.metatexts import metatexts
 from routers.condition_applications import condition_applications
 from routers.ai import openai
 from routers.stats import submissions as submission_stats
+from routers.diseases import diseases
+from routers.variants import Variants
+from routers.diseases import ClinVar
+from routers.phenotypes import PhenotypeAssociation as PhenotypeAssociation
+from routers.crosslink import external_resource as crosslink_external_resource
+from routers.crosslink import crosslink
 # from routers import play  # route to test things during development ###########################################################
 from lib.ai.agent.runtime import lifespan
 import pandas as pd
@@ -138,7 +144,13 @@ router_sources = [dataset,
                   openai,
                   pca,
                   submission_annotations,
-                  heatmap
+                  heatmap,
+                  diseases,
+                  ClinVar,
+                  Variants,
+                  PhenotypeAssociation,
+                  crosslink,
+                  crosslink_external_resource,
 ]
     
 
@@ -206,6 +218,7 @@ if __name__ == "__main__":
     args.add_argument("--users", help="Path to users.", default=None) #"fOtsqZCP"
     args.add_argument("--mitocarta_annotations", help="Whether to add the mitocarta annotations to the database. This should only be set to true if you want to add the mitocarta annotations, otherwise it should be false, as the mitocarta annotations are not intended for production use. ", action="store_true")
     args.add_argument("--reviewed_proteins_only", help="Whether to only add reviewed proteins from uniprot when adding proteomes. This should only be set to true if you want to only add reviewed proteins, otherwise it should be false, as adding unreviewed proteins can be useful for certain use cases. ", action="store_true")
+    args.add_argument("--external_resources_xl", help="Whether to add the crosslinking datasets from excel files in the resources folder. This should only be set to true if you want to add these datasets, otherwise it should be false, as these datasets are not intended for production use. ", action="store_true")
     args = args.parse_args()
     setup_db_default = args.setup_database
     migrate_submission_folder = args.migrate_submissions 
@@ -215,6 +228,7 @@ if __name__ == "__main__":
     lead_user = DB.users.get_lead_user() 
     add_control_proteome = args.add_control_proteome
     reviewed_proteins_only = args.reviewed_proteins_only
+    add_xlms_external_resources = args.external_resources_xl
     
     lead_user_tag = args.lead_user_tag
     print(proteomes_to_add,"???")
@@ -277,6 +291,11 @@ if __name__ == "__main__":
             
             #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589,UP000002311 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
 
+    if add_xlms_external_resources:
+        DB.external_resources._utils_insert_from_file(
+            file_path=os.path.join(args.resources_path, "external_resources/external_resources.json"),
+            folder_path=os.path.join(args.resources_path, "external_resources"),
+        )
             
     uvicorn.run(app, port = 5002, proxy_headers=True)
 

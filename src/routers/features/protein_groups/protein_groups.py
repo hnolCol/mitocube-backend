@@ -52,4 +52,10 @@ def get_protein_group_text(protein_group_tag : str, user: UserModel = Depends(ge
     protein_tags = DB.protein_groups.get_proteins(tag = protein_group_tag)
     t = ", ".join([DB.proteins.get(tag = pt).gene_name for pt in protein_tags])
     return t 
+
     
+@router.get("/protein/{protein_tag}", summary="Get protein groups containing a given protein.")
+def get_protein_groups_by_protein(protein_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    if not DB.proteins.exists(protein_tag):
+        raise HTTPException(status_code=404, detail="Protein not found")
+    return DB.protein_groups.get_protein(protein_tag)

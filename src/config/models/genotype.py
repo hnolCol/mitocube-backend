@@ -52,7 +52,7 @@ class ProteinMutation(BaseModel):
 class GeneModificationModel(BaseModel):
     tag : str #feature tag (e.g. Uniprot ID )
     zygosity : Literal["att_gene_zygosity:(+/+)","att_gene_zygosity:(-/+)","att_gene_zygosity:(-/-)","att_gene_zygosity:unknown"] #traits from att_gene_zygosity 
-    gene_engineering : Literal["att_gene_engineering:ko","att_gene_engineering:ki"] #traits from att_gene_engineering 
+    gene_engineering : Literal["att_gene_engineering:ko","att_gene_engineering:ki", "att_gene_engineering:natural_variant"] #traits from att_gene_engineering 
     editing_method : Literal["att_gene_editing_method:crispr","att_gene_editing_method:biggybac"] #traits from att_gene_editing_method 
     mutations : List[ProteinMutation]
     
@@ -86,7 +86,7 @@ class InsertGeneticApplicationModel(BaseModel):
     publication : Optional[str] = None 
     technical_text : Optional[str] = None
     components : List[AttributeTree] # the list of components as attribute tree
-
+    is_external: bool = False # whether this genotype is an external one (e.g. from ClinVar) 
 
 
 

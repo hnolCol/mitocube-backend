@@ -117,7 +117,7 @@ class GenotypeABC(ABC):
         return True
 
     @abstractmethod
-    def insert_genotype(self, tag : str,  text : str, component_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, ) -> bool:
+    def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, is_active : bool = True, is_external: bool = False) -> bool:
         """Inserts a new genotype into the database.
         Parameters
         ----------

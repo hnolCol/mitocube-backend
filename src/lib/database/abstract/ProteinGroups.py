@@ -159,3 +159,20 @@ class ProteinGroupsABC(ABC):
              -stats_tag
              -mean
         """
+
+
+    @abstractmethod
+    def get_protein(self, protein_tag: str) -> List[str]:
+        """Returns the list of protein group tags that contain a given protein.
+
+        Parameters
+        ----------
+        protein_tag : str
+            The protein tag 
+
+        Returns
+        -------
+        List[str]
+            A list of protein group tags that contain the given protein.
+            If the protein tag does not exist, an empty list is returned. 
+        """
