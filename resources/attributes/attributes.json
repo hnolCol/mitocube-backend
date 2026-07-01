@@ -201,7 +201,7 @@
         {
             "tag": "att_protease",
             "requires": null,
-            "children": null,
+            "children": "att_concentration",
             "text": "Protease",
             "abbr": null,
             "priority": 500,
@@ -3285,6 +3285,50 @@
             "text": "siRNA",
             "abbr": null,
             "priority": 500,
+            "allow_input": true,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_cell_isolation_method",
+            "requires": null,
+            "children": "att_purity",
+            "text": "Cell specific Isolation",
+            "abbr": null,
+            "priority": 600,
+            "allow_input": false,
+            "has_features_value": false,
+            "group_tag": "sample_prep",
+            "min_state": 0,
+            "attribute_group": "sample|dataset|filter",
+            "mandatory_for_active": null,
+            "allow_as_filter": "filter",
+            "allow_for_user": null,
+            "allow_for_genotype": null,
+            "allow_for_qc": null,
+            "allow_for_dataset": "dataset",
+            "allow_for_measurement": "sample",
+            "instrument": null,
+            "instrumenttype": null
+        },
+        {
+            "tag": "att_purity",
+            "requires": null,
+            "children": null,
+            "text": "Purity",
+            "abbr": null,
+            "priority": 600,
             "allow_input": true,
             "has_features_value": false,
             "group_tag": "sample_prep",
@@ -6899,7 +6943,7 @@
             "keyword": "expression",
             "text": "Expression Proteome",
             "description": "Expression Proteome comparing multiple samples of different conditions and/or genotypes.",
-            "priority": 600.0,
+            "priority": 800.0,
             "ols": null
         },
         {
@@ -6927,8 +6971,18 @@
             "attribute_tag": "att_experiment",
             "tag": "att_experiment:interaction",
             "keyword": "interaction",
-            "text": "Interaction Proteome",
-            "description": "Interaction Proteome",
+            "text": "Interaction Proteome/Immuno precipitation",
+            "description": "AP- LC-MS/MS - Interaction Proteome. Pulldown using a specific affinity purification.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "xl",
+            "attribute_tag": "att_experiment",
+            "tag": "att_experiment:xl",
+            "keyword": "xl;crosslink",
+            "text": "XL",
+            "description": "Crosslinking experiment",
             "priority": 500.0,
             "ols": null
         },
@@ -6938,7 +6992,7 @@
             "tag": "att_experiment:metrs",
             "keyword": "metrs",
             "text": "MetRS",
-            "description": "MetRS",
+            "description": "MetRS based detection of newly synthesized proteins",
             "priority": 500.0,
             "ols": null
         },
@@ -7029,6 +7083,26 @@
             "keyword": "PISA",
             "text": "Proteome integral solubility alteration (PISA)",
             "description": "PISA is based on perturbing the soluble state of the whole proteome by a temperature gradient (also named PISA-T). There are different versions of PISA and are distinguished by the temperature gradient and if a melting curve is measured.",
+            "priority": 700.0,
+            "ols": null
+        },
+        {
+            "value": "pelsa",
+            "attribute_tag": "att_experiment",
+            "tag": "att_experiment:pelsa",
+            "keyword": "PELSA",
+            "text": "Peptide-centric local stability assay (PELSA)",
+            "description": "Peptide centrid analysis to detect peptide stability dependency on compounds binding to the specific proteins",
+            "priority": 680.0,
+            "ols": null
+        },
+        {
+            "value": "comp",
+            "attribute_tag": "att_experiment",
+            "tag": "att_experiment:comp",
+            "keyword": "axon;soma",
+            "text": "Cell compartment",
+            "description": "Cell compartment proteomics such as axon / soma isolation",
             "priority": 500.0,
             "ols": null
         },
@@ -17383,6 +17457,16 @@
             "ols": null
         },
         {
+            "value": "ctrl",
+            "attribute_tag": "att_irradiance_type",
+            "tag": "att_irradiance_type:ctrl",
+            "keyword": null,
+            "text": "Ctrl",
+            "description": "Control condition for an irradiance experiment.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
             "value": "sievert",
             "attribute_tag": "att_irradiation_strength",
             "tag": "att_irradiation_strength:sievert",
@@ -17670,6 +17754,256 @@
             "text": "Olfactory bulb",
             "description": "Processes smell signals sent from the nose to the brain",
             "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "none",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:none",
+            "keyword": null,
+            "text": "None / Bulk Tissue",
+            "description": "No cell isolation performed; protein extraction from whole tissue or bulk sample.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "facs",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:facs",
+            "keyword": null,
+            "text": "FACS",
+            "description": "Fluorescence-Activated Cell Sorting using fluorescent antibodies and flow cytometry to isolate specific cell populations.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "macs",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:macs",
+            "keyword": null,
+            "text": "MACS",
+            "description": "Magnetic-Activated Cell Sorting using antibody-coated magnetic beads to enrich or isolate target cells.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "ab_enrichment",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:ab_enrichment",
+            "keyword": null,
+            "text": "Antibody-based Enrichment",
+            "description": "Generic antibody-mediated cell enrichment when the exact technology (e.g., MACS) is not specified.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "pos_sel",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:pos_sel",
+            "keyword": null,
+            "text": "Positive Selection",
+            "description": "Isolation based on the presence of one or more surface markers using antibodies.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "neg_sel",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:neg_sel",
+            "keyword": null,
+            "text": "Negative Selection (Depletion)",
+            "description": "Removal of unwanted cell populations while leaving target cells untouched.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "density",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:density",
+            "keyword": null,
+            "text": "Density Gradient Centrifugation",
+            "description": "Isolation based on cell density (e.g., Ficoll, Percoll).",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "centr",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:centr",
+            "keyword": null,
+            "text": "Differential Centrifugation",
+            "description": "Separation based on cell size and sedimentation properties through sequential centrifugation.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "size",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:size",
+            "keyword": null,
+            "text": "Size-based Filtration",
+            "description": "Isolation using filters or microfluidic devices that separate cells according to size.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "microfluidic_chamber",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:microfluidic_chamber",
+            "keyword": null,
+            "text": "Microfluidic Cell Sorting",
+            "description": "Cell isolation using microfluidic chips based on physical or biochemical characteristics.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "lcm",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:lcm",
+            "keyword": null,
+            "text": "Laser Capture Microdissection (LCM)",
+            "description": "Isolation of selected cells directly from tissue sections using laser microdissection.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "mciroscoop",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:mciroscoop",
+            "keyword": null,
+            "text": "Microscoop Isolation & Enrichment",
+            "description": "Enrichment and isolation using the microscoop platform.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "manual",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:manual",
+            "keyword": null,
+            "text": "Manual Cell Picking",
+            "description": "Individual cells selected manually using a microscope and micropipette or micromanipulator.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "diellectrophoric",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:diellectrophoric",
+            "keyword": null,
+            "text": "Dielectrophoretic Sorting",
+            "description": "Cell isolation based on dielectric properties in an electric field.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "acoustics",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:acoustics",
+            "keyword": null,
+            "text": "Acoustic Cell Sorting",
+            "description": "Cell isolation using acoustic waves without labeling.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "intertial",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:intertial",
+            "keyword": null,
+            "text": "Inertial Cell Sorting",
+            "description": "Label-free microfluidic separation based on cell size and hydrodynamic properties.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "affinity_based",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:affinity_based",
+            "keyword": null,
+            "text": "Affinity-based Capture",
+            "description": "Cell isolation using affinity ligands (antibodies, aptamers, lectins) immobilized on a surface.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "immunopanning",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:immunopanning",
+            "keyword": null,
+            "text": "Immunopanning",
+            "description": "Isolation by binding cells to antibody-coated plates.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "rosette_stop",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:rosette_stop",
+            "keyword": null,
+            "text": "RosetteSep Enrichment",
+            "description": "Whole blood enrichment using antibody-mediated rosetting prior to density centrifugation.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "cell_culture",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:cell_culture",
+            "keyword": null,
+            "text": "Cell Culture Selection",
+            "description": "Isolation through selective culture conditions or adherence.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "adherence_selection",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:adherence_selection",
+            "keyword": null,
+            "text": "Adherence Selection",
+            "description": "Isolation based on differential adherence of cells to plastic or coated surfaces.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "single_cell",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:single_cell",
+            "keyword": null,
+            "text": "Single-cell Isolation",
+            "description": "Isolation of individual cells irrespective of the underlying technology.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "unknown",
+            "attribute_tag": "att_cell_isolation_method",
+            "tag": "att_cell_isolation_method:unknown",
+            "keyword": null,
+            "text": "Unknown",
+            "description": "Cell isolation method not reported.",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "perc",
+            "attribute_tag": "att_purity",
+            "tag": "att_purity:perc",
+            "keyword": null,
+            "text": "%",
+            "description": "Percentage",
+            "priority": 500.0,
+            "ols": null
+        },
+        {
+            "value": "ppm",
+            "attribute_tag": "att_purity",
+            "tag": "att_purity:ppm",
+            "keyword": null,
+            "text": "p.p.m.",
+            "description": "Parts per million",
+            "priority": 450.0,
             "ols": null
         }
     ]

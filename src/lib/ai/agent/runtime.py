@@ -14,10 +14,8 @@ from contextlib import asynccontextmanager
 from langgraph.checkpoint.mongodb import MongoDBSaver
 
 from lib.ai.agent.agent import build_agent
-from lib.ai.agent.config import settings
-
-
-
+from lib.ai.agent.config import get_mongo_ai_db_settings
+settings = get_mongo_ai_db_settings()
 class AgentRuntime:
     def __init__(self) -> None:
         self.agent = None
@@ -25,7 +23,7 @@ class AgentRuntime:
 
     async def startup(self) -> None:
         self._checkpointer_cm = MongoDBSaver.from_conn_string(
-            settings.AGENT_MONGO_URI,
+            settings.AGENT_MONGO_URI, 
             settings.AGENT_MONGO_DB_NAME,
         )
         # Sync __enter__/__exit__ — this is intentional, see module docstring.
