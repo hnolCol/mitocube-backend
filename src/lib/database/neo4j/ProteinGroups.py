@@ -213,3 +213,11 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         
         r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.data)
         return sorted([ExclusivelyQuantifiedModel(**ri) for ri in r], key=lambda x: ";".join(x.exclusively_ca_tags), reverse=True)
+
+    def get_protein(self, protein_tag: str) -> List[str]:
+        query = (
+            "MATCH (pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein {tag: $protein_tag}) "
+            "RETURN pg.tag"
+        )
+        r = self._driver.execute_query(query, protein_tag=protein_tag, routing_="r", result_transformer_=Result.value)
+        return r

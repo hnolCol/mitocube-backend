@@ -35,10 +35,14 @@ from lib.database.abstract.Cache import CacheABC
 from lib.database.abstract.ProteinGroups import ProteinGroupsABC
 from lib.database.abstract.Proteins import ProteinsABC
 from lib.database.abstract.Proteomes import ProteomesABC
+from lib.database.abstract.Diseases import DiseaseABC
+from lib.database.abstract.Variants import VariantABC
+from lib.database.abstract.PhenotypeAssociation import PhenotypeAssociationABC
 from config.settings.db import get_db_settings
 from config.models.submissions.submissions import DatasetSubmissionModel
 from lib.database.abstract.Annotations import AnnotationsABC, AnnotationGroupsABC
-
+from lib.database.abstract.Crosslink import CrosslinkABC
+from lib.database.abstract.external_resource import ExternalResourceABC
 
 
 
@@ -98,6 +102,11 @@ class DatabaseABC(ABC):
     annotations : AnnotationsABC = None
     annotation_groups : AnnotationGroupsABC = None
     proteomes : ProteomesABC = None
+    diseases : DiseaseABC = None
+    variants : VariantABC = None
+    phenotype_associations : PhenotypeAssociationABC = None
+    crosslinks : CrosslinkABC = None
+    external_resources : ExternalResourceABC = None
 
     def __init__(self):
         """The abstract database class that defines

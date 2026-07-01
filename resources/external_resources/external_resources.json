@@ -1,0 +1,26 @@
+{
+    "resources": [
+      {
+        "external_resource": {
+          "title": "Cross-link assisted spatial proteomics to map sub-organelle proteomes and membrane protein topologies",
+          "link": "https://doi.org/10.1038/s41467-024-47569-x",
+          "doi": "10.1038/s41467-024-47569-x",
+          "type": "publication"
+        },
+        "crosslinks": [
+          {"file_path": "clasp_crosslinks.txt"}
+        ]
+      },
+      {
+        "external_resource": {
+          "title": "Cross-linking mass spectrometry discovers, evaluates, and corroborates structures and protein-protein interactions in the human cell",
+          "link": "https://doi.org/10.1073/pnas.2219418120",
+          "doi": "10.1073/pnas.2219418120",
+          "type": "publication"
+        },
+        "crosslinks": [
+          {"file_path": "pnas_crosslinks.txt"}
+        ]
+      }
+    ]
+  }

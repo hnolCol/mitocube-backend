@@ -286,7 +286,7 @@ class Neo4JGenotype(GenotypeABC):
         return r[0] if r else None
     
 
-    def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, is_active : bool = True) -> bool:
+    def insert_genotype(self, tag : str,  text : str, protein_tags : List[str], application_tags : List[str], user_tag : str, description : str|None, publication : str|None, technical_text : str|None, is_active : bool = True, is_external: bool = False) -> bool:
         """Inserts a new genotype into the database.
         Parameters
         ----------
@@ -301,7 +301,7 @@ class Neo4JGenotype(GenotypeABC):
         query = (
             "MERGE (gc:Genotype {tag : $tag}) "
             "ON CREATE "
-            "SET gc.is_active = true, gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
+            "SET gc.is_active = true, gc.created_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.is_external = $is_external, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
             "ON MATCH "
             "SET gc.modified_at = timestamp(), gc.text = $text, gc.description = $description, gc.publication = $publication, gc.technical_text = $technical_text, gc.s = toLower($text)+ ' '+ toLower($description) + ' '+ toLower($technical_text) "
             "WITH gc "
@@ -318,7 +318,7 @@ class Neo4JGenotype(GenotypeABC):
             "SET r_effects.created_at = timestamp() "
         )
 
-        self._driver.execute_query(query, tag = tag, is_active=is_active, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags)
+        self._driver.execute_query(query, tag = tag, is_active=is_active, text = text, user_tag = user_tag, application_tags = application_tags, description = description, publication = publication, technical_text = technical_text, routing_="w", database_="neo4j", protein_tags = protein_tags, is_external=is_external)
         return True
     
 
@@ -369,7 +369,7 @@ class Neo4JGenotype(GenotypeABC):
             tags.append(ca_tag)
 
         self.insert_genotype(tag = tag, text = data.text, application_tags=tags, user_tag=user_tag, description=data.description, publication=data.publication, technical_text=data.technical_text, 
-                             protein_tags=[tag for tag in protein_tags if tag is not None])
+                             protein_tags=[tag for tag in protein_tags if tag is not None], is_external=data.is_external)
         return True
 
     def edit_genotype( self, tag: str, new_tag: str,  text: str, application_tags: List[str], protein_tags: List[str], user_tag : str, description: str , publication: str | None, technical_text: str | None) -> bool:

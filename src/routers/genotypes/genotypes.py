@@ -154,21 +154,27 @@ def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[s
     return r 
 
 
-@router.post("/genotypes")
-def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel = Depends(get_user_from_token)):
-    """_summary_
+# @router.post("/genotypes")
+# def insert_genotype(genotype : InsertGeneticApplicationModel, user : UserModel = Depends(get_user_from_token)):
+#     """_summary_
 
-    Parameters
-    ----------
-    genotype : GenotypeModel
-        The defined genotype.
-    """
+#     Parameters
+#     ----------
+#     genotype : GenotypeModel
+#         The defined genotype.
+#     """
     
-    ok = DB.genotypes.insert(genotype, user_tag = user.tag)
-    if not ok:
-        raise HTTPException(status_code=400, detail="Genotype already exists in the database or another error occurred.")
+#     ok = DB.genotypes.insert(genotype, user_tag = user.tag)
+#     if not ok:
+#         raise HTTPException(status_code=400, detail="Genotype already exists in the database or another error occurred.")
 
-    return True 
+#     return True 
+@router.post("/genotypes")
+def insert_genotype(genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token)):
+    from services.encryption import create_hierarchical_hash
+    tag = create_hierarchical_hash([d.model_dump() for d in genotype.components])
+    DB.genotypes.insert(genotype, user_tag=user.tag)
+    return tag
 
 @router.put("/genotypes/{tag}")
 def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token)):

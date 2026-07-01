@@ -78,6 +78,20 @@
                     "functional_header": "Functional MitoCoP classification"
                 }
             ]
+        },
+        {
+            "annotation_group": {
+                "text": "Proximity Labeling",
+                "description": "Mitochondrial proximity interaction network (BioID)",
+                "source": "Antonicka et al. 2020, Cell Metabolism"
+            },
+            "annotations": [
+                {
+                    "file_path": "MitoCarta/interactions.txt",
+                    "annotation_text_column": "bait_name",
+                    "protein_tag_column": "UniProt"
+                }
+            ]
         }
     ]
 }

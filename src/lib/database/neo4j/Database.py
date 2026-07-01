@@ -33,6 +33,11 @@ from lib.database.neo4j.Proteins import Neo4JProteins
 from lib.database.neo4j.OpenAI import Neo4JOpenAI
 from config.models.submissions.submissions import DatasetSubmissionModel
 from lib.database.neo4j.Annotations import Neo4JAnnotations, Neo4JAnnotationGroups
+from lib.database.neo4j.Diseases import Neo4jDiseases
+from lib.database.neo4j.Variants import Neo4jVariants
+from lib.database.neo4j.PhenotypeAssociation import Neo4jPhenotypeAssociations
+from lib.database.neo4j.Crosslink import Neo4jCrosslinks
+from lib.database.neo4j.external_resource import Neo4jExternalResources
 
 import pandas as pd 
 class MCNeo4JDatabase(DatabaseABC):
@@ -76,6 +81,11 @@ class MCNeo4JDatabase(DatabaseABC):
         self.spareparts = Neo4jSpareParts(driver=self.connection.driver)
         self.annotations = Neo4JAnnotations(driver=self.connection.driver)
         self.annotation_groups = Neo4JAnnotationGroups(driver=self.connection.driver)
+        self.diseases = Neo4jDiseases(driver=self.connection.driver)
+        self.variants = Neo4jVariants(driver=self.connection.driver)
+        self.phenotype_associations = Neo4jPhenotypeAssociations(driver=self.connection.driver, condition_applications=self.condition_applications, genotypes=self.genotypes)
+        self.crosslinks = Neo4jCrosslinks(driver=self.connection.driver)
+        self.external_resources = Neo4jExternalResources(driver=self.connection.driver, crosslinks=self.crosslinks)
         
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
         
