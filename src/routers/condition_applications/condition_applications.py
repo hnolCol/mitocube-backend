@@ -56,7 +56,6 @@ def query_condition_applications(search_string : str = None,
 
     ca_tags = DB.condition_applications.find(search_string = search_string, samples_only = samples_only, protein_tags = protein_tags, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
 
-
     return ca_tags
 
 @router.get("/q/hierarchy")
@@ -68,15 +67,17 @@ def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group:
     exclude_list = exclude_attribute_group.split(",") if exclude_attribute_group else None
     
     if len(protein_tags) > 0:
-        ca_tags_with_protein_value = DB.condition_applications.find( protein_tags=protein_tags, 
+        ca_tags_with_protein_value = DB.condition_applications.find(protein_tags=protein_tags, 
                                                                     sort_by_frequency=True,
-                                                                    exclude_attribute_group=exclude_list 
+                                                                    exclude_attribute_group=exclude_list,
+                                                                    limit = limit
                                                                 )
     
     ca_tags_by_search_string = DB.condition_applications.find( search_string=search_string, 
                                                                 samples_only=False, 
                                                                 sort_by_frequency=True,
-                                                                exclude_attribute_group=exclude_list 
+                                                                exclude_attribute_group=exclude_list,
+                                                                limit = limit
                                                             )
     
     ca_tags = ca_tags_with_protein_value + [ca_tag for ca_tag in ca_tags_by_search_string if ca_tag not in ca_tags_with_protein_value]
@@ -103,8 +104,6 @@ def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group:
         }
         for attr, traits in tree.items()
     ]
-
-    print(result)
     return result
 
         

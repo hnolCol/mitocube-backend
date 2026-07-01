@@ -1,9 +1,18 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
 import pandas as pd
+from dataclasses import dataclass
 
 from config.models.annotations.annotations import ( AnnotationsModel, AnnotationGroupsModel)
-
+@dataclass
+class AnnotationVarianceResult:
+    table: pd.DataFrame
+ 
+    def top(self, n: int = 20, fdr_threshold: float = 0.05) -> pd.DataFrame:
+        if self.table.empty:
+            return self.table
+        sig = self.table[self.table["FDR"] <= fdr_threshold]
+        return sig.sort_values("p_value").head(n)
 class AnnotationGroupsABC(ABC):
     """
     Abstract class for annotation group.
@@ -134,7 +143,23 @@ class AnnotationGroupsABC(ABC):
         bool
             True if update was successful.
         """
-
+        
+    
+    @abstractmethod
+    def test_variance_enrichment(
+        self,
+        attribute_tag: str,
+        submission_tags: Optional[List[str]] = None,
+        level: Literal["annotation_group", "annotation"] = "annotation_group",
+        background_scope: Literal["global", "within_parent_group"] = "global",
+        effect_field: Literal["eta_squared", "cohen_f", "neg_log10_p"] = "eta_squared",
+        min_group_size: int = 3,
+        fdr_scope: Literal["per_submission", "global"] = "per_submission",
+        alternative: Literal["greater", "less", "two-sided"] = "greater",
+        annotation_tags : Optional[List[str]] = None,
+        annotation_group_tags : Optional[List[str]] = None,
+        ) -> AnnotationVarianceResult:
+        ""
 class AnnotationsABC(ABC):
     """
     Abstract class for annotation datasets.
@@ -248,7 +273,8 @@ class AnnotationsABC(ABC):
         ----------
         tag : str
             Annotation tag.
-
+        submission_tag : Optional[str]
+        
         Returns
         -------
         List[str]

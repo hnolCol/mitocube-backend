@@ -1,5 +1,7 @@
+from dataclasses import dataclass
+
 import pandas as pd
-from typing import Optional,List, Dict
+from typing import Optional,List, Dict, Literal
 import os
 
 from services.random_generators import get_random_string
@@ -11,6 +13,146 @@ from services.json import read_json
 
 from config.models.annotations.annotations import ( AnnotationGroupsModel, AnnotationsModel )
 from lib.database.abstract.Annotations import ( AnnotationGroupsABC, AnnotationsABC )
+from scipy.stats import mannwhitneyu
+
+
+
+def _benjamini_hochberg(p_values: pd.Series) -> pd.Series:
+    """Manual BH FDR correction (avoids a statsmodels dependency)."""
+    p = p_values.to_numpy(dtype=float)
+    n = len(p)
+    if n == 0:
+        return pd.Series([], dtype=float, index=p_values.index)
+
+    order = p.argsort()
+    ranked = p[order]
+    ranks = pd.Series(range(1, n + 1))
+    bh = ranked * n / ranks.to_numpy()
+
+    bh_sorted_back = pd.Series(bh).iloc[::-1].cummin().iloc[::-1].to_numpy()
+    bh_sorted_back = bh_sorted_back.clip(max=1.0)
+
+    out = pd.Series(index=p_values.index, dtype=float)
+    out.iloc[order] = bh_sorted_back
+    return out
+
+
+@dataclass
+class AnnotationVarianceResult:
+    table: pd.DataFrame
+
+    def top(self, n: int = 20, fdr_threshold: float = 0.05) -> pd.DataFrame:
+        if self.table.empty:
+            return self.table
+        sig = self.table[self.table["FDR"] <= fdr_threshold]
+        return sig.sort_values("p_value").head(n)
+
+def _run_mannwhitney_enrichment(
+    df: pd.DataFrame,
+    background_scope: Literal["global", "within_parent_group"],
+    effect_field: Literal["eta_squared", "cohen_f", "neg_log10_p"],
+    min_group_size: int,
+    fdr_scope: Literal["per_submission", "global"],
+    alternative: Literal["greater", "less", "two-sided"]) -> AnnotationVarianceResult:
+
+    """
+    Statistical core. `df` must have one row per (submission_tag,
+    protein_group_tag) with a `memberships` column: a list of
+    {"group_tag": ..., "parent_group_tag": ... or None} dicts (as
+    produced by either Cypher query above via Result.to_df).
+    """
+    work = df.copy()
+
+    if effect_field == "neg_log10_p":
+        import numpy as np
+        eps = work["p_value"].replace(0, pd.NA).dropna()
+        floor = eps.min() / 10 if not eps.empty else 1e-300
+        work["neg_log10_p"] = -np.log10(work["p_value"].clip(lower=floor))
+
+    work = work.dropna(subset=[effect_field])
+
+    # one row per (submission, protein_group), no duplication -- this is
+    # the universe of "everything tested" for global background lookups.
+    base = work[["submission_tag", "protein_group_tag", effect_field]].drop_duplicates(
+        subset=["submission_tag", "protein_group_tag"]
+    )
+
+    # explode memberships: one row per (submission, protein_group, group_tag)
+    exploded = work.explode("memberships")
+    exploded = exploded.dropna(subset=["memberships"])
+    exploded["group_tag"] = exploded["memberships"].apply(lambda m: m["group_tag"])
+    exploded["parent_group_tag"] = exploded["memberships"].apply(lambda m: m.get("parent_group_tag"))
+    exploded = exploded.dropna(subset=["group_tag"])
+
+    rows = []
+    for (submission_tag, group_tag), grp in exploded.groupby(
+        ["submission_tag", "group_tag"]
+    ):
+        in_group_pgs = set(grp["protein_group_tag"])
+        parent_group_tag = grp["parent_group_tag"].iloc[0]  # constant within a group_tag
+
+        if background_scope == "within_parent_group" and pd.notna(parent_group_tag):
+            # siblings: other protein groups under the SAME parent
+            # AnnotationGroup, excluding members of this Annotation.
+            sibling_mask = (
+                (exploded["submission_tag"] == submission_tag)
+                & (exploded["parent_group_tag"] == parent_group_tag)
+            )
+            candidate_pool = exploded[sibling_mask][
+                ["protein_group_tag", effect_field]
+            ].drop_duplicates(subset=["protein_group_tag"])
+        else:
+            # global: everything else tested in the submission
+            candidate_pool = base[base["submission_tag"] == submission_tag]
+
+        in_vals = candidate_pool[
+            candidate_pool["protein_group_tag"].isin(in_group_pgs)
+        ][effect_field].to_numpy()
+        out_vals = candidate_pool[
+            ~candidate_pool["protein_group_tag"].isin(in_group_pgs)
+        ][effect_field].to_numpy()
+
+        if len(in_vals) < min_group_size or len(out_vals) < min_group_size:
+            continue
+
+        try:
+            U, p = mannwhitneyu(in_vals, out_vals, alternative=alternative)
+        except ValueError:
+            continue
+
+        rows.append(
+            {
+                "submission_tag": submission_tag,
+                "group_tag": group_tag,
+                "parent_group_tag": parent_group_tag,
+                "n_in": len(in_vals),
+                "n_out": len(out_vals),
+                "median_in": pd.Series(in_vals).median(),
+                "median_out": pd.Series(out_vals).median(),
+                "mean_in": pd.Series(in_vals).mean(),
+                "mean_out": pd.Series(out_vals).mean(),
+                "U_statistic": U,
+                "p_value": p,
+                "direction": "elevated" if pd.Series(in_vals).median()
+                >= pd.Series(out_vals).median() else "reduced",
+            }
+        )
+
+    result = pd.DataFrame(rows)
+    if result.empty:
+        return AnnotationVarianceResult(result)
+
+    if fdr_scope == "global":
+        result["FDR"] = _benjamini_hochberg(result["p_value"])
+    else:
+        result["FDR"] = result.groupby("submission_tag")["p_value"].transform(
+            _benjamini_hochberg
+        )
+
+    result = result.sort_values(["submission_tag", "p_value"]).reset_index(drop=True)
+    
+    return AnnotationVarianceResult(result)
+
 
 class Neo4JAnnotationGroups(AnnotationGroupsABC):
 
@@ -223,6 +365,119 @@ class Neo4JAnnotationGroups(AnnotationGroupsABC):
         
         return r[0] if r else False
 
+
+    def test_variance_enrichment(
+        self,
+        attribute_tag: str,
+        submission_tags: Optional[List[str]] = None,
+        level: Literal["annotation_group", "annotation"] = "annotation",
+        background_scope: Literal["global", "within_parent_group"] = "global",
+        effect_field: Literal["eta_squared", "cohen_f", "neg_log10_p"] = "eta_squared",
+        min_group_size: int = 3,
+        fdr_scope: Literal["per_submission", "global"] = "per_submission",
+        alternative: Literal["greater", "less", "two-sided"] = "greater",
+        annotation_tags : Optional[List[str]] = None,
+        annotation_group_tags : Optional[List[str]] = None,
+    ) -> AnnotationVarianceResult:
+        """
+        Tests, per submission, whether any AnnotationGroup (or, if
+        level="annotation", any individual Annotation) shows higher (or
+        lower, if alternative != "greater") `effect_field` from the
+        precomputed Statistic node than its background. Uses a one-sided
+        Mann-Whitney U test with Benjamini-Hochberg FDR correction.
+    
+        Parameters
+        ----------
+        attribute_tag : str
+            Must match Statistic.attribute_tag (e.g. "treatment", "genotype").
+        submission_tags : list[str] or None
+            Restrict to these submissions. None = all submissions that have
+            Statistic nodes for this attribute_tag.
+        level : "annotation_group" | "annotation"
+            Granularity to test. "annotation_group" tests whole groups (e.g.
+            gene sets). "annotation" tests individual terms within those
+            groups.
+        background_scope : "global" | "within_parent_group"
+            Only used when level="annotation". "global": background is
+            every other tested ProteinGroup in the submission.
+            "within_parent_group": background is restricted to other
+            ProteinGroups belonging to the same parent AnnotationGroup,
+            excluding this Annotation -- i.e. "does this term stand out
+            from its siblings", not "...from the whole proteome". Ignored
+            (treated as "global") when level="annotation_group", since a
+            group has no parent to scope against.
+        effect_field : "eta_squared" | "cohen_f" | "neg_log10_p"
+            Which Statistic field to test for enrichment.
+        min_group_size : int
+            Skip (submission, group) pairs with fewer than this many
+            quantified protein groups on either side of the test.
+        fdr_scope : "per_submission" | "global"
+            BH correction scope: within each submission's tested groups, or
+            once across the whole output table.
+        alternative : "greater" | "less" | "two-sided"
+            "greater" (default): tests for groups MORE affected than
+            background. "two-sided" also catches unusually stable groups.
+    
+        Returns
+        -------
+        AnnotationVarianceResult wrapping a DataFrame with columns:
+            submission_tag, group_tag, parent_group_tag (None at
+            annotation_group level), n_in, n_out, median_in, median_out,
+            mean_in, mean_out, U_statistic, p_value, FDR, direction
+        """
+        if level == "annotation_group":
+            query = (
+                "MATCH (attribute:Attribute)<-[:OF_ATTRIBUTE]-(s:Statistics)-[:FOR_PROTEIN_GROUP]->(pg:ProteinGroup) WHERE attribute.tag = $attribute_tag "
+                "MATCH (s)-[:HAS_STATS]-(submission:Submission) "
+                "WHERE ($submission_tags IS NULL OR submission.tag IN $submission_tags) "
+                "OPTIONAL MATCH (pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation)<-[:HAS_ANNOTATION]-(ag:AnnotationGroup) "
+                "WHERE ($annotation_group_tags IS NULL OR ag.tag IN $annotation_group_tags) "
+                "RETURN "
+                " submission.tag AS submission_tag, "
+                " pg.tag AS protein_group_tag, "
+                " s.eta_squared AS eta_squared, "
+                " s.cohen_f AS cohen_f, "
+                " s.p_value AS p_value, "
+                " collect({group_tag: ag.tag, parent_group_tag: null}) AS memberships "
+            )
+        else:  # level == "annotation"
+            query = (
+                "MATCH (attribute:Attribute)<-[:OF_ATTRIBUTE]-(s:Statistics)-[:FOR_PROTEIN_GROUP]->(pg:ProteinGroup) WHERE attribute.tag = $attribute_tag "
+                "MATCH (s)<-[:HAS_STATS]-(submission:Submission) "
+                "WHERE ($submission_tags IS NULL OR submission.tag IN $submission_tags) "
+                "OPTIONAL MATCH (pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation)<-[:HAS_ANNOTATION]-(ag:AnnotationGroup) "
+                "WHERE ($annotation_tags IS NULL OR a.tag IN $annotation_tags) "
+                "RETURN "
+                " submission.tag AS submission_tag, "
+                " pg.tag AS protein_group_tag, "
+                " s.eta_squared AS eta_squared, "
+                " s.cohen_f AS cohen_f, "
+                " s.p_value AS p_value, "
+                " collect({group_tag: a.tag, parent_group_tag: ag.tag}) AS memberships "
+            )
+    
+        df = self._driver.execute_query(
+            query,
+            attribute_tag=attribute_tag,
+            submission_tags=submission_tags,
+            annotation_tags=annotation_tags,
+            annotation_group_tags=annotation_group_tags,
+            routing_="r",
+            result_transformer_=Result.to_df,
+        )
+        
+        if df.empty:
+            return AnnotationVarianceResult(df)
+    
+        return _run_mannwhitney_enrichment(
+            df,
+            background_scope=background_scope if level == "annotation" else "global",
+            effect_field=effect_field,
+            min_group_size=min_group_size,
+            fdr_scope=fdr_scope,
+            alternative=alternative,
+        )
+    
 
 
 class Neo4JAnnotations(AnnotationsABC):
@@ -602,7 +857,7 @@ class Neo4JAnnotations(AnnotationsABC):
         
         if submission_tag:
             query = (
-                "MATCH (s:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:HAS_PROTEIN]->(p:Protein) "
+                "MATCH (s:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
                 "MATCH (:Annotation {tag: $tag})-[:ANNOTATES]->(p) "
                 "RETURN DISTINCT p.tag"
             )
@@ -753,10 +1008,10 @@ class Neo4JAnnotations(AnnotationsABC):
     def get_proteins_by_annotation_group(self, group_tag: str, submission_tag: str) -> Dict[str, List[str]]:
 
         query = (
-            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(p:Protein) "
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(p:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
             "MATCH (ag:AnnotationGroup {tag: $group_tag})-[:HAS_ANNOTATION]->(a:Annotation)-[:ANNOTATES]->(p) "
             "RETURN a.tag AS annotation_tag, "
-            "collect(DISTINCT p.tag) AS protein_tags"
+            "collect(DISTINCT p.tag) AS protein_tags "
         )
 
         r = self._driver.execute_query(

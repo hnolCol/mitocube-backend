@@ -31,11 +31,7 @@ from config.models.submissions.states import StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.timeline import TimelineInputModel
 from config.models.submissions.runs import RunListRequestPropsModel, RunListResponseModel
-from config.enums.units import UnitsEnum
-from config.models.conditions_applications import ConditionApplicationTreeModel
 
-
-from services.random_generators import get_random_string
 
 
 from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin, is_creator_of_submission_or_curator
@@ -625,10 +621,8 @@ def update_submission_state(background_task : BackgroundTasks,
     if ok:
         submission_title = DB.submissions.get_title(tag = submission_tag) # to check if the submission exists and to get the title
         submission_user_tags = DB.submissions.get_users(tag = submission_tag)
-        print(submission_user_tags,"tags")
         submission_users = [DB.users.get_user_by_tag(tag = user_tag) for user_tag in submission_user_tags if DB.users.exists(tag = user_tag)]
         
-        print(submission_users)
         
         if len(submission_users) == 0:
             raise HTTPException(status_code=404, detail="Submission user not found. The state of the submission has been updated, but the user could not be found.")
@@ -875,14 +869,10 @@ def check_submission(
         attribute_groups="mandatory", 
         min_state=state
     )
+    ca_defined_attributes = DB.submissions.get_defined_attributes(tag=submission_tag)
     
-    filled = DB.submissions.get_conditions_applications(
-        tag=submission_tag, 
-        group_by_attribute=True
-    )
-    filled_tags = set(item.attribute_tag for item in filled)
     
-    missing_tags = [tag for tag in mandatory_tags if tag not in filled_tags]
+    missing_tags = [tag for tag in mandatory_tags if tag not in ca_defined_attributes]
     missing = [{"tag": tag, "text": DB.attributes.attribute(tag=tag).text} for tag in missing_tags]
 
     return {
@@ -941,3 +931,5 @@ def get_submission_query_count(
         "query_count": query_count,
         "total_count": total_count
     }
+    
+    

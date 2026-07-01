@@ -20,7 +20,6 @@ router = APIRouter(
     )
 
 
-
 #pca endpoints
 @router.get("/{submission_tag}/volcano",
             tags=["Dimensional reduction","Volcano"])
@@ -61,74 +60,12 @@ def get_dataset_volcano(submission_tag : str,
 
     
     
-    data_exist = DB.submission_has_dataset(tag = submission_tag)
+    data_exist = DB.submissions.quantification_exists(tag = submission_tag, type = "protein_groups")
     if not data_exist:  return no_data_found_http_exception
         
     if ca_tag_left == ca_tag_right:
         raise HTTPException(status_code=400, detail="Left and right condition application tags must be different.")
-    
-    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
-    print(DB.submissions.has_genotypes(tag = submission_tag))
-    print(condition_applications)
-    if DB.submissions.has_genotypes(tag = submission_tag):
-        genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
-        condition_applications = condition_applications.join(genotypes, how="outer")
-    
-    print(condition_applications)
-    if DB.genotypes.exists(tag = ca_tag_left):
-        attribute_tag = "att_genotype"
-    else:
-        attribute_tag = DB.condition_applications.get_attribute(ca_tag_left)
-        
-    if attribute_tag not in condition_applications.columns:
-        raise HTTPException(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
-    
-    # if within_trait_tag is not None:
-    sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index
-    sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
-    print(attribute_tag)
-    print("before within filter:", len(sample_tags_left), len(sample_tags_right))
-    if within_attribute_tags and within_ca_tags:
-        within_attr_list = within_attribute_tags.split(";")
-        within_ca_list = within_ca_tags.split(";")
-        for within_attr, within_ca in zip(within_attr_list, within_ca_list):
-            if within_attr in condition_applications.columns:
-                mask = condition_applications[within_attr] == within_ca
-                sample_tags_left = sample_tags_left[sample_tags_left.isin(condition_applications[mask].index)]
-                sample_tags_right = sample_tags_right[sample_tags_right.isin(condition_applications[mask].index)]
-    print("after within filter:", len(sample_tags_left), len(sample_tags_right))
-  
-    if attribute_tag == "att_genotype":
-        print("GENOTYPE texts")
-        print(DB.genotypes.get_text(ca_tag_left), DB.genotypes.get_text(ca_tag_right))
-    ca_left_text = DB.condition_applications.get_text(ca_tag_left) if attribute_tag != "att_genotype" else DB.genotypes.get_text(ca_tag_left)
-    ca_right_text = DB.condition_applications.get_text(ca_tag_right) if attribute_tag != "att_genotype" else DB.genotypes.get_text(ca_tag_right)
-
-    def clean_ca_text(text):
-        if text is None:
-            return text
-        # remove parentheses containing empty values 
-        cleaned = re.sub(r'\(\s*[^)]*\)', lambda m: m.group() if any(c.isdigit() for c in m.group()) else '', text)
-        return cleaned.strip()
-
-    ca_left_text = clean_ca_text(ca_left_text)
-    ca_right_text = clean_ca_text(ca_right_text)
-    sample_tags = sample_tags_left.to_list() + sample_tags_right.to_list()
-
-    suffix = f"{ca_left_text} vs. {ca_right_text}"
-    if within_ca_tags:
-        within_texts = []
-        for t in within_ca_tags.split(";"):
-            if t and DB.genotypes.exists(tag=t):
-                within_texts.append(DB.genotypes.get_text(t) or t)
-            elif t:
-                within_texts.append(DB.condition_applications.get_text(t) or t)
-        if within_texts:
-            suffix += f" (within {', '.join(within_texts)})"
-   # add within ca tag text
-    if annotation_tag is not None:
-        annotation_text = DB.annotations.get_text(tag=annotation_tag)
-        suffix += f" ({annotation_text if annotation_text else annotation_tag})"
+    sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag =  DB.samples.handle_comparison(submission_tag=submission_tag, ca_tag_left=ca_tag_left, ca_tag_right=ca_tag_right, within_attribute_tags=within_attribute_tags, within_ca_tags=within_ca_tags, annotation_tag=annotation_tag)
         
     # check if sample tags not empty 
 
@@ -156,10 +93,7 @@ def get_dataset_volcano(submission_tag : str,
     stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
     stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
     stats.loc[:,f"Significant {suffix}"] = stats.loc[:,f"fdr {suffix}"] <= fdr
-    # stats.loc[:,f"log2 FC"] = X.mean(axis=1) - Y.mean(axis=1)
-    
-    print("returning suffix:", suffix)
-    print("ca_left_text:", ca_left_text, "ca_right_text:", ca_right_text)
+
     
     return {"stats" : stats.to_dict(orient="records"), 
             "suffix" : suffix, 

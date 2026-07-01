@@ -567,8 +567,11 @@ Always leave RAM available for:
 ---
 
 
+# 29 Start docker instance with neo4j.
 
+Recommended for installing apoc and gds in one go. 
 
+```
 sudo docker run -d \
     --name neo4j-server \
     -p 7474:7474 -p 7687:7687 \
@@ -581,3 +584,25 @@ sudo docker run -d \
     --env NEO4J_dbms_security_procedures_unrestricted=apoc.\*,gds.\* \
     --env NEO4J_dbms_security_procedures_allowlist=apoc.\*,gds.\* \
     neo4j:5.26.26
+```
+Data will be stored in neo4j folder. Meaning that you can setup a new docker.
+
+To view all docker containers running: 
+```
+docker ps
+```
+
+
+Backup 
+
+cypher-shell 
+
+:use system
+STOP DATABASE neo4j;
+
+sudo docker exec -it neo4j-server neo4j-admin database dump neo4j --to-path=/data
+
+
+:use system
+START DATABASE neo4j;
+

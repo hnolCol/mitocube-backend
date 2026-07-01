@@ -79,7 +79,10 @@ class FeaturesABC(ABC):
     @abstractmethod
     def get_correlated_features(self, 
                             tag : str,
+                            
+                            metrics : Literal["raw", "z_score_sample","z_score_protein_group", "log2_fc_vs_mean"] = "raw",
                             annotation_tags :  List[str] = None,  
+                            submission_tags : List[str] = None,
                             direction : Literal["positive","negative","both"] = "both", 
                             limit : int = None, 
                             min_data_points : int = 20) -> pd.DataFrame:
@@ -213,7 +216,7 @@ class FeaturesABC(ABC):
         ""
         
     @abstractmethod
-    def get_quantification_per_sample(self, tag : str, submission_tags : List[str] = None) -> pd.DataFrame:
+    def get_quantification_per_sample(self, tag : str, submission_tags : List[str] = None, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> pd.DataFrame:
         """Returns the quantification values for a feature per sample. 
 
         Parameters

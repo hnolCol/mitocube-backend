@@ -94,11 +94,13 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
         attribute_tags = [col for col in df.columns if col != "tag"] #tag = sample_tag
         r = OrderedDict() 
         for attribute_tag in attribute_tags:
-            unique_cas = set() 
+            unique_cas = OrderedDict()
+
             for ca_tag in df[attribute_tag].str.join(";").values:
-                unique_cas.add(ca_tag) 
-            r[attribute_tag] = [ca_tag.split(";") for ca_tag in list(unique_cas)]
-        print(r)
+                unique_cas[ca_tag] = None
+
+            unique_cas = list(unique_cas.keys())
+            r[attribute_tag] = [ca_tag.split(";") for ca_tag in unique_cas]
         return r 
     
     return df.to_dict(orient="records")
@@ -118,7 +120,6 @@ def get_submission_sample_condition_application_attributes(submission_tag: str, 
     for sample_tag in sample_tags:
         ca_tags = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=False)
         attribute_tags.extend([DB.condition_applications.get_attribute(ca_tag) for ca_tag in ca_tags])
-    print(DB.submissions.has_genotypes(tag = submission_tag))
     if include_genotypes and DB.submissions.has_genotypes(tag = submission_tag):
         attribute_tags = ["att_genotype"] + attribute_tags
     return pd.Series(attribute_tags).dropna().unique().tolist()
@@ -157,7 +158,6 @@ def update_submission_condition_applications(
     selected_traits: List[AttributeTree],
     user: UserModel = Depends(get_user_from_token)
 ) -> bool:
-    print("RECEIVED:", selected_traits)
     if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
     return DB.submissions.edit_condition_applications(
         tag=submission_tag,

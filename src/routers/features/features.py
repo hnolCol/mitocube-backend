@@ -77,7 +77,7 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     
         
 @router.get("/{feature_tag}/d")
-def get_feature_data(feature_tag : str, submission_tag : str, append_condition_procedure : bool = True, user : UserModel = Depends(get_user_from_token)):
+def get_feature_data(feature_tag : str, submission_tag : str, append_condition_procedure : bool = True, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
     """Returns the data for a specific feature in a specific submission. This includes the quantification values for the feature in all samples of the submission and, if append_condition_procedure is True, also the condition applications for the samples. 
     This Endpoint combines peptide and protein group features. If you know what type the 
     feature has, you should likely use the more specific endpoints (proteins/{protein_tag}/d). 
@@ -119,7 +119,7 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         di = {"tag" : sample_tag, "value" : None}
         if not DB.samples.exists(tag = sample_tag):
             continue 
-        quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag)
+        quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag, metrics=metrics)
         di["value"] = quantified_value
         if append_condition_procedure:
             condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
@@ -176,21 +176,39 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
 
     return {
             "i" : protein[0],
-            "annotations": []
+            "annotation_tags": []
             }
+    
+
+    
+    
+@router.get("/{feature_tag}/annotations") 
+def get_feature_annotations(feature_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+    
+    if DB.proteins.exists(tag = feature_tag):
+        p_tags = [feature_tag]
+    elif DB.protein_groups.exists(tag = feature_tag):
+        p_tags = feature_tag.split(";")
+    else:
+        raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
+    
+    return DB.annotations.find(protein_tags=p_tags, limit = None)
     
     
 @router.get("/{feature_tag}/abundance") 
-def get_feature_abundance(feature_tag : str, attribute_tag : str = None, value : Literal["raw","z_score_sample","z_score_protein_group"] = "raw", user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]|Dict[str,QuantileModel]:
+def get_feature_abundance(feature_tag : str, 
+                          attribute_tag : str = None,
+                          value : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", 
+                          user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]|Dict[str,QuantileModel]:
     
     return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag, value = value)
 
 
 @router.get("/{feature_tag}/abundance/samples")
-def get_feature_sample_abundance(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
     if not DB.features.exists(tag=feature_tag):
         raise HTTPException(status_code=404, detail=f"The feature tag does not exist: {feature_tag} in the database.")
-    df =  DB.features.get_quantification_per_sample(tag = feature_tag)
+    df =  DB.features.get_quantification_per_sample(tag = feature_tag, metrics = metrics)
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No quantification data found for feature tag: {feature_tag} in the database.")
     df.loc[:,"value"] = df["value"].astype(float)
@@ -198,77 +216,77 @@ def get_feature_sample_abundance(feature_tag : str, user : UserModel = Depends(g
 
 
 
-@router.get("/{feature_tag}/data",
-            response_model=FeatureDataResponseModel)
-def get_dataset_data(feature_tag : str, submission_tags : str = None,  max_datasets : int = 200, user : UserModel = Depends(get_user_from_token)):
-    """
-    Returns the data for a specific feature in all datasets it was detected in. 
+# @router.get("/{feature_tag}/data",
+#             response_model=FeatureDataResponseModel)
+# def get_dataset_data(feature_tag : str, submission_tags : str = None, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
+#     """
+#     Returns the data for a specific feature in all datasets it was detected in. 
     
-    API Endpoint
-    ------------
-    ``GET api/features/{feature_key}/data```
+#     API Endpoint
+#     ------------
+#     ``GET api/features/{feature_key}/data```
     
-    Parameters
-    ----------
-    feature_key : str
-        The key of the feature (UniprotID).
-    user : UserModel
-        The user that was identified by the token.
+#     Parameters
+#     ----------
+#     feature_key : str
+#         The key of the feature (UniprotID).
+#     user : UserModel
+#         The user that was identified by the token.
     
-    Returns
-    -------
-    FeatureDataResponseModel
+#     Returns
+#     -------
+#     FeatureDataResponseModel
 
     
-    """
+#     """
     
 
-    feature_data = DB.features.get_data(tags=[feature_tag], 
-                                        submission_tags=APIParamString(param=submission_tags).param)
-    submission_tags = feature_data["submission_tag"].unique().tolist()
-    attribute_value_tags = feature_data["attribute_value_tag"].unique().tolist() 
-    attribute_tags = feature_data["attribute_tag"].unique().tolist() 
-    genotype_tags = feature_data[feature_data["attribute_tag"] == "att_genotype"]["attribute_value_tag"]
-    response_data = OrderedDict()#
-    sample_attributes_by_submission_tag = {}
-    #groupby tag and submission tag. This is too because the get_data function can be used to 
-    #retrieve data formore than one feature tag. However this is impossible due to the API route. 
-    #TO DO just ignore this here? 
-    for (_, submission_tag), data in feature_data.groupby(by=["tag","submission_tag"]):
+#     feature_data = DB.features.get_data(tags=[feature_tag], 
+#                                         submission_tags=APIParamString(param=submission_tags).param)
+#     submission_tags = feature_data["submission_tag"].unique().tolist()
+#     attribute_value_tags = feature_data["attribute_value_tag"].unique().tolist() 
+#     attribute_tags = feature_data["attribute_tag"].unique().tolist() 
+#     genotype_tags = feature_data[feature_data["attribute_tag"] == "att_genotype"]["attribute_value_tag"]
+#     response_data = OrderedDict()#
+#     sample_attributes_by_submission_tag = {}
+#     #groupby tag and submission tag. This is too because the get_data function can be used to 
+#     #retrieve data formore than one feature tag. However this is impossible due to the API route. 
+#     #TO DO just ignore this here? 
+#     for (_, submission_tag), data in feature_data.groupby(by=["tag","submission_tag"]):
         
-        pivot_attributes = data[["sample_index",
-                                "attribute_tag",
-                                "attribute_value_tag",
-                                "submission_tag"]].pivot_table(columns=["attribute_tag"],
-                                                                values="attribute_value_tag", 
-                                                                index="sample_index", 
-                                                                aggfunc=lambda x : x)
-        data_transformed = data[["sample_index","value"]].drop_duplicates("sample_index").set_index("sample_index").join(pivot_attributes)
-        response_data[submission_tag]  = data_transformed.sort_index().reset_index().to_dict(orient="records")
-        #if submission_tag not in sample_attributes_by_submission_tag:
-        sample_attributes_by_submission_tag[submission_tag] = data["attribute_tag"].unique().tolist()
+#         pivot_attributes = data[["sample_index",
+#                                 "attribute_tag",
+#                                 "attribute_value_tag",
+#                                 "submission_tag"]].pivot_table(columns=["attribute_tag"],
+#                                                                 values="attribute_value_tag", 
+#                                                                 index="sample_index", 
+#                                                                 aggfunc=lambda x : x)
+#         data_transformed = data[["sample_index","value"]].drop_duplicates("sample_index").set_index("sample_index").join(pivot_attributes)
+#         response_data[submission_tag]  = data_transformed.sort_index().reset_index().to_dict(orient="records")
+#         #if submission_tag not in sample_attributes_by_submission_tag:
+#         sample_attributes_by_submission_tag[submission_tag] = data["attribute_tag"].unique().tolist()
             
-        #
-    #get minimal meta information 
-    submission_meta = DB.meta.get(tags=submission_tags)
+#         #
+#     #get minimal meta information 
+#     submission_meta = DB.meta.get(tags=submission_tags)
     
-    attributes = DB.attributes.get(tags = attribute_tags)
-    attribute_values = DB.attributes.get_values(tags = attribute_value_tags)
-    genotypes = DB.genotypes.get(tags = genotype_tags)
+#     attributes = DB.attributes.get(tags = attribute_tags)
+#     attribute_values = DB.attributes.get_values(tags = attribute_value_tags)
+#     genotypes = DB.genotypes.get(tags = genotype_tags)
 
 
-    rsp = FeatureDataResponseModel(
-        sample_attribute_by_submission_tag = sample_attributes_by_submission_tag,
-        tag = feature_tag,
-        data = response_data,
-        submission_tags = submission_tags,
-        attributes = dict([(a.tag,a) for a in attributes]),
-        attribute_values_by_tag = dict([(av.tag,av) for av in attribute_values]),
-        title_by_tag = dict([(meta_data.tag, meta_data.title) for meta_data in submission_meta]),
-        genotypes_by_tag = dict([(g.tag,g) for g in genotypes])
-    )
+#     rsp = FeatureDataResponseModel(
+#         sample_attribute_by_submission_tag = sample_attributes_by_submission_tag,
+#         tag = feature_tag,
+#         data = response_data,
+#         submission_tags = submission_tags,
+#         attributes = dict([(a.tag,a) for a in attributes]),
+#         attribute_values_by_tag = dict([(av.tag,av) for av in attribute_values]),
+#         title_by_tag = dict([(meta_data.tag, meta_data.title) for meta_data in submission_meta]),
+#         genotypes_by_tag = dict([(g.tag,g) for g in genotypes])
+#     )
     
-    return rsp 
+#     return rsp 
 
 
 @router.get("/{feature_tag}/quant_count")
@@ -304,14 +322,14 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None):
     
     
 
-@router.get("/{feature_tag}/abundance")
-def get_feature_variance(feature_tag : str, submission_tags : str = None):
-    """Returns the log2 average abundance per submission
-    TODO: Should we implement that this returns also the attributes/traits
-    This would allow to get a graphical representation depending on the datasets.
-    """
-    avg_abundance = DB.features.get_avg_abundance(tags = [feature_tag], submission_tags=APIParamString(submission_tags).param)
-    return avg_abundance.to_dict(orient="records")
+# @router.get("/{feature_tag}/abundance")
+# def get_feature_variance(feature_tag : str, submission_tags : str = None):
+#     """Returns the log2 average abundance per submission
+#     TODO: Should we implement that this returns also the attributes/traits
+#     This would allow to get a graphical representation depending on the datasets.
+#     """
+#     avg_abundance = DB.features.get_avg_abundance(tags = [feature_tag], submission_tags=APIParamString(submission_tags).param)
+#     return avg_abundance.to_dict(orient="records")
     
 
 

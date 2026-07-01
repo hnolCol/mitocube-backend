@@ -46,15 +46,6 @@ class Ttest(DatasetStatistic):
             _description_
         """
         
-        # if impute:
-        #     datatable, imputed_bools = StandardImputation(self._dataset).get_imputation(sample_attribute_tag, 
-        #                                                                  within_attribute_tag=within_attribute_tag, 
-        #                                                                  within_attribute_value_tag=within_attribute_value_tag,
-        #                                                                  subset_attribute_value_tags=[attribute_value_left,attribute_value_right])
-        # else:
-        #     d
-        
-        #mapped_sample_names, _ = self._dataset.getSamplesAttributes()
 
         mapped_sample_index = self._sample_attribute_map
         datatable = self._datatable

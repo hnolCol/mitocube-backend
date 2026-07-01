@@ -203,12 +203,12 @@ def get_trait_text(trait_tag : str) -> str:
 
 
 @router.get("/{attribute_tag}/traits") 
-def get_all_traits_for_attribute_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_all_traits_for_attribute_tag(attribute_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     "Returns all trait tags associated with an attribute"
     if not DB.attributes.exists(tag = attribute_tag): 
         raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
     
-    return DB.attributes.get_trait_tags(tag = attribute_tag)
+    return DB.attributes.get_trait_tags(tag = attribute_tag, limit=limit)
 
 @router.get("/{attribute_tag}/traits/count") 
 def get_all_traits_count_for_attribute_tag(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:

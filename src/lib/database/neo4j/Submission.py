@@ -5,11 +5,9 @@ import uuid
 import pandas as pd 
 import datetime
 
-from pydantic import BaseModel
 from config.models.searches import FulltextSearchResult
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.runs import RunListModel, AnalyticRunModel
-from lib.data.runs.runs import RunListCreator
 from lib.database.abstract.Submission import SubmissionFilterABC, SubmissionsABC, SubmissionSummaryABC
 from lib.database.abstract.Meta import MetaABC
 from lib.database.abstract.Attributes import AttributesABC
@@ -17,19 +15,17 @@ from lib.database.abstract.Proteomes import ProteomesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
-from config.models.submissions.submissions import AttributeTree,  NewSubmissionModel
+from config.models.submissions.submissions import AttributeTree
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
-from config.exceptions.Proteome import ProteomeNotFoundError
 from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
-from config.models.submissions.metatexts import MetaTextInsertModel
-from services.encryption import create_hierarchical_hash
 from services.random_generators import get_random_string
-import os 
+from services.encryption import create_hierarchical_hash
 from lib.data.ranking.FeatureRanking import FeatureRanking
 import numpy as np
-from collections import defaultdict
 from itertools import islice
-import math
+
+
+from config.models.calculations.quantile import QuantileModel
 
 
 def chunk_dict(d, size):
@@ -130,7 +126,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = (
             "MATCH (submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
             "WHERE submission.tag = $tag "
-            "RETURN sample.tag ORDER BY sample.sample_index "
+            "RETURN sample.tag ORDER BY sample.sample_index"
             
         )
         
@@ -281,7 +277,85 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else []
 
 
+    def get_defined_attributes(self, tag : str) -> List[str]:
+        """Returns a list of all defined attribute tags for a given submission. E.g. all attributes that are defined for a submission, this does not include attributes that are not defined for the submission. This is useful to see which attributes are defined for a submission and which are not."""
+         
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication)-[:OF_ATTRIBUTE]->(attribute:Attribute) "
+            "OPTIONAL MATCH (condition)-[:HAS_VALUE*0..]->(cv:ConditionValue)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "RETURN attribute.tag, collect(a.tag) "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data)
+        flat_attributes = set()
+        for ri in r:
+            flat_attributes.add(ri["attribute.tag"])
+            for at in ri["collect(a.tag)"]:
+                flat_attributes.add(at)
+        return list(flat_attributes)
+        
+        
 
+    def has_quantification_distributution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
+        """Checks if a quantification distribution exists for a given submission and quantification type."""
+        tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+        query = (
+            "MATCH (qd:QuantificationDistribution {tag : $tag}) "
+            "RETURN count(qd) > 0 "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+
+    def get_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+        """Returns the distribution of quantification values for a given submission and quantification type. The distribution is represented as a QuantileModel instance."""
+
+        
+        dataset_distribution_exists = self.has_quantification_distributution(submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        if dataset_distribution_exists:
+            tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+            query = (
+                "MATCH (qd:QuantificationDistribution {tag : $tag}) "
+                "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
+            )
+            r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data)
+            print("GETTING STORED ONE!=")
+            if len(r) > 0:
+                return QuantileModel(tag=submission_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
+            
+        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample)"
+        
+        if quantification_type == "protein_groups":   
+            query += "-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            if annotation_tag is not None:
+                query += "WHERE EXISTS {(pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
+        elif quantification_type == "precursors":
+            query += "-[q:QUANTIFIED]->(pr:Precursor) "
+        else:
+            raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
+        query += "RETURN q.value AS value "
+        
+        r = self._driver.execute_query(query, routing_="r", submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag, result_transformer_=Result.value)
+        
+        if len(r) == 0: raise ValueError("No quantifications found for this submission and quantification type.")
+        
+        qm = QuantileModel(tag = submission_tag, min = np.min(r), q25 = np.percentile(r, 25), m = np.median(r), q75 = np.percentile(r, 75), max = np.max(r), N = len(r))
+        
+        self.insert_quantification_distribution(submission_tag=submission_tag, quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
+        
+        return qm 
+
+
+    def insert_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None) -> bool:
+        """Inserts the quantification distribution for a given submission and quantification type. This can be used to store pre-calculated distributions for faster retrieval."""
+        tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+        
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag}) "
+            "MERGE (qd:QuantificationDistribution {tag : $tag}) "
+            "SET qd.submission_tag = $submission_tag, qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), qd.min = $min, qd.q25 = $q25, qd.m = $m, qd.q75 = $q75, qd.max = $max, qd.N = $N "
+            "RETURN true "
+        )
+        r = self._driver.execute_query(query, routing_="w", submission_tag=submission_tag, tag=tag, quantification_type=quantification_type, min=distribution.min, q25=distribution.q25, m=distribution.m, q75=distribution.q75, max=distribution.max, N=distribution.N, result_transformer_=Result.value, annotation_tag=annotation_tag)
+        return r[0] if len(r) > 0 else False
 
     def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
         """Gets the condition application data associated with the genotype.
@@ -305,6 +379,9 @@ class Neo4JSubmissions(SubmissionsABC):
 
         ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
         return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]
+
+    
+        
 
     def get_users(self, tag : str) -> List[str]: 
         """Returns the users that are associated with the submission.
@@ -463,8 +540,17 @@ class Neo4JSubmissions(SubmissionsABC):
         self,
         tag: str,
         quantifications: List[ProteinGroupQuantificationModel],
-        batch_size: int = 600
+        batch_size: int = 600,
+        delete_if_exists: bool = True
         ) -> int:
+        
+        if delete_if_exists:
+            if self.quantification_exists(tag, type="protein_groups"):
+                query_delete = (
+                    "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+                    "DELETE q "
+                )
+                self._driver.execute_query(query_delete, routing_="w", tag=tag)
 
         quantifications_data = [x.model_dump() for x in quantifications]
 
@@ -519,6 +605,7 @@ class Neo4JSubmissions(SubmissionsABC):
         # )
 
         # return result[0] if result else 0
+    
 
 
     def transform_quantification_to_zscore_along_samples(self,tag : str) -> bool:
@@ -573,22 +660,47 @@ class Neo4JSubmissions(SubmissionsABC):
 
     def transform_quantification_to_zscore_along_protein_groups(self, tag : str) -> bool:
         """
-        Transforms the quantification values for a given submission to z-scores.
+        Transforms the quantification values for a given submission to z-scores along protein groups.
         """
         
-        query = (
-            "MATCH (submission:Submission {tag: $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
-            "CALL (pg, sample) { "
-                "MATCH (sample)-[q:QUANTIFIED]->(pg) "
-                "WITH avg(q.value) AS mean, stDev(q.value) AS stdev, collect(q) AS qs, pg "
-                "WHERE stdev > 0 "
+        query = """MATCH (submission:Submission {tag: $tag})
+                -[:HAS_SAMPLE]->(sample:Sample)
+                -[q:QUANTIFIED]->(pg:ProteinGroup)
 
-                "UNWIND qs AS q "
-                "SET q.z_score_protein_group = (q.value - mean) / stdev "
-                "RETURN count(*) AS updated "
-            "} "
-        "RETURN sum(updated)"
-        )   
+                WITH pg, avg(q.value) AS mean, stDev(q.value) AS stdev
+                WHERE stdev > 0
+
+                MATCH (submission:Submission {tag: $tag})
+                    -[:HAS_SAMPLE]->(sample:Sample)
+                    -[q:QUANTIFIED]->(pg)
+
+                WITH q, mean, stdev
+                SET q.z_score_protein_group = (q.value - mean) / stdev
+
+                RETURN count(q) AS updated """
+        r = self._driver.execute_query(
+            query,
+            routing_="w",
+            tag=tag,
+            result_transformer_=Result.value
+        )
+        print(r)
+        return r[0] if len(r) > 0 else 0
+
+    def transform_quantification_to_log2(self, tag : str) -> bool:
+        
+        query = """
+            MATCH (submission:Submission {tag: $tag})
+            MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup)
+
+            WITH submission, pg, avg(q.value) AS mean_log2
+
+            MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg)
+
+            SET q.log2_fc_vs_mean = q.value - mean_log2
+
+            RETURN count(q)
+            """
         r = self._driver.execute_query(
             query,
             routing_="w",
@@ -596,7 +708,6 @@ class Neo4JSubmissions(SubmissionsABC):
             result_transformer_=Result.value
         )
         return r[0] if len(r) > 0 else 0
-
 
 
     def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
@@ -825,7 +936,7 @@ class Neo4JSubmissions(SubmissionsABC):
     #                                    submission_tags = tags)
     #     return r 
     
-    def quantification_exists(self, tag : str, type : Literal["proteins","protein_groups","precursors","any"]) -> bool:
+    def quantification_exists(self, tag : str, type : Literal["proteins","protein_groups","precursors","any"] = "protein_groups") -> bool:
         """Checks if samples have quantification data for a given submission."""
         if type in ["proteins","protein_groups"]:
             query = (
@@ -1459,11 +1570,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     def filter_by_quantified_protein(self, protein_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
-            "MATCH (p:Protein ) "
+            "MATCH (p:Protein)<-[:HAS_PROTEINS]-(pg:ProteinGroup) "
             "WHERE p.tag in $protein_tags "
-            "MATCH (p)-[:QUANTIFIED_IN]->(submission:Submission) "
+            "MATCH (pg)<-[:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
             f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "RETURN DISTINCT submission.tag "
+            "WITH DISTINCT submission "
+            "RETURN submission.tag "
         )
         if ordered:
             query += "ORDER BY submission.created_at DESC "
@@ -1511,157 +1623,384 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
  
         return tags 
     
+    # def filter_by_condition_applications(
+    #     self, 
+    #     attribute_tag: List[str] = None,
+    #     trait_tag: List[str] = None,
+    #     ca_tags: List[str] = None,
+    #     ca_search_string: str = None,  
+    #     submission_tags: List[str] = None, 
+    #     include_sample_ca : bool = False,
+    #     limit: int = None, 
+    #     ordered: bool = True
+    # ) -> List[str]:
+    #     """Filter submissions by condition applications (attributes, traits, or search string)."""
+
+    #     if ca_tags is not None and len(ca_tags) > 0:
+    #         if include_sample_ca:
+    #             query = (
+    #                 "MATCH (submission:Submission) "
+    #                 f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}"
+    #                 "EXISTS { "
+    #                 "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+    #                 "  WHERE ca.tag IN $ca_tags "
+    #                 "} OR EXISTS { "
+    #                 "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+    #                 "  WHERE ca.tag IN $ca_tags "
+    #                 "}"
+    #                 f"{')' if submission_tags is not None else ''} "
+    #                 "RETURN DISTINCT submission.tag AS submission_tag "
+    #             )
+    #         else:
+    #             query = (
+    #                 "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+    #                 f"{'WHERE submission.tag IN $submission_tags AND ' if submission_tags is not None else 'WHERE '}"
+    #                 "ca.tag IN $ca_tags "
+    #                 "RETURN DISTINCT submission.tag AS submission_tag "
+    #             )
+            
+    #         if ordered:
+    #             query += "ORDER BY submission_tag DESC "
+    #         query = self._add_limit(query, limit)
+            
+    #         return self._driver.execute_query(
+    #             query, 
+    #             ca_tags=ca_tags,
+    #             submission_tags=submission_tags, 
+    #             limit=limit, 
+    #             result_transformer_=Result.value
+    #         )
+    
+    #     # Handle search string filtering
+    #     if ca_search_string is not None:
+    #         if include_sample_ca:
+    #             query = (
+    #                 "MATCH (submission:Submission) "
+    #                 f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}" 
+    #                 "EXISTS { "
+    #                 "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+    #                 "  MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+    #                 "  WHERE toLower(t.s) CONTAINS toLower($ca_search_string) "
+    #                 "     OR toLower(a.s) CONTAINS toLower($ca_search_string) "
+    #                 "} OR EXISTS { "
+    #                 "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+    #                 "  MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+    #                 "  WHERE toLower(t.s) CONTAINS toLower($ca_search_string) "
+    #                 "     OR toLower(a.s) CONTAINS toLower($ca_search_string) "
+    #                 "}"
+    #                 f"{')' if submission_tags is not None else ''} "  
+    #                 "RETURN DISTINCT submission.tag AS submission_tag "
+    #             )
+    #         else:
+    #             query = (
+    #                 "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+    #                 "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+    #                 f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}"
+    #                 "toLower(t.s) CONTAINS toLower($ca_search_string) "
+    #                 "OR toLower(a.s) CONTAINS toLower($ca_search_string)"
+    #                 f"{')' if submission_tags is not None else ''} "
+    #                 "RETURN DISTINCT submission.tag AS submission_tag "
+    #             )
+            
+    #         if ordered:
+    #             query += "ORDER BY submission_tag DESC "
+    #         query = self._add_limit(query, limit)
+            
+    #         return self._driver.execute_query(
+    #             query, 
+    #             ca_search_string=ca_search_string,
+    #             submission_tags=submission_tags, 
+    #             limit=limit, 
+    #             result_transformer_=Result.value
+    #         )
+        
+    #     # Handle attribute_tag and trait_tag filtering
+    #     if include_sample_ca:
+    #         query = (
+    #             "MATCH (submission:Submission) "
+    #             f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}"  
+    #             "EXISTS { "
+    #             "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+    #         )
+    #         if attribute_tag is not None:
+    #             query += "  WHERE attr.tag IN $attribute_tag "
+    #         if trait_tag is not None:
+    #             query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
+    #         query += (
+    #             "} OR EXISTS { "
+    #             "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+    #         )
+    #         if attribute_tag is not None:
+    #             query += "  WHERE attr.tag IN $attribute_tag "
+    #         if trait_tag is not None:
+    #             query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
+    #         query += (
+    #             "}"
+    #             f"{')' if submission_tags is not None else ''} " 
+    #             "RETURN DISTINCT submission.tag AS submission_tag "
+    #         )
+    #     else:
+    #         # Only submission-level CAs
+    #         query = (
+    #             "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+    #             f"{'WHERE submission.tag IN $submission_tags ' if submission_tags is not None else ''}"
+    #         )
+            
+    #         if trait_tag is not None:
+    #             query += (
+    #                 "MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) "
+    #                 "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags, COLLECT(DISTINCT trait.tag) AS trait_tags "
+    #             )
+    #             if attribute_tag is not None:
+    #                 query += "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) AND ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
+    #             else:
+    #                 query += "WHERE ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
+    #             query += "RETURN DISTINCT submission.tag AS submission_tag "
+    #         elif attribute_tag is not None:
+    #             query += (
+    #                 "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags "
+    #                 "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
+    #                 "RETURN DISTINCT submission.tag AS submission_tag "
+    #             )
+    #         else:
+    #             query += "RETURN DISTINCT submission.tag AS submission_tag "
+        
+    #     if ordered:
+    #         query += "ORDER BY submission_tag DESC "
+    #     query = self._add_limit(query, limit)
+        
+    #     r = self._driver.execute_query(query, attribute_tag=attribute_tag, trait_tag=trait_tag, 
+    #                                 submission_tags=submission_tags, limit=limit, 
+    #                                 result_transformer_=Result.value)
+    #     return r
     def filter_by_condition_applications(
-        self, 
+        self,
         attribute_tag: List[str] = None,
         trait_tag: List[str] = None,
         ca_tags: List[str] = None,
-        ca_search_string: str = None,  
-        submission_tags: List[str] = None, 
-        include_sample_ca : bool = False,
-        limit: int = None, 
-        ordered: bool = True
+        ca_search_string: str = None,
+        submission_tags: List[str] = None,
+        include_sample_ca: bool = False,
+        match_all: bool = True,
+        limit: int = None,
+        ordered: bool = True,
     ) -> List[str]:
         """Filter submissions by condition applications (attributes, traits, or search string)."""
 
         if ca_tags is not None and len(ca_tags) > 0:
-            if include_sample_ca:
-                query = (
-                    "MATCH (submission:Submission) "
-                    f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}"
-                    "EXISTS { "
-                    "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
-                    "  WHERE ca.tag IN $ca_tags "
-                    "} OR EXISTS { "
-                    "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
-                    "  WHERE ca.tag IN $ca_tags "
-                    "}"
-                    f"{')' if submission_tags is not None else ''} "
-                    "RETURN DISTINCT submission.tag AS submission_tag "
-                )
-            else:
-                query = (
-                    "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
-                    f"{'WHERE submission.tag IN $submission_tags AND ' if submission_tags is not None else 'WHERE '}"
-                    "ca.tag IN $ca_tags "
-                    "RETURN DISTINCT submission.tag AS submission_tag "
-                )
-            
-            if ordered:
-                query += "ORDER BY submission_tag DESC "
-            query = self._add_limit(query, limit)
-            
-            return self._driver.execute_query(
-                query, 
-                ca_tags=ca_tags,
-                submission_tags=submission_tags, 
-                limit=limit, 
-                result_transformer_=Result.value
-            )
-    
-        # Handle search string filtering
+            return self._filter_by_ca_tags(ca_tags, submission_tags, include_sample_ca, match_all, limit, ordered)
+
         if ca_search_string is not None:
+            return self._filter_by_ca_search_string(ca_search_string, submission_tags, include_sample_ca, limit, ordered)
+
+        return self._filter_by_attribute_trait(attribute_tag, trait_tag, submission_tags, include_sample_ca, limit, ordered)
+
+
+    def _filter_by_ca_tags(
+        self,
+        ca_tags: List[str],
+        submission_tags: List[str],
+        include_sample_ca: bool,
+        match_all: bool,
+        limit: int,
+        ordered: bool,
+    ) -> List[str]:
+        """Filter by explicit ca_tags list, with AND/OR logic across tags."""
+
+        where_clauses = []
+        if submission_tags is not None:
+            where_clauses.append("submission.tag IN $submission_tags")
+
+        if match_all:
+            # Each tag must match independently — interpolated since no per-tag param support
+            def make_exists(tag):
+                clauses = [
+                    f"EXISTS {{ MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag = '{tag}' }}"
+                ]
+                if include_sample_ca:
+                    clauses.append(
+                        f"EXISTS {{ MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag = '{tag}' }}"
+                    )
+                # Tag must appear on submission OR sample (if include_sample_ca), but ALL tags must match
+                return "(" + " OR ".join(clauses) + ")"
+
+            where_clauses.append(" AND ".join(make_exists(tag) for tag in ca_tags))
+
+        else:
             if include_sample_ca:
-                query = (
-                    "MATCH (submission:Submission) "
-                    f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}" 
-                    "EXISTS { "
-                    "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
-                    "  MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
-                    "  WHERE toLower(t.s) CONTAINS toLower($ca_search_string) "
-                    "     OR toLower(a.s) CONTAINS toLower($ca_search_string) "
-                    "} OR EXISTS { "
-                    "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
-                    "  MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
-                    "  WHERE toLower(t.s) CONTAINS toLower($ca_search_string) "
-                    "     OR toLower(a.s) CONTAINS toLower($ca_search_string) "
-                    "}"
-                    f"{')' if submission_tags is not None else ''} "  
-                    "RETURN DISTINCT submission.tag AS submission_tag "
+                where_clauses.append(
+                    "("
+                    "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags } "
+                    "OR EXISTS { MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags }"
+                    ")"
                 )
+                
             else:
-                query = (
-                    "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
-                    "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
-                    f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}"
-                    "toLower(t.s) CONTAINS toLower($ca_search_string) "
-                    "OR toLower(a.s) CONTAINS toLower($ca_search_string)"
-                    f"{')' if submission_tags is not None else ''} "
-                    "RETURN DISTINCT submission.tag AS submission_tag "
-                )
-            
-            if ordered:
-                query += "ORDER BY submission_tag DESC "
-            query = self._add_limit(query, limit)
-            
-            return self._driver.execute_query(
-                query, 
-                ca_search_string=ca_search_string,
-                submission_tags=submission_tags, 
-                limit=limit, 
-                result_transformer_=Result.value
-            )
-        
-        # Handle attribute_tag and trait_tag filtering
+                where_clauses.append("ca.tag IN $ca_tags")
+
+        match_clause = (
+            "MATCH (submission:Submission)"
+            if include_sample_ca or match_all
+            else "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)"
+        )
+
+        query = (
+            f"{match_clause} "
+            f"WHERE {' AND '.join(where_clauses)} "
+            "RETURN DISTINCT submission.tag AS submission_tag "
+        )
+        query = self._maybe_order(query, ordered)
+        query = self._add_limit(query, limit)
+
+        return self._driver.execute_query(
+            query,
+            ca_tags=ca_tags,
+            submission_tags=submission_tags,
+            limit=limit,
+            result_transformer_=Result.value,
+        )
+
+
+    def _filter_by_ca_search_string(
+        self,
+        ca_search_string: str,
+        submission_tags: List[str],
+        include_sample_ca: bool,
+        limit: int,
+        ordered: bool,
+    ) -> List[str]:
+        """Filter by free-text search across trait and attribute labels."""
+
+        where_clauses = []
+        if submission_tags is not None:
+            where_clauses.append("submission.tag IN $submission_tags")
+
+        text_match = (
+            "toLower(t.s) CONTAINS toLower($ca_search_string) "
+            "OR toLower(a.s) CONTAINS toLower($ca_search_string)"
+        )
+
         if include_sample_ca:
+            where_clauses.append(
+                f"("
+                f"EXISTS {{ "
+                f"  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+                f"  MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                f"  WHERE {text_match} "
+                f"}} OR EXISTS {{ "
+                f"  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+                f"  MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+                f"  WHERE {text_match} "
+                f"}})"
+            )
+            match_clause = "MATCH (submission:Submission)"
+        else:
+            where_clauses.append(f"({text_match})")
+            match_clause = (
+                "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+                "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute)"
+            )
+
+        query = (
+            f"{match_clause} "
+            f"WHERE {' AND '.join(where_clauses)} "
+            "RETURN DISTINCT submission.tag AS submission_tag "
+        )
+        query = self._maybe_order(query, ordered)
+        query = self._add_limit(query, limit)
+
+        return self._driver.execute_query(
+            query,
+            ca_search_string=ca_search_string,
+            submission_tags=submission_tags,
+            limit=limit,
+            result_transformer_=Result.value,
+        )
+
+
+    def _filter_by_attribute_trait(
+        self,
+        attribute_tag: List[str],
+        trait_tag: List[str],
+        submission_tags: List[str],
+        include_sample_ca: bool,
+        limit: int,
+        ordered: bool,
+    ) -> List[str]:
+        """Filter by attribute and/or trait tags."""
+
+        def _exists_block(subject: str) -> str:
+            """Build an EXISTS { ... } block for a given subject pattern."""
+            lines = [
+                f"EXISTS {{",
+                f"  MATCH ({subject})-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute)",
+            ]
+            if attribute_tag is not None:
+                lines.append("  WHERE attr.tag IN $attribute_tag")
+            if trait_tag is not None:
+                lines.append("  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag")
+            lines.append("}")
+            return " ".join(lines)
+
+        if include_sample_ca:
+            where_clauses = []
+            if submission_tags is not None:
+                where_clauses.append("submission.tag IN $submission_tags")
+
+            where_clauses.append(
+                f"({_exists_block('submission')} OR {_exists_block('submission)-[:HAS_SAMPLE]->(sample:Sample')})"
+            )
+
             query = (
                 "MATCH (submission:Submission) "
-                f"{'WHERE submission.tag IN $submission_tags AND (' if submission_tags is not None else 'WHERE '}"  
-                "EXISTS { "
-                "  MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
-            )
-            if attribute_tag is not None:
-                query += "  WHERE attr.tag IN $attribute_tag "
-            if trait_tag is not None:
-                query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
-            query += (
-                "} OR EXISTS { "
-                "  MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
-            )
-            if attribute_tag is not None:
-                query += "  WHERE attr.tag IN $attribute_tag "
-            if trait_tag is not None:
-                query += "  MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) WHERE trait.tag IN $trait_tag "
-            query += (
-                "}"
-                f"{')' if submission_tags is not None else ''} " 
+                f"WHERE {' AND '.join(where_clauses)} "
                 "RETURN DISTINCT submission.tag AS submission_tag "
             )
+
         else:
-            # Only submission-level CAs
             query = (
                 "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute) "
-                f"{'WHERE submission.tag IN $submission_tags ' if submission_tags is not None else ''}"
             )
-            
+            if submission_tags is not None:
+                query += "WHERE submission.tag IN $submission_tags "
+
             if trait_tag is not None:
                 query += (
                     "MATCH (ca)-[:INSTANCE_OF]->(trait:Trait) "
                     "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags, COLLECT(DISTINCT trait.tag) AS trait_tags "
                 )
+                conditions = ["ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags)"]
                 if attribute_tag is not None:
-                    query += "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) AND ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
-                else:
-                    query += "WHERE ALL(trait_tag IN $trait_tag WHERE trait_tag IN trait_tags) "
-                query += "RETURN DISTINCT submission.tag AS submission_tag "
+                    conditions.append("ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags)")
+                query += f"WHERE {' AND '.join(conditions)} "
+
             elif attribute_tag is not None:
                 query += (
                     "WITH submission, COLLECT(DISTINCT attr.tag) AS attr_tags "
                     "WHERE ALL(attr_tag IN $attribute_tag WHERE attr_tag IN attr_tags) "
-                    "RETURN DISTINCT submission.tag AS submission_tag "
                 )
-            else:
-                query += "RETURN DISTINCT submission.tag AS submission_tag "
-        
+
+            query += "RETURN DISTINCT submission.tag AS submission_tag "
+
+        query = self._maybe_order(query, ordered)
+        query = self._add_limit(query, limit)
+
+        return self._driver.execute_query(
+            query,
+            attribute_tag=attribute_tag,
+            trait_tag=trait_tag,
+            submission_tags=submission_tags,
+            limit=limit,
+            result_transformer_=Result.value,
+        )
+
+
+    def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
             query += "ORDER BY submission_tag DESC "
-        query = self._add_limit(query, limit)
-        
-        r = self._driver.execute_query(query, attribute_tag=attribute_tag, trait_tag=trait_tag, 
-                                    submission_tags=submission_tags, limit=limit, 
-                                    result_transformer_=Result.value)
-        return r
-            
+        return query
+    
+    
     def find(self, 
             search_string : str = None,
             state : List[int] = None, 
@@ -1675,6 +2014,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             genotype_tag : List[str] = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
+            ca_match_all : bool = True,
             limit : int = 10) -> List[str]:
         """Returns a list of submission tags that match the given filters."""
         tags = None
@@ -1701,7 +2041,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 submission_tags=tags,
                 include_sample_ca=include_sample_ca,
                 limit=limit_,
-                ordered=ordered
+                ordered=ordered,
+                match_all=ca_match_all
             )
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if trait_tags is not None:
@@ -1722,6 +2063,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             tags = self.filter_by_user(user_tags,submission_tags=tags,limit=limit_, ordered=ordered)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if protein_tags is not None:
+            limit_ = limit
             tags = self.filter_by_quantified_protein(protein_tags,submission_tags=tags,limit=limit_, ordered=ordered)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if not filter_defined: #none defined, then just return all. 

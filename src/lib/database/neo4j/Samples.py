@@ -1,22 +1,28 @@
-from typing import List, Dict
+from typing import List, Dict, Literal
 from neo4j import Driver, Result
 from datetime import datetime
 
 from lib.database.abstract.Samples import SamplesABC
-from services.encryption import create_hierarchical_hash
 from config.models.submissions.submissions import AttributeTree
 from config.models.conditions_applications import ConditionApplicationAttributeModel
-from config.models.genotype import InsertGeneticApplicationModel
+from lib.database.abstract.Genotypes import  GenotypeABC
+from lib.database.abstract.Annotations import AnnotationsABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from config.models.samples import SampleModel, SampleUpdateModel
 import pandas as pd
-import uuid
 
+import re
+
+from config.models.calculations.quantile import QuantileModel
 class Neo4JSamples(SamplesABC):
     """
     Neo4J implementation of the SamplesABC interface.
     """
-    def __init__(self, driver : Driver, condition_applications : ConditionApplicationABC):
+    def __init__(self, driver : Driver, condition_applications : ConditionApplicationABC, genotypes : GenotypeABC, annotations : AnnotationsABC):
+        self._driver = driver
+        self._condition_applications = condition_applications
+        self._genotypes = genotypes
+        self._annotations = annotations
         self._driver = driver
         self._condition_applications = condition_applications
 
@@ -156,16 +162,26 @@ class Neo4JSamples(SamplesABC):
         return  r[0] if len(r) > 0 else None
 
 
-    def get_quantified_data_for_feature(self, tag : str, feature_tag : str) -> float: 
+    def get_quantified_data_for_feature(self, tag : str, feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> float: 
         """Get the quantified data for a given sample and feature.
         A feature may be protein group or peptide.
         """
+        
+        metrics_mapping = {
+            "raw" : "value",
+            "z_score_sample" : "z_score_sample",
+            "z_score_protein_group" : "z_score_protein_group",
+            "log2_fc_vs_mean" : "log2_fc_vs_mean"
+        }
+        
+        if metrics not in metrics_mapping:
+            raise ValueError(f"Invalid metrics value. Allowed values are: {list(metrics_mapping.keys())}")
         
         if self.exists(tag = tag) is False: raise ValueError("Sample tag does not exist. ")
         
         query = (
             "MATCH (s:Sample {tag : $tag})-[r:QUANTIFIED]->(f:ProteinGroup|Peptide {tag : $feature_tag}) "
-            "RETURN r.value as value "
+            f"RETURN r.{metrics_mapping[metrics]} as value "
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag, feature_tag = feature_tag)
@@ -457,6 +473,151 @@ class Neo4JSamples(SamplesABC):
                                         tag=tag
                                     )
         return r[0] if len(r) > 0 and r[0] is not None else []
+
+    def has_sample_genotype(self, submission_tag : str) -> bool:
+        """Check if any sample in the submission has a genotype annotation.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The tag of the submission to check for genotype annotations.
+
+        Returns
+        -------
+        bool
+            True if at least one sample in the submission has a genotype annotation, False otherwise.
+        """
+
+        query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
+            "RETURN count(g) > 0 AS has_genotype"
+        )
+
+        r = self._driver.execute_query( query,
+                                        routing_="r",
+                                        result_transformer_=Result.value,
+                                        submission_tag=submission_tag
+                                    )
+        return r[0] if len(r) > 0 else False
+
+
+    def handle_comparison(self, submission_tag : str, ca_tag_left : str, ca_tag_right : str , within_attribute_tags : str, within_ca_tags : str, annotation_tag : str):
+        
+        condition_applications = self.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+        if self.has_sample_genotype(submission_tag=submission_tag):
+            genotypes = self.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
+            condition_applications = condition_applications.join(genotypes, how="outer")
+        
+        if self._genotypes.exists(tag = ca_tag_left):
+            attribute_tag = "att_genotype"
+        else:
+            attribute_tag = self._condition_applications.get_attribute(ca_tag_left)
+            
+        if attribute_tag not in condition_applications.columns:
+            raise ValueError(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
+        
+        # if within_trait_tag is not None:
+        sample_tags_left = condition_applications[condition_applications[attribute_tag] == ca_tag_left].index
+        sample_tags_right = condition_applications[condition_applications[attribute_tag] == ca_tag_right].index
+
+        if within_attribute_tags and within_ca_tags:
+            within_attr_list = within_attribute_tags.split(";")
+            within_ca_list = within_ca_tags.split(";")
+            for within_attr, within_ca in zip(within_attr_list, within_ca_list):
+                if within_attr in condition_applications.columns:
+                    mask = condition_applications[within_attr] == within_ca
+                    sample_tags_left = sample_tags_left[sample_tags_left.isin(condition_applications[mask].index)]
+                    sample_tags_right = sample_tags_right[sample_tags_right.isin(condition_applications[mask].index)]
+    
+        ca_left_text = self._condition_applications.get_text(ca_tag_left) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag_left)
+        ca_right_text = self._condition_applications.get_text(ca_tag_right) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag_right)
+
+        def clean_ca_text(text):
+            if text is None:
+                return text
+            # remove parentheses containing empty values 
+            cleaned = re.sub(r'\(\s*[^)]*\)', lambda m: m.group() if any(c.isdigit() for c in m.group()) else '', text)
+            return cleaned.strip()
+
+        ca_left_text = clean_ca_text(ca_left_text)
+        ca_right_text = clean_ca_text(ca_right_text)
+        sample_tags = sample_tags_left.to_list() + sample_tags_right.to_list()
+
+        suffix = f"{ca_left_text} vs. {ca_right_text}"
+        if within_ca_tags:
+            within_texts = []
+            for t in within_ca_tags.split(";"):
+                if t and self._genotypes.exists(tag=t):
+                    within_texts.append(self._genotypes.get_text(t) or t)
+                elif t:
+                    within_texts.append(self._condition_applications.get_text(t) or t)
+            if within_texts:
+                suffix += f" (within {', '.join(within_texts)})"
+    # add within ca tag text
+        if annotation_tag is not None:
+            annotation_text = self._annotations.get_text(tag=annotation_tag)
+            suffix += f" ({annotation_text if annotation_text else annotation_tag})"
+        return sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag
+
+    def calculate_test_quantification_distribution(self, submission_tag : str, testParam : Dict, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> Dict:
+        """Calculates the quantification distribution for a given submission and quantification type based on a statistical test. This is used to calculate the distribution for the test results in the volcano plot."""
+        
+        boolIdx = None
+       
+        sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag = self.handle_comparison(
+            submission_tag=submission_tag, 
+            ca_tag_left=testParam["ca_tag_left"],
+            ca_tag_right=testParam["ca_tag_right"], 
+            within_attribute_tags=testParam.get("within_attribute_tags", None), 
+            within_ca_tags=testParam.get("within_ca_tags", None), 
+            annotation_tag=testParam.get("annotation_tag", None)
+        )
+        
+        query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup) "
+            "WHERE s.tag IN $sample_tags "
+            "RETURN pg.tag as feature_tag, r.value as value, s.tag as sample_tag "
+        )
+        
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, sample_tags=sample_tags, submission_tag=submission_tag)
+        
+        df = r.pivot_table(index="feature_tag", columns="sample_tag", values="value")
+        log2FC = df[sample_tags_left].mean(axis=1) - df[sample_tags_right].mean(axis=1)
+        if annotation_tag is not None:
+            proteinTags = self._annotations.get_protein_tags(tag=annotation_tag, submission_tag=submission_tag)
+            boolIdx = log2FC.index.isin(proteinTags)
+                    
+        desc = log2FC.describe()
+        q = {
+                "submission_tag" : submission_tag,
+                "suffix" : suffix,
+                "annotation_tag" : annotation_tag,
+                "distributions" : [QuantileModel(
+                        tag = suffix,
+                        min = desc["min"],
+                        max = desc["max"],
+                        m = desc["50%"],
+                        q25 = desc["25%"],
+                        q75 = desc["75%"],
+                        N = desc["count"]
+            )]}
+        
+        if boolIdx is not None:
+            log2FCAnnotation = log2FC[boolIdx]
+            descAnnotation = log2FCAnnotation.describe()
+            q["distributions"].append(QuantileModel(
+                tag = f"{suffix} - annotated with {annotation_tag}",
+                min = descAnnotation["min"],
+                max = descAnnotation["max"],
+                m = descAnnotation["50%"],
+                q25 = descAnnotation["25%"],
+                q75 = descAnnotation["75%"],
+                N = descAnnotation["count"]
+            ))
+        
+        return q
+        
+        
 
     def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):
         """Insert proteins quantified in a given sample of a submission.

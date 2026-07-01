@@ -110,9 +110,7 @@ class Neo4JProteinGroups(ProteinGroupsABC):
 
         if limit is not None:
             query += "LIMIT $limit"
-            
-        print(query)
-            
+                        
         r = self._driver.execute_query(query, routing_="r", 
                                        search_string=search_string.lower() if search_string else None, 
                                        submission_tag=submission_tag, 
@@ -120,7 +118,6 @@ class Neo4JProteinGroups(ProteinGroupsABC):
                                        annotation_tags=annotation_tags, 
                                        limit=limit, 
                                        result_transformer_=Result.data)
-        print(r)
         return [ri["tag"] for ri in r]
     
     def get(self, tag : str):
