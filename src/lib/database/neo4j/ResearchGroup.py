@@ -133,6 +133,19 @@ class Neo4JResearchGroup(ResearchGroupABC):
         if len(r) == 0:  return 0
         return r[0]
     
+    
+    def get_submission_tags(self, tags : List[str]) -> List[str]:
+        "Returns the submission tags associated with the research groups"
+        query = (
+            "MATCH (rg:ResearchGroup) <-[:MEMBER_OF]-(u:User)-[:CREATED]->(s:Submission) "
+            "WHERE rg.tag IN $tags "
+            "RETURN s.tag order by s.created_at desc "
+        )
+        
+        r = self._driver.execute_query(query, tags = tags, routing_= "r", result_transformer_=Result.value)
+        if len(r) == 0:  return []
+        return r
+    
     def get_samples_count(self, tag : str) -> int:
         "Returns the number of samples associated with the research group"
         query = (

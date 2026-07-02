@@ -295,7 +295,8 @@ if __name__ == "__main__":
             #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
             #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
             
-            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589,UP000002311 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json --external_resources_xl
+            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589,UP000002311 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json --external_resources_xl --add_research_groups
+            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data  --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json --external_resources_xl --add_research_groups
 
     if add_xlms_external_resources:
         DB.external_resources._utils_insert_from_file(

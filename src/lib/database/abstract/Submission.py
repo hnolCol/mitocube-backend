@@ -640,6 +640,7 @@ class SubmissionFilterABC(ABC):
     
     @abstractmethod
     def find(self,
+            current_user_tag : str,
             search_string : str = None,
             state : List[int] = None, 
             trait_tags : List[str] = None, 
@@ -659,6 +660,8 @@ class SubmissionFilterABC(ABC):
 
         Parameters
         ----------
+        current_user_tag : str
+            The tag of the current user.
         state : List[int], optional
             _description_, by default None
         trait_tags : List[str], optional

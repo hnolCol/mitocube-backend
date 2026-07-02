@@ -20,7 +20,10 @@ class ResearchGroupABC(ABC):
     @abstractmethod
     def get_users_count(self, tag : str) -> int:
         " "
-    
+    @abstractmethod
+    def get_submission_tags(self, tag : str) -> List[str]:
+        "Returns the submission tags associated with the research group"
+        
     @abstractmethod
     def get_submissions_count(self, tag : str) -> int:
         ""

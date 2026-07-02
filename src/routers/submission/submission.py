@@ -125,6 +125,7 @@ def get_submission_by_query(state : str|int = None,
 
     N = DB.submissions.count()
     tags = DB.submission_filter.find(
+            current_user_tag=user.tag,
             search_string = search_string,
             state = APIParamInt(param = state).param, 
             attribute_tag=APIParamString(param=attribute_tag).param,
@@ -909,6 +910,7 @@ def get_submission_query_count(
     
     # Query count (matching filters, no limit)
     matching_tags = DB.submission_filter.find(
+        current_user_tag=user.tag,
         search_string = search_string,
         state = APIParamInt(param = state).param, 
         attribute_tag = APIParamString(param=attribute_tag).param,

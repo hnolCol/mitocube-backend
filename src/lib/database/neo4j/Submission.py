@@ -13,7 +13,10 @@ from lib.database.abstract.Meta import MetaABC
 from lib.database.abstract.Attributes import AttributesABC
 from lib.database.abstract.Proteomes import ProteomesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
+from lib.database.abstract.Users import UserABC 
+from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from lib.database.Neo4JDatabase import Neo4JFactory
+from config.enums.users.roles import UserRolesEnum
 from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import AttributeTree
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
@@ -1294,11 +1297,12 @@ class Neo4JSubmissions(SubmissionsABC):
             return False
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
-    def __init__(self, driver : Driver) -> None:
+    def __init__(self, driver : Driver, users : UserABC, research_groups : ResearchGroupABC) -> None:
         
         self._driver = driver
         self._factory = Neo4JFactory(driver=driver)
-        
+        self._users = users
+        self._research_groups = research_groups
         
     def _add_limit(self, query : str, limit : int = None):
         ""
@@ -1551,10 +1555,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         ""
         query = (
-            "MATCH (submission:Submission) "
+            
+            "MATCH (u:User)-[:CREATED|COLLABORATES]->(submission:Submission) "
             f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "MATCH (u:User) "
-            "WHERE u.tag in $user_tags AND (u)-[:CREATED]->(submission) " #filter_by_user
             "RETURN submission.tag "
         )
         if ordered:
@@ -1606,11 +1609,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         r = self._driver.execute_query(query, states = states, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
         return r
     
-    def filter_by_search_string(self, search_string : str, limit : int, ordered : bool = True) -> List[str]:
-        ""        
+    def filter_by_search_string(self, search_string : str, submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+        """Filter submissions by search string in title or tag."""
         query = (
             "MATCH (submission:Submission) "
-            "WHERE toLower(submission.title) CONTAINS $search_string "
+            f"{'WHERE submission.tag in $submission_tags AND (' if submission_tags is not None else 'WHERE ('}"
+            "toLower(submission.title) CONTAINS $search_string OR toLower(submission.tag) CONTAINS $search_string )"
             "RETURN submission.tag "
         )
         if ordered:
@@ -1841,7 +1845,30 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             limit=limit,
             result_transformer_=Result.value,
         )
-
+        
+    def _get_users_submission_scope(self, current_user_tag: str) -> List[str]:
+        """Get the submission scope for the current user."""
+        tags = set()
+        if not self._users.exists(current_user_tag): raise ValueError(f"User {current_user_tag} does not exist.")
+        
+        user = self._users.get_user_by_tag(tag = current_user_tag)
+        if user.role >= UserRolesEnum.CURATOR:
+            return None  # Curators have access to all submissions
+        if user.role == UserRolesEnum.GUEST:
+            return []  # Guests have no access to submissions
+        research_groups_tags = self._research_groups.find(user_tags=[current_user_tag])
+        for rg_tag in research_groups_tags:
+            if not self._research_groups.exists(rg_tag):
+                raise ValueError(f"Research group {rg_tag} does not exist.")
+            submission_tags = self._research_groups.get_submission_tags(tag = rg_tag)
+            for submission_tag in submission_tags:
+                tags.add(submission_tag)         
+        ##add submission tags that the user collaborated on and created. /might change the reserach group but remains owner of the submission
+        submission_user_tags = self.filter_by_user(user_tags=[current_user_tag], submission_tags=None, limit=None, ordered=True)
+        for submission_tag in submission_user_tags:
+            tags.add(submission_tag)    
+        return list(tags)
+        
 
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
@@ -1850,6 +1877,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     
     
     def find(self, 
+            current_user_tag : str,
             search_string : str = None,
             state : List[int] = None, 
             trait_tags : List[str] = None, 
@@ -1865,10 +1893,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             limit : int = 10) -> List[str]:
         """Returns a list of submission tags that match the given filters."""
         tags = None
+        
+        try:
+            tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+            if tags is not None and len(tags) == 0: return [] #if user has no access to any submissions, return empty list. No need to apply other filters.
+        except ValueError as e:
+            print(f"Error: {e}")
+            return []
+        
         filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags])
         if search_string is not None:
             limit_ = limit if all(attr is None for attr in [state, trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered)
+            tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered, submission_tags=tags)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if state is not None:
             limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
@@ -1902,9 +1938,11 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             tags = self.filter_by_quantified_protein(protein_tags,submission_tags=tags,limit=limit_, ordered=ordered)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if not filter_defined: #none defined, then just return all. 
-            
-            return self.get_all_tags(limit=limit, ordered= ordered)
-        
+            if tags is None: #then it must be admin or curator, so return all tags.
+                tags = self.get_all_tags(limit=limit, ordered=ordered)
+            elif isinstance(tags, list) and len(tags) > limit:
+                tags = tags[:limit]
+            return tags 
         if tags is None: return []
         
         return tags 
@@ -1913,17 +1951,13 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     def title_full_text_search(self, query_string : str):
         ""
         
-        
         r, _ , _ = self._factory.full_text_search("titleSearch",query_string)
-        
-        print(r)
-        
+
         
     def meta_text_search(self, query_string : str):
         ""
         r, _ , _ = self._factory.full_text_search("metatextSearch",query_string)
         
-        print(r)
         
     def full_dataset_text_search(self, search_string : str) -> List[FulltextSearchResult]:
         ""  
