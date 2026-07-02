@@ -217,6 +217,8 @@ if __name__ == "__main__":
     args.add_argument("--mitocarta_annotations", help="Whether to add the mitocarta annotations to the database. This should only be set to true if you want to add the mitocarta annotations, otherwise it should be false, as the mitocarta annotations are not intended for production use. ", action="store_true")
     args.add_argument("--reviewed_proteins_only", help="Whether to only add reviewed proteins from uniprot when adding proteomes. This should only be set to true if you want to only add reviewed proteins, otherwise it should be false, as adding unreviewed proteins can be useful for certain use cases. ", action="store_true")
     args.add_argument("--external_resources_xl", help="Whether to add the crosslinking datasets from excel files in the resources folder. This should only be set to true if you want to add these datasets, otherwise it should be false, as these datasets are not intended for production use. ", action="store_true")
+    args.add_argument("--add_research_groups", help="Whether to add research groups from a csv file in the resources folder. This should only be set to true if you want to add these research groups, otherwise it should be false, as these research groups are not intended for production use. ", action="store_true")
+    
     args = args.parse_args()
     setup_db_default = args.setup_database
     migrate_submission_folder = args.migrate_submissions 
@@ -227,6 +229,7 @@ if __name__ == "__main__":
     add_control_proteome = args.add_control_proteome
     reviewed_proteins_only = args.reviewed_proteins_only
     add_xlms_external_resources = args.external_resources_xl
+    research_groups_to_add = args.add_research_groups
     
     lead_user_tag = args.lead_user_tag
     if setup_db_default:
@@ -234,12 +237,19 @@ if __name__ == "__main__":
         DB.users.check(lead_tag = lead_user_tag)
         lead_user = DB.users.get_lead_user() 
         
+        research_group_file = os.path.join(args.resources_path, "research_groups/research_groups.txt") if os.path.exists(os.path.join(args.resources_path, "research_groups/research_groups.txt")) else None
+        if research_group_file is not None and research_groups_to_add:
+            rgs = DB.research_groups._utils_insert_from_file(file_path = research_group_file, sep="\t")
+            print(rgs)
+            default_rg = rgs.iloc[0]["tag"]
+
         genotype_file = os.path.join(args.resources_path, "genotypes/genotypes.json") if os.path.exists(os.path.join(args.resources_path, "genotypes/genotypes.json")) else None
         #adding attributes, will set is_updating to true for all attributes, but this is necessary to update the attributes with the correct trait associations. Required for a proteome addition.
         DB.attributes._utils_insert_from_file(file_path =os.path.join(args.resources_path, "attributes/attributes.json"))
         #adding users, will set is_updating to true for all users, but this is necessary to update the users with the correct information. 
-        if os.path.exists(user_path):
-            DB.users._utils_migrate(path_to_user_data=user_path) 
+        if user_path is not None and os.path.exists(user_path):
+            user_tags = DB.users._utils_migrate(path_to_user_data=user_path) 
+            DB.research_groups.insert_users(tag=default_rg, user_tags=user_tags)
         else:
             raise ValueError(f"User path {user_path} does not exist, cannot migrate users. Please provide a valid path to the users.json file. ")
        ##setting up some maintenance related information, such as instrument states, maintenance states, procedures, symptoms, and spare parts. This is necessary for the maintenance module to function properly.
@@ -252,7 +262,7 @@ if __name__ == "__main__":
         
         
         if CTRL_PROTEOME_SETTINGS.add_control_proteome or add_control_proteome:
-            control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t",)
+            control_proteome = pd.read_csv(CTRL_PROTEOME_SETTINGS.control_proteome_file, sep="\t")
             #adding proteme details, will set is_updating to true
             DB.proteomes.add_proteome_details( proteome_tag = "ctrl", proteome_info = {"name" : "Ctrl proteome","description" : "Control / misc proteins  such as GFP, and lucZ."})
             DB.proteomes.insert_proteome_from_dataframe(control_proteome, proteome_tag="ctrl", user_tag = lead_user)
