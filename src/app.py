@@ -162,7 +162,6 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 
 DB = Database.DB()
-DB.attributes._utils_insert_from_file(file_path =os.path.join("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/", "attributes/attributes.json"))
 
 
 origins = [
@@ -286,7 +285,7 @@ if __name__ == "__main__":
             #python3 src/app.py --setup_database --add_control_proteome --migrate_submissions /home/cloud/resources/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/resources/resources/data/users.json
             #python3 src/app.py --setup_database  --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
             
-            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589,UP000002311 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json
+            #python3 src/app.py --setup_database --mitocarta_annotations --add_control_proteome --migrate_submissions /home/cloud/resources/data --proteomes UP000005640,UP000000589,UP000002311 --resources_path /home/cloud/mitocube-backend/resources --lead_user_tag fOtsqZCP --users /home/cloud/mitocube-backend/resources/users/users.json --external_resources_xl
 
     if add_xlms_external_resources:
         DB.external_resources._utils_insert_from_file(
