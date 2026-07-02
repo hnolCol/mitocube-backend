@@ -68,7 +68,7 @@ pymongo==4.16.0
 pymongo-search-utils==0.3.0
 pypdf==6.1.0
 python-dateutil==2.9.0.post0
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 python-jose==3.3.0
 python-multipart==0.0.6
 pytz==2025.2
