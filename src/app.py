@@ -162,7 +162,7 @@ CTRL_PROTEOME_SETTINGS = get_control_proteome_settings()
 
 
 DB = Database.DB()
-
+DB.attributes._utils_insert_from_file(file_path =os.path.join("/Users/hnolte/Documents/GitHub/mitocube-backend/resources/", "attributes/attributes.json"))
 
 
 origins = [
@@ -275,7 +275,6 @@ if __name__ == "__main__":
         if genotype_file is not None:
             from migrate_genotypes import MigrateGenotypes 
             genotype_mapper_file_path = MigrateGenotypes(path_to_genotypes=genotype_file, fallback_user_tag=lead_user).migrate()
-            print(genotype_mapper_file_path)
         if migrate_submission_folder is not None:
             if genotype_file is None:
                 print("No genotype file provided, gentoypes are likely to be missed..")

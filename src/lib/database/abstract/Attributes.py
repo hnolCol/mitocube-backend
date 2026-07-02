@@ -124,6 +124,20 @@ class AttributesABC(ABC):
         Exception
             _description_
         """
+    @abstractmethod
+    def get_abbr(self, tag : str) -> Optional[str]:
+        """Returns the abbreviation of an attribute by its tag.
+
+        Parameters
+        ----------
+        tag : str
+            The attribute tag.
+
+        Returns
+        -------
+        Optional[str]
+            The abbreviation of the attribute, or None if not found.
+        """
         
     @abstractmethod  
     def get_values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:

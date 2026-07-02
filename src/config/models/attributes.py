@@ -102,9 +102,7 @@ class AttributeModel(AttributeBaseModel):
     - has_features_value (Optional[bool]):
                                     If True, attribute values represent selectable features
                                     (for example proteins).
-    - has_numeric_input (Optional[bool]):
-                                    If True the attribute accepts arbitrary numeric input
-                                    (instead of choosing from predefined values).
+    
     - min_state (int)           : Minimal submission state required to define this attribute.
                                     (Defaults to 0.)
 
@@ -120,9 +118,8 @@ class AttributeModel(AttributeBaseModel):
     children : Optional[List[str]] = None# list of strings that are children of this attribute (for example if an attribute has values to be entered by the user, the attribute must have UnitAttributes as children.)
     allow_input : bool #if the attribute allows for data input by the user. For example, a concentration.
     has_features_value : Optional[bool] = False  # if true, features (e.g. proteins) can be selected for this attribute
-    has_numeric_input : Optional[bool] = False  # if true, attribute can be defined by the user (numeric input)
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
-
+    abbr : Optional[str] = None  # optional abbreviation for the attribute, used in UI
     class Config:
         use_enum_values = True
 

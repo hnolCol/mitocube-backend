@@ -66,11 +66,11 @@ class Neo4JAttributes(AttributesABC):
             "ON CREATE "
             "SET attribute.text = a.text, attribute.priority = a.priority, "
             "attribute.group_tag = a.group_tag, attribute.s = a.s, attribute.created_at = timestamp(), "
-            "attribute.allow_input = a.allow_input "
+            "attribute.allow_input = a.allow_input, attribute.abbr = a.abbr "
             "ON MATCH "
             "SET attribute.text = a.text, attribute.priority = a.priority, "
             "attribute.group_tag = a.group_tag, attribute.s = a.s, attribute.modified_at = timestamp(), "
-            "attribute.allow_input = a.allow_input "
+            "attribute.allow_input = a.allow_input, attribute.abbr = a.abbr "
         )
         
         self._driver.execute_query(query, single_label_attributes = [a.model_dump(exclude_none=True) for a  in attribute_models])
@@ -238,6 +238,13 @@ class Neo4JAttributes(AttributesABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
         
+    def get_abbr(self, tag : str):
+        query = (
+            "MATCH (a:Attribute {tag : $tag}) RETURN a.abbr as abbr "
+        ) 
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r[0] if r else None
+    
     def count(self) -> int:
         
         query = (

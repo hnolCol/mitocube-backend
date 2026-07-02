@@ -18,7 +18,7 @@ router = APIRouter(
 @router.get("/permissions")
 def get_permissions(user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:
     """Fetches the permissions for the current user for submissions."""
-    return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.STANDARD, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, download= user.role >= UserRolesEnum.STANDARD) 
+    return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.STANDARD, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, download= user.role >= UserRolesEnum.STANDARD, edit = user.role >= UserRolesEnum.CURATOR,  upload = user.role >= UserRolesEnum.CURATOR, state_change= user.role >= UserRolesEnum.CURATOR, role=user.role) 
 
 @router.get("/{submission_tag}/permissions")
 def get_submission_permissions(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> PermissionResponseModel:

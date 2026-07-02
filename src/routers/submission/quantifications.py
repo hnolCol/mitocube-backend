@@ -100,7 +100,7 @@ def insert_protein_quantifications(
 
     ##first check if all proteins exist
     N = DB.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
-    num_quantifications = DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[q for q in quantifications.model_dump().get("quantifications", []) if np.isfinite(q["value"])])
+    num_quantifications = DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**q) for q in quantifications.model_dump().get("quantifications", []) if np.isfinite(q["value"])])
     #if num_quantifications != len(quantifications.quantifications):
     if apply_statistics:
         print("Calculating statistics...")
@@ -138,6 +138,7 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+    DB.submissions.transform_quantification_to_log2(tag = submission_tag)
     return True
 
 @router.post("/{submission_tag}/quantifications/proteins/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")

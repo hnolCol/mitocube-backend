@@ -17,7 +17,7 @@ from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.submissions import AttributeTree
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel
-from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
+from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
 from services.random_generators import get_random_string
 from services.encryption import create_hierarchical_hash
 from lib.data.ranking.FeatureRanking import FeatureRanking
@@ -255,13 +255,19 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else None
 
 
-    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False, group_by_min_state : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]: #TODO: make Dict a pydanitc model
+    def get_conditions_applications(self, tag : str, attribute_tags : List[str] = None, group_by_attribute : bool = False, group_by_min_state : bool = False) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]|List[ConditionApplicationStateAttributeModel]: #TODO: make Dict a pydanitc model
         """Returns the condition application tag for the submission by its tag. """
 
         query =  "MATCH (submission:Submission {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) " 
         if attribute_tags and len(attribute_tags) > 0:
             query += "WHERE EXISTS {(condition)-[:OF_ATTRIBUTE]->(aa:Attribute) WHERE aa.tag IN $attribute_tags} "
-        if group_by_attribute:
+        if group_by_min_state and group_by_attribute:
+            query += ("MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute)-[:REQUIRES_STATE]->(state:State) "
+                      "WITH a, state, collect(condition.tag) AS condition_tags "
+                      "ORDER BY a.priority DESC "
+                      "WITH state, collect({attribute_tag : a.tag, condition_application_tags : condition_tags}) AS attribute_conditions "
+                      "RETURN state.tag, attribute_conditions ")
+        elif group_by_attribute:
             query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) RETURN a.tag, collect(condition.tag) "
         elif group_by_min_state:
             query += ("MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute)-[:REQUIRES_STATE]->(state:State) ORDER BY a.priority DESC "
@@ -270,6 +276,14 @@ class Neo4JSubmissions(SubmissionsABC):
             query += "RETURN collect(condition.tag) "
             
         r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, result_transformer_=Result.values if group_by_attribute or group_by_min_state else Result.value)
+        if group_by_attribute and group_by_min_state:
+            print(r)
+            for ri in r:
+                print(ri[0], "state")
+                for ac in ri[1]:
+                    print(ac)
+                    print(ac["attribute_tag"], ac["condition_application_tags"])
+            return [ConditionApplicationStateAttributeModel(state_tag = ri[0], attribute_conditions = [ConditionApplicationAttributeModel(attribute_tag = ac["attribute_tag"], condition_application_tags = ac["condition_application_tags"]) for ac in ri[1]]) for ri in r]
         if group_by_attribute:
             return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
         if group_by_min_state:
@@ -378,10 +392,9 @@ class Neo4JSubmissions(SubmissionsABC):
         )
 
         ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
+        print([self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags], "???")
         return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]
 
-    
-        
 
     def get_users(self, tag : str) -> List[str]: 
         """Returns the users that are associated with the submission.
@@ -707,6 +720,7 @@ class Neo4JSubmissions(SubmissionsABC):
             tag=tag,
             result_transformer_=Result.value
         )
+        print(r,"TRANSFORMED")
         return r[0] if len(r) > 0 else 0
 
 
