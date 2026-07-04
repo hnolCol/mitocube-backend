@@ -6,16 +6,18 @@ This project uses MongoDB as its persistence layer. The easiest way to run Mongo
 
 Create a `.env` file containing the MongoDB credentials.
 
-```env
-MONGO_INITDB_ROOT_USERNAME=admin
-MONGO_INITDB_ROOT_PASSWORD=your-secure-password
-```
 
 > **Note:** Do not commit this file to version control. Add `.env` to your `.gitignore`.
 
 ---
 
 ## 2. Start MongoDB
+
+```env
+MONGO_INITDB_ROOT_USERNAME=admin
+MONGO_INITDB_ROOT_PASSWORD=your-secure-password
+```
+
 
 From the directory containing your `.env` file, run:
 
