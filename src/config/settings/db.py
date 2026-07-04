@@ -17,7 +17,7 @@ class DB(BaseSettings):
     db_uri : Optional[str] = None  # ToDo: create validation conditions if db_handler is postgresql? Good idea. I would use the @field_validator function which is also availabe in  pydantic Settings 
     db_user : Optional[str] = "neo4j"
     db_name : Optional[str] = None
-    db_pw : Optional[SecretStr] = None
+    db_pw : Optional[SecretStr]
     db_max_dataset_cached : int = 100
     
 

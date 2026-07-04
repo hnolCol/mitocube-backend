@@ -167,7 +167,9 @@ def get_attribute_by_tag(attribute_tag : str, user : UserModel = Depends(get_use
 def get_attribute_abbr(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
     "Returns the abbreviation of a single attribute by its tag"     
     attribute_abbr = DB.attributes.get_abbr(tag=attribute_tag)
-    return attribute_abbr
+    if isinstance(attribute_abbr, str) and len(attribute_abbr) > 0:
+        return attribute_abbr
+    return ""
 
 @router.get("/{attribute_tag}/required_traits")
 def get_attribute_required_traits(attribute_tag : str) -> List[str]:

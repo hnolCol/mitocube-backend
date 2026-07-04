@@ -606,3 +606,19 @@ sudo docker exec -it neo4j-server neo4j-admin database dump neo4j --to-path=/dat
 :use system
 START DATABASE neo4j;
 
+sudo -rf neo4j
+sudo docker rm neo4j-server
+sudo rm data/ -r 
+sudo rm import/ -r 
+sudo rm logs/ -r 
+sudo rm plugins/ -r
+
+sudo docker run -d     --name neo4j-server     --env-file .env     -p 7474:7474 -p 7687:7687     -v ~/neo4j/data:/data     -v ~/neo4j/plugins:/plugins     -v ~/neo4j/logs:/logs     -v ~/neo4j/import:/import     -e NEO4J_PLUGINS='["apoc","graph-data-science"]'     -e NEO4J_dbms_security_procedures_unrestricted=apoc.\*,gds.\*     -e NEO4J_dbms_security_procedures_allowlist=apoc.\*,gds.\*     neo4j:5.26.26
+
+tmux new -s setupdb
+source .venv/bin/activate
+python3 src/app.py --setupdb
+
+tmux 
+
+tmux kill-session -t setupdb
