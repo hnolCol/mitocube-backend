@@ -557,7 +557,7 @@ class Neo4JSubmissions(SubmissionsABC):
         tag: str,
         quantifications: List[ProteinGroupQuantificationModel],
         batch_size: int = 600,
-        delete_if_exists: bool = True
+        delete_if_exists: bool = False
         ) -> int:
         
         if delete_if_exists:
@@ -579,7 +579,7 @@ class Neo4JSubmissions(SubmissionsABC):
         #     quantifications: List[ProteinGroupQuantificationModel]
         # ---- 3. batch grouped data ----
         total = 0
-
+        print(quantifications_data)
         query = """
         CALL () {
             MATCH (submission:Submission {tag: $tag})
@@ -1860,7 +1860,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         for rg_tag in research_groups_tags:
             if not self._research_groups.exists(rg_tag):
                 raise ValueError(f"Research group {rg_tag} does not exist.")
-            submission_tags = self._research_groups.get_submission_tags(tag = rg_tag)
+            submission_tags = self._research_groups.get_submission_tags(tags = [rg_tag])
             for submission_tag in submission_tags:
                 tags.add(submission_tag)         
         ##add submission tags that the user collaborated on and created. /might change the reserach group but remains owner of the submission

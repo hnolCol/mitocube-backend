@@ -522,6 +522,8 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     ## add meta text 
     DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
     for title, text in submission.metatext.items():
+        if "research_aim" in title.lower():
+            continue
         DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
     
     try:
