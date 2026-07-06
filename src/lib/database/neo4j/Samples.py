@@ -511,8 +511,10 @@ class Neo4JSamples(SamplesABC):
         if self._genotypes.exists(tag = ca_tag_left):
             attribute_tag = "att_genotype"
         else:
-            attribute_tag = self._condition_applications.get_attribute(ca_tag_left)
-            
+            if ";" in ca_tag_left:
+                attribute_tag = self._condition_applications.get_attribute(ca_tag_left.split(";")[0])
+            else:
+                attribute_tag = self._condition_applications.get_attribute(ca_tag_left)
         if attribute_tag not in condition_applications.columns:
             raise ValueError(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
         
