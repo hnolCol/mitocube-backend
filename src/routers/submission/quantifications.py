@@ -103,7 +103,6 @@ def insert_protein_quantifications(
     num_quantifications = DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**q) for q in quantifications.model_dump().get("quantifications", []) if np.isfinite(q["value"])])
     #if num_quantifications != len(quantifications.quantifications):
     
-    print(num_quantifications)
     if apply_statistics:
         print("Calculating statistics...")
         DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)

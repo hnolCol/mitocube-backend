@@ -579,7 +579,7 @@ class Neo4JSubmissions(SubmissionsABC):
         #     quantifications: List[ProteinGroupQuantificationModel]
         # ---- 3. batch grouped data ----
         total = 0
-        print(quantifications_data)
+
         query = """
         CALL () {
             MATCH (submission:Submission {tag: $tag})
@@ -611,16 +611,6 @@ class Neo4JSubmissions(SubmissionsABC):
             total += record["total"] if record else 0
 
         return total
-
-        # result = self._driver.execute_query(
-        #     query,
-        #     routing_="w",
-        #     tag=tag,
-        #     quantifications=quantifications_data,
-        #     result_transformer_=Result.value
-        # )
-
-        # return result[0] if result else 0
     
 
 

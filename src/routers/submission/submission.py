@@ -640,7 +640,7 @@ def update_submission_state(background_task : BackgroundTasks,
                                  "state" : SubmissionStatesEnums(state_tag).name,
                                  "title" : submission_title,
                                  "submission_label" : submission_tag,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission_tag}" #pydanitc HttpUrl (url) returns www.__.com/  
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}submissions/{submission_tag}" #pydanitc HttpUrl (url) returns www.__.com/  
                              },
                              template_name=EMAIL_SETTINGS.mail_project_state_template)
     return ok 
