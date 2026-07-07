@@ -104,6 +104,8 @@ def get_user_summary(user_tag: str):
 # User Details
 # ============================================================
 
+
+
 @tool("get_user_details", args_schema=UserTagInput)
 def get_user_details(user_tag: str):
     """

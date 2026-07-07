@@ -353,16 +353,24 @@ class AttributesABC(ABC):
         """Returns the number of traits for a single attribute tag"""
         
     @abstractmethod
-    def insert(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
+    def insert(self, tag : str, text : str, priority : int = 500, abbreviation : str = None, min_state : SubmissionStatesEnums =  SubmissionStatesEnums.SUBMITTED, allow_input : bool = False, group_tags : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = []) -> bool:
         """Inserts an attribute and corresponding attribute_values to the database. 
         
 
         Parameters
         ----------
-        attribute : AttributeModel
-            The attribute that should be inserted. 
-        attribute_values : List[AttributeValueModel]
-            The corresponding attribute_values. 
+        tag : str
+            The attribute tag.
+        text : str
+            The attribute text.
+        priority : int, optional
+            The attribute priority, by default 500
+        group_tags : List[str], optional
+            The attribute group tags, by default []
+        children : List[str], optional
+            The children attribute tags, by default []
+        required_trait_tags : List[str], optional
+            The required trait tags, by default []
 
         Returns
         -------
@@ -372,8 +380,7 @@ class AttributesABC(ABC):
         Exception
         ---------
         ValueError
-            If the attribute allows features (has_feature_values = True), but attribute_values
-            are provided which is not allowed.
+            If the attribute exists already in the database.
         ValueError
             If the attribute_tag is already in the database. 
         """

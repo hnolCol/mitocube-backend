@@ -956,12 +956,45 @@ class Neo4JAttributes(AttributesABC):
             routing_="r", 
             database_="neo4j")
         
-        
         return [AttributeTraitTagResponseModel(**ri) for ri in r]
 
 
-    def insert(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel] = None) -> bool:
+    def insert(self, tag : str, text : str, priority : int = 500, allow_input : bool = False, abbreviation : str = None, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, group_tags : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = []) -> bool:
         "Insert attributes TODO : IMPLEMENT! " 
+        if self.exists(tag=tag):
+            raise ValueError(f"Attribute with tag {tag} already exists.")
+        search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
+        ##insert attribute first 
+        query = (
+            "MERGE (a:Attribute {tag : $tag}) "
+            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.created_at = timestamp(), a.s = $search_string "
+            "WITH a "
+            "MATCH (s:State {tag : $min_state}) "
+            "MERGE (a)-[:REQUIRES_STATE]->(s) "
+            "WITH a "
+            "UNWIND $group_tags as group_tag "
+            "MATCH (ag:AttributeGroup {tag : group_tag}) "
+            "MERGE (a)-[:PART_OF]->(ag) "
+            "WITH a ")
+        
+        if children is not None and len(children) > 0:
+            query += (
+                "UNWIND $children as child_tag "
+                "MATCH (child:Attribute {tag : child_tag}) "
+                "MERGE (a)-[:IS_CHILD]->(child) "
+                "WITH a "
+            )
+        if required_trait_tags is not None and len(required_trait_tags) > 0:
+            query += (
+                "UNWIND $required_trait_tags as required_trait_tag "
+                "MATCH (t:Trait {tag : required_trait_tag}) "
+                "MERGE (a)-[:REQUIRES_TRAIT]->(t) "
+                
+            )
+        query += "RETURN count(a) > 0 "
+        
+        ok = self._driver.execute_query(query, tag = tag, text = text, priority = priority, abbreviation = abbreviation, group_tags = group_tags, children = children, required_trait_tags = required_trait_tags, allow_input = allow_input, min_state = min_state, search_string = search_string, routing_="w", result_transformer_= Result.value)
+        return ok[0] if len(ok) > 0 else False
     
           
 

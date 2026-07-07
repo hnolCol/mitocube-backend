@@ -83,6 +83,7 @@ ConditionApplication are hierarchical and are connected, for example the attribu
 
 Guidelines:
 - The returned format should be mark down. 
+- Tge current_user_tag is required to find submission for the scope of the user. The current_user_tag is enable in the prompt.
 - The creator of the submission can be found by calling the get_submission_creator tool. This returns the user tag of the creator. You can then use the get_user_summary tool to get the name of the user.
 - Never return just the user tag.
 - Metatexts give experimental background. Research aims and title defines a project.

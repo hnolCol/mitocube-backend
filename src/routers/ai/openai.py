@@ -61,7 +61,7 @@ async def generate_cypher_query(prompt: str, session_id: str = None, user: UserM
     print(runtime.agent)
     try:
         result = await runtime.agent.ainvoke(
-            {"messages": [{"role": "user", "content": prompt}]},
+            {"messages": [{"role": "user", "content": prompt + f" The current user tag is {user.tag}"}]},
             config=config,
         )
     except Exception as e:

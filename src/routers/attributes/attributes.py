@@ -9,7 +9,7 @@ from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token, is_user_at_least_curator
 
 
-from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel
+from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel, AttributeInsertModel
 from config.models.parameter import APIParamString
 
 from lib.database.Database import Database
@@ -22,6 +22,28 @@ router = APIRouter(
     )
 
 
+
+@router.post("")
+def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+    "Inserts a new attribute into the database. Returns True if successful, False otherwise."
+    attribute_tag = "att_" + attribute.text.replace(" ","_").lower().encode('utf-8', 'ignore').decode('utf-8')
+    if DB.attributes.exists(tag = attribute_tag):
+        raise HTTPException(status_code=500, detail = "An attribute with the same tag exists already. Alter the text and check if the attribute is not already present before proceeding.")
+    if len(attribute_tag) > 35:
+        raise HTTPException(status_code=500, detail = "The attribute tag is too long. Please use a shorter text for the attribute.")
+    if len(attribute_tag) <= 4:
+        raise HTTPException(status_code=500, detail = "The attribute tag is too short. Please use a longer text for the attribute. Note that the attribute tag is generated from the text by replacing spaces with underscores and adding the prefix 'att_'. Non utf-8 characters are removed. The attribute tag must be at least 5 characters long.")
+    
+    ok = DB.attributes.insert(tag=attribute_tag, 
+                              text=attribute.text, 
+                              priority=attribute.priority, 
+                              min_state=attribute.min_state, 
+                              abbreviation=attribute.abbr, 
+                              allow_input=attribute.allow_input, 
+                              group_tags=attribute.group_tags, 
+                              children=attribute.children, 
+                              required_trait_tags=attribute.required_trait_tags)
+    return ok
 
 
 @router.get("/q")
