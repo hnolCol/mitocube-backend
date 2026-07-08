@@ -73,6 +73,7 @@ def get_submission_by_query(state : str|int = None,
                             genotype_tag : str = None, 
                             protein_tags: str = None,
                             user_tags : str = None,
+                            user_role : Literal["creator", "collaborator", "any"] = "any",  
                             include_sample_ca : bool = False,
                             ca_search_string : str = None,
                             limit : int = 20, 
@@ -124,6 +125,7 @@ def get_submission_by_query(state : str|int = None,
 
 
     N = DB.submissions.count()
+    parsed_user_tags = APIParamString(param=user_tags).param
     tags = DB.submission_filter.find(
             current_user_tag=user.tag,
             search_string = search_string,
@@ -132,6 +134,7 @@ def get_submission_by_query(state : str|int = None,
             trait_tags=APIParamString(param=trait_tags).param,
             ca_tags=APIParamString(param=ca_tags).param,
             user_tags=APIParamString(param=user_tags).param,
+            user_role=user_role,   
             genotype_tag = APIParamString(param=genotype_tag).param,
             include_sample_ca = include_sample_ca,
             ca_search_string = ca_search_string,
@@ -775,6 +778,7 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
         result.append({
             "tag": sample_tag,
             "index": sample.get("index") if sample else None,
+            "excluded": sample.get("excluded", False) if sample else False,
             "genotype": genotype,
             "attributes": attributes,
             "replicate": DB.samples.get_replicate(tag=sample_tag),
@@ -893,6 +897,7 @@ def get_submission_query_count(
     attribute_tag : str = None, 
     genotype_tag : str = None, 
     user_tags : str = None,
+    user_role : Literal["creator", "collaborator", "any"] = "any", 
     protein_tags : str = None,
     include_sample_ca : bool = False,
     ca_search_string : str = None,
@@ -919,6 +924,7 @@ def get_submission_query_count(
         trait_tags = APIParamString(param=trait_tags).param,
         ca_tags = APIParamString(param=ca_tags).param,
         user_tags = APIParamString(param=user_tags).param,
+        user_role = user_role,  
         genotype_tag = APIParamString(param=genotype_tag).param,
         protein_tags = APIParamString(param=protein_tags).param,
         include_sample_ca = include_sample_ca,

@@ -64,3 +64,18 @@ def update_sample(sample_tag: str, data: SampleUpdateModel, user: UserModel = De
         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
     DB.samples.update(tag=sample_tag, data=data)
     return True
+
+
+@router.patch("/{sample_tag}/exclude", summary="Exclude or include a sample from statistical analysis.")
+def set_sample_excluded(sample_tag: str, excluded: bool = True, user: UserModel = Depends(get_user_from_token)) -> bool:
+    "Sets Sample.excluded. Excluded samples are ignored when computing quantification statistics/distributions."
+    if not DB.samples.exists(tag=sample_tag):
+        raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+    return DB.samples.set_excluded(tag=sample_tag, excluded=excluded)
+
+
+@router.get("/submissions/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
+def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> bool:
+    if not DB.submissions.exists(tag=submission_tag):
+        raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
+    return DB.submissions.get_stats_outdated(tag=submission_tag)

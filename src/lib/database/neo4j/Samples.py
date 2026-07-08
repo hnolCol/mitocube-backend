@@ -153,8 +153,8 @@ class Neo4JSamples(SamplesABC):
         "Returns the sample information for a given sample tag."
         
         query = (
-            "MATCH (s:Sample {tag : $tag}) " 
-            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at}  "
+            "MATCH (s:Sample {tag : $tag}) "
+            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at, excluded : coalesce(s.excluded, false)}  "
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
@@ -379,6 +379,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "WHERE coalesce(s.excluded, false) = false "
             "RETURN s.sample_index as sample_index, s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
@@ -427,6 +428,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
+            "WHERE coalesce(s.excluded, false) = false "
             "RETURN s.sample_index as sample_index, s.tag as sample_tag, 'att_genotype' as attribute_tag, collect(g.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
@@ -861,3 +863,14 @@ class Neo4JSamples(SamplesABC):
         
         # Reindex to include all samples in correct order
         return pivot.reindex(prefixed_sample_names, fill_value="")
+    
+    def set_excluded(self, tag: str, excluded: bool) -> bool:
+        "Sets whether a sample is excluded from statistical analysis. Marks the parent submission's cached statistics as outdated."
+        query = (
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "SET s.excluded = $excluded "
+            "SET submission.stats_outdated = true "
+            "RETURN s.excluded "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, excluded=excluded, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False

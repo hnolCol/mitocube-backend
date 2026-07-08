@@ -545,6 +545,14 @@ class SubmissionsABC(ABC):
     def delete_runlist(self, submission_tag: str) -> bool:
         "Deletes the runlist for a given submission tag. Returns True if the runlist was deleted successfully, False otherwise."
 
+    @abstractmethod
+    def get_stats_outdated(self, tag: str) -> bool:
+        "Checks if the cached statistics for this submission are outdated (e.g. due to sample exclusion changes)."
+       
+    @abstractmethod
+    def clear_stats_outdated(self, tag: str) -> bool:
+        "Clears the stats-outdated flag for a submission after recalculation."
+       
 
 
 class SubmissionFilterABC(ABC):

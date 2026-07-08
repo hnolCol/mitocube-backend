@@ -16,8 +16,7 @@ router = APIRouter(
     tags=["Submission","Analysis"],
     )
 
-@router.get("/{submission_tag}/pca",
-            tags=["Dimensional reduction","PCA"])
+@router.get("/{submission_tag}/pca", tags=["Dimensional reduction","PCA"])
 def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : bool = True, user : UserModel = Depends(get_user_from_token)):
     """
     Returns the result of a Principal component analysis (PCA).
@@ -26,18 +25,18 @@ def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : b
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
 
 
-    data_table = DB.datasets.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, use_sample_tags=True) #the data columns are the sample indices 
-    projected_data, drivers, variance_explained = PCATransform(datatable=data_table,
-                                        n_components=4,
-                                        scale = scale).transform()
-    projected_data.index = data_table.columns.values
-    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+    
+    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  # already excludes excluded samples
     if DB.submissions.has_genotypes(tag = submission_tag):
         genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
         condition_applications = condition_applications.join(genotypes, how="outer")
         
 
+    sample_tags = condition_applications.index.tolist()
+    data_table = DB.datasets.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
 
+    projected_data, drivers, variance_explained = PCATransform(datatable=data_table, n_components=4, scale = scale).transform()
+    projected_data.index = data_table.columns.values
     projected_data = projected_data.join(condition_applications, how="left")
 
     

@@ -476,7 +476,7 @@ class Neo4JGenotype(GenotypeABC):
         return new_genotype_tag
         
 
-    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, is_active : bool = True, user_tag : str = None) -> List[str]:
+    def find(self, search_string : str = None, proteome_tags : List[str] = None, limit : int = None, is_active : bool = True, user_tag : str = None, used_in_submission : bool = False) -> List[str]:
         """Finds genotype tags that match the search string. 
         Returns the genotype tags that contain the search string.
         """
@@ -496,11 +496,14 @@ class Neo4JGenotype(GenotypeABC):
             query += "AND EXISTS {(p)<-[:IN_PROTEOME]-(proteome:Proteome) WHERE proteome.tag in proteome_tags}" 
         if search_string is not None and search_string != "":
             query += "AND (g.s CONTAINS $query_string OR p.s CONTAINS $query_string) "
+        if used_in_submission:
+            query += "AND EXISTS {(g)<-[:HAS_GENOTYPE]-(:Sample)<-[:HAS_SAMPLE]-(:Submission)} "
         query += "RETURN DISTINCT g.tag as tag " 
         if limit is not None:
             query += " LIMIT $limit"
 
-        r = self._driver.execute_query(query, is_active=is_active, query_string = search_string.lower() , routing_="r", result_transformer_=Result.value, limit=limit, proteome_tags = proteome_tags)
+        r = self._driver.execute_query(query, is_active=is_active, query_string = (search_string or "").lower(), routing_="r", 
+                                    result_transformer_=Result.value, limit=limit, proteome_tags = proteome_tags)
         return r
     
     def count_samples(self, tag) -> int:

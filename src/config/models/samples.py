@@ -7,6 +7,7 @@ class SampleModel(BaseModel):
     tag : str 
     text : str = None 
     index : int = None 
+    excluded : bool = False
     
     
 class SampleResponseModel(SampleModel):

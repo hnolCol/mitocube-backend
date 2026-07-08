@@ -108,7 +108,11 @@ def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from
     return genotype_text
 
 @router.get("/genotypes/q")
-def get_genotype_by_query(search_string : str = None, user_tag : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_genotype_by_query(search_string : str = None, 
+                          user_tag : str = None, 
+                          limit : int = None, 
+                          used_in_submission : bool = False,   
+                          user : UserModel = Depends(get_user_from_token)) -> List[str]:
     """
     Finds genotype tags that match the search string.
     Parameters
@@ -119,9 +123,10 @@ def get_genotype_by_query(search_string : str = None, user_tag : str = None, lim
         If provided, only genotypes created by the given user_tag are returned., by default None
     limit : int, optional
         The maximum number of genotype tags to return., by default None
+    used_in_submission : bool, optional
+        If True, only genotypes that are actually attached to a submission (via a Sample) are returned., by default False
     """
-    return DB.genotypes.find(search_string=search_string, user_tag=user_tag, limit=limit)
-
+    return DB.genotypes.find(search_string=search_string, user_tag=user_tag, limit=limit, used_in_submission=used_in_submission)
 
 @router.get("/genotypes/{genotype_tag}")
 def get_genotype_by_label(genotype_tag : str):

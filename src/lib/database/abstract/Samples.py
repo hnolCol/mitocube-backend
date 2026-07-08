@@ -255,3 +255,8 @@ class SamplesABC(ABC):
     def get_sample_list(self, submission_tag: str) -> pd.DataFrame:
         """Returns a DataFrame ready for RunListCreator.
         Index = sample names (s.text), columns = attribute tags, values = condition application tag strings."""
+
+
+    @abstractmethod
+    def set_excluded(self, tag: str, excluded: bool) -> bool:
+        "Sets whether a sample is excluded from statistical analysis / quantification aggregation."
