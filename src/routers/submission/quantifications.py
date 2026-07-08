@@ -111,7 +111,6 @@ def insert_protein_quantifications(
     return num_quantifications
 
 
-
 @router.patch("/{submission_tag}/protein_groups/statistics", summary="Calculate and insert the statistics for the protein groups of a given submission. Requires curator rights.")
 def calculate_protein_group_statistics(submission_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
     """
@@ -128,7 +127,6 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     bool
         True if the statistics were calculated and inserted successfully, False otherwise.
     """
-
     if DB.submissions.exists(tag=submission_tag) is False:
         raise submission_tag_not_found
     
@@ -138,6 +136,8 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
     DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
     DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+    DB.submissions.transform_quantification_to_log2(tag = submission_tag)
+    DB.submissions.clear_stats_outdated(tag = submission_tag)
     return True
 
 @router.post("/{submission_tag}/quantifications/proteins/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
@@ -232,3 +232,9 @@ def calculate_test_quantification_distribution(submission_tag : str,
     return DB.samples.calculate_test_quantification_distribution(submission_tag=submission_tag, testParam=testParam, quantification_type=quantification_type, annotation_tag=annotation_tag)
     
     
+
+@router.get("/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
+def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> bool:
+    if not DB.submissions.exists(tag=submission_tag):
+        raise submission_tag_not_found
+    return DB.submissions.get_stats_outdated(tag=submission_tag)

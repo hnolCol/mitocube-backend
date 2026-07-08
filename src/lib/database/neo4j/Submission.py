@@ -321,14 +321,14 @@ class Neo4JSubmissions(SubmissionsABC):
             if len(r) > 0:
                 return QuantileModel(tag=submission_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
             
-        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample)"
-        
-        if quantification_type == "protein_groups":   
-            query += "-[q:QUANTIFIED]->(pg:ProteinGroup) "
+        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample) WHERE coalesce(sample.excluded, false) = false "
+
+        if quantification_type == "protein_groups":
+            query += "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
             if annotation_tag is not None:
                 query += "WHERE EXISTS {(pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
         elif quantification_type == "precursors":
-            query += "-[q:QUANTIFIED]->(pr:Precursor) "
+            query += "MATCH (sample)-[q:QUANTIFIED]->(pr:Precursor) "
         else:
             raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
         query += "RETURN q.value AS value "
@@ -666,6 +666,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = """MATCH (submission:Submission {tag: $tag})
                 -[:HAS_SAMPLE]->(sample:Sample)
                 -[q:QUANTIFIED]->(pg:ProteinGroup)
+                WHERE coalesce(sample.excluded, false) = false
 
                 WITH pg, avg(q.value) AS mean, stDev(q.value) AS stdev
                 WHERE stdev > 0
@@ -692,6 +693,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = """
             MATCH (submission:Submission {tag: $tag})
             MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup)
+            WHERE coalesce(sample.excluded, false) = false
 
             WITH submission, pg, avg(q.value) AS mean_log2
 
@@ -1002,23 +1004,25 @@ class Neo4JSubmissions(SubmissionsABC):
         
         
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample) "
+            "WHERE coalesce(s.excluded, false) = false "
+            "MATCH (s)-[q:QUANTIFIED]->(p:ProteinGroup) "
             "MATCH (s)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "WITH p, q, a, collect(ca.tag) as ca_tags, s "
             "RETURN p.tag as protein_group_tag, q.value as value, a.tag as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
-            
         )
         r_ca = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
         
         if self.has_genotypes(tag = tag):
               
             query = (
-                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+                "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample) "
+                "WHERE coalesce(s.excluded, false) = false "
+                "MATCH (s)-[q:QUANTIFIED]->(p:ProteinGroup) "
                 "MATCH (s)-[:HAS_GENOTYPE]->(g:Genotype) "
                 "WITH p, q, collect(g.tag) as ca_tags, s "
                 "RETURN p.tag as protein_group_tag, q.value as value, 'att_genotype' as attribute_tag, apoc.text.join(apoc.coll.sort(ca_tags), ',') as ca_tags, s.tag as sample_tag "
             )
-        
         
             r_g = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
             r_ca = pd.concat([r_ca, r_g], ignore_index=True)
@@ -1278,6 +1282,25 @@ class Neo4JSubmissions(SubmissionsABC):
         except Exception as e:
             print(e)
             return False
+    
+    def get_stats_outdated(self, tag: str) -> bool:
+        "Checks if the cached statistics for this submission are outdated (e.g. due to sample exclusion changes)."
+        query = (
+            "MATCH (submission:Submission {tag: $tag}) "
+            "RETURN coalesce(submission.stats_outdated, false) "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+
+    def clear_stats_outdated(self, tag: str) -> bool:
+        "Clears the stats-outdated flag for a submission after recalculation."
+        query = (
+            "MATCH (submission:Submission {tag: $tag}) "
+            "SET submission.stats_outdated = false "
+            "RETURN true "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver) -> None:
@@ -1550,21 +1573,27 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         return [ri.value() for ri in r]
 
-    def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+    def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, role : Literal["creator", "collaborator", "any"] = "any", limit : int = None, ordered : bool = True) -> List[str]:
         ""
+        rel = {
+            "creator": "CREATED",
+            "collaborator": "COLLABORATES",
+            "any": "CREATED|COLLABORATES",
+        }[role]
+
         query = (
-            "MATCH (submission:Submission) "
-            f"{'WHERE submission.tag in $submission_tags' if submission_tags is not None else ''} " 
-            "MATCH (u:User) "
-            "WHERE u.tag in $user_tags AND (u)-[:CREATED]->(submission) " #filter_by_user
-            "RETURN submission.tag "
+            f"MATCH (u:User)-[:{rel}]->(submission:Submission) "
+            "WHERE u.tag IN $user_tags "
         )
+        if submission_tags is not None:
+            query += "AND submission.tag IN $submission_tags "
         if ordered:
             query += "ORDER BY submission.created_at DESC "
-        query = self._add_limit(query,limit)
+        query = self._add_limit(query, limit)
+        query += "RETURN submission.tag "
 
         r = self._driver.execute_query(query, user_tags=user_tags, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
-  
+
         return r
     
     def filter_by_quantified_protein(self, protein_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
@@ -2011,6 +2040,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             protein_tags: List[str] = None,
             ca_search_string : str = None,
             user_tags : List[str] = None, 
+            user_role : Literal["creator", "collaborator", "any"] = "any",  
             genotype_tag : List[str] = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
@@ -2060,7 +2090,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
 
         if user_tags is not None:
             limit_ = limit if protein_tags is None else None
-            tags = self.filter_by_user(user_tags,submission_tags=tags,limit=limit_, ordered=ordered)
+            tags = self.filter_by_user(user_tags,submission_tags=tags, role=user_role, limit=limit_, ordered=ordered)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if protein_tags is not None:
             limit_ = limit

@@ -25,12 +25,13 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     if not DB.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
     
-    data_table = DB.datasets.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, use_sample_tags=True) #the data columns are the sample indices 
-    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
-    
+    condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  # already excludes excluded samples
     if DB.submissions.has_genotypes(tag = submission_tag):
         genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
         condition_applications = condition_applications.join(genotypes, how="outer")
+
+    sample_tags = condition_applications.index.tolist()
+    data_table = DB.datasets.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
 
     try:
         stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True)
