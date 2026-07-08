@@ -167,6 +167,33 @@ class AnnotationsABC(ABC):
     """
 
     @abstractmethod
+    def count_proteins(self, tag: str) -> int:
+        """
+        Count proteins in an annotation.
+
+        Parameters
+        ----------
+        tag : str
+            Annotation tag.
+
+        Returns
+        -------
+        int
+            Number of proteins.
+        """
+    
+    @abstractmethod
+    def count(self) -> int:
+        """
+        Count all annotations in the database.
+
+        Returns
+        -------
+        int
+            Number of annotations.
+        """    
+    
+    @abstractmethod
     def exists(self, tag: str) -> bool:
         """
         Check if an annotation exists.
@@ -303,21 +330,6 @@ class AnnotationsABC(ABC):
         """
         
 
-    @abstractmethod
-    def count_proteins(self, tag: str) -> int:
-        """
-        Count proteins in an annotation.
-
-        Parameters
-        ----------
-        tag : str
-            Annotation tag.
-
-        Returns
-        -------
-        int
-            Number of proteins.
-        """
         
     @abstractmethod
     def update_annotation(self, annotation: AnnotationsModel) -> bool:

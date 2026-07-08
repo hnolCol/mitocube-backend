@@ -18,9 +18,10 @@ class UserABC(ABC):
     
     
         users = read_json(path_to_user_data)
-        print(users)
+        user_tags = []
         N = 0
         for u in users:
+            user_tags.append(u["label"])
             if self.exists(u["label"]):
                 print(f"User with tag {u['label']} already exists. Skipping migration for this user.")
                 continue
@@ -44,7 +45,7 @@ class UserABC(ABC):
                 print(f"Error migrating user {u['label']}: {e}")
         
         print(f"Migration of users completed. {N} users have been migrated.")                 
-            
+        return user_tags
             
     @abstractmethod 
     def add_user(self, user_props : UserModelForRegistration):

@@ -27,6 +27,7 @@ class SubmissionConditionApplicationInput(BaseModel):
     
 
 class FindSubmissionsInput(BaseModel):
+    current_user_tag : str = Field(..., description="The user tag of the current user. This is used to filter the submissions that the user has access to.")
     search_string: str = Field("", description="Search string for submissions")
     state: List[SubmissionStatesEnums] = Field(None, description="Filter submissions by state (leave empty for all states)")
     user_tags: List[str] = Field(None, description="Filter submissions by user tag (leave empty for all users). You can user_tags by the find_users tool to find user tags based on names.")
@@ -47,7 +48,8 @@ class SubmissionTitleAndAimOutput(BaseModel):
     research_aim: str
     
 @tool("find_submissions", args_schema=FindSubmissionsInput)
-def find_submissions(search_string: str = None, 
+def find_submissions(current_user_tag: str,
+                     search_string: str = None, 
                      protein_tags: List[str] = None,
                      state: List[SubmissionStatesEnums] = None, 
                      user_tags: List[str] = None,
@@ -60,8 +62,7 @@ def find_submissions(search_string: str = None,
     If no search_string is provided and limit = 1, the most recent submission tag will be returned.
     
     """
-    tags = DB.submission_filter.find(search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
-    print(tags, search_string, state, user_tags)
+    tags = DB.submission_filter.find(current_user_tag= current_user_tag, search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
     return tags
 
 @tool("get_submission_title_and_research_aim", args_schema=SubmissionTagsInput)
@@ -87,6 +88,7 @@ def count_submissions() -> int:
 
 @tool("count_submissions_by_query")
 def count_submissions_by_query(
+    current_user_tag : str,
     search_string: str = None,
     state: str = None,
     user_tags: List[str] = None
@@ -96,8 +98,9 @@ def count_submissions_by_query(
     total_count = DB.submissions.count()
 
     matches = DB.submission_filter.find(
+        current_user_tag=current_user_tag,
         search_string=search_string,
-        state=APIParamInt(param=state).param,
+        state=state,
         user_tags=APIParamString(param=user_tags).param,
         limit=None
     )

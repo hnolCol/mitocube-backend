@@ -1,7 +1,7 @@
 from typing import List, Tuple, Literal
 from neo4j import Driver, Result
-
-
+import pandas as pd 
+from services.encryption import create_hierarchical_hash
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from config.models.researchgroup import ResearchGroupInput, ResearchGroupModel
 
@@ -11,6 +11,22 @@ class Neo4JResearchGroup(ResearchGroupABC):
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
     
+    def _utils_insert_from_file(self, file_path : str, *args, **kwargs) -> pd.DataFrame:
+        """Inserts research groups from a txt file and returns a DataFrame with the generated tags."""
+        tags = []
+        df = pd.read_csv(file_path, *args, **kwargs)
+        research_groups = [ResearchGroupInput(**row) for row in df.to_dict(orient="records")]
+        for rg in research_groups:
+            tag = create_hierarchical_hash(rg.model_dump())
+            tags.append(tag)
+            if self.exists(tag):
+                print("Research group already exists: ", tag, rg.text)
+                continue
+            self.insert(tag, rg)
+            print("Research group inserted: ", tag, rg.text)
+        df.loc[:,"tag"] = tags 
+        return df 
+    
     def insert_users(self, tag : str, user_tags : List[str]):
         ""
         if not self.exists(tag): raise ValueError("Research group with tag {tag} does not exist.")
@@ -19,7 +35,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
             "MATCH (rg:ResearchGroup {tag : $tag}) "
             "UNWIND $user_tags as user_tag "
             "MATCH (u:User {tag : user_tag}) "
-            "MERGE (rg)<-[r:IS_PART_OF]-(u) "
+            "MERGE (rg)<-[r:MEMBER_OF]-(u) "
             "ON CREATE "
             "SET r.created_at = timestamp() "
         )
@@ -57,14 +73,14 @@ class Neo4JResearchGroup(ResearchGroupABC):
         
         if user_tags is not None:
             query = (
-                "MATCH (rg:ResearchGroup)<-[:IS_PART_OF]-(u:User) "
+                "MATCH (rg:ResearchGroup)<-[:MEMBER_OF]-(u:User) "
                 "WHERE u.tag IN $user_tags "
             )
             if submission_tags is not None:
-                query += "AND EXISTS {(rg)<-[:IS_PART_OF]-(su:User)-[:CREATED|COLLABORATES]->(s:Submission) WHERE s.tag IN $submission_tags} "
+                query += "AND EXISTS {(rg)<-[:MEMBER_OF]-(su:User)-[:CREATED|COLLABORATES]->(s:Submission) WHERE s.tag IN $submission_tags} "
         elif submission_tags is not None:
             query = (
-                "MATCH (rg:ResearchGroup)<-[:IS_PART_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
+                "MATCH (rg:ResearchGroup)<-[:MEMBER_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
                 "WHERE s.tag IN $submission_tags "
             )
         else:
@@ -107,10 +123,34 @@ class Neo4JResearchGroup(ResearchGroupABC):
 
 
     def get_submissions_count(self, tag : str) -> int:
-        ""
+        "Returns the number of submissions associated with the research group"
         query = (
-            "MATCH (rg:ResearchGroup {tag : $tag})<-[:IS_PART_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[:MEMBER_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
             "RETURN count(s) "
+        )
+        
+        r = self._driver.execute_query(query, tag = tag, routing_= "r", result_transformer_=Result.value)
+        if len(r) == 0:  return 0
+        return r[0]
+    
+    
+    def get_submission_tags(self, tags : List[str]) -> List[str]:
+        "Returns the submission tags associated with the research groups"
+        query = (
+            "MATCH (rg:ResearchGroup) <-[:MEMBER_OF]-(u:User)-[:CREATED]->(s:Submission) "
+            "WHERE rg.tag IN $tags "
+            "RETURN s.tag order by s.created_at desc "
+        )
+        
+        r = self._driver.execute_query(query, tags = tags, routing_= "r", result_transformer_=Result.value)
+        if len(r) == 0:  return []
+        return r
+    
+    def get_samples_count(self, tag : str) -> int:
+        "Returns the number of samples associated with the research group"
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[:MEMBER_OF]-(u:User)-[:CREATED]->(s:Submission)-[:HAS_SAMPLE]->(sa:Sample) "
+            "RETURN count(sa) "
         )
         
         r = self._driver.execute_query(query, tag = tag, routing_= "r", result_transformer_=Result.value)
@@ -118,7 +158,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
         return r[0]
 
     def get_tags(self, limit : int = 40) -> List[str]:
-        ""
+        "Returns the tags of the research groups, ordered by creation date"
         
         query = (
             "MATCH (rg:ResearchGroup) "
@@ -131,7 +171,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
     def get_users(self, tag : str) -> List[str]:
         "Returns the user tags that are part of the research group"
         query = (
-            "MATCH (rg:ResearchGroup {tag : $tag})<-[r:IS_PART_OF]-(u:User) "
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[r:MEMBER_OF]-(u:User) "
             "RETURN collect(u.tag) "
         )
         
@@ -143,7 +183,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
     def get_users_count(self, tag : str) -> int:
         "Returns the number of users that are part of the research group"
         query = (
-            "MATCH (rg:ResearchGroup {tag : $tag})<-[r:IS_PART_OF]-(u:User) "
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[r:MEMBER_OF]-(u:User) "
             "RETURN count(u) "
         )
         
@@ -159,10 +199,12 @@ class Neo4JResearchGroup(ResearchGroupABC):
             "MERGE (rg:ResearchGroup {tag : $tag}) "
             "ON CREATE "
             "SET rg.created_at = timestamp(), rg.text =  $research_group.text, rg.abbreviation =  $research_group.abbreviation, "
-            "rg.address =  $research_group.address, rg.email =  $research_group.email, rg.institute =  $research_group.institute, rg.url =  $research_group.url "   
+            "rg.address =  $research_group.address, rg.email =  $research_group.email, rg.institute =  $research_group.institute, rg.url =  $research_group.url, "   
+            "rg.profile_text =  $research_group.profile_text "
             "ON MATCH "
             "SET rg.modified_at = timestamp(), rg.text =  $research_group.text, rg.abbreviation =  $research_group.abbreviation, "
-            "rg.address =  $research_group.address, rg.email =  $research_group.email, rg.institute =  $research_group.institute, rg.url =  $research_group.url "   
+            "rg.address =  $research_group.address, rg.email =  $research_group.email, rg.institute =  $research_group.institute, rg.url =  $research_group.url, "   
+            "rg.profile_text =  $research_group.profile_text "
             "RETURN rg.tag"
         )
         
@@ -177,7 +219,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
             "MATCH (rg:ResearchGroup {tag : $tag}) "
             "UNWIND $user_tags as user_tag "
             "MATCH (u:User {tag : user_tag}) "
-            "MATCH (rg)<-[r:IS_PART_OF]-(u) "
+            "MATCH (rg)<-[r:MEMBER_OF]-(u) "
             "DELETE r"
         )
         
@@ -189,3 +231,28 @@ class Neo4JResearchGroup(ResearchGroupABC):
         "" 
         self.insert(research_group)
 
+
+    def set_subgroup(self, parent_tag : str, child_tag : str):
+        "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."
+        if not self.exists(parent_tag): raise ValueError(f"Parent research group with tag {parent_tag} does not exist.")
+        if not self.exists(child_tag): raise ValueError(f"Child research group with tag {child_tag} does not exist.")
+        
+        query = (
+            "MATCH (parent:ResearchGroup {tag : $parent_tag}) "
+            "MATCH (child:ResearchGroup {tag : $child_tag}) "
+            "MERGE (child)-[:SUBGROUP_OF]->(parent) "
+        )
+        
+        self._driver.execute_query(query, routing_="w", parent_tag = parent_tag, child_tag = child_tag)
+        
+    def remove_subgroup(self, parent_tag : str, child_tag : str):
+        "Removes the parent-child relationship between two research groups."
+        if not self.exists(parent_tag): raise ValueError(f"Parent research group with tag {parent_tag} does not exist.")
+        if not self.exists(child_tag): raise ValueError(f"Child research group with tag {child_tag} does not exist.")
+        
+        query = (
+            "MATCH (parent:ResearchGroup {tag : $parent_tag})<-[r:SUBGROUP_OF]-(child:ResearchGroup {tag : $child_tag}) "
+            "DELETE r"
+        )
+        
+        self._driver.execute_query(query, routing_="w", parent_tag = parent_tag, child_tag = child_tag)

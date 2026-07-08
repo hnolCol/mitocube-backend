@@ -20,10 +20,16 @@ class ResearchGroupABC(ABC):
     @abstractmethod
     def get_users_count(self, tag : str) -> int:
         " "
-    
+    @abstractmethod
+    def get_submission_tags(self, tags : str) -> List[str]:
+        "Returns the submission tags associated with the research group"
+        
     @abstractmethod
     def get_submissions_count(self, tag : str) -> int:
         ""
+    @abstractmethod
+    def get_samples_count(self, tag : str) -> int:
+        "Returns the number of samples associated with the research group"
         
     @abstractmethod    
     def insert(self, research_group):
@@ -43,3 +49,6 @@ class ResearchGroupABC(ABC):
     def find(self, search_string: str = None, user_tags: List[str] = None, submission_tags: List[str] = None, limit: int = 20) -> List[str]:
         """Finds research group tags that match the search string, user tags, or submission tags."""
         
+    @abstractmethod
+    def set_subgroup(self, parent_tag : str, child_tag : str):
+        "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."

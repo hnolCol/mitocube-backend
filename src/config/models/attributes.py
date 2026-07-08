@@ -102,9 +102,7 @@ class AttributeModel(AttributeBaseModel):
     - has_features_value (Optional[bool]):
                                     If True, attribute values represent selectable features
                                     (for example proteins).
-    - has_numeric_input (Optional[bool]):
-                                    If True the attribute accepts arbitrary numeric input
-                                    (instead of choosing from predefined values).
+    
     - min_state (int)           : Minimal submission state required to define this attribute.
                                     (Defaults to 0.)
 
@@ -115,14 +113,12 @@ class AttributeModel(AttributeBaseModel):
         runtime types (string and list respectively).
     """
     
-    group_tag : str  # attribute grouping
+    group_tag : Optional[str] = None  # attribute grouping
     s : Optional[str] = None # search string (no caps)
     children : Optional[List[str]] = None# list of strings that are children of this attribute (for example if an attribute has values to be entered by the user, the attribute must have UnitAttributes as children.)
     allow_input : bool #if the attribute allows for data input by the user. For example, a concentration.
-    has_features_value : Optional[bool] = False  # if true, features (e.g. proteins) can be selected for this attribute
-    has_numeric_input : Optional[bool] = False  # if true, attribute can be defined by the user (numeric input)
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
-
+    abbr : Optional[str] = None  # optional abbreviation for the attribute, used in UI
     class Config:
         use_enum_values = True
 
@@ -151,8 +147,26 @@ class AttributeModel(AttributeBaseModel):
         return str(v)
 
 
+class MinimalTraitModel(BaseModel):
+    text : str
+    description : str
+    priority : int = 500
 
-
+class AttributeInsertModel(BaseModel):
+    """
+    Model for inserting a new attribute into the database.
+    The tag is generated from the text as '{text}'.
+    """
+    text: str
+    group_tags: List[str] = []
+    priority: int = 500
+    allow_input: bool = False
+    min_state: int = 0
+    parents : List[str] = []  # list of parent attribute tags, if any
+    abbr: Optional[str] = None
+    children : List[str] = [] 
+    required_trait_tags : List[str] = []  # list of trait tags that are required for this attribute. For example, if the attribute is "att_organism", the required_trait_tags could be ["att_organism:human", "att_organism:mouse"] to indicate that the user must select one of these traits when defining the attribute.
+    traits : List[MinimalTraitModel] = []  # list of traits to be inserted along with the attribute. Each trait is represented by a MinimalTraitModel which includes the text, description, and priority.
 class AttributeResponseModel(AttributeBaseModel):
     allow_input : bool = False  # if the attribute allows for data input by the user. For example, a concentration.
 

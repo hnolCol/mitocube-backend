@@ -88,8 +88,7 @@ class Neo4jCrosslinks(CrosslinkABC):
     def find(self, protein_tag: str, resource_tag: Optional[str] = None, limit: Optional[int] = None) -> List[dict]:
         query = (
             "MATCH (p:Protein {tag: $protein_tag})<-[pl:LINKS]-(xl:XL)-[ol:LINKS]->(other:Protein) "
-            "WHERE id(pl) <> id(ol) "
-            "AND (p.tag <> other.tag OR id(pl) < id(ol)) "
+            "WHERE p.tag <> other.tag "
         )
 
         if resource_tag is not None:

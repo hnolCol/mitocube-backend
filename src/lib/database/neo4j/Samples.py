@@ -513,8 +513,10 @@ class Neo4JSamples(SamplesABC):
         if self._genotypes.exists(tag = ca_tag_left):
             attribute_tag = "att_genotype"
         else:
-            attribute_tag = self._condition_applications.get_attribute(ca_tag_left)
-            
+            if ";" in ca_tag_left:
+                attribute_tag = self._condition_applications.get_attribute(ca_tag_left.split(";")[0])
+            else:
+                attribute_tag = self._condition_applications.get_attribute(ca_tag_left)
         if attribute_tag not in condition_applications.columns:
             raise ValueError(status_code=404, detail=f"Attribute tag {attribute_tag} not found in sample condition applications for submission {submission_tag}.")
         
@@ -530,9 +532,19 @@ class Neo4JSamples(SamplesABC):
                     mask = condition_applications[within_attr] == within_ca
                     sample_tags_left = sample_tags_left[sample_tags_left.isin(condition_applications[mask].index)]
                     sample_tags_right = sample_tags_right[sample_tags_right.isin(condition_applications[mask].index)]
-    
-        ca_left_text = self._condition_applications.get_text(ca_tag_left) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag_left)
-        ca_right_text = self._condition_applications.get_text(ca_tag_right) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag_right)
+
+        ##ugly find better way for this.
+        if ";" in ca_tag_left: 
+            ca_tags = ca_tag_left.split(";") 
+            ca_left_text = ",".join([self._condition_applications.get_text(ca_tag) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag) for ca_tag in ca_tags])
+        else:
+            ca_left_text = self._condition_applications.get_text(ca_tag_left) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag_left)
+        
+        if ";" in ca_tag_right:
+            ca_tags = ca_tag_right.split(";") 
+            ca_right_text = ",".join([self._condition_applications.get_text(ca_tag) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag) for ca_tag in ca_tags])
+        else:   
+            ca_right_text = self._condition_applications.get_text(ca_tag_right) if attribute_tag != "att_genotype" else self._genotypes.get_text(ca_tag_right)
 
         def clean_ca_text(text):
             if text is None:

@@ -688,6 +688,21 @@ class Neo4JAnnotations(AnnotationsABC):
 
             print(f"  Done.")
 
+    def count(self) -> int:
+        """Counts the total number of annotations in the database."""
+
+        query = (
+            "MATCH (a:Annotation) "
+            "RETURN count(a)"
+        )
+        r = self._driver.execute_query( query,
+                                        routing_="r",
+                                        result_transformer_=Result.value,
+                                    )
+
+        return r[0] if r else 0
+
+
     def exists(self, tag: str) -> bool:
 
         query = (
@@ -702,6 +717,9 @@ class Neo4JAnnotations(AnnotationsABC):
                                     )
         
         return r[0] if r else False
+
+
+
 
     def insert(self, annotation: AnnotationsModel) -> bool:
        

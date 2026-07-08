@@ -30,3 +30,9 @@ class ConditionApplicationAttributeModel(BaseModel):
 class ConditionApplicationStateModel(BaseModel):
     state_tag : str|int
     condition_application_tags : List[str] 
+
+
+class ConditionApplicationStateAttributeModel(BaseModel):
+    state_tag : str|int
+    attribute_conditions : List[ConditionApplicationAttributeModel] 
+    

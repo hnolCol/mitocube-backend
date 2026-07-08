@@ -77,5 +77,6 @@ def get_protein_interpro_features(tag: str, user: UserModel = Depends(get_user_f
                             })
             return features
 
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching InterPro features for {tag}: {e}")
         return []

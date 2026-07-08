@@ -33,6 +33,7 @@ from lib.ai.agent.tools.ca import CONDITION_APPLICATION_TOOLS
 from lib.ai.agent.tools.genotypes import GENOTYPE_TOOLS
 from lib.ai.agent.tools.users import USER_TOOLS
 from lib.ai.agent.tools.submission_counts import SUBMISSION_COUNT_TOOLS
+from lib.ai.agent.tools.submission_metatext import SUBMISSION_METATEXT_TOOLS
 class ChatRequest(BaseModel):
     message: str = Field(..., description="The user's natural-language question.")
     session_id: str = Field(
@@ -58,11 +59,14 @@ llm = ChatOpenAI(
     model=open_ai_settings.chat_model,
     base_url=open_ai_settings.chat_ai_base_url,
     api_key=open_ai_settings.open_ai_api_key,
+    max_retries=5, timeout=60
 )
 
-ALL_TOOLS = SUBMISSION_TOOLS + SUBMISSION_COUNT_TOOLS + PROTEIN_TOOLS + CONDITION_APPLICATION_TOOLS + GENOTYPE_TOOLS + USER_TOOLS
+ALL_TOOLS = SUBMISSION_TOOLS + SUBMISSION_METATEXT_TOOLS + SUBMISSION_COUNT_TOOLS + PROTEIN_TOOLS + CONDITION_APPLICATION_TOOLS + GENOTYPE_TOOLS + USER_TOOLS
 
-
+import json
+schema_size = sum(len(json.dumps(t.args_schema.model_json_schema())) for t in ALL_TOOLS if hasattr(t, "args_schema"))
+print(len(ALL_TOOLS), schema_size)
 
 SYSTEM_PROMPT = """\
 You are a proteomics data analyst assistant. You answer questions about \
@@ -79,8 +83,10 @@ ConditionApplication are hierarchical and are connected, for example the attribu
 
 Guidelines:
 - The returned format should be mark down. 
+- Tge current_user_tag is required to find submission for the scope of the user. The current_user_tag is enable in the prompt.
 - The creator of the submission can be found by calling the get_submission_creator tool. This returns the user tag of the creator. You can then use the get_user_summary tool to get the name of the user.
 - Never return just the user tag.
+- Metatexts give experimental background. Research aims and title defines a project.
 - Submission are equal to Projects or Datasets. If a submission tag is provided, please add the title of the submission.
 - If a submission tag is provided, please add the title of the submission. 
 - Link submissions in the output to their webpage (e.g. https://mitocube.age.mpg.de/submissions/{submission_tag}). 
@@ -102,7 +108,8 @@ And these are the colors of the states:
     ANALYSIS = "#dbae57" 
     DONE = "#eb6a47" 
     ACTIVE = "#ac3e30"
-- protein_tags may be provided, you can link them to https://mitocube.age.mpg.de/proteins/{protein_tag}. 
+    use these colors in the output when you mention the state of a submission!
+- protein_tags may be provided, you can link the data of proteins to https://mitocube.age.mpg.de/proteins/{protein_tag}. 
 - If a tool returns an empty list or "not_found", say so plainly — do not \
 invent plausible-looking data to fill the gap.
 - Numeric results (abundances, peptide counts, coverage) must come verbatim \
@@ -110,7 +117,7 @@ from tool output. Round only for readability, and say when you've rounded.
 - If a request is ambiguous (e.g. "the cancer study" matches multiple \
 submissions), ask the user to disambiguate rather than picking one.
 -  Annotations are very powerful for filtering. If the user asks about an annotation such as MitoCarta3.0 or a GO term, use the annotation tools to filter the relevant proteins before answering.
-- If the user asks for a list of proteins, the tag in protein nodes is the uniprot accession. All protein nodes have a "gene_name" property which is the gene name. If the user asks for a list of proteins, clarify if they want gene names or uniprot accessions, and provide the list in the requested format.
+- If the user asks for a list of proteins, the tag in protein nodes is the Uniprot accession. All protein nodes have a "gene_name" property which is the gene name. If the user asks for a list of proteins, clarify if they want gene names or uniprot accessions, and provide the list in the requested format.
 """
 
 

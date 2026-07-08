@@ -32,6 +32,7 @@ class InsertGeneticApplicationModel(BaseModel):
     publication: Optional[str] = None
     technical_text: Optional[str] = None
     components: List[AttributeTree]
+    is_external : Optional[bool] = False
 
 
 # Tag mappings

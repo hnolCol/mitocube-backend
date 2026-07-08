@@ -9,7 +9,7 @@ from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token, is_user_at_least_curator
 
 
-from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel
+from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel, AttributeInsertModel
 from config.models.parameter import APIParamString
 
 from lib.database.Database import Database
@@ -23,6 +23,41 @@ router = APIRouter(
 
 
 
+@router.post("")
+def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+    "Inserts a new attribute into the database. Returns True if successful, False otherwise."
+    attribute_tag = "att_" + attribute.text.replace(" ","_").lower().encode('utf-8', 'ignore').decode('utf-8')
+    if DB.attributes.exists(tag = attribute_tag):
+        raise HTTPException(status_code=500, detail = "An attribute with the same tag exists already. Alter the text and check if the attribute is not already present before proceeding.")
+    if len(attribute_tag) > 35:
+        raise HTTPException(status_code=500, detail = "The attribute tag is too long. Please use a shorter text for the attribute.")
+    if len(attribute_tag) <= 4:
+        raise HTTPException(status_code=500, detail = "The attribute tag is too short. Please use a longer text for the attribute. Note that the attribute tag is generated from the text by replacing spaces with underscores and adding the prefix 'att_'. Non utf-8 characters are removed. The attribute tag must be at least 5 characters long.")
+    print(attribute_tag, "ATTRIBUTE TAG")
+    print(attribute)
+    ok = DB.attributes.insert(tag=attribute_tag, 
+                              text=attribute.text, 
+                              priority=attribute.priority, 
+                              min_state=attribute.min_state, 
+                              abbreviation=attribute.abbr, 
+                              allow_input=attribute.allow_input, 
+                              group_tags=attribute.group_tags, 
+                              parents=attribute.parents,
+                              children=attribute.children, 
+                              required_trait_tags=attribute.required_trait_tags)
+    if ok:
+        for t in attribute.traits:
+            #tag is created in here
+            trait = InsertTraitModel(
+                attribute_tag=attribute_tag,
+                text = t.text, 
+                value = t.text.replace(" ","_").lower().encode('utf-8', 'ignore').decode('utf-8'),
+                description=t.description,
+                priority=t.priority
+            )
+            ok = DB.attributes.insert_trait(trait)
+    return ok
+
 
 @router.get("/q")
 def get_attributes(
@@ -31,6 +66,7 @@ def get_attributes(
     attribute_groups: Optional[str] = None,  # Accept any string, handle parsing below
     include_traits: bool = True,
     limit: int = 20,
+    attribute_tags : Optional[str] = None,
     group_by : Optional[Literal["attribute_group","min_state"]] = None,
     user: UserModel = Depends(get_user_from_token)
 ) -> List[AttributeTraitTagResponseModel] | List[str] | Dict[str, List[str]]:
@@ -47,7 +83,8 @@ def get_attributes(
                 search_string=search_string,
                 min_state=min_state,
                 limit=limit,
-                attribute_groups=attribute_groups
+                attribute_groups=attribute_groups,
+                attribute_tags=APIParamString(param=attribute_tags).param 
             )
         
     if search_string is not None and isinstance(search_string, str) and len(search_string) > 0:
@@ -162,6 +199,14 @@ def get_attribute_by_tag(attribute_tag : str, user : UserModel = Depends(get_use
     attribute = DB.attributes.attribute(tag=attribute_tag)
     return attribute
 
+
+@router.get("/{attribute_tag}/abbr")
+def get_attribute_abbr(attribute_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
+    "Returns the abbreviation of a single attribute by its tag"     
+    attribute_abbr = DB.attributes.get_abbr(tag=attribute_tag)
+    if isinstance(attribute_abbr, str) and len(attribute_abbr) > 0:
+        return attribute_abbr
+    return ""
 
 @router.get("/{attribute_tag}/required_traits")
 def get_attribute_required_traits(attribute_tag : str) -> List[str]:

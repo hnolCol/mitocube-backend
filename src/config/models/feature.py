@@ -1,5 +1,5 @@
 from deprecated import deprecated
-from pydantic import BaseModel  # , field_serializer, field_validator, root_validator
+from pydantic import BaseModel, field_validator  # , field_serializer, root_validator
 from typing import List, Dict, Optional  # , Any
 # from collections import OrderedDict
 # import pandas as pd
@@ -26,8 +26,18 @@ class FeatureNeoModel(BaseModel):
     aa_length : int = None
     reviewed : Optional[bool] = True 
 
-
-
+    @field_validator("reviewed", mode="before")
+    def check_reviewed(cls, v):
+        if v is None:
+            return False 
+        if isinstance(v, bool):
+            return v 
+        if isinstance(v, str):
+            if v.lower() in ["true", "yes", "1", "reviewed"]:
+                return True
+            elif v.lower() in ["false", "no", "0", "unreviewed"]:
+                return False
+        return v
 
 class FeatureGeneModel(BaseModel):
     

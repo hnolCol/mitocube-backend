@@ -50,10 +50,22 @@ class FindSubmissionsInput(BaseModel):
             "at 25 — ask the user to narrow the search if they need more)."
         ),
     )
-
+class FindSubmissionsInput(BaseModel):
+    search_string: str = Field(
+        default="",
+        description=(
+            "Free-text search matched against submission title, PI name, and "
+            "organism. Leave empty to list all submissions (results are capped "
+            "at 25 — ask the user to narrow the search if they need more)."
+        ),
+    )
+    user_tag: str | None = Field(
+        default=None,
+        description="Required user tag to filter submissions by current user. The user tag is important to set the scope of the user (e.g. what is the user allowed to access.)",
+    )
 
 @tool("find_submissions", args_schema=FindSubmissionsInput)
-def find_submissions(search_string: str = "") -> str:
+def find_submissions(user_tag : str, search_string: str = "") -> str:
     """Search proteomics submissions by title, PI name, or organism.
 
     Returns a JSON list of matching submissions, each with:
@@ -66,7 +78,7 @@ def find_submissions(search_string: str = "") -> str:
 
     Returns an empty list (not an error) if nothing matches.
     """
-    results = DB.submissions.find(search_string=search_string)
+    results = DB.submission_filter.find(current_user = user_tag, search_string=search_string)
     truncated = results[:25]
     return json.dumps(
         {

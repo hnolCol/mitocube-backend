@@ -120,6 +120,7 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         if not DB.samples.exists(tag = sample_tag):
             continue 
         quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag, metrics=metrics)
+        print(quantified_value)
         di["value"] = quantified_value
         if append_condition_procedure:
             condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
@@ -127,9 +128,6 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
                 genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
                 condition_applications = condition_applications.join(genotypes, how="outer")
             for attribute_tag in condition_applications.columns:
-                # attribute_tag = ca.attribute_tag
-                # if attribute_tag is None:   
-                #     continue
                 attribute_tags.add(attribute_tag)
                 condition_application_tags = condition_applications.loc[sample_tag, attribute_tag]
                 di[attribute_tag] = condition_application_tags

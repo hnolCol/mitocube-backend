@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.Database import Database
+from collections import OrderedDict
 from config.models.user import UserModel
 from config.models.attributes import AttributeTree
-from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
+from config.models.conditions_applications import ConditionApplicationAttributeModel, ConditionApplicationStateAttributeModel, ConditionApplicationStateModel, ConditionApplicationTreeModel
 from services.random_generators import get_random_string
 from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
@@ -31,6 +32,25 @@ def transform_for_ui(item : ConditionApplicationTreeModel, r : List = None, ca_i
     }
 
 
+def merge_siblings(nodes):
+    """Merge sibling nodes that share the same (type, tag, value),
+    pooling their children together. Recurses into children."""
+    grouped = OrderedDict()
+
+    for node in nodes:
+        key = (node['type'], node['tag'], node.get('value'))
+        if key not in grouped:
+            new_node = dict(node)      # shallow copy
+            new_node['children'] = []  # will fill in below
+            grouped[key] = new_node
+        grouped[key]['children'].extend(node['children'])
+
+    # recurse so children get merged too, at every depth
+    for node in grouped.values():
+        node['children'] = merge_siblings(node['children'])
+
+    return list(grouped.values())
+
 DB = Database.DB()
 
 router = APIRouter(
@@ -39,7 +59,7 @@ router = APIRouter(
     )
 
 @router.get("/{submission_tag}/ca")
-def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, group_by_min_state : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]:
+def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, group_by_min_state : bool = False, user: UserModel = Depends(get_user_from_token)) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]|List[ConditionApplicationStateAttributeModel]:
     "Return the condition applications for a given submission."
     return DB.submissions.get_conditions_applications(submission_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=group_by_attribute, group_by_min_state=group_by_min_state)
 
@@ -138,7 +158,8 @@ def get_ca_tree_for_submission(submission_tag: str, user: UserModel = Depends(ge
         tree = DB.condition_applications.get_tree(tag=ca_tag)
         if tree:
             result.append(transform_for_ui(tree[0], ca_id=submission_tag))
-    return result
+    #merge the siblings together - since the ca are stored separately in the database, but they are merged together for the UI. This way we avoid storing the same condition application multiple times in the database, but we can still display them together in the UI.
+    return merge_siblings(result) 
 
 
 

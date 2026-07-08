@@ -166,7 +166,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
         ca_tree = self.get_tree(tag)
         if ca_tree is not None and len(ca_tree) > 0:
-            return self.extract_ca_item(ca_tree[0]).replace("String)",")") #dangerous replace here.
+            return self.extract_ca_item(ca_tree[0]).replace("String)",")").replace("( ","(").replace(", )",")") #dangerous replace here.
         else:
             return ""
 

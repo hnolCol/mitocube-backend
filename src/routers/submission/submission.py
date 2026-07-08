@@ -69,7 +69,6 @@ def get_submission_by_query(state : str|int = None,
                             search_string : str = None,
                             trait_tags : str = None, 
                             attribute_tag : str = None, 
-                            trait_tag : str = None,
                             ca_tags : str = None,
                             genotype_tag : str = None, 
                             protein_tags: str = None,
@@ -128,10 +127,10 @@ def get_submission_by_query(state : str|int = None,
     N = DB.submissions.count()
     parsed_user_tags = APIParamString(param=user_tags).param
     tags = DB.submission_filter.find(
+            current_user_tag=user.tag,
             search_string = search_string,
             state = APIParamInt(param = state).param, 
             attribute_tag=APIParamString(param=attribute_tag).param,
-            trait_tag=APIParamString(param=trait_tag).param,
             trait_tags=APIParamString(param=trait_tags).param,
             ca_tags=APIParamString(param=ca_tags).param,
             user_tags=APIParamString(param=user_tags).param,
@@ -526,6 +525,8 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     ## add meta text 
     DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
     for title, text in submission.metatext.items():
+        if "research_aim" in title.lower():
+            continue
         DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
     
     try:
@@ -642,7 +643,7 @@ def update_submission_state(background_task : BackgroundTasks,
                                  "state" : SubmissionStatesEnums(state_tag).name,
                                  "title" : submission_title,
                                  "submission_label" : submission_tag,
-                                 "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission_tag}" #pydanitc HttpUrl (url) returns www.__.com/  
+                                 "submission_url" : f"{GENERAL_SETTINGS.url}submissions/{submission_tag}" #pydanitc HttpUrl (url) returns www.__.com/  
                              },
                              template_name=EMAIL_SETTINGS.mail_project_state_template)
     return ok 
@@ -916,6 +917,7 @@ def get_submission_query_count(
     
     # Query count (matching filters, no limit)
     matching_tags = DB.submission_filter.find(
+        current_user_tag=user.tag,
         search_string = search_string,
         state = APIParamInt(param = state).param, 
         attribute_tag = APIParamString(param=attribute_tag).param,

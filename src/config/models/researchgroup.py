@@ -8,6 +8,7 @@ class ResearchGroupModel(BaseModel):
     text : str 
     abbreviation : str 
     email : EmailStr
+    profile_text : Optional[str] = None
     address: str 
     institute : str
     url : Optional[str] = None
@@ -23,6 +24,7 @@ class ResearchGroupInput(BaseModel):
     email : EmailStr
     address: str 
     institute : str
+    profile_text : Optional[str] = None
     url : Optional[str] = None
     
     
