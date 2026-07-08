@@ -75,12 +75,14 @@ class Neo4JProteins(ProteinsABC):
     
     def get(self, tag : str) -> FeatureNeoModel:
         ""
+    
         query = (
             "MATCH (p:Protein) "
             "WHERE p.tag = $tag "
             "RETURN properties(p) as props " 
         )
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+
         return FeatureNeoModel(**r[0])
   
     def get_favorite_proteins(self, submission_tags : List[str] = None, annotation_tags : List[str] = None, proteome_tags : List[str] = None, user_tag : str = None, limit : int = 40) -> List[str]:

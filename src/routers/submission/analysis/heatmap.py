@@ -20,7 +20,7 @@ router = APIRouter(
 
 
 @router.get("/{submission_tag}/heatmap")
-def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.2, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token)):
+def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.05, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token)):
     
     if not DB.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")

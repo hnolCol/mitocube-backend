@@ -38,7 +38,8 @@ def get_protein_features(tag: str, user: UserModel = Depends(get_user_from_token
     FeatureNeoModel
         The protein information model.
     """
-
+    if not DB.proteins.exists(tag = tag):
+        raise HTTPException(status_code=404, detail=f"No protein found for tag {tag}")
     return DB.proteins.get(tag = tag)
     
 
