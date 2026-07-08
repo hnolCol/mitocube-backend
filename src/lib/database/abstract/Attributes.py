@@ -220,6 +220,7 @@ class AttributesABC(ABC):
                                                    search_string : str = None, 
                                                    min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                                    limit : int = None,
+                                                   attribute_tags : List[str] = None,
                                                    attribute_groups : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None
                                                     ) -> List[AttributeTraitResponseModel]:
         """Finds attributes and attribute values by a search string the minimal required 

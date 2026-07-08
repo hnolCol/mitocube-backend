@@ -147,6 +147,11 @@ class AttributeModel(AttributeBaseModel):
         return str(v)
 
 
+class MinimalTraitModel(BaseModel):
+    text : str
+    description : str
+    priority : int = 500
+
 class AttributeInsertModel(BaseModel):
     """
     Model for inserting a new attribute into the database.
@@ -157,10 +162,11 @@ class AttributeInsertModel(BaseModel):
     priority: int = 500
     allow_input: bool = False
     min_state: int = 0
+    parents : List[str] = []  # list of parent attribute tags, if any
     abbr: Optional[str] = None
     children : List[str] = [] 
     required_trait_tags : List[str] = []  # list of trait tags that are required for this attribute. For example, if the attribute is "att_organism", the required_trait_tags could be ["att_organism:human", "att_organism:mouse"] to indicate that the user must select one of these traits when defining the attribute.
-
+    traits : List[MinimalTraitModel] = []  # list of traits to be inserted along with the attribute. Each trait is represented by a MinimalTraitModel which includes the text, description, and priority.
 class AttributeResponseModel(AttributeBaseModel):
     allow_input : bool = False  # if the attribute allows for data input by the user. For example, a concentration.
 

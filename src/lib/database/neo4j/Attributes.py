@@ -893,7 +893,8 @@ class Neo4JAttributes(AttributesABC):
                                     search_string : str = None, 
                                     min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                     limit : int = None, 
-                                    attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] ]= None) -> List[AttributeTraitTagResponseModel]:
+                                    attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] ]= None,
+                                    attribute_tags : List[str] = None) -> List[AttributeTraitTagResponseModel]:
         """Finds the attribute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
         The result is ordered by the attribute priority and trait priority.
@@ -915,16 +916,17 @@ class Neo4JAttributes(AttributesABC):
         query = "MATCH (a:Attribute)-[:HAS_TRAIT]->(t:Trait) "
         
         where_clauses = []
-        params = {}
+        # params = {}
 
-        if search_string is not None:
-            params["search_string"] = search_string.lower()
-        if min_state is not None:
-            params["min_state"] = min_state
-        if attribute_groups is not None:
-            params["attribute_groups"] = attribute_groups
+        # if search_string is not None:
+        #     params["search_string"] = search_string.lower()
+        # if min_state is not None:
+        #     params["min_state"] = min_state
+        # if attribute_groups is not None:
+        #     params["attribute_groups"] = attribute_groups
 
-
+        if attribute_tags is not None:
+            where_clauses.append("a.tag IN $attribute_tags")
         if min_state is not None:
             where_clauses.append("EXISTS {(a)-[:REQUIRES_STATE]->(s:State) WHERE s.tag <= $min_state}")
         if attribute_groups is not None:
@@ -951,6 +953,7 @@ class Neo4JAttributes(AttributesABC):
             search_string=search_string.lower() if search_string is not None else "",
             limit = limit,
             min_state = min_state, 
+            attribute_tags = attribute_tags,
             attribute_groups = attribute_groups,
             result_transformer_= Result.data,
             routing_="r", 
@@ -959,12 +962,14 @@ class Neo4JAttributes(AttributesABC):
         return [AttributeTraitTagResponseModel(**ri) for ri in r]
 
 
-    def insert(self, tag : str, text : str, priority : int = 500, allow_input : bool = False, abbreviation : str = None, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, group_tags : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = []) -> bool:
+    def insert(self, tag : str, text : str, priority : int = 500, allow_input : bool = False, abbreviation : str = None, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, group_tags : List[str] = [], parents : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = []) -> bool:
         "Insert attributes TODO : IMPLEMENT! " 
         if self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} already exists.")
         search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
         ##insert attribute first 
+        
+        print("PARENTS ", parents)
         query = (
             "MERGE (a:Attribute {tag : $tag}) "
             "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.created_at = timestamp(), a.s = $search_string "
@@ -984,6 +989,14 @@ class Neo4JAttributes(AttributesABC):
                 "MERGE (a)-[:IS_CHILD]->(child) "
                 "WITH a "
             )
+            
+        if parents is not None and len(parents) > 0:
+            query += (
+                "UNWIND $parents as parent_tag "
+                "MATCH (parent:Attribute {tag : parent_tag}) "
+                "MERGE (parent)-[:IS_CHILD]->(a) "
+                "WITH a "
+            )
         if required_trait_tags is not None and len(required_trait_tags) > 0:
             query += (
                 "UNWIND $required_trait_tags as required_trait_tag "
@@ -993,7 +1006,8 @@ class Neo4JAttributes(AttributesABC):
             )
         query += "RETURN count(a) > 0 "
         
-        ok = self._driver.execute_query(query, tag = tag, text = text, priority = priority, abbreviation = abbreviation, group_tags = group_tags, children = children, required_trait_tags = required_trait_tags, allow_input = allow_input, min_state = min_state, search_string = search_string, routing_="w", result_transformer_= Result.value)
+        print("QUERY ", query)
+        ok = self._driver.execute_query(query, tag = tag, text = text, priority = priority, abbreviation = abbreviation, group_tags = group_tags, children = children, parents = parents, required_trait_tags = required_trait_tags, allow_input = allow_input, min_state = min_state, search_string = search_string, routing_="w", result_transformer_= Result.value)
         return ok[0] if len(ok) > 0 else False
     
           
