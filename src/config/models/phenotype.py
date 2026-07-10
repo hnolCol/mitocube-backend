@@ -10,9 +10,12 @@ class PhenotypeModel(BaseModel):
     group_text: str #phenotype group text to classfiy the phenotypes 
      
      
-class PhenotypeInputModel(PhenotypeModel):
-    ""
-    
+class PhenotypeInputModel(BaseModel):
+    tag: Optional[str] = None
+    text: str
+    description: Optional[str] = None
+    group_tag: Optional[str] = None
+    group_text: Optional[str] = None
     
 class PhenotypeGenotypeInput(BaseModel):
     phenotype_tag : str 
