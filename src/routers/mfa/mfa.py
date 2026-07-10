@@ -1,7 +1,4 @@
 import pyotp
-import qrcode
-import io
-import base64
 
 from fastapi import APIRouter, Depends, BackgroundTasks,  HTTPException
 from routers.authentication.token import create_access_token, get_time_stamp
