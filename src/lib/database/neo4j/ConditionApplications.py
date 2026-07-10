@@ -395,8 +395,8 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             if exclude_attribute_group is not None and len(exclude_attribute_group) > 0:
                 query += (
                     "AND NOT EXISTS { "
-                    "  (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
-                    "  WHERE a.tag IN $exclude_attribute_group "
+                    "  (ca)-[:OF_ATTRIBUTE]->(a:Attribute)-[:PART_OF]->(ag:AttributeGroup) "
+                    "  WHERE ag.group_tag IN $exclude_attribute_group "
                     "} "
                 )
             
@@ -421,8 +421,8 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         if exclude_attribute_group is not None and len(exclude_attribute_group) > 0:
             query += (
                 "WHERE NOT EXISTS { "
-                "  (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
-                "  WHERE a.group_tag IN $exclude_attribute_group "
+                "  (ca)-[:OF_ATTRIBUTE]->(a:Attribute)-[:PART_OF]->(ag:AttributeGroup) "
+                "  WHERE ag.group_tag IN $exclude_attribute_group "
                 "} "
             )
             where_added = True
