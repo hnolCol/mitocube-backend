@@ -17,10 +17,11 @@ from services.random_generators import get_random_string
 from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publications
 from langchain_core.messages import AIMessage
 from lib.database.Database import Database
-import re
+
 
 from lib.ai.agent.agent import ChatRequest
-from lib.ai.agent.runtime import runtime
+from lib.ai.agent.runtime import ai_agent_runtime
+
 DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()
@@ -30,9 +31,6 @@ router = APIRouter(
     prefix="/api/ai/openai",
     tags=["OpenAI", "ChatGPT"]
     )
-
-
-
 
 
 @router.get("/literature/feature/proteins/{feature_tag}", response_description="Generates a literate search and summarizes the results.")
@@ -58,9 +56,9 @@ async def generate_cypher_query(prompt: str, session_id: str = None, user: UserM
         session_id = f"open_ai_chat_user_{user.tag}_{get_random_string()}"
     
     config = {"configurable": {"thread_id": session_id}}
-    print(runtime.agent)
+    print(ai_agent_runtime.agent)
     try:
-        result = await runtime.agent.ainvoke(
+        result = await ai_agent_runtime.agent.ainvoke(
             {"messages": [{"role": "user", "content": prompt + f" The current user tag is {user.tag}"}]},
             config=config,
         )

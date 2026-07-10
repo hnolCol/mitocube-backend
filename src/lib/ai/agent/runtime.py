@@ -9,13 +9,12 @@ place for that; see app/main.py.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 
 from langgraph.checkpoint.mongodb import MongoDBSaver
 
 from lib.ai.agent.agent import build_agent
-from lib.ai.agent.config import get_mongo_ai_db_settings
-settings = get_mongo_ai_db_settings()
+from lib.ai.agent.config import get_mongo_db_settings
+settings = get_mongo_db_settings()
 class AgentRuntime:
     def __init__(self) -> None:
         self.agent = None
@@ -35,13 +34,5 @@ class AgentRuntime:
             self._checkpointer_cm.__exit__(None, None, None)
 
 
-runtime = AgentRuntime()
+ai_agent_runtime = AgentRuntime()
 
-
-@asynccontextmanager
-async def lifespan(app):
-    await runtime.startup()
-    try:
-        yield
-    finally:
-        await runtime.shutdown()

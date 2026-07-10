@@ -22,8 +22,8 @@ class TokenResponse(BaseModel):
     """Response Model for a valid login."""
     success : bool 
     token : str 
-    
     verified : bool = False
+    mfa_enabled : bool = False
     role : UserRolesEnum = 0
     tag : Optional[str] = None
     firstname : Optional[str] = None

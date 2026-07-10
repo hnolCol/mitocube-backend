@@ -50,6 +50,8 @@ class UserModel(BasicUserWithEmail):
     allow_login : bool = True 
     role : UserRolesEnum = UserRolesEnum.STANDARD
     is_lead_admin : bool = False
+    mfa_secret: str | None = None
+    mfa_enabled: bool = False
     #salt : str = None
 
 

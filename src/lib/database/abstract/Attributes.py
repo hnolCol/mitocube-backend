@@ -37,6 +37,25 @@ class AttributesABC(ABC):
     - AttributeModel and AttributeValueModel
     
     """
+    
+    @abstractmethod
+    def allow_input(self, tag : str) -> bool:
+        """Returns if an attribute allows input values. 
+        If True, the attribute can be defined by a user input. 
+        If False, the attribute can only be defined by a specific
+        attribute value or feature. 
+        
+        Parameters
+        ----------
+        tag : str
+            The attribute tag. 
+
+        Returns
+        -------
+        bool
+            If the attribute allows user input. 
+        """
+    
     @abstractmethod
     def count(self) -> int:
         """The number of attributes
@@ -99,10 +118,12 @@ class AttributesABC(ABC):
     
     @abstractmethod
     def get(self, 
-        tags : List[str] = None, 
-        attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None, 
-        group_by : Literal["attribute_group"] = None,
-        min_state : SubmissionStatesEnums =SubmissionStatesEnums.SUBMITTED) -> List[str]:
+            tags : List[str] = None,
+            attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
+            min_state : SubmissionStatesEnums = None, 
+            limit : int = None,
+            group_by : Literal["attribute_group","min_state"] = None) -> List[str]|Dict[str, List[str]]:
+        
         """Returns attributes by their tags. If the tag is not in the 
         database it is simply ignored. 
 

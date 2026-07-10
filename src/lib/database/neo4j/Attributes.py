@@ -144,6 +144,15 @@ class Neo4JAttributes(AttributesABC):
                 values = [AttributeValueModel(**av) for av in ri[1]]
             return (attribute,values)
         
+        
+    def allow_input(self, tag : str) -> bool:
+        """Checks if the attribute allows for user input."""
+        query = (
+            "MATCH (a:Attribute {tag : $tag}) RETURN a.allow_input as allow_input "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r[0] if r else False
+    
     def attribute(self, tag : str) -> AttributeResponseModel:
         """Returns an attribute by tag."""
         

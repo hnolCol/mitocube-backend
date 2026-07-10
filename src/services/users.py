@@ -10,6 +10,25 @@ from config.models.user import UserModel, UserRolesEnum, PublicUser
 from lib.database.Database import Database
 DB = Database.DB()
 
+def check_mfa_setup_token(token: dict = Depends(get_decoded_token)) -> dict:
+    if token.get("purpose") != "mfa_setup":
+        raise token_not_valid_exception
+    if "tag" not in token:
+        raise token_not_valid_exception
+    return token
+
+def check_pending_mfa_token(token: dict = Depends(get_decoded_token)) -> dict:
+    """
+    Ensures the token is a pending-MFA token (issued by /token, not yet verified).
+    Rejects fully verified tokens, share tokens, or anything else — this token
+    type should only ever be usable against /verify.
+    """
+    if token.get("purpose") != "mfa_pending":
+        raise token_not_valid_exception
+    if "tag" not in token:
+        raise token_not_valid_exception
+    return token
+
 
 def are_public_users_allowed(user_tags  : List[str]) -> List[bool]:
     """Checks if a list of Users are allowed to login."""
@@ -57,7 +76,7 @@ def check_user_allowed(user_exists : bool, user : UserModel) -> UserModel:
     return user 
 
 def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
-    """"""
+    """Check if the token is verified. Raises an exception if not."""
     if "verified" in token and token["verified"]:
         return token 
     raise token_not_valid_exception
@@ -65,7 +84,7 @@ def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
 def get_user_from_token(token = Depends(check_token_verified)) -> UserModel:
     """Extracts the user from a token"""
     #DB.get_user_by_id()
-    if "tag" not in token : token_not_valid_exception
+    if "tag" not in token : raise token_not_valid_exception
     user_in_db = DB.users.get_user_by_tag(tag = token["tag"])
     user  = check_user_allowed(user_in_db is not None,user_in_db)
     return user 

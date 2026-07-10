@@ -20,7 +20,6 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 # from lib.database.ABCDatabase import MCAttributes
 from lib.database.Database import Database
 
-from lib.ai.agent.runtime import runtime
 
 # 
 ### import services
@@ -80,15 +79,17 @@ from routers.diseases import ClinVar
 from routers.phenotypes import PhenotypeAssociation as PhenotypeAssociation
 from routers.crosslink import external_resource as crosslink_external_resource
 from routers.crosslink import crosslink
+from routers.mfa import mfa
 # from routers import play  # route to test things during development ###########################################################
-from lib.ai.agent.runtime import lifespan
+from lib.lifespan import lifespan
 import pandas as pd
 import argparse 
 
 
 
 #the order of these matters for the functioning of the routes
-router_sources = [dataset,
+router_sources = [
+                  dataset,
                   protein_groups,
                   protein_favorite,
                   protein_find,
@@ -130,6 +131,7 @@ router_sources = [dataset,
                   researchgroup,
                   phenotypes,
                   maintenance,
+                  mfa,
                   states,
                   maintenancepermissions,
                   symptoms,

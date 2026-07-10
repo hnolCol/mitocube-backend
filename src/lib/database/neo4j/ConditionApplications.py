@@ -75,17 +75,22 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             query = (
                 "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
                 "OPTIONAL MATCH p = ((ca)-[:HAS_VALUE*0..]->(cv:ConditionValue)) "
+                "WITH ca, p, "
+                "     [n IN nodes(p) WHERE n:ConditionValue | "
+                "         head([(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.priority]) "
+                "     ] AS priorities "
+                "ORDER BY priorities "
                 "WITH ca, collect(nodes(p)) AS paths "
                 "RETURN [path IN paths | "
                 "            [n IN path | "
                 "                { "
-            "                       label: labels(n)[0], " #label of the node 
-                "                   tag : n.tag, "
+                "                    label: labels(n)[0], "
+                "                    tag : n.tag, "
                 "                    trait_tag: [(n)-[:INSTANCE_OF]->(t:Trait) | t.tag][0], "
                 "                    attribute_tag: [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0], "
                 "                    protein_tag : CASE WHEN [(n)-[:OF_ATTRIBUTE]->(a:Attribute) | a.tag][0] = 'att_protein' THEN [(n)-[:EFFECTS]->(p:Protein) | p.tag][0] ELSE null END, "
-                "                    value : n.value      "           
-                "                    } "
+                "                    value : n.value "
+                "                } "
                 "            ] "
                 "    ] AS children "
             )
@@ -180,7 +185,10 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             trait_nodes = attribute_node["children"]
             if len(trait_nodes) > 0:
                 for trait_node in trait_nodes:
-                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = trait_node.get("value"), trait_tag= trait_node["tag"], parent_tag=parent_tag, extra_data_for_hash = extra_data_for_hash)
+                    value = trait_node.get("value", None)
+                    
+                                  
+                    parent_tag_2 = self.insert_condition_value(attribute_tag=attribute_tag, value = value, trait_tag= trait_node["tag"], parent_tag=parent_tag, extra_data_for_hash = extra_data_for_hash)
                     # if len(trait_node.get("children",[])) > 0:
                     #     self._handle_children(trait_node=trait_node, parent_tag=parent_tag_2)
                     if len(trait_node.get("children", [])) > 0:
@@ -221,6 +229,59 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         return gcv_tag
 
 
+
+    def clean_attribute(self, attribute_tree : Dict) -> AttributeTree:
+        new_children = []
+
+        for child in attribute_tree["children"]:
+            if child.get("type") == "attribute":
+                cleaned = self.clean_attribute(child)
+                if cleaned:
+                    new_children.append(cleaned)
+
+            elif child.get("type") == "trait":
+                if self._attributes.allow_input(tag=attribute_tree["tag"]) and child.get("value") in (None, "", None):
+                    continue
+
+                new_children.append(child)
+
+        attribute_tree["children"] = new_children
+
+        # Remove only input attributes that became empty
+        if self._attributes.allow_input(tag=attribute_tree["tag"]) and len(new_children) == 0:
+            return None
+
+        return attribute_tree
+    def clean_node(self, node : Dict, parent_attribute_tag : str = None):
+        cleaned_children = []
+
+        # Clean children recursively
+        for child in node.get("children", []):
+            cleaned = self.clean_node(
+                child,
+                parent_attribute_tag=node["tag"] if node["type"] == "attribute" else parent_attribute_tag
+            )
+
+            if cleaned is not None:
+                cleaned_children.append(cleaned)
+
+        node["children"] = cleaned_children
+
+        # Structural nodes with children are always kept
+        if node["children"]:
+            return node
+
+        # Empty attribute nodes should be removed
+        if node["type"] == "attribute":
+            return None
+
+        # Leaf trait validation
+        if node["type"] == "trait" and self._attributes.allow_input(tag=parent_attribute_tag):
+            if node.get("value") in (None, "", "null"):
+                return None
+
+        return node
+    
     def insert(self, condition_application : AttributeTree, extra_data_for_hash : Dict={}) -> str:
         """Inserts a new condition application into the database.
 
@@ -250,11 +311,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                             "type": "attribute",
                             "tag": "att_concentration",
                             "children": [
-                                {"type": "trait", "tag": "mM", "value": 2, 
-                                 "children": [
-                                     {"type" : "attribute", "tag" : "temperature", "children" : [
-                                         {"type" : "trait", "tag" : "high"}
-                                     ]}
+                                {"type": "trait", "tag": "mM", "value": 2}
                                  ]}
                             ]
                         },
@@ -269,6 +326,9 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
         """
         component = condition_application.model_dump()  # Convert Pydantic models to list of dicts if necessary
+        print(component)
+        component = self.clean_node(component, parent_attribute_tag=None)  # Clean the attribute tree to remove empty input attributes
+        print("CLEAN", component)
         hash_tag = create_hierarchical_hash({**component, **extra_data_for_hash})        
 
         if not self.exists(hash_tag):

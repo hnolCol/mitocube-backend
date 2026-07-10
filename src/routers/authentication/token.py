@@ -1,6 +1,7 @@
 import time 
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Body
+import pyotp
 
 from config.models.user import UserModel
 from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword, TokenValidResponse
@@ -10,31 +11,35 @@ from config.settings.email import get_email_settings
 from services.date import get_time_stamp
 from services.mail import send_email_in_background
 from services.random_generators import get_random_string
-from services.users import get_user_from_login, check_user_allowed, is_user_admin, get_user_from_token
+from services.users import get_user_from_login, check_user_allowed, is_user_admin, get_user_from_token, check_pending_mfa_token
 from services.encryption import create_access_token, check_for_verification_code_in_token, check_share_token_password
-from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked
-
-
+from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked, mfa_locked_out, user_not_found
+from lib.mfa.mfa import mfa_runtime
+from config.settings.token import get_mfa_settings
+from config.settings.token import get_user_token_settings
 from lib.database.Database import Database
+from cryptography.fernet import Fernet
+
 DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
+MFA_SETTINGS = get_mfa_settings()
+token_settings = get_user_token_settings()
+
 router = APIRouter(
     prefix="/api/auth/token",
     tags=["Token", "Authentication"]
     )
 
-
+fernet = Fernet(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value())
 
 @router.post("/", response_description="Returns a jwt token This token still has to be verified by a one time password.", response_model=TokenResponse)
 def login_for_access_token(background_task : BackgroundTasks, 
                            user : UserModel = Depends(get_user_from_login), 
                            verification_code : str = Depends(lambda : get_random_string(12))) -> TokenResponse:
     """
-    Returns a jwt token upon successful login that contains a verification code as well the user label.
-    The verification code is send to the mail stored in the database and the token can be validated
-    with the verification code. 
+    Returns a jwt token upon successful. This token is not verified yet.
 
     Parameters
     ----------
@@ -50,28 +55,38 @@ def login_for_access_token(background_task : BackgroundTasks,
     TokenResponse
         The response of the HTTP Request. 
     """
-    #create jwt token with just the id and the verification code
-    jwt_token = create_access_token(user.model_dump(),
-                                    key_subset=["tag"],
-                                    add_dict={
-                                        "verification_code" : verification_code,
-                                        })
+    if mfa_runtime.is_locked_out(user.tag):
+        raise mfa_locked_out
 
-    send_email_in_background(
-        background_tasks=background_task,
-        subject="Token Verification",
-        email_to=[user.email],
-        cc = [],
-        include_setting_cc=False,
-        body={
-            "app_name" : GENERAL_SETTINGS.app_name,
-            "first_name" : user.firstname,
-            "verification_code" : verification_code
-        },
-        template_name=EMAIL_SETTINGS.mail_verification_template
-    )
 
-    return TokenResponse(success=True,token=jwt_token,verified=False)
+
+    if not user.mfa_enabled:
+        #send code to setup the mfa for the user. This is a one time code that is valid for 15 min.
+        mfa_runtime.store_challenge(user.tag, verification_code, ttl=token_settings.expires_after_minutes)
+        send_email_in_background(
+            background_tasks=background_task,
+            subject="Token Verification",
+            email_to=[user.email],
+            cc = [],
+            include_setting_cc=False,
+            body={
+                "app_name" : GENERAL_SETTINGS.app_name,
+                "first_name" : user.firstname,
+                "verification_code" : verification_code
+            },
+            template_name=EMAIL_SETTINGS.mail_verification_template
+        )
+        #create jwt token with just the id and the verification code
+    jwt_token = create_access_token(
+                        user.model_dump(),
+                        key_subset=["tag"],
+                        add_dict={
+                            "purpose" : "mfa_pending",
+                            # "verification_code" : verification_code,
+                            },
+                        expires_delta=token_settings.expires_after_minutes)
+    
+    return TokenResponse(success=True,token=jwt_token,verified=False, mfa_enabled  = user.mfa_enabled)
 
 
 
@@ -97,9 +112,64 @@ def check_token(user : UserModel = Depends(get_user_from_token)):
         verified = True, 
         tag=user.tag)
     
+@router.post("/verify", response_model=TokenResponse)
+def verify_token_by_code(verification: TokenVerificationCode,
+                         decoded_token: dict = Depends(check_pending_mfa_token)):
+    user_tag = decoded_token["tag"]
+
+    if mfa_runtime.is_locked_out(user_tag):
+        raise mfa_locked_out
+
+    db_user = DB.users.get_user_by_tag(user_tag)
+    if db_user is None:
+        raise user_blocked
+
+    if db_user.mfa_enabled:
+        # Returning user — TOTP code, straight to a full session.
+        # Decrypt the MFA secret
+        db_user.mfa_secret = fernet.decrypt(db_user.mfa_secret.encode()).decode()
+        totp = pyotp.TOTP(db_user.mfa_secret)
+        code_valid = totp.verify(verification.verification_code, valid_window=1)
+    else:
+        # First login — emailed code, proves email ownership only.
+        stored_code = mfa_runtime.get_challenge_code(user_tag)
+        code_valid = stored_code is not None and verification.verification_code == stored_code
+
+    if not code_valid:
+        count = mfa_runtime.register_failure(user_tag)
+        if count >= MFA_SETTINGS.MFA_MAX_ATTEMPTS:
+            raise mfa_locked_out
+        raise verification_code_incorrect
+
+    mfa_runtime.reset_attempts(user_tag)
+
+    allowed, user = DB.users.is_user_allowed(tag=user_tag)
+    if not allowed:
+        raise user_blocked
+
+    if db_user.mfa_enabled:
+        #deafults to a 48h token. This is the token that is used for all further requests.
+        jwt_token = create_access_token(
+            user.model_dump(), key_subset=["tag"],
+            add_dict={"verified": True, "verified_at": get_time_stamp()},
+        )
+        return TokenResponse(success=True, token=jwt_token, verified=True,
+                              role=user.role, firstname=user.firstname,
+                              lastname=user.lastname, tag=user.tag,
+                              mfa_enabled=True)
+    else:
+        # Email proven — now hand over a token that can ONLY set up MFA.
+        mfa_runtime.clear_challenge(user_tag)
+        jwt_token = create_access_token(
+            user.model_dump(), key_subset=["tag"],
+            add_dict={"purpose": "mfa_setup"},
+            expires_delta=token_settings.expires_after_minutes,
+        )
+        return TokenResponse(success=True, token=jwt_token, verified=False,
+                              mfa_enabled=False)
     
 
-@router.post("/verify", 
+@router.post("/verify222", 
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
              response_model=TokenResponse)
 def verify_token_by_code(verification : TokenVerificationCode,
@@ -108,20 +178,29 @@ def verify_token_by_code(verification : TokenVerificationCode,
     Verifies jwt by comparing the verification code that has been sent by mail to the one hidden in the jwt token.
     
     """
-    if verification.verification_code != decoded_token["verification_code"]:
-        raise verification_code_incorrect
-    #get user by id 
     user_tag = decoded_token["tag"]
-    allowed, user  = DB.users.is_user_allowed(tag = user_tag)
-    if not allowed: raise user_blocked
 
-    jwt_token = create_access_token(user.model_dump(),
-                                    key_subset=["tag"],
-                                    add_dict={"verified" : True, 
-                                              "verified_at" : get_time_stamp()})
+    if mfa_runtime.is_locked_out(user_tag):
+        raise mfa_locked_out
+
+    if verification.verification_code != decoded_token["verification_code"]:
+        count = mfa_runtime.register_failure(user_tag)
+        if count >= MFA_SETTINGS.MFA_MAX_ATTEMPTS:
+            raise mfa_locked_out
+        raise verification_code_incorrect
+
+    mfa_runtime.reset(user_tag)
+
+    allowed, user = DB.users.is_user_allowed(tag=user_tag)
+    if not allowed:
+        raise user_blocked
+
+    jwt_token = create_access_token(user.model_dump(), key_subset=["tag"],
+                                    add_dict={"verified": True, "verified_at": get_time_stamp()})
     
-    return TokenResponse(success=True, token = jwt_token, verified=True, role=user.role, firstname = user.firstname, lastname=user.lastname, tag=user.tag)
-
+    return TokenResponse(success=True, token=jwt_token, verified=True,
+                          role=user.role, firstname=user.firstname,
+                          lastname=user.lastname, tag=user.tag)
 ### Share Token
 
 @router.post("/share", 

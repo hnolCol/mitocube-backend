@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     MONGO_AUTH_DB: str = "admin"
 
     AGENT_MONGO_DB_NAME: str = os.environ.get("AGENT_MONGO_DB_NAME", "mongodb")
+    MFA_MONGO_DB_NAME: str = os.environ.get("MFA_MONGO_DB_NAME", "auth")
 
     @property
     def AGENT_MONGO_URI(self) -> str:
@@ -27,5 +28,5 @@ class Settings(BaseSettings):
         extra = "ignore"
 
 @lru_cache
-def get_mongo_ai_db_settings() -> Settings:
+def get_mongo_db_settings() -> Settings:
     return Settings()

@@ -8,7 +8,7 @@ from passlib.context import CryptContext
 import hashlib
 import json 
 from typing import List
-from datetime import datetime 
+from datetime import datetime, timedelta
 
 from config.settings.encryption import Encryption
 from config.settings.token import get_user_token_settings, get_share_token_settings
@@ -82,11 +82,11 @@ def verify_password(plain_password : str, password_hash : str) -> bool:
     """Verifies a given plain password against a password hash"""
     return pwd_context.verify(plain_password, password_hash)
 
-
 def create_access_token(data: dict, 
-                        key_subset : List[str] = None, 
-                        add_dict : dict = None,
-                        share_token : bool = False) -> str:
+                        key_subset: List[str] = None, 
+                        add_dict: dict = None,
+                        share_token: bool = False,
+                        expires_delta: timedelta = None) -> str:
     """
     Encodes data (dict) in a jwt token using the jwt secret key.
     
@@ -101,6 +101,9 @@ def create_access_token(data: dict,
         Convenient to avoid merging of dicts before. 
     share_token : bool, default False
         If the access_token should is a share token and not a simple login token. 
+    expires_delta : timedelta, default None
+        Overrides the default token lifetime (user_token_settings.expires_after_hours).
+        Use for shorter-lived tokens, e.g. pending MFA verification.
         
     Returns
     -------
@@ -112,26 +115,22 @@ def create_access_token(data: dict,
         raise ValueError("Empty dict passed to create jwt token.")
     
     if key_subset is None:
-        
         to_encode = data.copy()
-
     else:
         if not any(k in data for k in key_subset):
-
             raise ValueError("Not a single key of key_subset is present in data.")
-        
         to_encode = dict([(k,v) for k,v in data.items() if k in key_subset])
     
-    if add_dict is not None and isinstance(add_dict,dict):
+    if add_dict is not None and isinstance(add_dict, dict):
         for k,v in add_dict.items():
             to_encode[k] = v
+
     current_time = get_current_datetime()
+
     if share_token:
         return create_share_token(to_encode, current_time)
     else:
-        
-        expire = current_time + user_token_settings.expires_after_hours
-
+        expire = current_time + (expires_delta or user_token_settings.expires_after_hours)
         to_encode["exp"] = expire
 
         return jwt.encode(to_encode,
