@@ -374,6 +374,39 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="w", submission_tag=submission_tag, tag=tag, quantification_type=quantification_type, min=distribution.min, q25=distribution.q25, m=distribution.m, q75=distribution.q75, max=distribution.max, N=distribution.N, result_transformer_=Result.value, annotation_tag=annotation_tag)
         return r[0] if len(r) > 0 else False
 
+
+    def is_quantified(self, tag : str, quant_tags : List[str], quantification_type : Literal["protein_groups","precursors", "proteins"],  ) -> pd.Series:
+        
+        if quantification_type == "protein_groups":
+            query = (
+                "UNWIND $quant_tags AS tag "
+                "WITH tag, EXISTS { "
+                "    MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) WHERE pg.tag in $quant_tags "
+                "  } as quantified "
+                "RETURN pg.tag as tag, quantified "
+            )
+            
+        elif quantification_type == "precursors":
+            query = (
+                "UNWIND $quant_tags AS tag "
+                "WITH tag, EXISTS { "
+                "    MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pr:Precursor) WHERE pr.tag in $quant_tags "
+                "} as quantified "
+                "RETURN pr.tag as tag,  quantified "
+            )
+        elif quantification_type == "proteins":
+            query = (
+                "UNWIND $quant_tags AS tag "
+                "WITH tag, EXISTS {"
+                "    MATCH (:Submission {tag: $tag})-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein {tag: tag})"
+                "} AS quantified "
+                "RETURN tag, quantified"
+            )
+        
+        df = self._driver.execute_query(query, routing_="r", tag = tag, quant_tags = quant_tags, result_transformer_=Result.to_df)
+        
+        return pd.Series(index=df["tag"].values, data=df["quantified"].values)
+
     def condition_application_data(self, tag : str) -> List[ConditionApplicationTreeModel]:
         """Gets the condition application data associated with the genotype.
 

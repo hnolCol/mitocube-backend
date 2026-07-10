@@ -322,6 +322,9 @@ class SubmissionsABC(ABC):
         
         """
     @abstractmethod
+    def is_quantified(self, tag : str, quant_tags : List[str], quantification_type : Literal["protein_groups","precursors", "proteins"],  ) -> pd.Series:
+        "Batch check if a feature is quantified in a submission. Returns a pandas series with the feature tag as index and a boolean as value." 
+    @abstractmethod
     def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinGroupQuantificationModel]) -> int:   
         """
         Inserts protein quantifications for a given submission.
