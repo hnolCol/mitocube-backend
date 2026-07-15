@@ -68,7 +68,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                 "MATCH (ca:ConditionApplication {tag : $ca_tag}) "
                 "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
                 "MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
-                "RETURN [[{ label : labels(ca)[0], tag : ca.tag, attribute_tag : a.tag, trait_tag : t.tag, value : null}]] AS children "
+                "RETURN [[{ label : labels(ca)[0], tag : ca.tag, attribute_tag : a.tag, trait_tag : t.tag, value : ca.value}]] AS children "
             )
         else:
 
@@ -134,8 +134,8 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         """Extracts the text representation of a condition application item recursively.
         Parameters
         ----------
-        item : Dict
-            The condition application item. The keys must include 'value', 'trait_tag', 'attribute_tag', and 'children'.
+        item : ConditionApplicationTreeModel
+            The condition application item. The attributes must include 'value', 'trait_tag', 'attribute_tag', and 'children'.
             If no children are present, 'children' should be an empty list.
         add_separator : bool, optional
             Whether to add a separator after the item, by default False
@@ -161,8 +161,8 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         if item.children is not None and len(item.children) > 0:
             t += " ("
             for n,c in enumerate(item.children):
-                t += self.extract_ca_item(c, add_separator = n < len(item.children)-1) 
-                t += ", " if add_separator else ""
+                t += self.extract_ca_item(c, add_separator = len(item.children) > 1)
+                t += ", " if len(item.children) > 1 else ""
             t += ")"
         return t
 
@@ -335,10 +335,18 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             attribute_tag = component.get("tag") 
             for child in component.get("children", []):
                 child_tag = child.get("tag")
-                
+                value = child.get("value", None)
+                print(value,"value",child_tag, attribute_tag)
+                print(child)
                 query = (
                     "MERGE (ca:ConditionApplication {tag : $hash_tag}) "
                     "ON CREATE SET ca.created_at = timestamp() "
+                )
+                if value is not None:
+                    print("ADDING VALUE!!!!")
+                    query += ", ca.value = $value "
+                        
+                query += (
                     "WITH ca "
                     "MATCH (a:Attribute {tag : $attribute_tag}) "
                     "MERGE (ca)-[:OF_ATTRIBUTE]->(a) "
@@ -346,7 +354,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
                     "MATCH (t:Trait {tag : $child_tag}) "
                     "MERGE (ca)-[:INSTANCE_OF]->(t) "
                 )
-                self._driver.execute_query(query, hash_tag = hash_tag, routing_="w", database_="neo4j", child_tag = child_tag, attribute_tag=attribute_tag)
+                self._driver.execute_query(query, hash_tag = hash_tag, routing_="w", database_="neo4j", child_tag = child_tag, attribute_tag=attribute_tag, value=value)
                 if len(child.get("children",[])) > 0:
                     self._handle_children(trait_node=child, parent_tag=hash_tag, extra_data_for_hash = extra_data_for_hash)     
         return hash_tag
@@ -364,7 +372,7 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         bool
             True if the condition application has a value, False otherwise.
         """
-        self._has_values(tag)
+        return self._has_values(tag)
 
 
     def delete(self, tag: str) -> bool:

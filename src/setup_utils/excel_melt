@@ -1,0 +1,70 @@
+Sub MeltData()
+    Dim ws As Worksheet, wsOut As Worksheet
+    Dim selRange As Range
+    Dim idColHeader As String
+    Dim idCol As Long
+    Dim headerRow As Long
+    Dim lastRow As Long
+    Dim outRow As Long
+    Dim area As Range
+    Dim dataCol As Long
+    Dim r As Long
+    Dim colHeader As String
+
+    ' 1. Let user select the columns to melt (include the header row!)
+    On Error Resume Next
+    Set selRange = Application.InputBox( _
+        "Select the COLUMNS you want to melt/unpivot (include the header row). " & _
+        "Hold Ctrl to pick multiple non-adjacent columns.", _
+        "Select Columns to Melt", Type:=8)
+    On Error GoTo 0
+    If selRange Is Nothing Then Exit Sub
+
+    Set ws = selRange.Worksheet
+    headerRow = selRange.Row
+    lastRow = ws.Cells(ws.Rows.Count, selRange.Column).End(xlUp).Row
+
+    ' 2. Ask which column is the ID column to keep
+    idColHeader = InputBox("Enter the exact header name of the ID column to keep:", "ID Column", "PG.ProteinGroups")
+    If idColHeader = "" Then Exit Sub
+
+    Dim foundCell As Range
+    Set foundCell = ws.Rows(headerRow).Find(idColHeader, LookIn:=xlValues, LookAt:=xlWhole)
+    If foundCell Is Nothing Then
+        MsgBox "Couldn't find a header called '" & idColHeader & "' in row " & headerRow, vbExclamation
+        Exit Sub
+    End If
+    idCol = foundCell.Column
+
+    ' 3. Create/reset output sheet
+    Application.DisplayAlerts = False
+    On Error Resume Next
+    ThisWorkbook.Sheets("Melted").Delete
+    On Error GoTo 0
+    Application.DisplayAlerts = True
+
+    Set wsOut = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    wsOut.Name = "Melted"
+    wsOut.Cells(1, 1).Value = idColHeader
+    wsOut.Cells(1, 2).Value = "sample_tag"
+    wsOut.Cells(1, 3).Value = "Vvalue"
+
+    ' 4. Loop through selected columns (handles multiple selected blocks) and melt
+    outRow = 2
+    For Each area In selRange.Areas
+        For dataCol = area.Column To area.Column + area.Columns.Count - 1
+            If dataCol <> idCol Then
+                colHeader = ws.Cells(headerRow, dataCol).Value
+                For r = headerRow + 1 To lastRow
+                    wsOut.Cells(outRow, 1).Value = ws.Cells(r, idCol).Value
+                    wsOut.Cells(outRow, 2).Value = colHeader
+                    wsOut.Cells(outRow, 3).Value = ws.Cells(r, dataCol).Value
+                    outRow = outRow + 1
+                Next r
+            End If
+        Next dataCol
+    Next area
+
+    wsOut.Columns.AutoFit
+    MsgBox "Melt complete! " & (outRow - 2) & " rows created on sheet 'Melted'.", vbInformation
+End Sub

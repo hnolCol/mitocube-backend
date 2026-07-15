@@ -39,8 +39,7 @@ def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : b
     projected_data.index = data_table.columns.values
     projected_data = projected_data.join(condition_applications, how="left")
 
-    
-    return DatasetPCAResponse(projection=projected_data.to_dict(orient="records"), 
+    return DatasetPCAResponse(projection=projected_data.reset_index(names="tag").to_dict(orient="records"), 
                               drivers=drivers.reset_index(names="tag").to_dict(orient="records"), 
                               variance_explained=variance_explained.tolist())
     

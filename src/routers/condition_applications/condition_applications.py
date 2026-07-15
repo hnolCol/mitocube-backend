@@ -10,7 +10,7 @@ from lib.database.Database import Database
 from services.users import get_user_from_token
 
 from services.condition_application import build_condition_application_tree
-
+from config.models.parameter import APIParamString
 DB = Database.DB()
 
 
@@ -64,7 +64,8 @@ def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group:
     ca_tags_with_protein_value = []
     protein_tags = DB.proteins.find(search_string=search_string, is_condition_value=True)
     
-    exclude_list = exclude_attribute_group.split(",") if exclude_attribute_group else None
+    
+    exclude_list = APIParamString(param=exclude_attribute_group).param
     
     if len(protein_tags) > 0:
         ca_tags_with_protein_value = DB.condition_applications.find(protein_tags=protein_tags, 

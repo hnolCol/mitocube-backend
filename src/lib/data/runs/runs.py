@@ -354,7 +354,7 @@ class RunListCreator:
                 user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
                 run_names = [f"{today_as_string}_{self._dataset_label}_{user_initials}_{sample_name.split('_',maxsplit=2)[-1]}" for sample_name in self._sample_list.index]
             else:
-                run_names = [f"{today_as_string}_{self._dataset_label}_{sample_name.split('_',maxsplit=2)[-1]}" for sample_name in self._sample_list.index]
+                run_names = [f"{today_as_string}_{self._dataset_label}_{sample_name.split('_')[-1]}_{sample_name.split('_')[2]}" for sample_name in self._sample_list.index] # was max split
         elif self._aggregated_on is None and self._fractionate:
             run_names = self._get_fraction_runs(self._sample_list.index.to_list())
             
