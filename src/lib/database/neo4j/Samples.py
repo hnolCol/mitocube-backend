@@ -941,3 +941,12 @@ class Neo4JSamples(SamplesABC):
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, excluded=excluded, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+    
+    def is_excluded(self, tag: str) -> bool:
+        "Checks whether a sample is excluded from statistical analysis."
+        query = (
+            "MATCH (s:Sample {tag : $tag}) "
+            "RETURN coalesce(s.excluded, false) "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False

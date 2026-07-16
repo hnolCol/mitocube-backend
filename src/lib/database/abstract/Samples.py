@@ -220,6 +220,10 @@ class SamplesABC(ABC):
         """
 
     @abstractmethod
+    def is_excluded(self, tag: str) -> bool:
+        """Checks whether a sample is excluded from statistical analysis."""
+
+    @abstractmethod
     def get_replicate(self, tag: str) -> int:
         """Get the replicate number for a given sample.
 

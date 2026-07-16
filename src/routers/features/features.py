@@ -110,7 +110,7 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
     if not DB.submissions.exists(tag = submission_tag):
         raise HTTPException(status_code=404, detail = "Submission tag not found in the database.")
     
-    sample_tags = DB.submissions.get_samples(tag = submission_tag) # check if submission has samples
+    sample_tags = DB.submissions.get_samples(tag = submission_tag, ignore_excluded=True) # check if submission has samples
     if not sample_tags:
         raise HTTPException(status_code=404, detail = "No samples found for submission tag.")
     d = []
@@ -119,6 +119,8 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         di = {"tag" : sample_tag, "value" : None}
         if not DB.samples.exists(tag = sample_tag):
             continue 
+        if DB.samples.is_excluded(tag = sample_tag):
+            continue  # Skip excluded samples
         quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag, metrics=metrics)
         di["value"] = quantified_value
         if append_condition_procedure:

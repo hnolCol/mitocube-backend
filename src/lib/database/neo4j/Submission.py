@@ -124,11 +124,12 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0]
     
     
-    def get_samples(self, tag : str) -> List[str]:
+    def get_samples(self, tag : str, ignore_excluded : bool = False) -> List[str]:
         "" 
         query = (
             "MATCH (submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
             "WHERE submission.tag = $tag "
+            ("AND coalesce(sample.excluded, false) = false " if ignore_excluded else "") +
             "RETURN sample.tag ORDER BY sample.sample_index"
             
         )
