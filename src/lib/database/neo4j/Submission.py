@@ -128,11 +128,11 @@ class Neo4JSubmissions(SubmissionsABC):
         "" 
         query = (
             "MATCH (submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
-            "WHERE submission.tag = $tag "
-            ("AND coalesce(sample.excluded, false) = false " if ignore_excluded else "") +
-            "RETURN sample.tag ORDER BY sample.sample_index"
+            "WHERE submission.tag = $tag ")
+        if ignore_excluded:
+            query += "AND coalesce(sample.excluded, false) = false "
             
-        )
+        query +="RETURN sample.tag ORDER BY sample.sample_index"
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag=tag)
         return r
