@@ -2,6 +2,8 @@ from typing import List, Dict, Literal
 from neo4j import Driver, Result
 from datetime import datetime
 
+import numpy as np 
+
 from lib.database.abstract.Samples import SamplesABC
 from config.models.submissions.submissions import AttributeTree
 from config.models.conditions_applications import ConditionApplicationAttributeModel
@@ -14,6 +16,7 @@ import pandas as pd
 import re
 
 from config.models.calculations.quantile import QuantileModel
+from services.encryption import create_hierarchical_hash
 class Neo4JSamples(SamplesABC):
     """
     Neo4J implementation of the SamplesABC interface.
@@ -631,6 +634,70 @@ class Neo4JSamples(SamplesABC):
         
         return q
         
+        
+    
+
+    def has_quantification_distributution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
+        """Checks if a quantification distribution exists for a given sample and quantification type."""
+        qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+        query = (
+            "MATCH (qd:QuantificationDistribution {tag : $qd_tag}) "
+            "RETURN count(qd) > 0 "
+        )
+        r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+
+    def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+        """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
+
+        dataset_distribution_exists = self.has_quantification_distributution(tag=tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        if dataset_distribution_exists:
+            qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+            query = (
+                "MATCH (qd:QuantificationDistribution {tag : $qd_tag})<-[:HAS_QUANTIFICATION_DISTRIBUTION]-(sample:Sample {tag : $tag}) "
+                "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
+            )
+            r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, tag = tag, result_transformer_=Result.data)
+            if len(r) > 0:
+                return QuantileModel(tag=qd_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
+            
+        query = "MATCH (sample:Sample {tag : $tag}) WHERE coalesce(sample.excluded, false) = false "
+
+        if quantification_type == "protein_groups":
+            query += "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            if annotation_tag is not None:
+                query += "WHERE EXISTS {(pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
+        elif quantification_type == "precursors":
+            query += "MATCH (sample)-[q:QUANTIFIED]->(pr:Precursor) "
+        else:
+            raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
+        query += "RETURN q.value AS value "
+        
+        r = self._driver.execute_query(query, routing_="r", tag=tag, quantification_type=quantification_type, annotation_tag=annotation_tag, result_transformer_=Result.value)
+        
+        if len(r) == 0: raise ValueError("No quantifications found for this submission and quantification type.")
+        
+        qm = QuantileModel(tag = tag, min = np.min(r), q25 = np.percentile(r, 25), m = np.median(r), q75 = np.percentile(r, 75), max = np.max(r), N = len(r))
+        
+        self.insert_quantification_distribution(tag=tag, quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
+        
+        return qm 
+
+
+    def insert_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None) -> bool:
+        """Inserts the quantification distribution for a given submission and quantification type. This can be used to store pre-calculated distributions for faster retrieval."""
+        qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+        
+        query = (
+            "MATCH (sample:Sample {tag : $sample_tag}) "
+            "MERGE (qd:QuantificationDistribution {tag : $qd_tag}) "
+            "SET qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), qd.min = $min, qd.q25 = $q25, qd.m = $m, qd.q75 = $q75, qd.max = $max, qd.N = $N "
+            "WITH sample, qd "
+            "MERGE (sample)-[:HAS_QUANTIFICATION_DISTRIBUTION]->(qd) "
+            "RETURN true "
+        )
+        r = self._driver.execute_query(query, routing_="w", qd_tag=qd_tag, sample_tag=tag, quantification_type=quantification_type, min=distribution.min, q25=distribution.q25, m=distribution.m, q75=distribution.q75, max=distribution.max, N=distribution.N, result_transformer_=Result.value, annotation_tag=annotation_tag)
+        return r[0] if len(r) > 0 else False
         
 
     def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):

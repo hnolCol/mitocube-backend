@@ -4,7 +4,8 @@ from config.models.user import UserModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token, is_user_at_least_curator
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Tuple
+from collections import OrderedDict
 import numpy as np
 
 from config.models.calculations.quantile import QuantileModel
@@ -239,3 +240,31 @@ def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_f
     if not DB.submissions.exists(tag=submission_tag):
         raise submission_tag_not_found
     return DB.submissions.get_stats_outdated(tag=submission_tag)
+
+
+
+@router.get("/{submission_tag}/samples/quantifications/distribution", summary="Get the distribution of quantification values for a given submission and quantification type.")
+def get_sample_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> List[Tuple[str, QuantileModel]]:
+    """     
+    Get the distribution of quantification values for a given submission and quantification type.
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission.  
+    quantification_type : Literal["protein_groups","precursors"]
+        The type of quantifications to get the distribution for.
+    annotation_tag : str, optional
+        The tag of the annotation, by default None
+    user : UserModel, optional
+        The user that is extracted by the token, by default Depends(get_user_from_token)        
+        """   
+    DB.submission_exists(tag=submission_tag) or submission_tag_not_found
+    if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
+        raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
+    sample_tags = DB.submissions.get_samples(tag=submission_tag)
+    qs = []
+    for sample_tag in sample_tags:
+        q = DB.samples.get_quantification_distribution(tag=sample_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        qs.append((sample_tag, q))
+    return qs

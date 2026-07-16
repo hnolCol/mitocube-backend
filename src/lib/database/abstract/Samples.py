@@ -260,3 +260,18 @@ class SamplesABC(ABC):
     @abstractmethod
     def set_excluded(self, tag: str, excluded: bool) -> bool:
         "Sets whether a sample is excluded from statistical analysis / quantification aggregation."
+    
+    @abstractmethod
+    def has_quantification_distributution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
+        """Checks if a quantification distribution exists for a given sample and quantification type."""
+        
+    @abstractmethod
+    def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+        """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
+
+        
+
+    @abstractmethod
+    def insert_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None) -> bool:
+        """Inserts the quantification distribution for a given submission and quantification type. This can be used to store pre-calculated distributions for faster retrieval."""
+        

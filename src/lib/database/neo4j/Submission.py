@@ -325,7 +325,6 @@ class Neo4JSubmissions(SubmissionsABC):
     def get_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
         """Returns the distribution of quantification values for a given submission and quantification type. The distribution is represented as a QuantileModel instance."""
 
-        
         dataset_distribution_exists = self.has_quantification_distributution(submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
         if dataset_distribution_exists:
             tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
@@ -334,7 +333,6 @@ class Neo4JSubmissions(SubmissionsABC):
                 "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
             )
             r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data)
-            print("GETTING STORED ONE!=")
             if len(r) > 0:
                 return QuantileModel(tag=submission_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
             
