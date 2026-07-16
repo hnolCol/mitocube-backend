@@ -1,3 +1,5 @@
+import colorsys
+
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.Database import Database
 from config.models.user import UserModel
@@ -7,7 +9,6 @@ from services.users import get_user_from_token, is_user_at_least_curator
 from typing import Dict, List, Literal, Tuple
 from collections import OrderedDict
 import numpy as np
-
 from config.models.calculations.quantile import QuantileModel
 
 DB = Database.DB()
@@ -244,7 +245,7 @@ def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_f
 
 
 @router.get("/{submission_tag}/samples/quantifications/distribution", summary="Get the distribution of quantification values for a given submission and quantification type.")
-def get_sample_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> List[Tuple[str, QuantileModel]]:
+def get_sample_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> List[Tuple[str, QuantileModel, str]]:
     """     
     Get the distribution of quantification values for a given submission and quantification type.
 
@@ -263,8 +264,38 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
     if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
     sample_tags = DB.submissions.get_samples(tag=submission_tag)
+    ca = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, return_sample_index = False)  # Preload condition applications for efficiency
+    #unique_ca_tags = 
+        
+    # 1. Combine all columns into one "||"-joined key
+    ca['combo'] = ca.astype(str).agg('||'.join, axis=1)
+
+    # 2. Get unique combinations
+    unique_combos = ca['combo'].unique()
+    n = len(unique_combos)
+
+    # 3. Generate n visually distinct hex colors (works for any n, not capped at 20)
+    # 3. Generate n visually distinct hex colors (pure Python, no matplotlib)
+    def generate_hex_colors(n):
+        colors = []
+        for i in range(n):
+            hue = i / n
+            r, g, b = colorsys.hsv_to_rgb(hue, 0.65, 0.90)
+            hex_color = '#{:02x}{:02x}{:02x}'.format(
+                round(r * 255), round(g * 255), round(b * 255)
+            )
+            colors.append(hex_color)
+        return colors
+
+    hex_colors = generate_hex_colors(n)
+
+    # 4. Build the color mapper: combo -> hex color
+    color_mapper = dict(zip(unique_combos, hex_colors))
+
+    # 5. (optional) map colors back onto the dataframe
+    ca['color'] = ca['combo'].map(color_mapper)
     qs = []
     for sample_tag in sample_tags:
         q = DB.samples.get_quantification_distribution(tag=sample_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
-        qs.append((sample_tag, q))
+        qs.append((sample_tag, q, ca.loc[ca.index == sample_tag, 'color'].values[0] if sample_tag in ca.index else '#000000'))  # Default to black if not found
     return qs
