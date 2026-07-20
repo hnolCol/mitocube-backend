@@ -10,4 +10,5 @@ class QuantileModel(BaseModel):
     q75: float 
     max: float 
     N: int
+    outlier_removed: Optional[bool] = False
     

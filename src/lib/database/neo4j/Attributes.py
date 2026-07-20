@@ -484,6 +484,18 @@ class Neo4JAttributes(AttributesABC):
         
         return attribute_tags
     
+    def get_groups(self, tag : str) -> List[str]:
+        "Returns the attribute's group tags."
+        query = (
+            "MATCH (a:Attribute)-[:PART_OF]->(ag:AttributeGroup) "
+            "WHERE a.tag = $tag "
+            "RETURN ag.tag "
+        )
+        
+        attribute_group_tags = self._driver.execute_query(query_=query, routing_="r", tag = tag, result_transformer_= Result.value)
+        if not isinstance(attribute_group_tags,list): return []
+        
+        return attribute_group_tags
     
     def get_trait_tags(self, tag : str = None, limit : int = None) ->  List[str]:
         """Returns the trait_tags for a single attribute tag, if you want to get 
@@ -970,15 +982,57 @@ class Neo4JAttributes(AttributesABC):
         
         return [AttributeTraitTagResponseModel(**ri) for ri in r]
 
+    def _build_relation_clauses(self, children: List[str], parents: List[str], required_trait_tags: List[str]) -> str:
+        """Builds the optional UNWIND/MERGE clauses shared by insert() and update()."""
+        query = ""
+        if children:
+            query += (
+                "UNWIND $children as child_tag "
+                "MATCH (child:Attribute {tag : child_tag}) "
+                "MERGE (a)-[:IS_CHILD]->(child) "
+                "WITH a "
+            )
+        if parents:
+            query += (
+                "UNWIND $parents as parent_tag "
+                "MATCH (parent:Attribute {tag : parent_tag}) "
+                "MERGE (parent)-[:IS_CHILD]->(a) "
+                "WITH a "
+            )
+        if required_trait_tags:
+            query += (
+                "UNWIND $required_trait_tags as required_trait_tag "
+                "MATCH (t:Trait {tag : required_trait_tag}) "
+                "MERGE (a)-[:REQUIRES_TRAIT]->(t) "
+            )
+        return query
 
-    def insert(self, tag : str, text : str, priority : int = 500, allow_input : bool = False, abbreviation : str = None, min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, group_tags : List[str] = [], parents : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = []) -> bool:
-        "Insert attributes TODO : IMPLEMENT! " 
+
+    def _execute_upsert(self, query: str, tag: str, text: str, priority: int, allow_input: bool,
+                        abbreviation: str, group_tags: List[str], children: List[str],
+                        parents: List[str], required_trait_tags: List[str],
+                        min_state: SubmissionStatesEnums, search_string: str) -> bool:
+        """Runs the final insert/update query with the shared parameter set."""
+        ok = self._driver.execute_query(
+            query,
+            tag=tag, text=text, priority=priority, abbreviation=abbreviation,
+            group_tags=group_tags, children=children, parents=parents,
+            required_trait_tags=required_trait_tags, allow_input=allow_input,
+            min_state=min_state, search_string=search_string,
+            routing_="w", result_transformer_=Result.value
+        )
+        return ok[0] if len(ok) > 0 else False
+
+
+    def insert(self, tag: str, text: str, priority: int = 500, allow_input: bool = False,
+            abbreviation: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
+            group_tags: List[str] = [], parents: List[str] = [], children: List[str] = [],
+            required_trait_tags: List[str] = []) -> bool:
+        "Insert attributes"
         if self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} already exists.")
         search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
-        ##insert attribute first 
-        
-        print("PARENTS ", parents)
+
         query = (
             "MERGE (a:Attribute {tag : $tag}) "
             "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.created_at = timestamp(), a.s = $search_string "
@@ -989,56 +1043,54 @@ class Neo4JAttributes(AttributesABC):
             "UNWIND $group_tags as group_tag "
             "MATCH (ag:AttributeGroup {tag : group_tag}) "
             "MERGE (a)-[:PART_OF]->(ag) "
-            "WITH a ")
-        
-        if children is not None and len(children) > 0:
-            query += (
-                "UNWIND $children as child_tag "
-                "MATCH (child:Attribute {tag : child_tag}) "
-                "MERGE (a)-[:IS_CHILD]->(child) "
-                "WITH a "
-            )
-            
-        if parents is not None and len(parents) > 0:
-            query += (
-                "UNWIND $parents as parent_tag "
-                "MATCH (parent:Attribute {tag : parent_tag}) "
-                "MERGE (parent)-[:IS_CHILD]->(a) "
-                "WITH a "
-            )
-        if required_trait_tags is not None and len(required_trait_tags) > 0:
-            query += (
-                "UNWIND $required_trait_tags as required_trait_tag "
-                "MATCH (t:Trait {tag : required_trait_tag}) "
-                "MERGE (a)-[:REQUIRES_TRAIT]->(t) "
-                
-            )
+            "WITH a "
+        )
+        query += self._build_relation_clauses(children, parents, required_trait_tags)
         query += "RETURN count(a) > 0 "
-        
-        print("QUERY ", query)
-        ok = self._driver.execute_query(query, tag = tag, text = text, priority = priority, abbreviation = abbreviation, group_tags = group_tags, children = children, parents = parents, required_trait_tags = required_trait_tags, allow_input = allow_input, min_state = min_state, search_string = search_string, routing_="w", result_transformer_= Result.value)
-        return ok[0] if len(ok) > 0 else False
-    
-          
 
-    def insert_value(self, tag : str, attribute_value : AttributeValueModel) -> bool:
-        ""
-    
+        return self._execute_upsert(query, tag, text, priority, allow_input, abbreviation,
+                                    group_tags, children, parents, required_trait_tags,
+                                    min_state, search_string)
+
+
+    def update(self, tag: str, text: str, priority: int = 500, allow_input: bool = False,
+            abbreviation: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
+            group_tags: List[str] = [], parents: List[str] = [], children: List[str] = [],
+            required_trait_tags: List[str] = []) -> bool:
+        "Update attributes"
+        if not self.exists(tag=tag):
+            raise ValueError(f"Attribute with tag {tag} does not exist.")
+        search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
+
+        # delete existing relationships first to avoid duplicates, then reinsert them
+        delete_query = (
+            "MATCH (a:Attribute {tag : $tag}) "
+            "OPTIONAL MATCH (a)-[r:REQUIRES_STATE]->(s:State) "
+            "OPTIONAL MATCH (a)-[r1:REQUIRES_TRAIT]->(t:Trait) "
+            "OPTIONAL MATCH (a)-[r2:PART_OF]->(ag:AttributeGroup) "
+            "OPTIONAL MATCH (a)-[r3:IS_CHILD]->(child:Attribute) "
+            "DELETE r, r1, r2, r3 "
+        )
+        self._driver.execute_query(delete_query, tag=tag, routing_="w", result_transformer_=Result.value)
+
         query = (
             "MATCH (a:Attribute {tag : $tag}) "
-            "MERGE (av:AttributeValue {tag : $attribute_value_tag}) "
-            "SET av += $attribute_value_props "
-            "MERGE (a)-[:HAS_VALUE]->(av) "
-            "RETURN count(av)"
+            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.modified_at = timestamp(), a.s = $search_string "
+            "WITH a "
+            "MATCH (s:State {tag : $min_state}) "
+            "MERGE (a)-[:REQUIRES_STATE]->(s) "
+            "WITH a "
+            "UNWIND $group_tags as group_tag "
+            "MATCH (ag:AttributeGroup {tag : group_tag}) "
+            "MERGE (a)-[:PART_OF]->(ag) "
+            "WITH a "
         )
-        
-        r = self._driver.execute_query(query, tag = tag, 
-                                   attribute_value_tag = attribute_value.tag, 
-                                   attribute_value_props = attribute_value.model_dump(exclude_none=True),
-                                   result_transformer_= Result.value,
-                                   routing_= "w")
+        query += self._build_relation_clauses(children, parents, required_trait_tags)
+        query += "RETURN count(a) > 0 "
 
-        return r 
+        return self._execute_upsert(query, tag, text, priority, allow_input, abbreviation,
+                                    group_tags, children, parents, required_trait_tags,
+                                    min_state, search_string)
         
         
         
@@ -1072,10 +1124,6 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query, tags = tags, result_transformer_=Result.data)
         return [AttributeUnitResponseModel(**ri) for ri in r ]
-
-
-    def update(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel] = None) -> bool:
-        return super().update(attribute, attribute_values)
 
     def update_values(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel], join: bool = True) -> Tuple[AttributeModel,List[AttributeValueModel]]:
         #return super().update_values(attribute, attribute_values, join)
@@ -1135,20 +1183,28 @@ class Neo4JAttributes(AttributesABC):
         return True 
     
     
-    def get_unittype(self, tags: List[str]) -> Dict[str,List[str]]:
+    
+    def get_parents(self, tag : str) -> List[str]:
+        """Returns the parent tags for a given attribute tag.
+
+        Parameters
+        ----------
+        tag : str
+            The attribute tag for which the parent tags should be returned.
+
+        Returns
+        -------
+        List[str]
+            A list of parent attribute tags. If the attribute has no parents, an empty list is returned.
+        """
         
         query = (
-            "MATCH (a:Attribute) "
-            "WHERE a.tag in $tags "
-            "MATCH (a)-[:HAS_UNIT_TYPE]-(unittype:UnitType) "
-            "WITH a, unittype ORDER BY unittype.priority DESC "
-            "RETURN a.tag, collect(unittype.tag) "
+            "MATCH (a:Attribute {tag: $tag})<-[:IS_CHILD]-(parent:Attribute) "
+            "RETURN parent.tag ORDER BY parent.priority DESC "
         )
         
-        
-        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.values, tags = tags)
-        return OrderedDict([(attribute_tag, unit_type_tags) for attribute_tag, unit_type_tags in r])
-    
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r if r else []
     
     def get_attribute_hierarchy(self, tags : List[str], submission_tag : str) -> List[AttributeTreeNode]:
         """_summary_
@@ -1221,6 +1277,8 @@ class Neo4JAttributes(AttributesABC):
     
         return [AttributeTreeNode(**attributes_tree) for attributes_tree in attribute_tres_sorted]
         
+
+
 
 
 

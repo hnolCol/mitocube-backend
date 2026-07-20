@@ -29,7 +29,7 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 #from migration.load_data import MigrateScripts 
 
 ### import routers
-from routers.dataset import dataset
+
 from routers.dataset import correlation as submission_correlation # volcano
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim, ranking
 from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap
@@ -89,7 +89,6 @@ import argparse
 
 #the order of these matters for the functioning of the routes
 router_sources = [
-                  dataset,
                   protein_groups,
                   protein_favorite,
                   protein_find,

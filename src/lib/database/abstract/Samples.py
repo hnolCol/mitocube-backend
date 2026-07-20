@@ -266,7 +266,7 @@ class SamplesABC(ABC):
         "Sets whether a sample is excluded from statistical analysis / quantification aggregation."
     
     @abstractmethod
-    def has_quantification_distributution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
+    def has_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
         """Checks if a quantification distribution exists for a given sample and quantification type."""
         
     @abstractmethod

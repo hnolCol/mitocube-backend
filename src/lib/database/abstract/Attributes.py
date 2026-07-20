@@ -200,6 +200,15 @@ class AttributesABC(ABC):
             
         """
         
+    
+    @abstractmethod
+    def get_min_state(self, tag : str) -> str:
+        """Returns the minimum state_tag for the given attribute tag."""
+    
+    @abstractmethod
+    def get_groups(self, tag : str) -> List[str]:
+        "Returns the attribute's group tags."
+        
     @abstractmethod
     def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None) -> List[AttributeValueModel]:
         ""
@@ -363,6 +372,10 @@ class AttributesABC(ABC):
         "Returns a list of children attribute tags. If no children define, an empty list is returned."
         
     @abstractmethod
+    def get_parents(self, tag : str) -> List[str]:
+        "Returns the parent attribute tag. If no parent defined, an empty list is returned."
+        
+    @abstractmethod
     def get_trait_tags(self, tag : str = None, limit : int = None) ->  List[AttributeValueModel]:
         "Return the trait_tags for a given attribute_tag"
         
@@ -407,15 +420,10 @@ class AttributesABC(ABC):
             If the attribute_tag is already in the database. 
         """
         
-    @abstractmethod 
-    def insert_value(self, tag : str, attribute_value : AttributeValueModel) -> bool:
-        "insert value for a given attribute"
-       
-        
     
         
     @abstractmethod
-    def update(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
+    def update(self, tag : str,  attribute : AttributeModel, attribute_values : List[AttributeValueModel] = None) -> bool:
         """Updates an attribute and its values. 
 
         Parameters
@@ -451,30 +459,7 @@ class AttributesABC(ABC):
             _description_
         """
     
-    
-    @abstractmethod
-    def get_unittype(self, tags : List[str]) -> Dict[str,List[str]]:
-        """Returns the unittype(s) by an attribute tag list. 
-        A UnitType is for example 'Concentration'. For example 
-        a chemical component might have the UnitType 'concentration' and
-        'time'. To define the duration of the treatment and the used concentration. 
-        Each UnitType has several pre define Units (mg/ml, M, %). 
-        Of note, 'Features' are also considered as a UnitType and allow to define 
-        a specific feature to an attribute. 
-        
-        Parameters
-        ----------
-        tags : List[str]
-            List of attribute tags to get the UnitType for. 
-            
-        Returns 
-        -------
-        Dict[str,List[str]]
-            Key are the attribute tags 
-            and the List (values) contains the tags of the unittypes 
-
-        """
-    
+   
     
     
     @abstractmethod

@@ -17,6 +17,7 @@ import re
 
 from config.models.calculations.quantile import QuantileModel
 from services.encryption import create_hierarchical_hash
+from services.statistics.quantile import remove_outliers_iqr
 class Neo4JSamples(SamplesABC):
     """
     Neo4J implementation of the SamplesABC interface.
@@ -637,22 +638,22 @@ class Neo4JSamples(SamplesABC):
         
     
 
-    def has_quantification_distributution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
+    def has_quantification_distribution(self, qd_tag : str) -> bool:
         """Checks if a quantification distribution exists for a given sample and quantification type."""
-        qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+        
         query = (
-            "MATCH (qd:QuantificationDistribution {tag : $qd_tag}) "
+            "MATCH (qd:QuantificationDistribution {tag : $tag}) "
             "RETURN count(qd) > 0 "
         )
-        r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r", tag = qd_tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
 
-    def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+    def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> QuantileModel:
         """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
-
-        dataset_distribution_exists = self.has_quantification_distributution(tag=tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})
+        dataset_distribution_exists = self.has_quantification_distribution(qd_tag=qd_tag)
         if dataset_distribution_exists:
-            qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+            
             query = (
                 "MATCH (qd:QuantificationDistribution {tag : $qd_tag})<-[:HAS_QUANTIFICATION_DISTRIBUTION]-(sample:Sample {tag : $tag}) "
                 "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
@@ -676,27 +677,26 @@ class Neo4JSamples(SamplesABC):
         r = self._driver.execute_query(query, routing_="r", tag=tag, quantification_type=quantification_type, annotation_tag=annotation_tag, result_transformer_=Result.value)
         
         if len(r) == 0: raise ValueError("No quantifications found for this submission and quantification type.")
+        values = remove_outliers_iqr(pd.Series(r), k = 1.5)
+        qm = QuantileModel(tag = tag, min = np.min(values), q25 = np.percentile(values, 25), m = np.median(values), q75 = np.percentile(values, 75), max = np.max(values), N = len(values))
         
-        qm = QuantileModel(tag = tag, min = np.min(r), q25 = np.percentile(r, 25), m = np.median(r), q75 = np.percentile(r, 75), max = np.max(r), N = len(r))
-        
-        self.insert_quantification_distribution(tag=tag, quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
+        self.insert_quantification_distribution(tag=tag, qd_tag=qd_tag,  quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
         
         return qm 
 
 
-    def insert_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None) -> bool:
+    def insert_quantification_distribution(self, tag : str, qd_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None, remove_outlier : bool = True) -> bool:
         """Inserts the quantification distribution for a given submission and quantification type. This can be used to store pre-calculated distributions for faster retrieval."""
-        qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
         
         query = (
             "MATCH (sample:Sample {tag : $sample_tag}) "
             "MERGE (qd:QuantificationDistribution {tag : $qd_tag}) "
-            "SET qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), qd.min = $min, qd.q25 = $q25, qd.m = $m, qd.q75 = $q75, qd.max = $max, qd.N = $N "
+            "SET qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), qd.min = $min, qd.q25 = $q25, qd.m = $m, qd.q75 = $q75, qd.max = $max, qd.N = $N, qd.outlier_removed = $outlier_removed "
             "WITH sample, qd "
             "MERGE (sample)-[:HAS_QUANTIFICATION_DISTRIBUTION]->(qd) "
             "RETURN true "
         )
-        r = self._driver.execute_query(query, routing_="w", qd_tag=qd_tag, sample_tag=tag, quantification_type=quantification_type, min=distribution.min, q25=distribution.q25, m=distribution.m, q75=distribution.q75, max=distribution.max, N=distribution.N, result_transformer_=Result.value, annotation_tag=annotation_tag)
+        r = self._driver.execute_query(query, routing_="w", qd_tag=qd_tag, sample_tag=tag, quantification_type=quantification_type, min=distribution.min, q25=distribution.q25, m=distribution.m, q75=distribution.q75, max=distribution.max, N=distribution.N, result_transformer_=Result.value, annotation_tag=annotation_tag, outlier_removed=remove_outlier)
         return r[0] if len(r) > 0 else False
         
 

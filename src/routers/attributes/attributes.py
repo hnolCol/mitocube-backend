@@ -3,7 +3,7 @@ from typing import List, Optional, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
-from config.models.attributes import AttributeModel, AttribteValueInsertModel, InsertTraitModel, UpdateTraitModel
+from config.models.attributes import AttributeEditModel, AttributeModel, AttribteValueInsertModel, InsertTraitModel, UpdateTraitModel
 from config.enums.states import SubmissionStatesEnums
 
 from services.users import get_user_from_token, is_user_at_least_curator
@@ -33,8 +33,7 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
         raise HTTPException(status_code=500, detail = "The attribute tag is too long. Please use a shorter text for the attribute.")
     if len(attribute_tag) <= 4:
         raise HTTPException(status_code=500, detail = "The attribute tag is too short. Please use a longer text for the attribute. Note that the attribute tag is generated from the text by replacing spaces with underscores and adding the prefix 'att_'. Non utf-8 characters are removed. The attribute tag must be at least 5 characters long.")
-    print(attribute_tag, "ATTRIBUTE TAG")
-    print(attribute)
+
     ok = DB.attributes.insert(tag=attribute_tag, 
                               text=attribute.text, 
                               priority=attribute.priority, 
@@ -56,6 +55,27 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
                 priority=t.priority
             )
             ok = DB.attributes.insert_trait(trait)
+    else:
+        raise HTTPException(status_code=500, detail = "Failed to insert attribute. Check if the attribute is not already present before proceeding. The traits were not inserted. If the attribute was inserted, you can delete it and try again.")
+    return ok
+
+
+
+@router.patch("/{attribute_tag}") 
+def update_attribute(attribute_tag : str, attribute : AttributeEditModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+    "Updates existing attribute in the database. Returns True if successful, False otherwise."
+    if not DB.attributes.exists(tag = attribute_tag):
+        raise HTTPException(status_code=404, detail = "Attribute not found.")
+    ok = DB.attributes.update(tag=attribute_tag,
+                              text=attribute.text, 
+                              priority=attribute.priority, 
+                              min_state=attribute.min_state, 
+                              abbreviation=attribute.abbr, 
+                              allow_input=attribute.allow_input, 
+                              group_tags=attribute.group_tags, 
+                              parents=attribute.parents,
+                              children=attribute.children, 
+                              required_trait_tags=attribute.required_trait_tags)
     return ok
 
 
@@ -105,11 +125,11 @@ def get_attributes(
     )
 
 
-@router.get("/hierarchy")
-def get_attribute_hierarchy(tags : str, submission_tag  : str,  user : UserModel = Depends(get_user_from_token)) -> List[AttributeTreeNode]:
-    ""
-    attribute_hierarchy = DB.attributes.get_attribute_hierarchy(tags=APIParamString(param=tags).param, submission_tag = submission_tag)
-    return attribute_hierarchy
+# @router.get("/hierarchy")
+# def get_attribute_hierarchy(tags : str, submission_tag  : str,  user : UserModel = Depends(get_user_from_token)) -> List[AttributeTreeNode]:
+#     ""
+#     attribute_hierarchy = DB.attributes.get_attribute_hierarchy(tags=APIParamString(param=tags).param, submission_tag = submission_tag)
+#     return attribute_hierarchy
 
 @router.get("/groups", summary="Returns the attribute group tags present in the database.")
 def get_attribute_groups(limit : int = None) -> List[str]:
@@ -117,6 +137,8 @@ def get_attribute_groups(limit : int = None) -> List[str]:
     Returns the attribute group tags present in the database.
     """
     return DB.attributes.get_attribute_group_tags(limit=limit)
+
+
 
 
 
@@ -276,6 +298,19 @@ def get_attribute_children(attribute_tag : str) -> List[str]:
     return DB.attributes.get_children(tag = attribute_tag)
 
 
+@router.get("/{attribute_tag}/groups")
+def get_attribute_groups(attribute_tag : str) -> List[str]:
+    "Returns the list of groups of an attribute by its tag"
+    
+    if not DB.attributes.exists(tag = attribute_tag): 
+        raise HTTPException(status_code=404,detail="Tag not associated with a trait/attribute value")
+    
+    return DB.attributes.get_groups(tag = attribute_tag)
+
+@router.get("/{attribute_tag}/parents")
+def get_attribute_parents(attribute_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    return DB.attributes.get_parents(tag=attribute_tag)
+
 
 @router.get("/{attribute_tag}/min_state")
 def get_min_state_for_attribute(attribute_tag : str) -> SubmissionStatesEnums:
@@ -318,72 +353,6 @@ def get_priority_for_attribute(attribute_tag : str) -> int:
 
     return DB.attributes.get_priority(tag = attribute_tag)
 
-
-@router.get("/attribute_values/q")
-def get_attribute_values(tags : str = None, attribute_value_tag : str = None, attribute_tag : str = None, max_attributes : int = 999999):
-    """Returns a list of attribute values that are present in the given submission tags. 
-    Use the attribute_value_tag and attribute_tag params to return a subset of attribute_tags. 
-    
-
-    Parameters
-    ----------
-    tags : str, optional
-        The submission tag, by default None
-    attribute_value_tag : str, optional
-        _description_, by default None
-    attribute_tag : str, optional
-        _description_, by default None
-    max_attributes : int, optional
-        _description_, by default 999999
-        #TODO: implement a limit 
-
-    Returns
-    -------
-    _type_
-        _description_
-    """
-    
-    # db_helper = MCDatabaseHelper.getDatabaseHelper()
-    if tags is None:
-        tags = DB.get_submission_tags()
-    
-    attribute_values_by_dataset = DB.attributes.get_attribute_values_by_dataset_tags(
-        dataset_tags = APIParamString(param=tags).param,
-        attribute_tags = APIParamString(param=attribute_tag).param,
-        attribute_value_tags = APIParamString(param=attribute_value_tag).param)
-    
-    attribute_value_tags = [av.attribute_value.tag for av in attribute_values_by_dataset]
-    submission_count_by_attribute_value_tag= dict([(av.attribute_value.tag, {"count" : av.count, "tags" : av.tags}) for av in attribute_values_by_dataset])
-    attribute_values_by_tag = dict([(av.attribute_value.tag,av.attribute_value) for av in attribute_values_by_dataset])
-
-    return {"attribute_value_tags" : attribute_value_tags, "count" : submission_count_by_attribute_value_tag, "attribute_values_by_tag" : attribute_values_by_tag}
-
-
-# @router.get("/{attribute_tag}/traits/{trait_tag}}")
-# def get_trait(attribute_tag : str, trait_tag : str, include_input : bool = True, submission_tag : str = None):
-#     "Return the specific trait."
-#     if DB.attributes.exists(value=trait_tag):
-#         if not include_input: return DB.attributes.get_values(tags=[trait_tag])
-#         if submission_tag is not None:
-#             return DB.attributes.get_values_by_submission_tag(submission_tag=submission_tag, tags=[trait_tag], include_input=include_input)
-#         else:
-#             raise HTTPException(status_code=404,detail="Submission tag must be provided if include_input is true.")
-        
-#     raise HTTPException(status_code=404,detail="Tag not associated with a trait/attribute value")
-
-@router.post("/{attribute_tag}/value")
-def add_attribute_value(attribute_tag : str, attribute_value : AttribteValueInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> None: 
-    "Adds an attribute value for an attribute."
-    attribute_value_tag = attribute_value.text.replace(" ","_").lower()
-    if DB.attributes.exists(tag = attribute_tag, value=attribute_value_tag):
-        
-        raise HTTPException(status_code=500, detail = "An attribute_value with the same tag exists already.")
-    
-    DB.attributes.insert_value(attribute_tag, attribute_value=AttributeValueModel(text = attribute_value.text, 
-                                                                                  description= attribute_value.description,
-                                                                                  attribute_tag = attribute_tag,
-                                                                                  tag = attribute_value_tag))
-    
     
 @router.delete("/{attribute_tag}/values/{trait_tag}")
 def delete_attribute_value(attribute_tag : str, trait_tag : str, user : UserModel = Depends(is_user_at_least_curator)):

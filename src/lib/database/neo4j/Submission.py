@@ -67,18 +67,6 @@ class Neo4JSubmissions(SubmissionsABC):
             raise ValueError("Submission with this tag does not exist. Please create the submission first.")
 
 
-        # query = (   
-        #     "MATCH (submission:Submission {tag : $tag}) "   
-        #     "UNWIND $timeline as entry "
-        #     "MATCH (s:State {tag : entry.state}) "
-        #     "MERGE (submission)-[r:IN_STATE]->(s) "
-        #     "SET r.created_at = entry.timestamp "
-        # )
-
-        # self._driver.execute_query(query, routing_="w", tag = tag, timeline = timeline)
-
-        # return True
-
 
     
     def count(self, state : SubmissionStatesEnums = None) -> int:
@@ -313,27 +301,26 @@ class Neo4JSubmissions(SubmissionsABC):
         
         
 
-    def has_quantification_distributution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
+    def has_quantification_distribution(self, qd_tag : str) -> bool:
         """Checks if a quantification distribution exists for a given submission and quantification type."""
-        tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
         query = (
-            "MATCH (qd:QuantificationDistribution {tag : $tag}) "
+            "MATCH (qd:QuantificationDistribution {tag : $qd_tag}) "
             "RETURN count(qd) > 0 "
         )
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
 
-    def get_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
+    def get_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> QuantileModel:
         """Returns the distribution of quantification values for a given submission and quantification type. The distribution is represented as a QuantileModel instance."""
-
-        dataset_distribution_exists = self.has_quantification_distributution(submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        qd_tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})
+        dataset_distribution_exists = self.has_quantification_distribution(qd_tag=qd_tag)
         if dataset_distribution_exists:
-            tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+            
             query = (
-                "MATCH (qd:QuantificationDistribution {tag : $tag}) "
+                "MATCH (qd:QuantificationDistribution {tag : $qd_tag}) "
                 "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
             )
-            r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data)
+            r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, result_transformer_=Result.data)
             if len(r) > 0:
                 return QuantileModel(tag=submission_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
             
@@ -355,22 +342,27 @@ class Neo4JSubmissions(SubmissionsABC):
         
         qm = QuantileModel(tag = submission_tag, min = np.min(r), q25 = np.percentile(r, 25), m = np.median(r), q75 = np.percentile(r, 75), max = np.max(r), N = len(r))
         
-        self.insert_quantification_distribution(submission_tag=submission_tag, quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
+        self.insert_quantification_distribution(submission_tag=submission_tag, qd_tag=qd_tag, quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag, remove_outlier=remove_outlier)
         
         return qm 
 
 
-    def insert_quantification_distribution(self, submission_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None) -> bool:
+    def insert_quantification_distribution(self, submission_tag : str, qd_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None, remove_outlier : bool = True) -> bool:
         """Inserts the quantification distribution for a given submission and quantification type. This can be used to store pre-calculated distributions for faster retrieval."""
-        tag = create_hierarchical_hash(data = {"submission_tag" : submission_tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag})
+        
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag}) "
-            "MERGE (qd:QuantificationDistribution {tag : $tag}) "
-            "SET qd.submission_tag = $submission_tag, qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), qd.min = $min, qd.q25 = $q25, qd.m = $m, qd.q75 = $q75, qd.max = $max, qd.N = $N "
+            "MERGE (qd:QuantificationDistribution {tag : $qd_tag}) "
+            "SET qd.submission_tag = $submission_tag, qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), qd.min = $min, qd.q25 = $q25, qd.m = $m, qd.q75 = $q75, qd.max = $max, qd.N = $N, qd.outlier_removed = $remove_outlier "
             "RETURN true "
         )
-        r = self._driver.execute_query(query, routing_="w", submission_tag=submission_tag, tag=tag, quantification_type=quantification_type, min=distribution.min, q25=distribution.q25, m=distribution.m, q75=distribution.q75, max=distribution.max, N=distribution.N, result_transformer_=Result.value, annotation_tag=annotation_tag)
+        r = self._driver.execute_query(query, routing_="w", 
+                                       submission_tag=submission_tag, 
+                                       qd_tag=qd_tag, quantification_type=quantification_type,
+                                       min=distribution.min, q25=distribution.q25, m=distribution.m, 
+                                       q75=distribution.q75, max=distribution.max, N=distribution.N, 
+                                       result_transformer_=Result.value, annotation_tag=annotation_tag, outlier_removed=remove_outlier)
         return r[0] if len(r) > 0 else False
 
 
