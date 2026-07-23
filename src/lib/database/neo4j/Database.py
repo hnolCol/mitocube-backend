@@ -38,7 +38,7 @@ from lib.database.neo4j.Variants import Neo4jVariants
 from lib.database.neo4j.PhenotypeAssociation import Neo4jPhenotypeAssociations
 from lib.database.neo4j.Crosslink import Neo4jCrosslinks
 from lib.database.neo4j.external_resource import Neo4jExternalResources
-
+from lib.database.neo4j.Protocols import Neo4JProtocols
 import pandas as pd 
 class MCNeo4JDatabase(DatabaseABC):
     
@@ -94,6 +94,7 @@ class MCNeo4JDatabase(DatabaseABC):
         
         self.cache = Neo4JCache()
         self.openai = Neo4JOpenAI(driver = self.connection.driver)
+        self.protocols = Neo4JProtocols(driver = self.connection.driver)
         #checks if all is correctly defined 
         self.__create_fulltext_search()
         super(MCNeo4JDatabase, self).__init__()

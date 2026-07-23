@@ -326,9 +326,9 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
         """
         component = condition_application.model_dump()  # Convert Pydantic models to list of dicts if necessary
-        print(component)
+
         component = self.clean_node(component, parent_attribute_tag=None)  # Clean the attribute tree to remove empty input attributes
-        print("CLEAN", component)
+
         hash_tag = create_hierarchical_hash({**component, **extra_data_for_hash})        
 
         if not self.exists(hash_tag):
@@ -336,14 +336,13 @@ class Neo4JConditionApplications(ConditionApplicationABC):
             for child in component.get("children", []):
                 child_tag = child.get("tag")
                 value = child.get("value", None)
-                print(value,"value",child_tag, attribute_tag)
-                print(child)
+           
                 query = (
                     "MERGE (ca:ConditionApplication {tag : $hash_tag}) "
                     "ON CREATE SET ca.created_at = timestamp() "
                 )
                 if value is not None:
-                    print("ADDING VALUE!!!!")
+              
                     query += ", ca.value = $value "
                         
                 query += (

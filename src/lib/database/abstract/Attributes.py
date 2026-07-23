@@ -200,11 +200,7 @@ class AttributesABC(ABC):
             
         """
         
-    
-    @abstractmethod
-    def get_min_state(self, tag : str) -> str:
-        """Returns the minimum state_tag for the given attribute tag."""
-    
+
     @abstractmethod
     def get_groups(self, tag : str) -> List[str]:
         "Returns the attribute's group tags."

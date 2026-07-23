@@ -269,12 +269,12 @@ class Neo4JSubmissions(SubmissionsABC):
             
         r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, result_transformer_=Result.values if group_by_attribute or group_by_min_state else Result.value)
         if group_by_attribute and group_by_min_state:
-            print(r)
-            for ri in r:
-                print(ri[0], "state")
-                for ac in ri[1]:
-                    print(ac)
-                    print(ac["attribute_tag"], ac["condition_application_tags"])
+            # print(r)
+            # for ri in r:
+            #     print(ri[0], "state")
+            #     for ac in ri[1]:
+            #         print(ac)
+            #         print(ac["attribute_tag"], ac["condition_application_tags"])
             return [ConditionApplicationStateAttributeModel(state_tag = ri[0], attribute_conditions = [ConditionApplicationAttributeModel(attribute_tag = ac["attribute_tag"], condition_application_tags = ac["condition_application_tags"]) for ac in ri[1]]) for ri in r]
         if group_by_attribute:
             return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]

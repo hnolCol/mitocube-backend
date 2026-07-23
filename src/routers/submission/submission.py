@@ -787,6 +787,14 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
     return result
 
 
+@router.get("/submissions/{submission_tag}/protocols")
+def get_submission_protocols(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+    
+    protocol_tags = DB.protocols.find(submission_tags = [submission_tag])
+    return protocol_tags
+
+
 @router.post("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags=["Runlist"])
 def create_submission_runlist(
     submission_tag: str,

@@ -720,8 +720,8 @@ class Neo4JAttributes(AttributesABC):
         return [AttributeModel(**ri) for ri in r]
     
     
-    def get_min_state(self, tag : str) -> SubmissionStatesEnums:
-        """Returns the minimum state for the given attribute tag."""
+    def get_min_state(self, tag : str) -> str:
+        """Returns the minimum state_tag for the given attribute tag."""
         
         query = (
             "MATCH (a:Attribute)-[:REQUIRES_STATE]->(s:State) "
@@ -733,8 +733,7 @@ class Neo4JAttributes(AttributesABC):
 
         if len(r) == 0:
             raise ValueError(f"Attribute with tag {tag} does not have a minimum state defined.")
-        return SubmissionStatesEnums(int(r[0]))
-
+        return r[0]
 
     def get_priority(self, tag : str) -> int:
         """Returns the priority of the attribute with the given tag."""

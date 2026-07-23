@@ -87,7 +87,6 @@ def disable_mfa(payload: MFADisableRequest, user: UserModel = Depends(get_user_f
     security-sensitive, so a single factor (just the session token)
     shouldn't be enough to turn it off.
     """
-    print(payload)
     if not user.mfa_enabled:
         raise mfa_not_enabled
 

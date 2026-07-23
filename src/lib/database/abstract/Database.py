@@ -43,6 +43,7 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from lib.database.abstract.Annotations import AnnotationsABC, AnnotationGroupsABC
 from lib.database.abstract.Crosslink import CrosslinkABC
 from lib.database.abstract.external_resource import ExternalResourceABC
+from lib.database.abstract.Protocols import ProtocolsABC
 
 
 
@@ -107,6 +108,7 @@ class DatabaseABC(ABC):
     phenotype_associations : PhenotypeAssociationABC = None
     crosslinks : CrosslinkABC = None
     external_resources : ExternalResourceABC = None
+    protocols : ProtocolsABC = None
 
     def __init__(self):
         """The abstract database class that defines
@@ -257,7 +259,10 @@ class DatabaseABC(ABC):
         if not isinstance(self.proteins, ProteinsABC):
             raise TypeError("The proteins class must be an instance of the ProteinsABC.")
 
-
+        if self.protocols is None:
+            raise NotImplementedError("A database class must have the protocols attribute defined.")
+        if not isinstance(self.protocols, ProtocolsABC):
+            raise TypeError("The protocols class must be an instance of the ProtocolABC.")
 
 
     def submission_exists(self, tag : str) -> bool:
