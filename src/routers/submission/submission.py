@@ -466,22 +466,6 @@ def get_submissions_by_user_label(tags : str = None, group : Literal["state","us
     return counts.to_dict(orient="index")
    
 
-# @router.get("/submissions/users", response_model=List)
-# def get_submissions_by_user_label(user : UserModel = Depends(get_user_from_token)):
-#     """Returns the the number and the labels by user that 
-#     are found in the database. 
-
-#     Returns
-#     -------
-#     _type_
-#         _description_
-
-#     Raises
-#     ------
-#     """
-#     db_helper = MCDatabaseHelper.getDatabaseHelper()
-#     return db_helper.get_labels_by_users()
-
 
 @router.get("/submission/ftquery")
 def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)] = None, user : UserModel = Depends(get_user_from_token)):
@@ -537,6 +521,21 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                                 submission_tags=[submission.tag])) 
     except Exception as e:
         print("Error when inserting news: ", e)
+    
+    ccs = [DB.users.get_user_by_tag(tag = user_tag).email for user_tag in submission.collaborators if DB.users.exists(tag = user_tag)]
+    send_email_in_background(background_tasks=background_task,
+                        subject=f"Submission Complete : {submission.title} ({submission.tag})",
+                        email_to=[user.email],
+                        cc=ccs,
+                        body={
+                            "app_name" : GENERAL_SETTINGS.app_name,
+                            "first_name" : user.firstname,
+                            "title" : submission.title,
+                            "tag" : submission.tag,
+                            "submission_url" : f"{GENERAL_SETTINGS.url}submissions/{submission.tag}"
+                        },
+                        template_name=EMAIL_SETTINGS.mail_submission_complete_template)    
+
     return True
     
     # #save_json(metadata.model_dump(),"MODEL.json")
@@ -561,19 +560,7 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                              content = f"New dataset online: {metadata.title} by {user.firstname}.", 
                              submission_tags=[metadata.tag])) 
     
-    send_email_in_background(background_tasks=background_task,
-                        subject=f"Submission Complete : {submission.title} ({submission.tag})",
-                        email_to=[user.email],
-                        cc=[u.email for idx,u in enumerate(submission.collaborators) if check_collaborators[idx]],
-                        body={
-                            "app_name" : GENERAL_SETTINGS.app_name,
-                            "first_name" : user.firstname,
-                            "title" : submission.title,
-                            "tag" : submission.tag,
-                            "submission_url" : f"{GENERAL_SETTINGS.url}datasets/{submission.tag}"
-                        },
-                        template_name=EMAIL_SETTINGS.mail_submission_complete_template)    
-
+    
     return 
     
     
