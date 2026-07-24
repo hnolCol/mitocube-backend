@@ -305,12 +305,15 @@ class Neo4JSamples(SamplesABC):
             If group_by_attribute is True, a list of ConditionApplicationAttributeModel is returned.
         """
             
-        query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) " 
+        query = "MATCH (sample:Sample {tag: $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) "
         query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) "
         if attribute_tags is not None and len(attribute_tags) > 0:
-                query += "WHERE a.tag IN $attribute_tags "
+            query += "WHERE a.tag IN $attribute_tags "
+
         if group_by_attribute:
-            query += "RETURN a.tag as attribute_tag, collect(condition.tag) as condition_application_tags ORDER BY a.priority DESC, a.text ASC "
+            query += "WITH a, collect(condition.tag) as condition_application_tags "
+            query += "ORDER BY a.priority DESC, a.text ASC "
+            query += "RETURN a.tag as attribute_tag, condition_application_tags "
         else:
             query += "WITH condition, a ORDER BY a.priority DESC, a.text ASC "
             query += "RETURN collect(condition.tag) "
