@@ -306,14 +306,13 @@ class Neo4JSamples(SamplesABC):
         """
             
         query =  "MATCH (sample:Sample {tag : $tag})-[:HAS_APPLICATION]->(condition:ConditionApplication) " 
-        if group_by_attribute:
-            query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) "
-            if attribute_tags is not None and len(attribute_tags) > 0:
+        query += "MATCH (condition)-[:OF_ATTRIBUTE]->(a:Attribute) "
+        if attribute_tags is not None and len(attribute_tags) > 0:
                 query += "WHERE a.tag IN $attribute_tags "
-            query += "RETURN a.tag as attribute_tag, collect(condition.tag) as condition_application_tags "
+        if group_by_attribute:
+            query += "RETURN a.tag as attribute_tag, collect(condition.tag) as condition_application_tags ORDER BY a.priority DESC, a.text ASC "
         else:
-            if attribute_tags is not None and len(attribute_tags) > 0:
-                query += "WHERE EXISTS {(condition)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE a.tag IN $attribute_tags} "
+            query += "WITH condition, a ORDER BY a.priority DESC, a.text ASC "
             query += "RETURN collect(condition.tag) "
         r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags=attribute_tags, result_transformer_=Result.values if group_by_attribute else Result.value)
         if group_by_attribute:
