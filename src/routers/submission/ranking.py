@@ -6,6 +6,7 @@ from lib.database.Database import Database
 from config.models.user import UserModel
 from services.users import get_user_from_token
 from config.models.feature import ExclusivelyQuantifiedModel
+from config.models.parameter import APIParamString
 DB = Database.DB()
 
 router = APIRouter(
@@ -21,6 +22,6 @@ def get_ranking(tag : str, user : UserModel = Depends(get_user_from_token)) -> b
     
     
 @router.get("/{tag}/ranking/exclusively_quantified")
-def get_exclusively_quantified(tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[ExclusivelyQuantifiedModel]:
+def get_exclusively_quantified(tag : str, annotation_tags : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[ExclusivelyQuantifiedModel]:
     "Get the exclusively quantified proteins for a given submission."
-    return DB.protein_groups.get_exclusively_quantified(submission_tag = tag)
+    return DB.protein_groups.get_exclusively_quantified(submission_tag = tag, annotation_tags = APIParamString(param=annotation_tags).param, limit = limit)

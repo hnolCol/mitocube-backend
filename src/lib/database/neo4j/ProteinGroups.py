@@ -199,16 +199,22 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, limit=limit, result_transformer_=Result.data)
         return [ProteinGroupSubmissionStatisticsModel(**ri) for ri in r]
     
-    def get_exclusively_quantified(self, submission_tag : str ) -> List[ExclusivelyQuantifiedModel]:
+    def get_exclusively_quantified(self, submission_tag : str, annotation_tags : List[str] = None, limit : int = None) -> List[ExclusivelyQuantifiedModel]:
         
         
-        query = (
-            "MATCH (pg:ProteinGroup)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute)  " 
-            "WHERE EXISTS {(stats)-[:HAS_STATS]-(submission:Submission {tag : $submission_tag})} AND stats.exclusively = true "
+        query = "MATCH (pg:ProteinGroup)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute)  " 
+        
+        if annotation_tags is not None and len(annotation_tags) > 0:
+            query += "WHERE EXISTS {(pg)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(annotation:Annotation) WHERE annotation.tag IN $annotation_tags}  AND "
+        else:
+            query += "WHERE "    
+        query += (
+            "EXISTS {(stats)-[:HAS_STATS]-(submission:Submission {tag : $submission_tag})} AND stats.exclusively = true "
             "RETURN pg.tag as tag, a.tag as attribute_tag, stats.tag as stats_tag, stats.mean as mean, stats.exclusively_ca_tags as exclusively_ca_tags, stats.quantified_in_samples as quantified_in_samples ORDER BY mean DESC "
         )
-        
-        r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.data)
+        if limit is not None:
+            query += "LIMIT $limit"
+        r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.data, annotation_tags = annotation_tags, limit = limit)
         return sorted([ExclusivelyQuantifiedModel(**ri) for ri in r], key=lambda x: ";".join(x.exclusively_ca_tags), reverse=True)
 
     def get_protein(self, protein_tag: str) -> List[str]:

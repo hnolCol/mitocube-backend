@@ -142,7 +142,7 @@ class ProteinGroupsABC(ABC):
         
         
     @abstractmethod
-    def get_exclusively_quantified(self, submission_tag : str) -> List[ExclusivelyQuantifiedModel]:
+    def get_exclusively_quantified(self, submission_tag : str, annotation_tags : List[str] = None, limit : int = None) -> List[ExclusivelyQuantifiedModel]:
         """Returns the list of protein group tags that are exclusively quantified in a given submission.
 
         Parameters
