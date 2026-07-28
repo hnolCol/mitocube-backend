@@ -307,13 +307,13 @@ def get_users_associated_with_submission(submission_tag : str, user : UserModel 
 
 
 @router.post("/submissions/{submission_tag}/collaborators")
-def add_collaborators(submission_tag : str, collaborators : str, replace : bool = True, user : UserModel = Depends(get_user_from_token)):
-    """_summary_
+def add_collaborators(submission_tag: str, collaborators: str, replace: bool = True, user: UserModel = Depends(is_creator_of_submission_or_curator)):
+    """Adds or replaces the collaborators for a submission.
 
     Parameters
     ----------
     submission_tag : str
-        The submission label.
+        The submission tag.
     collaborators : str
         user labels of collaborators, for multiple users separate them by a ';'
     replace : bool, optional
@@ -326,12 +326,24 @@ def add_collaborators(submission_tag : str, collaborators : str, replace : bool 
     _type_
         _description_
     """
-    
-    
+    if not DB.submission_exists(tag=submission_tag): raise tag_not_found
 
+    collaborator_tags = APIParamString(param=collaborators).param or []
 
-@router.get("/submissions/{submission_tag}/owner", response_model=PublicUser)
-def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    if not replace and len(collaborator_tags) == 0:
+        raise HTTPException(status_code=400, detail="No collaborator tags provided to add.")
+
+    for user_tag in collaborator_tags:
+        if not DB.users.exists(tag=user_tag):
+            raise user_not_found
+
+    ok = DB.submissions.set_collaborators(tag=submission_tag, collaborator_tags=collaborator_tags, replace=replace)
+    if not ok:
+        raise HTTPException(status_code=500, detail="There was an error when updating the collaborators.")
+    return True
+
+@router.get("/submissions/{submission_tag}/owner")
+def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str | None:
     """_summary_
 
     Parameters
@@ -354,9 +366,11 @@ def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_us
         If the user is not found in the database.
     """
     
+    # if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
+    # user = DB.meta.get_owner(dataset_tag=submission_tag)
+    # return user 
     if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
-    user = DB.meta.get_owner(dataset_tag=submission_tag)
-    return user 
+    return DB.submissions.get_creator(tag = submission_tag)
     
 
 @router.post("/submissions/{submission_tag}/owner")
@@ -396,13 +410,20 @@ def change_submission_owner(submission_tag : str,
         If the user that is supposed to be the new owner is blocked (not allowed for login)
     """
     
+    # if not DB.users.exists(tag = user_tag): raise user_not_found 
+    # if not DB.submission_exists(tag = submission_tag): raise tag_not_found
+    # ok = DB.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
+    # if not ok:
+    #     raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
+    # return True
+
+
     if not DB.users.exists(tag = user_tag): raise user_not_found 
     if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    ok = DB.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
+    ok = DB.submissions.update_owner(tag=submission_tag, user_tag=user_tag, add_prev_user_to_collaborators=add_prev_user_to_collaborators)
     if not ok:
         raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
     return True
-
 
 @router.get("/submissions/{submission_tag}/state", response_model=SubmissionStatesEnums)
 def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
@@ -984,3 +1005,5 @@ def get_submission_query_count(
     }
     
     
+
+

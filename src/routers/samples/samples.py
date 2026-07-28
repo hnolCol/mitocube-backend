@@ -79,3 +79,11 @@ def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_f
     if not DB.submissions.exists(tag=submission_tag):
         raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
     return DB.submissions.get_stats_outdated(tag=submission_tag)
+
+@router.get("/submissions/{submission_tag}/export", summary="Get sample export data (sample_tag, replicate, genotype, condition applications) for download.")
+def get_samples_export(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[Dict]:
+    "Returns one row per sample with resolved genotype/condition-application text for CSV/TSV export."
+    if not DB.submissions.exists(tag=submission_tag):
+        raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
+    df = DB.samples.get_samples_export_data(submission_tag=submission_tag)
+    return df.to_dict(orient="records")

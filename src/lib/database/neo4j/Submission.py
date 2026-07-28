@@ -426,8 +426,9 @@ class Neo4JSubmissions(SubmissionsABC):
         """
         
         query = (
-            "MATCH (submission:Submission {tag : $tag})<-[:COLLABORATES|CREATED]-(user:User) " #COLLABORATES|
-            "RETURN collect(user.tag) " ) 
+                "MATCH (submission:Submission {tag : $tag})<-[:COLLABORATES|CREATED]-(user:User) "
+                "RETURN collect(DISTINCT user.tag) "
+        )
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value) 
         return r[0] if len(r) > 0 else []
     
@@ -1294,6 +1295,57 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+    
+    def update_owner(self, tag: str, user_tag: str, add_prev_user_to_collaborators: bool = False) -> bool:
+        "Replaces the creator of a submission with a different user. If the new owner was previously a collaborator, that collaborator edge is removed."
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "OPTIONAL MATCH (old_owner:User)-[old_r:CREATED]->(submission) "
+        )
+        if add_prev_user_to_collaborators:
+            query += (
+                "FOREACH (_ IN CASE WHEN old_owner IS NOT NULL THEN [1] ELSE [] END | "
+                "  MERGE (old_owner)-[:COLLABORATES]->(submission) "
+                ") "
+            )
+        query += (
+            "DELETE old_r "
+            "WITH submission "
+            "MATCH (new_owner:User {tag : $user_tag}) "
+            "OPTIONAL MATCH (new_owner)-[stale_collab:COLLABORATES]->(submission) "
+            "DELETE stale_collab "
+            "WITH submission, new_owner "
+            "MERGE (new_owner)-[r:CREATED]->(submission) "
+            "SET r.created_at = timestamp() "
+            "RETURN true "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+
+
+    def set_collaborators(self, tag: str, collaborator_tags: List[str], replace: bool = True) -> bool:
+        "Sets, extends, or clears the collaborators of a submission."
+        query = "MATCH (submission:Submission {tag : $tag}) "
+        if replace:
+            query += (
+                "OPTIONAL MATCH (old:User)-[old_r:COLLABORATES]->(submission) "
+                "DELETE old_r "
+                "WITH submission "
+            )
+        if len(collaborator_tags) == 0:
+            query += "RETURN true "
+            r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
+            return r[0] if len(r) > 0 else False
+
+        query += (
+            "UNWIND $collaborator_tags as collaborator_tag "
+            "MATCH (c:User {tag : collaborator_tag}) "
+            "MERGE (c)-[r:COLLABORATES]->(submission) "
+            "SET r.created_at = timestamp() "
+            "RETURN true "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, collaborator_tags=collaborator_tags, result_transformer_=Result.value)
+        return len(r) > 0
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver, users : UserABC, research_groups : ResearchGroupABC) -> None:

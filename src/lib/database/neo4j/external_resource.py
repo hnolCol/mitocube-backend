@@ -117,19 +117,16 @@ class Neo4jExternalResources(ExternalResourceABC):
         return r
 
     def find_by_protein(self, protein_tag: str) -> List[dict]:
-        """For a given protein, returns the external resources that have XL
-        annotations involving it, with the XL count per resource."""
         query = (
             "MATCH (p:Protein {tag: $protein_tag})<-[:LINKS]-(xl:XL) "
             "MATCH (r:ExternalResource)-[:HAS_XL]->(xl) "
-            "RETURN r.tag AS tag, r.title AS title, r.link AS link, "
-            "  r.doi AS doi, r.type AS type, count(xl) AS crosslink_count"
+            "RETURN r.tag AS tag, r.title AS title, r.link AS link, r.author AS author, "
+            "  r.publication_date AS publication_date, r.doi AS doi, r.type AS type, "
+            "  r.cell_type AS cell_type, r.cross_linkers AS cross_linkers, "
+            "  count(xl) AS crosslink_count"
         )
         r = self._driver.execute_query(
-            query,
-            protein_tag=protein_tag,
-            routing_="r",
-            result_transformer_=Result.data,
+            query, protein_tag=protein_tag, routing_="r", result_transformer_=Result.data,
         )
         return r
 

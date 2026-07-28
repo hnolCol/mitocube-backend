@@ -20,6 +20,8 @@ class ExternalResourceModel(BaseModel):
     tag: str
     title: str
     link: str
+    author: Optional[str] = None
+    publication_date: Optional[str] = None
     doi: Optional[str] = None
     type: str
     created_at: Optional[int] = None
