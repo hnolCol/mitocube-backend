@@ -204,11 +204,16 @@ def get_quantification_distribution(submission_tag : str, quantification_type : 
 
 
 
-@router.post("/{submission_tag}/quantifications/test/distribution", summary="Calculate the distribtion based on a test (e.g. log2FC)")
+@router.get("/{submission_tag}/quantifications/test/distribution", summary="Calculate the distribtion based on a test (e.g. log2FC)")
 def calculate_test_quantification_distribution(submission_tag : str,  
-                                               testParam : Dict, 
+                                               ca_left_tag : str,
+                                               ca_right_tag : str,
+                                               attribute_tag : str = None,
+                                               within_ca_tags : str = None,
+                                               within_attribute_tags : str = None, 
                                                quantification_type : Literal["protein_groups","precursors"] = "protein_groups", 
                                                annotation_tag : str = None,
+                                               annotation_group_tag : str = None,
                                                user : UserModel = Depends(get_user_from_token)) -> Dict:
     """     
     Calculate the distribution of quantification values for a given submission and quantification type based on a test (e.g. log2FC). This can be used to calculate the distribution for specific subsets of the data (e.g. only for significantly regulated protein groups).
@@ -232,9 +237,17 @@ def calculate_test_quantification_distribution(submission_tag : str,
     if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
     
-    return DB.samples.calculate_test_quantification_distribution(submission_tag=submission_tag, testParam=testParam, quantification_type=quantification_type, annotation_tag=annotation_tag)
-    
-    
+    return DB.samples.calculate_test_quantification_distribution(
+        submission_tag=submission_tag,
+        attribute_tag=attribute_tag,
+        ca_tag_left=ca_left_tag,
+        ca_tag_right=ca_right_tag,
+        within_attribute_tags=within_attribute_tags,
+        within_ca_tags=within_ca_tags,
+        quantification_type=quantification_type,
+        annotation_tag=annotation_tag,
+        annotation_group_tag=annotation_group_tag
+    )
 
 @router.get("/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
 def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> bool:

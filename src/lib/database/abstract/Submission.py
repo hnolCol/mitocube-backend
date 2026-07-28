@@ -557,6 +557,15 @@ class SubmissionsABC(ABC):
         "Clears the stats-outdated flag for a submission after recalculation."
        
 
+    @abstractmethod
+    def update_owner(self, tag: str, user_tag: str, add_prev_user_to_collaborators: bool = False) -> bool:
+        "Replaces the creator of a submission with a different user."
+
+
+    @abstractmethod
+    def set_collaborators(self, tag: str, collaborator_tags: List[str], replace: bool = True) -> bool:
+        "Sets or extends the collaborators of a submission."
+        
 
 class SubmissionFilterABC(ABC):
     

@@ -576,39 +576,64 @@ class Neo4JSamples(SamplesABC):
             suffix += f" ({annotation_text if annotation_text else annotation_tag})"
         return sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag
 
-    def calculate_test_quantification_distribution(self, submission_tag : str, testParam : Dict, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> Dict:
+    def calculate_test_quantification_distribution(self, submission_tag : str, attribute_tag : str, ca_tag_left : str, ca_tag_right : str, quantification_type : Literal["protein_groups","precursors"], within_attribute_tags : str = None, within_ca_tags : str = None, annotation_tag : str = None, annotation_group_tag : str = None) -> Dict:
         """Calculates the quantification distribution for a given submission and quantification type based on a statistical test. This is used to calculate the distribution for the test results in the volcano plot."""
         
         boolIdx = None
        
         sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag = self.handle_comparison(
-            submission_tag=submission_tag, 
-            ca_tag_left=testParam["ca_tag_left"],
-            ca_tag_right=testParam["ca_tag_right"], 
-            within_attribute_tags=testParam.get("within_attribute_tags", None), 
-            within_ca_tags=testParam.get("within_ca_tags", None), 
-            annotation_tag=testParam.get("annotation_tag", None)
+            submission_tag=submission_tag,
+            ca_tag_left=ca_tag_left,
+            ca_tag_right=ca_tag_right,
+            within_attribute_tags=within_attribute_tags,
+            within_ca_tags=within_ca_tags,
+            annotation_tag=annotation_tag
         )
+
         
         query = (
             "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup) "
             "WHERE s.tag IN $sample_tags "
+        )
+        if annotation_tag is not None:
+            query += (
+                "AND EXISTS {(pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
+            )
+        elif annotation_group_tag is not None:
+            query += (
+                "AND EXISTS {(pg)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(:Annotation)<-[:HAS_ANNOTATION]-(ag:AnnotationGroup {tag : $annotation_group_tag})} "
+            )
+        query += (
             "RETURN pg.tag as feature_tag, r.value as value, s.tag as sample_tag "
         )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, sample_tags=sample_tags, submission_tag=submission_tag)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, sample_tags=sample_tags, submission_tag=submission_tag, annotation_tag=annotation_tag, annotation_group_tag=annotation_group_tag)
         
         df = r.pivot_table(index="feature_tag", columns="sample_tag", values="value")
+
+        if not set(sample_tags_left).issubset(df.columns) or not set(sample_tags_right).issubset(df.columns):
+            return {
+                "submission_tag": submission_tag,
+                "suffix": suffix,
+                "annotation_tag": annotation_tag,
+                "annotation_group_tag": annotation_group_tag,
+                "distributions": [QuantileModel(tag=suffix, min=0, max=0, m=0, q25=0, q75=0, N=0)]
+            }
+
         log2FC = df[sample_tags_left].mean(axis=1) - df[sample_tags_right].mean(axis=1)
-        if annotation_tag is not None:
-            proteinTags = self._annotations.get_protein_tags(tag=annotation_tag, submission_tag=submission_tag)
-            boolIdx = log2FC.index.isin(proteinTags)
+        
+        # df = r.pivot_table(index="feature_tag", columns="sample_tag", values="value")
+        # log2FC = df[sample_tags_left].mean(axis=1) - df[sample_tags_right].mean(axis=1)
+        # if annotation_tag is not None:
+        #     proteinTags = self._annotations.get_protein_tags(tag=annotation_tag, submission_tag=submission_tag)
+        #     boolIdx = log2FC.index.isin(proteinTags)
                     
         desc = log2FC.describe()
         q = {
                 "submission_tag" : submission_tag,
                 "suffix" : suffix,
                 "annotation_tag" : annotation_tag,
+                "annotation_group_tag" : annotation_group_tag,
                 "distributions" : [QuantileModel(
                         tag = suffix,
                         min = desc["min"],
@@ -618,7 +643,7 @@ class Neo4JSamples(SamplesABC):
                         q75 = desc["75%"],
                         N = desc["count"]
             )]}
-        
+        return q 
         if boolIdx is not None:
             log2FCAnnotation = log2FC[boolIdx]
             descAnnotation = log2FCAnnotation.describe()
@@ -950,3 +975,80 @@ class Neo4JSamples(SamplesABC):
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+
+
+    def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True) -> pd.DataFrame:
+        """
+        Returns one row per sample in the submission (including excluded samples) with
+        columns: sample_tag, replicate, genotype, and one column per condition-application
+        attribute tag. Each cell is formatted as "text (tag)"; multiple values for the
+        same attribute on the same sample are joined by `join`.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag to export samples for.
+        join : str, optional
+            Separator used when a sample has multiple values for the same attribute.
+        sort_ca_tags : bool, optional
+            If True, tags are sorted alphabetically before joining, by default True
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: sample_tag, replicate, genotype, <attribute_tag>, <attribute_tag>, ...
+        """
+        query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample) "
+            "RETURN s.tag as sample_tag, s.sample_index as sample_index, s.replicate as replicate "
+            "ORDER BY s.sample_index ASC "
+        )
+        df = self._driver.execute_query(
+            query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag
+        )
+        df.set_index("sample_tag", inplace=True)
+
+        def format_tags(tags, get_text_fn):
+            ordered_tags = sorted(tags) if sort_ca_tags else tags
+            formatted = []
+            for t in ordered_tags:
+                text = get_text_fn(tag=t)
+                formatted.append(text if text else t)  
+            return join.join(formatted)
+
+
+        genotype_query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
+            "RETURN s.tag as sample_tag, collect(g.tag) as genotype_tags "
+        )
+        genotype_df = self._driver.execute_query(
+            genotype_query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag
+        )
+        if not genotype_df.empty:
+            genotype_df["genotype"] = genotype_df["genotype_tags"].apply(
+                lambda tags: format_tags(tags, self._genotypes.get_text)
+            )
+            genotype_df.set_index("sample_tag", inplace=True)
+            df = df.join(genotype_df["genotype"], how="left")
+        else:
+            df["genotype"] = ""
+        df["genotype"] = df["genotype"].fillna("")
+
+        ca_query = (
+            "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "RETURN s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as ca_tags "
+        )
+        ca_df = self._driver.execute_query(
+            ca_query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag
+        )
+        if not ca_df.empty:
+            ca_df["formatted"] = ca_df["ca_tags"].apply(
+                lambda tags: format_tags(tags, self._condition_applications.get_text)
+            )
+            pivot = ca_df.pivot_table(index="sample_tag", columns="attribute_tag", values="formatted", aggfunc="first")
+            df = df.join(pivot, how="left")
+
+        df = df.fillna("")
+        df.drop(columns=["sample_index"], inplace=True, errors="ignore")
+        df.reset_index(inplace=True)
+        return df
