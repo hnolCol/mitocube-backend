@@ -58,6 +58,22 @@ class ProteinGroupsABC(ABC):
             True if the tag exists, False otherwise. 
         """
         
+    @abstractmethod
+    def count_quant_values(self, submission_tags : List[str] = None, proteome_tags : List[str] = None) -> int:
+        """Returns the number of quantified values for protein groups, optionally filtered by submission and proteome tags.
+
+        Parameters
+        ----------
+        submission_tags : List[str], optional
+            A list of submission tags to filter by, by default None
+        proteome_tags : List[str], optional
+            A list of proteome tags to filter by, by default None
+
+        Returns
+        -------
+        int
+            The number of quantified values matching the filters.
+        """
         
     @abstractmethod
     def find(self, search_string : str = None, submission_tag : str = None, sort_by_stat_attribute : str = None, limit : int = None, annotation_tags : List[str] = None) -> List[str]:
@@ -149,6 +165,10 @@ class ProteinGroupsABC(ABC):
         ----------
         submission_tag : str
             The submission tag 
+        annotation_tags : List[str], optional
+            If provided, filters the results by the given annotation tags, by default None
+        limit : int, optional
+            If provided, limits the number of results returned, by default None
 
         Returns
         -------

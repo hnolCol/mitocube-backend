@@ -384,8 +384,8 @@ def change_submission_owner(submission_tag : str,
     ----------
     submission_tag : str
         The submission tag
-    user_label : str
-       The user label that identifies the user. If the user_label does not exists, an user_not_found Exception is raise.
+    user_tag : str
+       The user tag that identifies the user. If the user_tag does not exists, an user_not_found Exception is raise.
     add_prev_user_to_collaborators : bool, optional
         Query parameter that indicated, if the previous user should be added to the collaborators. by default False
     user : UserModel, optional
@@ -393,7 +393,7 @@ def change_submission_owner(submission_tag : str,
 
     API Endpoint
     ------------
-    POST /api/submissions/{submission_label}/owner.
+    POST /api/submissions/{submission_tag}/owner.
 
     Returns
     -------

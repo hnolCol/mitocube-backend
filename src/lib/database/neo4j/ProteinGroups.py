@@ -10,24 +10,26 @@ import pandas as pd
 class Neo4JProteinGroups(ProteinGroupsABC):
     
     def __init__(self, driver : Driver) -> None:
-        ""
+        """Initializes the Neo4JProteinGroups instance."""
         self._driver = driver 
     
     
-    def count(self, submission_tag : str) -> int:
-        """Counts the number of protein groups. If a submission tag is given, only counts protein groups associated with that submission (e.g. that were quantified).
+    def count(self, submission_tag : str = None) -> int:
+        """Counts the number of quantified protein groups. If a submission tag is given, only counts protein groups associated with that submission (e.g. that were quantified).
         """
-        query = (
-            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup) "
-            "RETURN count(DISTINCT pg.tag)"
-        )
+        query = "MATCH (pg:ProteinGroup)"
+        if submission_tag is not None:
+            query += "WHERE EXISTS {(pg)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
+        else:
+            query += "WHERE EXISTS {(pg)<-[:QUANTIFIED]-(:Sample)} "
+        query += "RETURN count(pg)"
         
         r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else 0
     
     
     def insert_bulk(self, protein_groups : List[str], protein_group_separator : str = ";") -> int:
-        ""
+        """Inserts protein groups in bulk."""
         not_existing = [pg for pg in protein_groups if not self.exists(pg)]
         if len(not_existing) == 0: return 0
         query = (
@@ -224,3 +226,19 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         )
         r = self._driver.execute_query(query, protein_tag=protein_tag, routing_="r", result_transformer_=Result.value)
         return r
+    
+    def count_quant_values(self, submission_tags : List[str] = None, proteome_tags : List[str] = None) -> int:
+        
+        query = "MATCH (submission)-[:HAS_SAMPLE]->(:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup) "
+        if submission_tags is not None and len(submission_tags) > 0:
+            query += "WHERE submission.tag IN $submission_tags " 
+        if proteome_tags is not None and len(proteome_tags) > 0:
+            if submission_tags is not None and len(submission_tags) > 0:
+                query += "AND "
+            else:
+                query += "WHERE "
+            query += "EXISTS {(pg)-[:HAS_PROTEINS]->(p:Protein)-[:IN_PROTEOME]->(proteome:Proteome) WHERE proteome.tag IN $proteome_tags} "
+        query += "RETURN count(r) "
+        r = self._driver.execute_query(query, submission_tags = submission_tags, proteome_tags = proteome_tags, routing_="r", result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else 0
+        

@@ -23,18 +23,15 @@ class Neo4JProteins(ProteinsABC):
         "Returns the number of quantified proteins in the database"
         if quantified:
             query = (
-                "MATCH (p:Protein) "
-                "WHERE EXISTS {(p:Protein)<-[:HAS_PROTEINS]-(pg:ProteinGroup)<-[:QUANTIFIED]-(:Sample)}"
-                "RETURN count(p) " 
+                "MATCH (:Sample)-[:QUANTIFIED]->(:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
+                "RETURN count(DISTINCT p) "
             )
-            
         else:
             query = (
                 "MATCH (p:Protein) "
-                "RETURN count(p) " 
+                "RETURN count(p) "
             )
-            
-        r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
         return r[0]
     
     

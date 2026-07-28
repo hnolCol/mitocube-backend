@@ -307,9 +307,11 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
         key_figures["Submissions"] = len(DB.get_submission_tags())
     if KEY_FIGURE_SETTINGS.number_published_datasets:
         published_datasets = DB.submission_filter.find(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE], limit = None)
-        key_figures["Published Data"] = len(published_datasets)
+        key_figures["Active Submissions"] = len(published_datasets)
     if KEY_FIGURE_SETTINGS.number_proteins:
-        key_figures["Quantified Proteins"] = DB.proteins.count(quantified=True)
+        key_figures["Quantified Proteins"] = DB.protein_groups.count()
+    if KEY_FIGURE_SETTINGS.number_quant_values:
+        key_figures["Quantified Values"] = DB.protein_groups.count_quant_values()
     if KEY_FIGURE_SETTINGS.number_genotypes:
         key_figures["Genotypes"] = DB.genotypes.count()
     if KEY_FIGURE_SETTINGS.number_users:
