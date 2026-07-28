@@ -17,12 +17,13 @@ class Neo4JProteinGroups(ProteinGroupsABC):
     def count(self, submission_tag : str = None) -> int:
         """Counts the number of quantified protein groups. If a submission tag is given, only counts protein groups associated with that submission (e.g. that were quantified).
         """
-        query = "MATCH (pg:ProteinGroup) "
+        
         if submission_tag is not None:
-            query += "WHERE EXISTS {(pg)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
+            query = "MATCH (sub:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(pg:ProteinGroup) "
+            query += "RETURN count(DISTINCT pg) "
         else:
-            query += "WHERE EXISTS {(pg)<-[:QUANTIFIED]-(:Sample)} "
-        query += "RETURN count(pg)"
+            query = "MATCH (pg:ProteinGroup)<-[:QUANTIFIED]-(:Sample)"
+            query += "RETURN count(DISTINCT pg)"
         
         r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else 0
