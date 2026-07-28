@@ -17,7 +17,7 @@ class Neo4JProteinGroups(ProteinGroupsABC):
     def count(self, submission_tag : str = None) -> int:
         """Counts the number of quantified protein groups. If a submission tag is given, only counts protein groups associated with that submission (e.g. that were quantified).
         """
-        query = "MATCH (pg:ProteinGroup)"
+        query = "MATCH (pg:ProteinGroup) "
         if submission_tag is not None:
             query += "WHERE EXISTS {(pg)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
         else:
