@@ -271,6 +271,10 @@ class SubmissionsABC(ABC):
     def get_views(self, tag : str) -> int:
         "Returns the number of views for a submission."
         
+    @abstractmethod
+    def get_view_score(self, tag : str) -> float:
+        "Returns the view score for a submission. This is used to determine the trending submissions."
+    
         
     @abstractmethod
     def get_protein_group_quantification_count(self) -> pd.DataFrame:
@@ -614,6 +618,21 @@ class SubmissionFilterABC(ABC):
         """
         
     @abstractmethod
+    def get_trending(self, limit : int = 10) -> List[str]:
+        """Returns the trending submissions based on the view score.
+
+        Parameters
+        ----------
+        limit : int, optional
+            The maximum number of trending submissions to return, by default 10
+
+        Returns
+        -------
+        List[str]
+            A list of submission tags ordered by their view score in descending order.
+        """
+        
+    @abstractmethod
     def group_by_state(self, tags : List[str] = None) -> Dict[str, List[str]]:
         """Groups the submission tags by state. 
         Parameters
@@ -701,4 +720,24 @@ class SubmissionFilterABC(ABC):
         ------
         Exception
             _description_
+        """
+
+
+    @abstractmethod
+    def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
+        """Sorts the submission tags by the number of views in descending order. 
+        The sorting is performed on the given list of submission tags. 
+        If the limit is provided, only the top N submission tags are returned. 
+
+        Parameters
+        ----------
+        tags : List[str]
+            The list of submission tags to sort.
+        limit : int, optional
+            The maximum number of submission tags to return, by default 10
+
+        Returns
+        -------
+        List[str]
+            The sorted list of submission tags by views in descending order.
         """

@@ -7,7 +7,6 @@ from lib.database.abstract.Database import DatabaseABC
 from lib.database.neo4j.Proteomes import Neo4JProteomes
 from lib.database.neo4j.Attributes import Neo4JAttributes
 from lib.database.neo4j.Dataset import Neo4JDataset
-from lib.database.neo4j.Filters import Neo4JFilter
 from lib.database.neo4j.Submission import Neo4JSubmissionFilter, Neo4JSubmissions, Neo4JSubmissionSummary
 from lib.database.neo4j.Meta import Neo4JMetaHandler
 from lib.database.neo4j.Users import Neo4JUser
@@ -58,7 +57,6 @@ class MCNeo4JDatabase(DatabaseABC):
         
         self.users = Neo4JUser(driver=self.connection.driver)
         self.features = Neo4JFeatures(driver=self.connection.driver)
-        self.filters = Neo4JFilter(driver=self.connection.driver)
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver, users=self.users, research_groups=self.research_groups)
         self.genotypes = Neo4JGenotype(driver=self.connection.driver, condition_applications=self.condition_applications)

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
-# from datetime import timedelta
-from typing import List, Dict, Optional, Tuple, Literal  # , Any
-from deprecated import deprecated
-import pandas as pd
+from typing import List, Literal  
 from config.models.news.news import NewsModel
 
 class NewsABC(ABC):

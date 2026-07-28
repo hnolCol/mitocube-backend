@@ -10,7 +10,6 @@ from neo4j import Driver
 import pandas as pd
 
 from lib.database.abstract.Attributes import AttributesABC
-from lib.database.abstract.Filter import FilterABC
 from lib.database.abstract.Users import UserABC 
 from lib.database.abstract.Meta import MetaABC 
 from lib.database.abstract.Submission import SubmissionFilterABC, SubmissionsABC, SubmissionSummaryABC
@@ -74,7 +73,6 @@ class DatabaseABC(ABC):
     users : UserABC = None 
     features : FeaturesABC = None
     attributes : AttributesABC = None
-    filters : FilterABC = None
     submissions : SubmissionsABC = None
     submission_filter : SubmissionFilterABC = None
     datasets : DatasetABC = None 
@@ -151,12 +149,6 @@ class DatabaseABC(ABC):
         
         if not isinstance(self.attributes, AttributesABC):
             raise TypeError("The attribute user must be an instance of AttributesABC")
-        
-        if self.filters is None:
-            raise NotImplementedError("A database class must have the filter attribute defined.")
-        
-        if not isinstance(self.filters, FilterABC):
-            raise TypeError("The attribute filters must be an instance of FilterABC")
         
         if self.submission_filter is None:
             raise NotImplementedError("A database class must have the submission_filter attribute defined.")

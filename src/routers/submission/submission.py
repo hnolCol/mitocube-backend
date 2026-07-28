@@ -78,6 +78,7 @@ def get_submission_by_query(state : str|int = None,
                             ca_search_string : str = None,
                             limit : int = 20, 
                             ordered : bool = True,
+                            sort_by_views : bool = False,
                             group_by_state : bool = True,
                             group_by_user : bool = False,
                             group_by_date : bool = False,
@@ -123,9 +124,12 @@ def get_submission_by_query(state : str|int = None,
     #         - 'total_count' (int) : The number of all submissions in the dataset. 
     """
 
-
+    if sort_by_views: 
+        #get all tags then sort by views 
+        ordered = False 
+        limit = None 
+        
     N = DB.submissions.count()
-    parsed_user_tags = APIParamString(param=user_tags).param
     tags = DB.submission_filter.find(
             current_user_tag=user.tag,
             search_string = search_string,
@@ -144,6 +148,11 @@ def get_submission_by_query(state : str|int = None,
             )
     if len(tags) == 0 and any([group_by_date,group_by_state,group_by_user]):
         return {}
+    
+    if sort_by_views:
+        #sort by views
+        tags = DB.submission_filter.sort_by_views(tags = tags)
+
     if group_by_state:
         #group by state
         tags = DB.submission_filter.group_by_state(tags = tags)
@@ -154,7 +163,6 @@ def get_submission_by_query(state : str|int = None,
         #group by date
         tags = DB.submission_filter.group_by_date(tags = tags)
     return tags 
-    
 
 
 # @router.patch("/submissions/{submission_label}/metatext", summary="Update the metatext of a submission.")
@@ -174,6 +182,26 @@ def get_submission_by_query(state : str|int = None,
 #     dataset.write_json(update_submission, update = True)/s
 #     return True 
     
+
+
+@router.get("/submissions/trending", summary="Returns the trending submissions based on the view score.", response_model=List[str])
+def get_trending_submissions(limit : int, user = Depends(get_user_from_token)): 
+    """Returns the trending submissions based on the view score.
+
+    Parameters
+    ----------
+    limit : int
+        The maximum number of trending submissions to return.
+    user : UserModel, optional
+        The user making the request, by default Depends(get_user_from_token)
+
+    Returns
+    -------
+    List[str]
+        A list of submission tags ordered by their view score in descending order.
+    """
+    
+    return DB.submission_filter.get_trending(limit = limit)
 
 
 @router.get("/submissions/{submission_tag}/exists")
@@ -399,7 +427,27 @@ def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_us
     if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
     return DB.submissions.get_state(tag = submission_tag)
 
+@router.get("/submissions/{submission_tag}/view_score", response_model=float)
+def get_submission_view_score(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+    """Returns the view score of a submission.
 
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission the views should be returned.
+
+    Returns
+    -------
+    float
+        The view score of the submission.
+
+    Raises
+    ------
+    tag_not_found
+       The submission_tag was not found.
+    """
+    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
+    return DB.submissions.get_view_score(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/views")
 def get_submission_views(submission_tag : str, user : UserModel = Depends(get_user_from_token)):

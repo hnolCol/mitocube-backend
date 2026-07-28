@@ -89,56 +89,18 @@ def query_user_db(search_string : str = None, limit : int = 40, user : UserModel
 
     Parameters
     ----------
-    query : str, optional
-        _description_, by default None
+    search_string : str, optional
+        The search string to query users, by default None
     limit : int, optional
-        _description_, by default 40
+        The maximum number of user tags to return, by default 40
 
     Returns
     -------
-    _type_
-        _description_
+    List[str]
+        A list of user tags matching the search criteria.
     """
 
     return DB.users.find(search_string, limit=limit)
-
-# @router.post("/users/pw",summary="Allows users to change the password for themselves.")
-# def change_password(updated_pw : Dict[str,str], user : UserModel = Depends(get_user_from_token)):
-#     """_summary_
-
-#     Parameters
-#     ----------
-#     updated_pw : Dict
-#         A dict of shape updated_pw = {"password" : <string>}.
-#     user : UserModel, optional
-#         The User identified using the jwt token, by default Depends(get_user_from_token)
-
-#     Returns
-#     -------
-#     _type_
-#         _description_
-
-#     Raises
-#     ------
-#     HTTPException
-#         _description_
-#     """
-#     # try:
-#     #     UserDB.update_user_password_by_label(user_label=user.label, password = updated_pw["password"])
-#     # except Exception as e:
-#     #     raise HTTPException(status_code=400,detail="An error occurred during password change.")
-
-#     new_password = updated_pw.get("password")
-#     if not new_password:
-#         raise HTTPException(422, "Password is required.")
-
-#     try:
-#         hashed = DB.users.hash_password(new_password)
-#     except ValueError as e:
-#         raise HTTPException(422, str(e))
-
-#     if not DB.users.update(tag=user.tag, user_props={"password": hashed}):
-#         raise HTTPException(400, "Could not update password.")
     
 @router.post("/users/pw", summary="Allows users to change the password for themselves.")
 def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_user_from_token)):
@@ -165,18 +127,6 @@ def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_us
 
     if not DB.users.update(tag=user.tag, user_props={"password": hashed}):
         raise HTTPException(400, "Could not update password.")
-    
-
-@router.patch("/users/user", summary="Updates some properties of a user")
-def update_user(user_props : dict, user : UserModel = Depends(is_user_admin)):
-    """Requires admin rights. Change to allow that users modify themselves."""
-    user_props_att_renamed = dict([(k.replace("att_user_",""), v if not isinstance(v, dict) else v["name"]) for k,v in user_props.items()])
-    try:
-        user_to_update = UserModelForUpdate(**user_props_att_renamed)
-    except Exception as e:
-        raise HTTPException(status_code=422,detail=str(e))
-        
-    UserDB.update_user_by_label(user_label = user_to_update.label, user_props=user_to_update)
     
 
 @router.get("/users/full",  response_model=UsersAdminResponse)

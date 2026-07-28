@@ -1,12 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
-# from datetime import timedelta
-from typing import List, Dict, Optional, Tuple, Literal  # , Any
-from deprecated import deprecated
-import pandas as pd
-from config.models.performance import QCPeptidesModel, QCRunModel, QCPeptideModel
-from config.models.peptides import PeptideResponseModel
+from typing import List
 from config.models.feature import FeatureNeoModel
 
 class ProteinsABC(ABC):

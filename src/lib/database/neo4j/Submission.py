@@ -1,7 +1,6 @@
+import math
 from typing import Literal, List , Dict, Optional
-from unittest import result
 from neo4j import Driver, Result 
-import uuid
 import pandas as pd 
 import datetime
 
@@ -46,8 +45,7 @@ class Neo4JSubmissions(SubmissionsABC):
         self._proteomes = proteomes
         self._condition_applications = condition_applications
 
-     
-
+    
 
     def _m_insert_timeline(self, tag :str, timeline : List[Dict]):
         """_summary_
@@ -269,12 +267,6 @@ class Neo4JSubmissions(SubmissionsABC):
             
         r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, result_transformer_=Result.values if group_by_attribute or group_by_min_state else Result.value)
         if group_by_attribute and group_by_min_state:
-            # print(r)
-            # for ri in r:
-            #     print(ri[0], "state")
-            #     for ac in ri[1]:
-            #         print(ac)
-            #         print(ac["attribute_tag"], ac["condition_application_tags"])
             return [ConditionApplicationStateAttributeModel(state_tag = ri[0], attribute_conditions = [ConditionApplicationAttributeModel(attribute_tag = ac["attribute_tag"], condition_application_tags = ac["condition_application_tags"]) for ac in ri[1]]) for ri in r]
         if group_by_attribute:
             return [ConditionApplicationAttributeModel(attribute_tag = ri[0], condition_application_tags = ri[1]) for ri in r]
@@ -372,18 +364,18 @@ class Neo4JSubmissions(SubmissionsABC):
             query = (
                 "UNWIND $quant_tags AS tag "
                 "WITH tag, EXISTS { "
-                "    MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) WHERE pg.tag in $quant_tags "
+                "    MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup {tag : tag}) "
                 "  } as quantified "
-                "RETURN pg.tag as tag, quantified "
+                "RETURN tag, quantified "
             )
             
         elif quantification_type == "precursors":
             query = (
                 "UNWIND $quant_tags AS tag "
                 "WITH tag, EXISTS { "
-                "    MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pr:Precursor) WHERE pr.tag in $quant_tags "
+                "    MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pr:Precursor {tag : tag}) "
                 "} as quantified "
-                "RETURN pr.tag as tag,  quantified "
+                "RETURN tag, quantified "
             )
         elif quantification_type == "proteins":
             query = (
@@ -419,7 +411,6 @@ class Neo4JSubmissions(SubmissionsABC):
         )
 
         ca_tags = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
-        print([self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags], "???")
         return [self._condition_applications.get_tree(tag=ca_tag) for ca_tag in ca_tags]
 
 
@@ -487,28 +478,49 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators, created_at = created_at)
+        return True
+
+    def insert_view(self, tag : str, user_tag : str, decay_rate : float = math.log(2)/(5 * 24)) -> bool:
+        """Inserts a view for a submission.
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+        user_tag : str
+            The user tag of the user viewing the submission.
+        decay_rate : float
+            The decay rate for the view score to identify the most recent views. The default value is set to log(2)/(5 * 24), which corresponds to a half-life of 5 days.
+
+        Returns
+        -------
+        bool
+            True if the view was inserted successfully, False otherwise.
+        """
         
-    def insert_view(self, tag : str, user_tag : str) -> bool:
-        "Inserts a view for a submission."
-        
+      
         query = (
             "MATCH (submission:Submission {tag : $tag}) "
             "MERGE (vc:ViewCounter {submission_tag: $tag}) "
-            "SET vc.count = coalesce(vc.count, 0) + 1 "
-            "WITH submission, vc "
+            "WITH submission, vc, "
+            "CASE WHEN vc.lastUpdated IS NULL THEN 0 "
+            "    ELSE (timestamp() - vc.lastUpdated) / 3600000.0 "
+            "END AS hoursElapsed "
+            "SET vc.count = coalesce(vc.count, 0) + 1, "
+            "    vc.score = coalesce(vc.score, 0) * exp(-$decay_rate * hoursElapsed) + 1, "
+            "    vc.lastUpdated = timestamp() "
             "MERGE (submission)-[:HAS_VIEW_COUNTER]->(vc) "
             "WITH submission "
             "MATCH (u:User {tag : $user_tag}) "
             "MERGE (u)-[r:VIEWED]->(submission) "
             "ON CREATE SET r.created_at = timestamp() "
-            "WITH submission, r "
+            "WITH u "
             "MATCH (u)-[v:VIEWED]->(s:Submission {tag : $tag}) "
             "WITH v ORDER BY v.created_at DESC SKIP 20 " #make this a property to be defined. 
             "DELETE v "
             "RETURN true "
         )
 
-        self._driver.execute_query(query, routing_="w", tag = tag, user_tag = user_tag)
+        self._driver.execute_query(query, routing_="w", tag = tag, user_tag = user_tag, decay_rate = decay_rate)
         return True
     
      
@@ -547,35 +559,6 @@ class Neo4JSubmissions(SubmissionsABC):
         self._driver.execute_query(query, routing_="w", tag=tag, research_aim=research_aim, user_tag=user_tag)
         return True
     
-    # def insert_protein_quantifications(self, tag : str, quantifications : List[ProteinGroupQuantificationModel]) -> int:   
-    #     """
-    #     Inserts protein quantifications for a given submission.
-
-    #     Parameters
-    #     ----------
-    #     tag : str
-    #         The tag of the submission.
-    #     quantifications : List[Dict]
-    #         List of protein quantifications to insert.
-
-    #     Returns
-    #     -------
-    #     int
-    #         Number of inserted protein quantifications.
-    #     """
-    #     query = (
-    #         "MATCH (submission:Submission {tag : $tag}) "
-    #         "UNWIND $quantifications as quantification "
-    #         "MATCH (pg:ProteinGroup {tag : quantification.tag}) "
-    #         "MATCH (sample:Sample {tag : quantification.sample_tag})<-[:HAS_SAMPLE]-(submission) "
-    #         "MERGE (sample)-[q:QUANTIFIED]->(pg) "
-    #         "SET q.value = quantification.value, q.score = quantification.score, q.submission_tag = $tag, q.created_at = timestamp() "
-    #         "RETURN count(q) "
-    #     )
-    #     r = self._driver.execute_query(query, routing_="w", tag=tag, quantifications=quantifications, result_transformer_=Result.value)
-    #     print(r[0] if len(r) > 0 else 0)
-    #     return r[0] if len(r) > 0 else 0
-    
     def insert_protein_quantifications(
         self,
         tag: str,
@@ -593,15 +576,6 @@ class Neo4JSubmissions(SubmissionsABC):
                 self._driver.execute_query(query_delete, routing_="w", tag=tag)
 
         quantifications_data = [x.model_dump() for x in quantifications]
-
-        # class ProteinGroupQuantificationModel(BaseModel):
-        #         tag : str # Protein group tag 
-        #         sample_tag : str # Sample tag 
-        #     value : float  # Quantification value (intensity, such as LFQ, iBAQ, TMT, etc)
-
-        # class ProteinQuantificationBulkInsertModel(BaseModel):
-        #     quantifications: List[ProteinGroupQuantificationModel]
-        # ---- 3. batch grouped data ----
         total = 0
 
         query = """
@@ -622,17 +596,18 @@ class Neo4JSubmissions(SubmissionsABC):
         
         RETURN sum(created) AS total
         """
-        for i in range(0, len(quantifications_data), batch_size):
-            batch = quantifications_data[i:i+batch_size]
-        
-            result = self._driver.session().run(
-                query,
-                tag=tag,
-                qs=batch
-            )
+        with self._driver.session() as session:
+            for i in range(0, len(quantifications_data), batch_size):
+                batch = quantifications_data[i:i+batch_size]
 
-            record = result.single()
-            total += record["total"] if record else 0
+                result = session.run(
+                    query,
+                    tag=tag,
+                    qs=batch
+                )
+
+                record = result.single()
+                total += record["total"] if record else 0
 
         return total
     
@@ -659,25 +634,6 @@ class Neo4JSubmissions(SubmissionsABC):
 
             "RETURN count(q) AS updated "
         )
-
-
-            #     query = (
-            # "MATCH (pg:ProteinGroup {tag: $tag})<-[:QUANTIFIED]-(sample:Sample)-[q:QUANTIFIED]->(pg) "
-
-            # "WITH pg, q, q.value AS value "
-
-            # "WITH pg, "
-            #     "avg(value) AS mean, "
-            #     "stDev(value) AS stdev, "
-            #     "collect({q: q, value: value}) AS rows "
-            # "WHERE stdev > 0 "
-
-            # "UNWIND rows AS row "
-            # "SET row.q.z_score_sample = (row.value - mean) / stdev "
-
-            # "RETURN size(rows) AS updated"
-            # )
-
 
         r = self._driver.execute_query(
             query,
@@ -715,7 +671,6 @@ class Neo4JSubmissions(SubmissionsABC):
             tag=tag,
             result_transformer_=Result.value
         )
-        print(r)
         return r[0] if len(r) > 0 else 0
 
     def transform_quantification_to_log2(self, tag : str) -> bool:
@@ -739,13 +694,11 @@ class Neo4JSubmissions(SubmissionsABC):
             tag=tag,
             result_transformer_=Result.value
         )
-        print(r,"TRANSFORMED")
         return r[0] if len(r) > 0 else 0
 
 
-    def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
-        ""
-        print("not implemented yet")
+    def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:
+        raise NotImplementedError("insert_precursor_quantifications is not implemented yet.")
     
     def get_views(self, tag : str) -> int:
         
@@ -757,6 +710,15 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else 0
 
+    def get_view_score(self, tag : str) -> float:
+        "For trending submissions"
+        query = (
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_VIEW_COUNTER]->(vc:ViewCounter) "
+            "RETURN vc.score "
+        )
+
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else 0.0
 
     
     def insert_attributes(self, tag, traits : List[AttributeTree]) -> bool:
@@ -1409,6 +1371,28 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return submission_counts.set_index("tag")
     
     
+    def get_trending(self, tags : List[str] = None, limit : int = 10) -> List[str]:
+        """Returns the trending submissions based on the view score.
+
+        Parameters
+        ----------
+        limit : int, optional
+            The maximum number of trending submissions to return, by default 10
+
+        Returns
+        -------
+        List[str]
+            A list of submission tags ordered by their view score in descending order.
+        """
+        query = (
+            "MATCH (submission:Submission)-[:HAS_VIEW_COUNTER]->(vc:ViewCounter) WHERE vc.score IS NOT NULL "
+            "RETURN submission.tag ORDER BY vc.score DESC "
+            "LIMIT $limit"
+        )
+        
+        r = self._driver.execute_query(query, limit = limit, routing_="r", database_="neo4j", result_transformer_=Result.value)
+        return r
+    
     def group_by_state(self, tags : List[str] = None) -> Dict[str|int, List[str]]:
         """Groups the submissions by their state and returns the counts of each state.
 
@@ -1708,19 +1692,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             where_clauses.append("submission.tag IN $submission_tags")
 
         if match_all:
-            # Each tag must match independently — interpolated since no per-tag param support
-            def make_exists(tag):
-                clauses = [
-                    f"EXISTS {{ MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag = '{tag}' }}"
-                ]
-                if include_sample_ca:
-                    clauses.append(
-                        f"EXISTS {{ MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag = '{tag}' }}"
-                    )
-                # Tag must appear on submission OR sample (if include_sample_ca), but ALL tags must match
-                return "(" + " OR ".join(clauses) + ")"
-
-            where_clauses.append(" AND ".join(make_exists(tag) for tag in ca_tags))
+            # Every tag in $ca_tags must independently match — parameterized via ALL() to avoid interpolating tags into the query
+            per_tag_clauses = [
+                "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag = t }"
+            ]
+            if include_sample_ca:
+                per_tag_clauses.append(
+                    "EXISTS { MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag = t }"
+                )
+            # Tag must appear on submission OR sample (if include_sample_ca), but ALL tags must match
+            where_clauses.append(
+                "ALL(t IN $ca_tags WHERE (" + " OR ".join(per_tag_clauses) + "))"
+            )
 
         else:
             if include_sample_ca:
@@ -1991,17 +1974,31 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         if tags is None: return []
         
         return tags 
+    
+    
+    def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
+        """Sorts the submission tags by the number of views in descending order."""
+        query = (
+            "MATCH (submission:Submission)-[:HAS_VIEW_COUNTER]->(vc:ViewCounter) "
+            "WHERE submission.tag in $tags "
+            "RETURN submission.tag as tag, vc.count as views "
+            "ORDER BY vc.views DESC "
+        )
+        query = self._add_limit(query,limit)
+        r = self._driver.execute_query(query, tags = tags, limit = limit, routing_="r", result_transformer_=Result.data)
+        return [ri.get("tag") for ri in r]
         
-        
-    def title_full_text_search(self, query_string : str):
-        ""
+    def title_full_text_search(self, query_string : str) -> List[FulltextSearchResult]:
+        """Performs a full-text search on submission titles.""" 
         
         r, _ , _ = self._factory.full_text_search("titleSearch",query_string)
+        return [ri.data() for ri in r]
 
         
-    def meta_text_search(self, query_string : str):
+    def meta_text_search(self, query_string : str) -> List[FulltextSearchResult]:
         ""
         r, _ , _ = self._factory.full_text_search("metatextSearch",query_string)
+        return [ri.data() for ri in r]
         
         
     def full_dataset_text_search(self, search_string : str) -> List[FulltextSearchResult]:
@@ -2011,6 +2008,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return [ri.data() for ri in r]
         
     
+        
+        
         
 
 

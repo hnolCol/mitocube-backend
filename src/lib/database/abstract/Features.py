@@ -2,24 +2,11 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
-from collections import OrderedDict
-
-from typing import List, Dict, Optional, Tuple, Literal  # , Any
-from deprecated import deprecated
-
+from typing import List, Dict, Literal  
 import pandas as pd
 
-from config.models.user import UserModel 
 from config.models.feature import FeatureNeoModel
-from config.models.filter import FilterModel
 from config.models.calculations.quantile import QuantileModel
-   
-   
-   
-   
-   
-   
-   
 class FeaturesABC(ABC):
     """
     Features (proteins) can be added only from an uniprot

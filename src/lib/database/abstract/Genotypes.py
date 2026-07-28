@@ -3,9 +3,6 @@ from typing import List
 from neo4j import Driver
 
 from config.models.genotype import MinimalGenotypeModel, GenotypeModel , InsertGeneticApplicationModel
-from config.models.attributes import AttributeTree
-from config.models.user import UserModel
-from config.models.permissions import PermissionResponseModel 
 from config.models.conditions_applications import ConditionApplicationTreeModel
 
 
