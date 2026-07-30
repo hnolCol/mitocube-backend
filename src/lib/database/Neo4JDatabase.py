@@ -61,7 +61,6 @@ class NodeLabelModel(BaseModel):
         
     @model_serializer()
     def serialize_model(self):
-        
         return f"{self.cypher_label}:{self.label}"
  
 class RelationLabelModel(NodeLabelModel):

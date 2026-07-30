@@ -460,7 +460,6 @@ class Neo4JGenotype(GenotypeABC):
 
         ex_protein_tags = [_find_protein_tag([c]) for c in data.components]
         protein_tags = [tags[0] for tags in ex_protein_tags if len(tags) > 0]
-        print(protein_tags)
         if len(protein_tags) == 0:
             raise ValueError("No feature (protein tag) found in the genotype components.")
         

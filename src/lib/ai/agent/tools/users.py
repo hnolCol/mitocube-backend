@@ -84,7 +84,6 @@ def get_user_summary(user_tag: str):
         submission_count = 0 
         
     favorite_proteins = DB.proteins.get_favorite_proteins(user_tag=user_tag)
-    print("get_user_summary called with user_tag:", user_tag, "submission_count:", submission_count)
     
     return {
         "user_tag": user_tag,

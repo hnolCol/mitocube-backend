@@ -31,7 +31,7 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
         condition_applications = condition_applications.join(genotypes, how="outer")
 
     sample_tags = condition_applications.index.tolist()
-    data_table = DB.datasets.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
+    data_table = DB.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
 
     try:
         stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True)

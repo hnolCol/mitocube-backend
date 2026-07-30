@@ -836,7 +836,6 @@ class Neo4JAnnotations(AnnotationsABC):
         if limit is not None:
             query += "LIMIT $limit"
         
-        print(query, search_string, group_tags, protein_tags, submission_tags, limit)
         r = self._driver.execute_query( query,
                                         group_tags=group_tags,
                                         protein_tags=protein_tags,

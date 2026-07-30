@@ -13,8 +13,8 @@ from config.settings.keyfigures import get_key_figure_settings
 
 from lib.database.Database import Database 
 
-
-
+from datetime import timedelta
+from lib.cache.cache import db_cache_runtime
 
 from config.enums.states import SubmissionStatesEnums
 
@@ -300,25 +300,29 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     user : UserModel, optional
         the user that is inferred from the token, by default Depends(get_user_from_token)
     """
-    
-    
-    key_figures = OrderedDict()
-    if KEY_FIGURE_SETTINGS.number_submissions:
-        key_figures["Submissions"] = len(DB.get_submission_tags())
-    if KEY_FIGURE_SETTINGS.number_published_datasets:
-        published_datasets = DB.submission_filter.find(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE], limit = None)
-        key_figures["Active Submissions"] = len(published_datasets)
-    if KEY_FIGURE_SETTINGS.number_proteins:
-        key_figures["Quantified Proteins"] = DB.protein_groups.count()
-    if KEY_FIGURE_SETTINGS.number_quant_values:
-        key_figures["Quantified Values"] = DB.protein_groups.count_quant_values()
-    if KEY_FIGURE_SETTINGS.number_genotypes:
-        key_figures["Genotypes"] = DB.genotypes.count()
-    if KEY_FIGURE_SETTINGS.number_users:
-        key_figures["Users"] = DB.users.count()
-    return [{"label" : k, "metric" : v} for k,v in key_figures.items()]
+    def _get_keyfigures(user : UserModel):
+        key_figures = OrderedDict()
+        if KEY_FIGURE_SETTINGS.number_submissions:
+            key_figures["Submissions"] = len(DB.get_submission_tags())
+        if KEY_FIGURE_SETTINGS.number_published_datasets:
+            published_datasets = DB.submission_filter.find(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE], limit = None)
+            key_figures["Active Submissions"] = len(published_datasets)
+        if KEY_FIGURE_SETTINGS.number_proteins:
+            key_figures["Quantified Proteins"] = DB.protein_groups.count()
+        if KEY_FIGURE_SETTINGS.number_quant_values:
+            key_figures["Quantified Values"] = DB.protein_groups.count_quant_values()
+        if KEY_FIGURE_SETTINGS.number_genotypes:
+            key_figures["Genotypes"] = DB.genotypes.count()
+        if KEY_FIGURE_SETTINGS.number_users:
+            key_figures["Users"] = DB.users.count()
+        keyfigureData = [{"label" : k, "metric" : v} for k,v in key_figures.items()]
+        return keyfigureData
 
-
+    cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_keyfigures", user.tag])    
+    keyfigureData = db_cache_runtime.get_or_compute(cache_key = cache_key,
+                                        compute_fn = lambda : _get_keyfigures(user),
+                                        cache_time = timedelta(hours = 24))
+    return keyfigureData
 
 @router.get("/info/terms")
 def get_terms_of_use(user : UserModel = Depends(get_user_from_token)):

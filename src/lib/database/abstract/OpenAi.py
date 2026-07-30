@@ -69,7 +69,6 @@ class OpenAIClient(ABC):
             
             pubmed_ids = pubmed_search_result.get("esearchresult", {}).get("idlist", [])
             pubmed_ids_pub_date = pubmed_search_result_pub_data.get("esearchresult", {}).get("idlist", [])
-            print(list(set(pubmed_ids + pubmed_ids_pub_date)))
             pubmed_publication_abstracts = get_pubmed_publications(pubmedids=list(set(pubmed_ids + pubmed_ids_pub_date)))
             r[protein_name] = {
                 "pubmed_ids" : pubmed_ids,
@@ -103,7 +102,6 @@ class OpenAIClient(ABC):
             df_out = pd.concat([df_out, df], ignore_index=True).drop_duplicates(keep="first") # we want to keep the first classification, as it is more likely to be correct, but we do not want duplicates in the output.
 
             classes = df_out.to_dict(orient="records")
-        print(df_out)
         df_out.to_csv("functional_classification_output.csv", index=False, sep="\t")
         return classes
         

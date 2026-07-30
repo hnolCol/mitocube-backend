@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod, ABC
 from collections import OrderedDict
-# from datetime import timedelta
+from datetime import timedelta
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 from neo4j import Driver 
@@ -47,6 +47,9 @@ from lib.database.abstract.Protocols import ProtocolsABC
 
 
 DB_SETTINGS = get_db_settings()
+
+
+from lib.cache.cache import db_cache_runtime
 
 ## load database 
 
@@ -342,13 +345,11 @@ class DatabaseABC(ABC):
         pd.DataFrame
             _description_
         """
-    
-        cache_key = self.cache.calculate_key([tag,annotation_tag if annotation_tag is not None else "", ",".join(sample_tags) if sample_tags is not None and len(sample_tags) > 0 else "", str(use_sample_tags), level])
-        if self.cache.exists(cache_key):
-            return self.cache.get(cache_key)
-        datatable = self.datasets.get_datatable(tag = tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=use_sample_tags, level=level)
-        self.cache.insert(cache_key, datatable)
-        return datatable 
+        cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_datatable",tag,annotation_tag if annotation_tag is not None else "", ",".join(sample_tags) if sample_tags is not None and len(sample_tags) > 0 else "", str(use_sample_tags), level])    
+        datatable = db_cache_runtime.get_or_compute(cache_key = cache_key,
+                                        compute_fn = lambda : self.datasets.get_datatable(tag = tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=use_sample_tags, level=level),
+                                        cache_time = timedelta(hours = 12))
+        return datatable
         
    
     def get_meta_data(self, tag : str) -> DatasetSubmissionModel:
