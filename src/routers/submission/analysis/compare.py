@@ -19,7 +19,6 @@ from scipy.stats import ttest_ind, false_discovery_control
 import numpy as np
 from services.statistics.clustering import cluster_to_dataframe
 
-
 DB = Database.DB()
 
 router = APIRouter(
@@ -80,7 +79,7 @@ def _annotation_analysis(annotation_tag: str, submission_tag : str) -> Dict:
     
 
     protein_tags = DB.annotations.get_protein_tags(tag = annotation_tag, submission_tag = submission_tag)
-    return {"ids" : protein_tags}
+    return {"ids" : pd.Index(protein_tags)}
     
  
 def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[str]], increase: bool = True, strict: bool = True, protein_group_tags: List[str] = None) -> Dict:
