@@ -20,17 +20,41 @@ router = APIRouter(
     )
 
 
+def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float):
+    dt = DB.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
+    if dt.empty:
+        raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.") 
+    if sample_tags_left.size < 2 or sample_tags_right.size < 2:
+        raise HTTPException(status_code=400, detail="At least two samples are required in each group for t-test.")
+    
+    X = dt.loc[:,sample_tags_left]
+    Y = dt.loc[:,sample_tags_right]
+
+    T,p = ttest_ind(X, Y, nan_policy="omit", axis=1, equal_var=equal_variance)
+    p_value_name = f"p-value"
+        
+    #create data frame with the t-test statistics 
+    stats = pd.DataFrame(
+            {f"t-value {suffix}" : T, 
+             p_value_name : p, 
+             "tag" : dt.index,
+             f"log2FC {suffix}" : X.mean(axis=1) - Y.mean(axis=1)
+            }, 
+            columns=[f"t-value {suffix}",p_value_name,"tag", f"log2FC {suffix}"]
+            ).dropna(subset=[p_value_name])
+    stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
+    stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
+    stats.loc[:,f"Significant {suffix}"] = stats.loc[:,f"fdr {suffix}"] <= fdr
+    return stats 
+
 #pca endpoints
 @router.get("/{submission_tag}/volcano",
             tags=["Dimensional reduction","Volcano"])
 def get_dataset_volcano(submission_tag : str, 
-                        # attribute_tag : str,
                         ca_tag_left : str, 
                         ca_tag_right : str,
                         within_attribute_tags : str = None,
                         within_ca_tags : str = None,      
-                      #  attribute_value_tag_left : str, attribute_value_tag_right : str, sample_attribute_tag : str, within_attribute_tag : str = None,
-                        within_trait_tag : str = None, 
                         impute : bool = True,
                         annotation_tag : str = None, 
                         equal_variance : bool = True,
@@ -69,31 +93,8 @@ def get_dataset_volcano(submission_tag : str,
         
     # check if sample tags not empty 
 
-    dt = DB.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
-    if dt.empty:
-        raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.") 
-    if sample_tags_left.size < 2 or sample_tags_right.size < 2:
-        raise HTTPException(status_code=400, detail="At least two samples are required in each group for t-test.")
-    
-    X = dt.loc[:,sample_tags_left]
-    Y = dt.loc[:,sample_tags_right]
 
-    T,p = ttest_ind(X, Y, nan_policy="omit", axis=1, equal_var=equal_variance)
-    p_value_name = f"p-value"
-        
-    #create data frame with the t-test statistics 
-    stats = pd.DataFrame(
-            {f"t-value {suffix}" : T, 
-             p_value_name : p, 
-             "tag" : dt.index,
-             f"log2FC {suffix}" : X.mean(axis=1) - Y.mean(axis=1)
-            }, 
-            columns=[f"t-value {suffix}",p_value_name,"tag", f"log2FC {suffix}"]
-            ).dropna(subset=[p_value_name])
-    stats.loc[:,f"-log10 p-value {suffix}"] = -np.log10(stats.loc[:,p_value_name])
-    stats.loc[:,f"fdr {suffix}"] = false_discovery_control(stats[p_value_name].values)
-    stats.loc[:,f"Significant {suffix}"] = stats.loc[:,f"fdr {suffix}"] <= fdr
-
+    stats = handle_pairwise(submission_tag=submission_tag, annotation_tag=annotation_tag, sample_tags=sample_tags, sample_tags_left=sample_tags_left, sample_tags_right=sample_tags_right, suffix=suffix, equal_variance=equal_variance, fdr=fdr)
     
     return {"stats" : stats.to_dict(orient="records"), 
             "suffix" : suffix, 

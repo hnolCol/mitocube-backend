@@ -509,13 +509,17 @@ class Neo4JSamples(SamplesABC):
         return r[0] if len(r) > 0 else False
 
 
-    def handle_comparison(self, submission_tag : str, ca_tag_left : str, ca_tag_right : str , within_attribute_tags : str, within_ca_tags : str, annotation_tag : str):
-        
+    def get_sample_condition_application_map_for_submission(self, submission_tag : str) -> pd.DataFrame:
         condition_applications = self.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
         if self.has_sample_genotype(submission_tag=submission_tag):
             genotypes = self.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
             condition_applications = condition_applications.join(genotypes, how="outer")
+            
+        return condition_applications
+    
+    def handle_comparison(self, submission_tag : str, ca_tag_left : str, ca_tag_right : str , within_attribute_tags : str, within_ca_tags : str, annotation_tag : str):
         
+        condition_applications = self.get_sample_condition_application_map_for_submission(submission_tag=submission_tag)
         if self._genotypes.exists(tag = ca_tag_left):
             attribute_tag = "att_genotype"
         else:
@@ -555,8 +559,9 @@ class Neo4JSamples(SamplesABC):
         def clean_ca_text(text):
             if text is None:
                 return text
+            cleaned = re.sub(r'\(\s*\)', '', text)
             # remove parentheses containing empty values 
-            cleaned = re.sub(r'\(\s*[^)]*\)', lambda m: m.group() if any(c.isdigit() for c in m.group()) else '', text)
+            # cleaned = re.sub(r'\(\s*[^)]*\)', lambda m: m.group() if any(c.isdigit() for c in m.group()) else '', text)
             return cleaned.strip()
 
         ca_left_text = clean_ca_text(ca_left_text)

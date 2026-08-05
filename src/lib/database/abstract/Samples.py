@@ -66,7 +66,24 @@ class SamplesABC(ABC):
         
     @abstractmethod
     def get(self, tag : str) -> SampleModel:
-        "Returns the sample information for a given sample tag."
+        """Returns the sample information for a given sample tag."""
+        
+        
+    @abstractmethod
+    def get_sample_condition_application_map_for_submission(self, submission_tag : str) -> pd.DataFrame:
+        """Returns a DataFrame with sample tags as index and condition application tags as columns for a given submission.
+        If the samples have genotypes, the genotype tags are also included as a column.
+        
+        Parameters
+        ----------
+        submission_tag : str
+            The tag of the submission to get the sample-condition application map for.
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with sample tags as index and condition application tags as columns. If genotypes are present, a column for genotype tags is also included.
+        """
         
     @abstractmethod
     def exists(self, tag : str) -> bool: 

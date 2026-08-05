@@ -32,7 +32,7 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 
 from routers.dataset import correlation as submission_correlation # volcano
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim, ranking
-from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap
+from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap, compare
 from routers.submission import permissions as submissions_permissions
 from routers.authentication import token, user
 from routers.info import info
@@ -81,6 +81,7 @@ from routers.crosslink import external_resource as crosslink_external_resource
 from routers.crosslink import crosslink
 from routers.protocols import protocols
 from routers.mfa import mfa
+
 # from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
 import pandas as pd
@@ -111,6 +112,7 @@ router_sources = [
                   #annotations,
                   heatmap, 
                   volcano,
+                  compare,
                   genotype_permissions, 
                   genotypes, 
                   attribute_permissions,

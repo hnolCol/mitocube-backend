@@ -11,13 +11,15 @@ from config.exceptions.HTTPExceptions import no_data_found_http_exception, filte
 from config.models.user import UserModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token
+
+from services.statistics.clustering import cluster_to_dataframe, compute_zscores, filter_for_clustering
+
 DB = Database.DB()
 
 router = APIRouter(
     prefix="/api/submissions/analysis",
     tags=["Submission","Analysis","Heatmap"],
 )
-
 
 @router.get("/{submission_tag}/heatmap")
 def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.05, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token)):
@@ -29,27 +31,53 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     if DB.submissions.has_genotypes(tag = submission_tag):
         genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
         condition_applications = condition_applications.join(genotypes, how="outer")
-
+    
+    cols = condition_applications.columns.tolist()
+    #sort by condition application groups.
+    first_seen = condition_applications.groupby(cols, sort=False).ngroup()
+    condition_applications = (
+        condition_applications
+        .assign(_grp=first_seen)
+        .sort_values('_grp', kind='stable')
+        .drop(columns='_grp')
+    )
     sample_tags = condition_applications.index.tolist()
     data_table = DB.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
-
+    data_table = data_table.loc[:,condition_applications.index]
     try:
-        stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True)
+        stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True, min_non_nan=2)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error in one way anova " + str(e))
     if stats.empty or stats.index.size < 3: raise HTTPException(status_code=400, detail="No or less than 3 significant hits found using ANOVA. Please use a volcano plot.")
-    clusters, zscores = HierarchicalClustering(data_table).get_clusters(idcs=stats.index, n_clusters= n_clusters)
-    stats_and_zscores = zscores.join([stats,clusters], how="left")
-    clusters_for_group = clusters.loc[stats_and_zscores.index,:].reset_index() #index is now number, before keys
+    
+    
+    sig_data = data_table.loc[stats.index]
+    sig_data = filter_for_clustering(sig_data)
+    zscores = compute_zscores(sig_data)
+
+    # cluster on the z-scored data (leaf-ordered, with a 'cluster' column)
+    clustered = cluster_to_dataframe(
+        zscores.values, n_clusters=n_clusters,
+        index=zscores.index, columns=zscores.columns
+    )
+
+    clusters = clustered[["cluster"]]
+    zscores = zscores.loc[clustered.index]  # reorder z-scores to match leaf order
+
+    stats_and_zscores = zscores.join([stats, clusters], how="left")
+
+    clusters_for_group = clusters.loc[stats_and_zscores.index, :].reset_index()
     grouped_clusters = clusters_for_group.groupby(by="cluster")
-    cluster_indices = OrderedDict([(cluster_idx,cluster_data.index.to_list()) for cluster_idx, cluster_data in grouped_clusters])
-        
+    cluster_indices = OrderedDict(
+        (cluster_idx, cluster_data.index.to_list())
+        for cluster_idx, cluster_data in grouped_clusters
+    )
         
     return {
         "submission_tag" : submission_tag,
         "attribute_tag" : attribute_tag,
         "data" : stats_and_zscores.reset_index(names="tag").to_dict(orient="records"),
-        "value_names" : data_table.columns.to_list(),
+        "value_names" : condition_applications.index.to_list(),
         "label_names" : ["tag"],
         "color_names" : [],
         "cluster_indices" : cluster_indices,

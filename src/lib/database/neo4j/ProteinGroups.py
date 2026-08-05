@@ -1,4 +1,4 @@
-from typing import Optional,List, Dict
+from typing import Optional,List, Dict, Tuple
 
 from neo4j import Driver, Result
 
@@ -57,6 +57,39 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         r = self._driver.execute_query(query, tag = tag, result_transformer_=Result.value)
         return r[0]
     
+    
+    def find_trend_values(self,  sample_group_tags: List[Tuple[list, str, list]], tags : List[str] = None) -> List[dict]:
+        """Get avg QUANTIFIED value per ProteinGroup per sample group.
+
+        sample_group_tags: list of (ca_tags, group_tag, sample_tags), in the
+        order you want them compared (i.e. same order as the original ca_tags param).
+        """
+        # attach explicit index so we can reconstruct order after Cypher grouping
+        indexed_groups = [
+            {"idx": i, "ca_tags": g[0], "group_tag": g[1], "sample_tags": g[2]}
+            for i, g in enumerate(sample_group_tags)
+        ]
+
+        query = (
+            "UNWIND $groups as grp "
+            "MATCH (s:Sample)-[r:QUANTIFIED]->(pg:ProteinGroup) "
+            "WHERE s.tag IN grp.sample_tags " )
+    
+        if tags is not None and len(tags) > 0:
+            query += "AND pg.tag IN $tags "
+            
+        query += (
+            "WITH pg, grp.idx as idx, grp.group_tag as group_tag, "
+            "     avg(r.value) as avg_value, count(r) as quant_count "
+            "RETURN pg.tag as tag, idx, group_tag, avg_value, quant_count"
+        )
+
+        r = self._driver.execute_query(
+            query, routing_="r",
+            groups=indexed_groups,
+            result_transformer_=Result.to_df,
+        )
+        return r
    
    
     def find(self, search_string : str = None, submission_tag : str = None, sort_by_stat_attribute : str = None,  annotation_tags : List[str] = None, limit : int = 20) -> List[str]:
