@@ -1,17 +1,17 @@
 
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends,  HTTPException
 from lib.database.Database import Database
 from config.models.user import UserModel
-from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 
-from lib.data.transform.PCA import PCATransform
-from config.models.dataset.pca import DatasetPCAResponse
 import networkx as nx
 import random
 from typing import Dict, Any, List
-
+from lib.cache.cache import db_cache_runtime
+from collections import deque
 DB = Database.DB()
 
 router = APIRouter(
@@ -24,7 +24,43 @@ from typing import Any, Dict, List, Optional
  
 import networkx as nx
 import numpy as np
- 
+from numba import njit
+
+@njit(cache=True)
+def remove_overlaps_numba(coords, min_dist, iterations):
+    min_dist2 = min_dist * min_dist
+
+    for _ in range(iterations):
+        moved = False
+
+        for i in range(coords.shape[0]):
+            for j in range(i + 1, coords.shape[0]):
+
+                dx = coords[i, 0] - coords[j, 0]
+                dy = coords[i, 1] - coords[j, 1]
+
+                dist2 = dx * dx + dy * dy
+
+                if dist2 < min_dist2 and dist2 > 1e-12:
+                    dist = np.sqrt(dist2)
+
+                    factor = (min_dist - dist) / (2.0 * dist)
+
+                    px = dx * factor
+                    py = dy * factor
+
+                    coords[i, 0] += px
+                    coords[i, 1] += py
+
+                    coords[j, 0] -= px
+                    coords[j, 1] -= py
+
+                    moved = True
+
+        if not moved:
+            break
+
+    return coords
  
 # -----------------------------------------------------------------
 # 1. Figure out which nodes are "centers"
@@ -58,7 +94,7 @@ def infer_center_nodes(
 # -----------------------------------------------------------------
 # 2. Map every node to its cluster's center
 # -----------------------------------------------------------------
-def assign_clusters(G: nx.Graph, center_nodes: List[Any]) -> Dict[Any, Any]:
+def assign_clusters2(G: nx.Graph, center_nodes: List[Any]) -> Dict[Any, Any]:
     """
     Assigns every node to the nearest center node (by shortest path length).
     Nodes unreachable from any center fall back to being their own cluster.
@@ -82,7 +118,30 @@ def assign_clusters(G: nx.Graph, center_nodes: List[Any]) -> Dict[Any, Any]:
  
     return cluster_of
  
- 
+
+
+def assign_clusters(G, center_nodes):
+    cluster_of = {}
+    queue = deque()
+
+    # Initialize all centers
+    for c in center_nodes:
+        cluster_of[c] = c
+        queue.append(c)
+
+    while queue:
+        node = queue.popleft()
+
+        for nbr in G.neighbors(node):
+            if nbr not in cluster_of:
+                cluster_of[nbr] = cluster_of[node]
+                queue.append(nbr)
+
+    # Handle disconnected nodes
+    for node in G.nodes:
+        cluster_of.setdefault(node, node)
+
+    return cluster_of
 # -----------------------------------------------------------------
 # 3a. Measure how connected each pair of clusters is
 # -----------------------------------------------------------------
@@ -114,7 +173,7 @@ def _pair_weight(weights: Dict[tuple, int], a: Any, b: Any) -> int:
 def order_clusters_by_overlap(
     center_nodes: List[Any],
     weights: Dict[tuple, int],
-    refine_iterations: int = 200,
+    refine_iterations: int = 150,
 ) -> List[Any]:
     """
     Arranges center_nodes into a circular order that maximizes the total
@@ -222,29 +281,13 @@ def layout_clusters(
 # -----------------------------------------------------------------
 # 5. Final overlap cleanup
 # -----------------------------------------------------------------
-def remove_overlaps(
-    pos: Dict[Any, np.ndarray],
-    min_dist: float = 0.3,
-    iterations: int = 50,
-) -> Dict[Any, np.ndarray]:
+def remove_overlaps(pos, min_dist=0.3, iterations=50):
     nodes = list(pos.keys())
-    coords = np.array([pos[n] for n in nodes], dtype=float)
- 
-    for _ in range(iterations):
-        moved = False
-        for i in range(len(nodes)):
-            for j in range(i + 1, len(nodes)):
-                delta = coords[i] - coords[j]
-                dist = np.linalg.norm(delta)
-                if dist < min_dist and dist > 1e-6:
-                    push = (delta / dist) * (min_dist - dist) / 2
-                    coords[i] += push
-                    coords[j] -= push
-                    moved = True
-        if not moved:
-            break
- 
-    return {n: coords[idx] for idx, n in enumerate(nodes)}
+    coords = np.array([pos[n] for n in nodes], dtype=np.float64)
+
+    coords = remove_overlaps_numba(coords, min_dist, iterations)
+
+    return {n: coords[i] for i, n in enumerate(nodes)}
  
  
 # -----------------------------------------------------------------
@@ -369,7 +412,8 @@ def nx_to_indexed_graph_with_layout2(
         k = None,
         seed=seed,
         scale=scale,
-        iterations=iterations
+        iterations=iterations,
+        method="energy"
     )
 
     nodes = []
@@ -432,6 +476,10 @@ def get_annotation_network(submission_tag : str, annotation_group_tag : str = No
     
     if not DB.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
+    cache_key = db_cache_runtime.make_cache_key(key_data = ["db.submission.get_network",submission_tag, annotation_group_tag, show_quantified_proteins_only, min_proteins])  
+    cached_result =  db_cache_runtime.get(cache_key)
+    if cached_result is not None:
+        return cached_result
     if DB.annotation_groups.exists(tag = annotation_group_tag):
         annotation_tags = DB.annotation_groups.get_annotations(group_tag = annotation_group_tag)
         graph_data = []
@@ -457,4 +505,7 @@ def get_annotation_network(submission_tag : str, annotation_group_tag : str = No
                 radius=6.0,
                 min_dist=0.3,
             )
+          
+        db_cache_runtime.set(cache_key, result, cache_time=timedelta(hours = 12))
+        
         return result
