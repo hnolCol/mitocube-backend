@@ -92,7 +92,7 @@ types-PyYAML==6.0.12.20250915
 typing-inspection==0.4.1
 typing_extensions==4.15.0
 tzdata==2023.3
-urllib3==2.0.4
+urllib3==2.7.0
 uuid_utils==0.16.2
 uvicorn==0.23.1
 websockets==15.0.1
