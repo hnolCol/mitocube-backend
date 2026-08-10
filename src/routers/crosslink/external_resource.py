@@ -54,6 +54,14 @@ def get_external_resource(tag: str, user: UserModel = Depends(get_user_from_toke
     return DB.external_resources.get(tag)
 
 
+@router.get("/{tag}/condition_applications")
+def get_external_resource_condition_applications(tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+    """Returns condition-application tags (cell line, crosslinker, etc.) attached to a resource."""
+    if not DB.external_resources.exists(tag):
+        raise HTTPException(status_code=404, detail="External resource not found.")
+    return DB.external_resources.get_condition_applications(tag=tag)
+
+
 @router.get("/{tag}/crosslinks")
 def find_crosslinks_by_resource(tag: str, limit: int = 100, user: UserModel = Depends(get_user_from_token)) -> List[CrosslinkModel]:
     """Returns crosslinks linked to the given external resource."""

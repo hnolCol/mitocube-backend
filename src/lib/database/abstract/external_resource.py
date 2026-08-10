@@ -38,4 +38,7 @@ class ExternalResourceABC(ABC):
     @abstractmethod
     def find_by_protein(self, protein_tag: str) -> List[dict]:
         """Returns external resources that have crosslink annotations for a given protein."""
-        
+    
+    @abstractmethod
+    def get_condition_applications(self, tag: str) -> List[str]:
+        """Returns condition-application tags (cell line, crosslinker, etc.) attached to a resource."""

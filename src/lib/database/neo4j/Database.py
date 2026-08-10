@@ -86,7 +86,8 @@ class MCNeo4JDatabase(DatabaseABC):
         self.variants = Neo4jVariants(driver=self.connection.driver)
         self.phenotype_associations = Neo4jPhenotypeAssociations(driver=self.connection.driver, condition_applications=self.condition_applications, genotypes=self.genotypes)
         self.crosslinks = Neo4jCrosslinks(driver=self.connection.driver)
-        self.external_resources = Neo4jExternalResources(driver=self.connection.driver, crosslinks=self.crosslinks)
+        self.external_resources = Neo4jExternalResources(driver=self.connection.driver, crosslinks=self.crosslinks,
+                                                         condition_applications=self.condition_applications)
         
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
         
