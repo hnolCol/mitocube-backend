@@ -6,26 +6,61 @@ from neo4j import Driver, Result
 from services.json import read_json
 from lib.database.abstract.external_resource import ExternalResourceABC
 from lib.database.abstract.Crosslink import CrosslinkABC
+from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from config.models.external_resource import ExternalResourceInsertModel, ExternalResourceModel
 from config.models.crosslink import CrosslinkInsertModel
+from config.models.conditions_applications import ConditionApplicationTreeModel
+from config.models.attributes import AttributeTree
 
 
 class Neo4jExternalResources(ExternalResourceABC):
     """
     Neo4j layout:
         (ExternalResource {external, link, title})-[:HAS_XL]->(XL)
+        (ExternalResource)-[:HAS_APPLICATION]->(ConditionApplication)
         (XL)-[:LINKS {position, peptide_sequence}]->(Protein)
         (XL)-[:LINKS {position, peptide_sequence}]->(Protein)
     """
 
-    def __init__(self, driver: Driver, crosslinks: CrosslinkABC) -> None:
+    def __init__(self, driver: Driver, crosslinks: CrosslinkABC, condition_applications: ConditionApplicationABC) -> None:
         self._driver = driver
         self._crosslinks = crosslinks
+        self._condition_applications = condition_applications
 
     def exists(self, tag: str) -> bool:
         query = "WITH EXISTS { (r:ExternalResource {tag: $tag}) } AS exists RETURN exists"
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
         return r[0]
+
+    def _insert_condition_applications(self, resource_tag: str, condition_applications: List[AttributeTree]) -> None:
+        """Insert condition applications for an external resource, mirroring
+        Neo4jPhenotypeAssociations._insert_condition_applications: each top-level
+        attribute's children are split into individual trees so condition-application
+        nodes are shared/deduped by content across parents, then merged onto the
+        resource in one batch."""
+        ts = []
+        for attribute_tree in condition_applications:
+            for c in attribute_tree.children:
+                updated_tree = AttributeTree(
+                    tag=attribute_tree.tag,
+                    type=attribute_tree.type,
+                    value=attribute_tree.value,
+                    children=[c]
+                )
+                tag = self._condition_applications.insert(condition_application=updated_tree)
+                ts.append(tag)
+
+        if not ts:
+            return
+
+        query = (
+            "MATCH (r:ExternalResource {tag: $resource_tag}) "
+            "MATCH (ca:ConditionApplication) "
+            "WHERE ca.tag IN $tags "
+            "MERGE (r)-[rel:HAS_APPLICATION]->(ca) "
+            "SET rel.created_at = timestamp() "
+        )
+        self._driver.execute_query(query, routing_="w", resource_tag=resource_tag, tags=ts)
 
     def insert(self, data: ExternalResourceInsertModel) -> bool:
         query = (
@@ -36,13 +71,17 @@ class Neo4jExternalResources(ExternalResourceABC):
             "  r.link = $link, "
             "  r.doi = $doi, "
             "  r.type = $type, "
-            "  r.external = true "
+            "  r.author = $author, "
+            "  r.publication_date = $publication_date, "
+            "  r.external = $external "
             "ON MATCH SET "
             "  r.title = $title, "
             "  r.link = $link, "
             "  r.doi = $doi, "
             "  r.type = $type, "
-            "  r.external = true "
+            "  r.author = $author, "
+            "  r.publication_date = $publication_date, "
+            "  r.external = $external "
             "RETURN true AS ok"
         )
         r = self._driver.execute_query(
@@ -52,10 +91,18 @@ class Neo4jExternalResources(ExternalResourceABC):
             link=data.link,
             doi=data.doi,
             type=data.type,
+            author=data.author,
+            publication_date=data.publication_date,
+            external=data.is_external,
             routing_="w",
             result_transformer_=Result.value,
         )
-        return bool(r) and r[0]
+        ok = bool(r) and r[0]
+
+        if ok and data.condition_applications:
+            self._insert_condition_applications(data.tag, data.condition_applications)
+
+        return ok
 
     def get(self, tag: str) -> ExternalResourceModel:
         query = (
@@ -79,6 +126,28 @@ class Neo4jExternalResources(ExternalResourceABC):
         )
         return r
 
+    def get_condition_applications(self, tag: str) -> List[str]:
+        query = (
+            "MATCH (r:ExternalResource {tag: $tag})-[:HAS_APPLICATION]->(ca:ConditionApplication) "
+            "OPTIONAL MATCH (ca)-[:OF_ATTRIBUTE]->(attr:Attribute) "
+            "OPTIONAL MATCH (ca)-[:INSTANCE_OF]->(val) "
+            "RETURN "
+            "  coalesce(attr.text, attr.name, attr.tag) AS attribute_label, "
+            "  coalesce(val.text, val.name, val.tag, ca.tag) AS value_label"
+        )
+        r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.data)
+
+        labels = []
+        for row in r:
+            a, v = row.get("attribute_label"), row.get("value_label")
+            if a and v:
+                labels.append(f"{a}: {v}")
+            elif v:
+                labels.append(str(v))
+            elif a:
+                labels.append(str(a))
+        return labels
+    
     def link_crosslink(self, resource_tag: str, crosslink_tag: str) -> bool:
         query = (
             "MATCH (r:ExternalResource {tag: $resource_tag}) "
@@ -122,7 +191,6 @@ class Neo4jExternalResources(ExternalResourceABC):
             "MATCH (r:ExternalResource)-[:HAS_XL]->(xl) "
             "RETURN r.tag AS tag, r.title AS title, r.link AS link, r.author AS author, "
             "  r.publication_date AS publication_date, r.doi AS doi, r.type AS type, "
-            "  r.cell_type AS cell_type, r.cross_linkers AS cross_linkers, "
             "  count(xl) AS crosslink_count"
         )
         r = self._driver.execute_query(

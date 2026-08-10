@@ -81,3 +81,79 @@ def get_protein_interpro_features(tag: str, user: UserModel = Depends(get_user_f
     except Exception as e:
         print(f"Error fetching InterPro features for {tag}: {e}")
         return []
+    
+
+@router.get("/{tag}/topology")
+def get_protein_topology(tag: str, user: UserModel = Depends(get_user_from_token)) -> dict:
+    """Fetches transmembrane and topological domain annotations for a UniProt accession."""
+    try:
+        with httpx.Client(http2=True, timeout=20) as client:
+            r = client.get(
+                f"https://rest.uniprot.org/uniprotkb/{tag}.json",
+                headers={"Accept": "application/json"},
+            )
+            if r.status_code != 200:
+                return {"length": None, "tm_segments": [], "topological_domains": []}
+
+            data = r.json()
+
+        features = data.get("features", [])
+
+        tm_segments = []
+        topological_domains = []
+        for f in features:
+            f_type = f.get("type")
+            location = f.get("location", {})
+            start = location.get("start", {}).get("value")
+            end = location.get("end", {}).get("value")
+            if start is None or end is None:
+                continue
+
+            if f_type == "Transmembrane":
+                tm_segments.append({
+                    "start": int(start),
+                    "end": int(end),
+                    "description": f.get("description"),
+                })
+            elif f_type == "Topological domain":
+                topological_domains.append({
+                    "start": int(start),
+                    "end": int(end),
+                    "label": f.get("description"),
+                })
+
+        return {
+            "length": data.get("sequence", {}).get("length"),
+            "tm_segments": tm_segments,
+            "topological_domains": topological_domains,
+        }
+
+    except Exception as e:
+        print(f"Error fetching UniProt topology for {tag}: {e}")
+        return {"length": None, "tm_segments": [], "topological_domains": []}
+    
+
+@router.get("/{tag}/structure")
+def get_protein_structure(tag: str, user: UserModel = Depends(get_user_from_token)) -> dict:
+    """Fetches AlphaFold structure metadata (model URL, confidence) for a UniProt accession."""
+    try:
+        with httpx.Client(http2=True, timeout=20) as client:
+            r = client.get(f"https://alphafold.ebi.ac.uk/api/prediction/{tag}")
+            if r.status_code != 200:
+                return {"available": False}
+
+            results = r.json()
+            if not results:
+                return {"available": False}
+
+            entry = results[0]
+            return {
+                "available": True,
+                "cif_url": entry.get("cifUrl"),
+                "pdb_url": entry.get("pdbUrl"),
+                "model_version": entry.get("modelCreatedDate"),
+            }
+
+    except Exception as e:
+        print(f"Error fetching AlphaFold structure for {tag}: {e}")
+        return {"available": False}
