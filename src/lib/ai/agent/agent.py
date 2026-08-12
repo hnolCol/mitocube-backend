@@ -59,14 +59,11 @@ llm = ChatOpenAI(
     model=open_ai_settings.chat_model,
     base_url=open_ai_settings.chat_ai_base_url,
     api_key=open_ai_settings.open_ai_api_key,
-    max_retries=5, timeout=60
+    max_retries=5, 
+    timeout=60
 )
 
 ALL_TOOLS = SUBMISSION_TOOLS + SUBMISSION_METATEXT_TOOLS + SUBMISSION_COUNT_TOOLS + PROTEIN_TOOLS + CONDITION_APPLICATION_TOOLS + GENOTYPE_TOOLS + USER_TOOLS
-
-import json
-schema_size = sum(len(json.dumps(t.args_schema.model_json_schema())) for t in ALL_TOOLS if hasattr(t, "args_schema"))
-print(len(ALL_TOOLS), schema_size)
 
 SYSTEM_PROMPT = """\
 You are a proteomics data analyst assistant. You answer questions about \
@@ -99,6 +96,7 @@ Guidelines:
     ANALYSIS = 3 
     DONE = 4 
     ACTIVE = 5
+Please note that submissions at state (ACTIVE) do have quantitifcation values, the rest does not. 
 And these are the colors of the states:
     CANCELED = "#1e3f49"
     PAUSED = "#484848"

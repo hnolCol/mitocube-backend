@@ -23,7 +23,15 @@ class OneWayANOVA(DatasetStatistic):
         """
         n_rows = groups[0].shape[0]
 
-        means = np.stack([np.nanmean(g, axis=1) for g in groups], axis=1)  # nan if count==0
+        means = np.stack([
+            np.divide(
+                np.nansum(g, axis=1),
+                counts[:, k],
+                out=np.full(n_rows, np.nan, dtype=float),
+                where=counts[:, k] > 0
+            )
+            for k, g in enumerate(groups)
+        ], axis=1)
         n_valid_groups = valid_group.sum(axis=1)
         eligible = n_valid_groups >= 2
 
@@ -82,15 +90,27 @@ class OneWayANOVA(DatasetStatistic):
             raise ValueError("Nan filtering resulted in an empty datatable.")
 
         data_for_test = [datatable.loc[:, cols].values for cols in grouped_sample_names]
-
+        print("HERE?")
         if use_plain_f_oneway:
             F, p = f_oneway(*data_for_test, axis=1)
         else:
+            print(
+                "ANOVA:",
+                "rows=", len(datatable),
+                "groups=", len(grouped_sample_names),
+                "shapes=", [x.shape for x in data_for_test],
+            )
+            min_valid = min_non_nan if min_non_nan is not None else 1
+
             counts, valid_group = self.get_group_validity(
-                datatable, grouped_sample_names, min_non_nan or 1
+                datatable, grouped_sample_names, min_valid
+            )
+            print(
+                "valid groups per row:",
+                np.unique(valid_group.sum(axis=1), return_counts=True)
             )
             F, p = self.nan_f_oneway(data_for_test, counts, valid_group)
-            
+        print("here2??")
         stats = pd.DataFrame({"F" : F, "p-value" : p}, columns=["F","p-value"], index = datatable.index)
         stats = stats.dropna(subset=["p-value"])
         if stats.empty : raise ValueError("All caluclated p-values were nan. Not enough samples/valid values?")

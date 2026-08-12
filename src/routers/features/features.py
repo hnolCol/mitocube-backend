@@ -23,10 +23,6 @@ router = APIRouter(
     )
 
 
-
-
-
-
 @router.get("/q")
 def find_feature_by_query(search_string : str = None, submission_tag : str = None, include_types : str = None, exclude_types : str = None, limit : int = 30, sort_by_stat : str = None, annotation_tags : str = None, user : UserModel = Depends(get_user_from_token)):
 
@@ -34,12 +30,20 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     exclude_types = APIParamString(param=exclude_types).param
     annotation_tags = APIParamString(param=annotation_tags).param
 
+    
+    if submission_tag is not None:
+        if not DB.submissions.exists(tag=submission_tag):
+            raise HTTPException(status_code=404, detail=f"Submission {submission_tag} not found")
+        if not DB.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
+            raise HTTPException(status_code=403, detail=f"User {user.tag} does not have access to submission {submission_tag}")
+    
     if include_types is not None:
         if any([t not in ["protein_groups","peptides"] for t in include_types]):
             raise HTTPException(status_code=400, detail="include_types must be one of 'protein_groups', 'peptides'.")
     if exclude_types is not None:
         if any([t not in ["protein_groups","peptides"] for t in exclude_types]):
             raise HTTPException(status_code=400, detail="exclude_types must be one of 'protein_groups', 'peptides'.")
+        
     if include_types is not None and exclude_types is not None:
         if any([t in exclude_types for t in include_types]):
             raise HTTPException(status_code=400, detail="include_types and exclude_types must not contain the same types.")
@@ -52,8 +56,9 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     pg_peptides = {}
     if "protein_groups" in include_types:
         pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag, sort_by_stat_attribute=sort_by_stat, annotation_tags=annotation_tags)
+    else:
+        pgs_search_result = []
     
-        print(pgs_search_result)
     if "peptides" in include_types:
         
         peptides = DB.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)
@@ -65,8 +70,6 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
                 pg_peptides[pg].append(peptide)
                 
     peptide_only_matches_pgs = [pg for pg in pg_peptides if pg not in pgs_search_result]
-
-   
     pgs_with_peptides = [{"tag" : pg, "pg_match" : True,  "protein_tags" : pg.split(";"), "peptide_match" : pg in pg_peptides, "peptide_tags" : pg_peptides[pg] if pg in pg_peptides else []} for pg in pgs_search_result]
     peptide_only = [{"tag" : pg, "pg_match" : False, "protein_tags" : pg.split(";"), "peptide_match" : True, "peptide_tags" : peptides} for pg,peptides in pg_peptides.items() if pg in peptide_only_matches_pgs]
 
@@ -109,6 +112,9 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
     if not DB.submissions.exists(tag = submission_tag):
         raise HTTPException(status_code=404, detail = "Submission tag not found in the database.")
+    
+    if not DB.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
+        raise HTTPException(status_code=403, detail = "User does not have access to the submission.")
     
     sample_tags = DB.submissions.get_samples(tag = submission_tag, ignore_excluded=True) # check if submission has samples
     if not sample_tags:
@@ -207,85 +213,14 @@ def get_feature_abundance(feature_tag : str,
 def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
     if not DB.features.exists(tag=feature_tag):
         raise HTTPException(status_code=404, detail=f"The feature tag does not exist: {feature_tag} in the database.")
-    df =  DB.features.get_quantification_per_sample(tag = feature_tag, metrics = metrics)
+    submission_scope_tags = DB.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
+    if len(submission_scope_tags) == 0:
+        raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
+    df =  DB.features.get_quantification_per_sample(tag = feature_tag, metrics = metrics, submission_tags = submission_scope_tags)
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No quantification data found for feature tag: {feature_tag} in the database.")
     df.loc[:,"value"] = df["value"].astype(float)
     return df.to_dict(orient="records")
-
-
-
-# @router.get("/{feature_tag}/data",
-#             response_model=FeatureDataResponseModel)
-# def get_dataset_data(feature_tag : str, submission_tags : str = None, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
-#     """
-#     Returns the data for a specific feature in all datasets it was detected in. 
-    
-#     API Endpoint
-#     ------------
-#     ``GET api/features/{feature_key}/data```
-    
-#     Parameters
-#     ----------
-#     feature_key : str
-#         The key of the feature (UniprotID).
-#     user : UserModel
-#         The user that was identified by the token.
-    
-#     Returns
-#     -------
-#     FeatureDataResponseModel
-
-    
-#     """
-    
-
-#     feature_data = DB.features.get_data(tags=[feature_tag], 
-#                                         submission_tags=APIParamString(param=submission_tags).param)
-#     submission_tags = feature_data["submission_tag"].unique().tolist()
-#     attribute_value_tags = feature_data["attribute_value_tag"].unique().tolist() 
-#     attribute_tags = feature_data["attribute_tag"].unique().tolist() 
-#     genotype_tags = feature_data[feature_data["attribute_tag"] == "att_genotype"]["attribute_value_tag"]
-#     response_data = OrderedDict()#
-#     sample_attributes_by_submission_tag = {}
-#     #groupby tag and submission tag. This is too because the get_data function can be used to 
-#     #retrieve data formore than one feature tag. However this is impossible due to the API route. 
-#     #TO DO just ignore this here? 
-#     for (_, submission_tag), data in feature_data.groupby(by=["tag","submission_tag"]):
-        
-#         pivot_attributes = data[["sample_index",
-#                                 "attribute_tag",
-#                                 "attribute_value_tag",
-#                                 "submission_tag"]].pivot_table(columns=["attribute_tag"],
-#                                                                 values="attribute_value_tag", 
-#                                                                 index="sample_index", 
-#                                                                 aggfunc=lambda x : x)
-#         data_transformed = data[["sample_index","value"]].drop_duplicates("sample_index").set_index("sample_index").join(pivot_attributes)
-#         response_data[submission_tag]  = data_transformed.sort_index().reset_index().to_dict(orient="records")
-#         #if submission_tag not in sample_attributes_by_submission_tag:
-#         sample_attributes_by_submission_tag[submission_tag] = data["attribute_tag"].unique().tolist()
-            
-#         #
-#     #get minimal meta information 
-#     submission_meta = DB.meta.get(tags=submission_tags)
-    
-#     attributes = DB.attributes.get(tags = attribute_tags)
-#     attribute_values = DB.attributes.get_values(tags = attribute_value_tags)
-#     genotypes = DB.genotypes.get(tags = genotype_tags)
-
-
-#     rsp = FeatureDataResponseModel(
-#         sample_attribute_by_submission_tag = sample_attributes_by_submission_tag,
-#         tag = feature_tag,
-#         data = response_data,
-#         submission_tags = submission_tags,
-#         attributes = dict([(a.tag,a) for a in attributes]),
-#         attribute_values_by_tag = dict([(av.tag,av) for av in attribute_values]),
-#         title_by_tag = dict([(meta_data.tag, meta_data.title) for meta_data in submission_meta]),
-#         genotypes_by_tag = dict([(g.tag,g) for g in genotypes])
-#     )
-    
-#     return rsp 
 
 
 @router.get("/{feature_tag}/quant_count")
@@ -302,7 +237,7 @@ def get_quantification_counts(feature_tag : str):
 
 
 @router.get("/{feature_tag}/variance")
-def get_feature_variance(feature_tag : str, submission_tags : str = None):
+def get_feature_variance(feature_tag : str, submission_tags : str = None, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 
     Parameters
@@ -315,20 +250,17 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None):
     _type_
         _description_
     """
-    
+    submission_scope_tags = DB.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+        
+    if submission_tags is not None:
+        submission_tags = [submission_tag for submission_tag in APIParamString(param=submission_tags).param if submission_tag in submission_scope_tags]
+    else:
+        submission_tags = submission_scope_tags
+    if len(submission_tags) == 0:
+        raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
+    submission_scope_tags = DB.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
     f_stats = DB.features.get_f_value(tags=[feature_tag], submission_tags=APIParamString(submission_tags).param)
     return f_stats.to_dict(orient="records")
-    
-    
-
-# @router.get("/{feature_tag}/abundance")
-# def get_feature_variance(feature_tag : str, submission_tags : str = None):
-#     """Returns the log2 average abundance per submission
-#     TODO: Should we implement that this returns also the attributes/traits
-#     This would allow to get a graphical representation depending on the datasets.
-#     """
-#     avg_abundance = DB.features.get_avg_abundance(tags = [feature_tag], submission_tags=APIParamString(submission_tags).param)
-#     return avg_abundance.to_dict(orient="records")
     
 
 

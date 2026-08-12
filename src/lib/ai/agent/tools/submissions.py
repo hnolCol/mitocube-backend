@@ -31,7 +31,7 @@ class FindSubmissionsInput(BaseModel):
     search_string: str = Field("", description="Search string for submissions")
     state: List[SubmissionStatesEnums] = Field(None, description="Filter submissions by state (leave empty for all states)")
     user_tags: List[str] = Field(None, description="Filter submissions by user tag (leave empty for all users). You can user_tags by the find_users tool to find user tags based on names.")
-    limit: int = Field(2, description="Maximum number of submission tags to return")
+    limit: int = Field(None, description="Maximum number of submission tags to return. By default None (e.g. no limit). If you want to get all submission tags, set limit to None.")
     ca_tags : List[str] = Field(None, description="Filter submissions by condition application tags (leave empty for all condition applications). You can use the find_condition_applications tool to find condition application tags based on names.")
     protein_tags: List[str] = Field(None, description="Filter submissions by protein tags (leave empty for all proteins). This will return only submission that quantified the given proteins.")
     

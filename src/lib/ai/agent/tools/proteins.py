@@ -1,6 +1,6 @@
 
-from typing import List, Tuple
-
+from typing import List, Literal, Tuple
+import pandas as pd
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from lib.database.Database import Database 
@@ -43,4 +43,25 @@ def get_protein_gene_name(protein_tags: List[str]) -> List[Tuple[str,str]]:
             results.append((tag, gene_name))
     return results
    
-PROTEIN_TOOLS = [find_proteins, get_protein_gene_name]
+@tool("get_protein_abundance_in_submissions")
+def get_protein_abundance_in_submissions(protein_tag : str, submission_tag: str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "log2_fc_vs_mean") -> Tuple[str, pd.DataFrame, pd.DataFrame]:
+    """
+    Returns the abundance of a protein in a specific submission given the sample_tag, the condition (ConditionApplication, or ca_tag) and the protein_tag. 
+    The ca tags are the condition applications that describe the samples in the submission. Each ca_tag corresponds to a specific combination. A single sample 
+    can be connected to multiple condition applications, and a single condition application can be connected to multiple samples.
+    The metric describe what kind of quantification value is returned. Raw is the log2 LFQ intensity, z_score_sample is the z-score of the protein in the sample, z_score_protein_group is the z-score of the protein across all samples in the submission, and log2_fc_vs_mean is the log2 fold change of the protein in the sample compared to the mean of all samples in the submission.
+   
+    The output is a Tuple of the
+    0 - protein_tag (uniprot accession)
+    1 - DataFrame with the abundance values for each sample in the submission. The index is the sample_tag, and the columns are the abundance values for each metric. 
+    2 - DataFrame with the condition application attributes for each sample in the submission. The index is the sample_tag, and the columns are the condition application attribute_tags, the cell values are the ca_tags that describe the sample. If a sample is connected to multiple condition applications, the cell will contain a list of ca_tags.
+    The ca_tags can be used to retireve the text describing them with the ca_tools
+    
+    """ 
+    if not DB.proteins.exists(tag = protein_tag): raise ValueError(f"Protein tag {protein_tag} does not exist.") 
+    ca_tags = DB.samples.get_sample_condition_application_map_for_submission(submission_tag=submission_tag) #returns a dataframe, sample_tag as index. Attribute tag as columns and ca_tags for each sample_tag.
+    data = DB.features.get_quantification_per_sample(tag = protein_tag, submission_tags = [submission_tag]) 
+  
+    return protein_tag, data, ca_tags
+
+PROTEIN_TOOLS = [find_proteins, get_protein_gene_name, get_protein_abundance_in_submissions]

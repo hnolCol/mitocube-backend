@@ -11,13 +11,14 @@ from config.models.calculations.quantile import QuantileModel
 
 from services.annotations.uniprot import download_proteome_annotations
 from config.models.feature import FeatureNeoModel, FeatureSequenceResponseModel
-
+from lib.database.abstract.Submission import SubmissionFilterABC
 
 
 class Neo4JFeatures(FeaturesABC):
     
-    def __init__(self, driver : Driver) -> None:
+    def __init__(self, driver : Driver, submission_filter : SubmissionFilterABC) -> None:
         self._driver = driver 
+        self._submission_filter
         
     def count(self, quantified: bool = True) -> int:
         "Returns the number of quantified proteins in the database"
@@ -589,6 +590,7 @@ class Neo4JFeatures(FeaturesABC):
                 - sample_tag(str) : The tag of the sample
                 - tag(str) : The tag of the feature
         """
+        
         query = (
             "MATCH (f:ProteinGroup|Peptide {tag : $tag})<-[r:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
         )

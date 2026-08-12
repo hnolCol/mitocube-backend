@@ -25,16 +25,18 @@ def get_submission_permissions(submission_tag: str, user: UserModel = Depends(ge
     # Fetch and return the permissions for the specified submission
     if not DB.submissions.exists(tag = submission_tag):
         raise HTTPException(status_code=404, detail=f"Submission with tag {submission_tag} not found")
-    user_tag = DB.submissions.get_creator(tag = submission_tag)  # Ensure the submission exists
+    has_access = DB.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag)
+    user_tag = DB.submissions.get_creator(tag = submission_tag) # Ensure the submission exists
     is_creator = (user.tag == user_tag)
-    is_at_least_curator = (user.role >= UserRolesEnum.CURATOR)  # Assuming curator 
+    is_at_least_curator = (user.role >= UserRolesEnum.CURATOR)  # Assuming curator has access to all submissions
     return PermissionResponseModel(user_tag = user.tag, 
+                                   view = has_access,
                                    role = user.role,
                                    tag = submission_tag,
                                    edit = is_creator or is_at_least_curator, 
                                    delete = is_creator or is_at_least_curator,
                                    upload = is_at_least_curator,
                                    state_change= is_at_least_curator,
-                                   download= user.role >= UserRolesEnum.STANDARD,
-                                   comment = user.role >= UserRolesEnum.STANDARD) 
+                                   download= user.role >= UserRolesEnum.STANDARD and has_access,
+                                   comment = user.role >= UserRolesEnum.STANDARD and has_access) 
     

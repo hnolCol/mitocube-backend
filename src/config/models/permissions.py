@@ -6,6 +6,7 @@ from config.enums.users.roles import UserRolesEnum
 class PermissionBaseModel(BaseModel):
     """Base model for permissions."""
     user_tag : str 
+    view : bool = False
     role : UserRolesEnum = UserRolesEnum.GUEST #minimum role to access the resource
     tag : Optional[str] = None #tag of the resource, if None, the permission applies to all resources of this type 
     archive : bool = False #if True, the resource is archived and should not be shown in lists

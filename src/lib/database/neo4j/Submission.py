@@ -1948,6 +1948,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             tags.add(submission_tag)    
         return list(tags)
         
+    def get_user_submission_scope_tags(self, user_tag : str) -> List[str]:
+        """Get the submission scope for a given user."""
+        return self._get_users_submission_scope(current_user_tag=user_tag)
+
+
+    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if a user has access to a submission. 
+            This is useful to check if a user can access a submission before returning the submission data. """
+        user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
+        if user_scope is None: return True #curator or admin, has access to all submissions
+        return submission_tag in user_scope
+        
 
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:

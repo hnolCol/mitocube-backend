@@ -676,6 +676,28 @@ class SubmissionFilterABC(ABC):
         TypeError
             If the tags parameter is not a list of strings or None.
         """
+    @abstractmethod
+    def get_user_submission_scope_tags(self, user_tag : str) -> List[str]:
+        """Get the submission scope for a given user (e.g. where the user has access to)."""
+    
+    
+    @abstractmethod
+    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if a user has access to a submission. 
+        This is useful to check if a user can access a submission before returning the submission data. 
+
+        Parameters
+        ----------
+        user_tag : str
+            The tag of the user.
+        submission_tag : str
+            The tag of the submission.
+
+        Returns
+        -------
+        bool
+            True if the user has access to the submission, False otherwise.
+        """
     
     @abstractmethod
     def find(self,
