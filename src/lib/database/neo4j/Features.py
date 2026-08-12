@@ -16,7 +16,7 @@ from lib.database.abstract.Submission import SubmissionFilterABC
 
 class Neo4JFeatures(FeaturesABC):
     
-    def __init__(self, driver : Driver, submission_filter : SubmissionFilterABC) -> None:
+    def __init__(self, driver : Driver) -> None:
         self._driver = driver 
         
     def count(self, quantified: bool = True) -> int:
