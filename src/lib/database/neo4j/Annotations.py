@@ -809,14 +809,12 @@ class Neo4JAnnotations(AnnotationsABC):
         query = (
                 "MATCH (ag:AnnotationGroup)-[:HAS_ANNOTATION]->(a:Annotation) "
             )
-        
-        
         if group_tags is not None:
             query += "WHERE ag.tag IN $group_tags "
                 
         if submission_tags is not None:
             where_clauses.append("""EXISTS {
-                (a)-[:ANNOTATES]->(:Protein)<-[:HAS_PROTEINS]-(pg:ProteinGroup)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(s:Submission)
+                (s:Submission)-[:HAS_SAMPLE]->(:Sample)-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(a:Annotation)
                 WHERE s.tag IN $submission_tags
             }""")
         if protein_tags is not None:

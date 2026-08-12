@@ -45,7 +45,7 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     data_table = DB.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
     data_table = data_table.loc[:,condition_applications.index]
     try:
-        stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True, min_non_nan=2)
+        stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True, min_non_nan=3)
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error in one way anova " + str(e))
     if stats.empty or stats.index.size < 3: raise HTTPException(status_code=400, detail="No or less than 3 significant hits found using ANOVA. Please use a volcano plot.")

@@ -60,7 +60,7 @@ class OneWayANOVA(DatasetStatistic):
         p = np.where(np.isnan(F), np.nan, f.sf(F, df_between, df_within))
         return F, p
     
-    def get_stats(self, sample_attribute_tag : str = "att_genotype", fdr : float = 0.05, dropna : bool = True, min_non_nan : int = 2) -> pd.DataFrame:
+    def get_stats(self, sample_attribute_tag : str = "att_genotype", fdr : float = 0.05, dropna : bool = True, min_non_nan : int = 3) -> pd.DataFrame:
         """_summary_
 
         Parameters
