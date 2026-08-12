@@ -58,7 +58,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.users = Neo4JUser(driver=self.connection.driver)
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver, users=self.users, research_groups=self.research_groups)
-        self.features = Neo4JFeatures(driver=self.connection.driver, submission_filter=self.submission_filter)
+        self.features = Neo4JFeatures(driver=self.connection.driver)
         self.genotypes = Neo4JGenotype(driver=self.connection.driver, condition_applications=self.condition_applications)
         self.proteomes = Neo4JProteomes(driver = self.connection.driver, features=self.features)
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes, condition_applications=self.condition_applications)

@@ -18,7 +18,6 @@ class Neo4JFeatures(FeaturesABC):
     
     def __init__(self, driver : Driver, submission_filter : SubmissionFilterABC) -> None:
         self._driver = driver 
-        self._submission_filter
         
     def count(self, quantified: bool = True) -> int:
         "Returns the number of quantified proteins in the database"
