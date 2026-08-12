@@ -54,13 +54,13 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     sig_data = data_table.loc[stats.index]
     sig_data = filter_for_clustering(sig_data)
     zscores = compute_zscores(sig_data)
-
+    print("zscores shape:", zscores.shape, "reached")
     # cluster on the z-scored data (leaf-ordered, with a 'cluster' column)
     clustered = cluster_to_dataframe(
         zscores.values, n_clusters=n_clusters,
         index=zscores.index, columns=zscores.columns
     )
-
+    print("never reached this")
     clusters = clustered[["cluster"]]
     zscores = zscores.loc[clustered.index]  # reorder z-scores to match leaf order
 
