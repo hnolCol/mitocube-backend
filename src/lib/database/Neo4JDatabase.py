@@ -138,7 +138,6 @@ class Neo4JConstructor:
     
     def __init__(self, driver : Driver) -> None:
         self._driver = driver 
-        self.features = Neo4JFeatures(driver=driver)
         self.factory = Neo4JFactory(driver=driver)
         
         self._add_constraints()
