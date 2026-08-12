@@ -168,7 +168,6 @@ class Neo4JConditionApplications(ConditionApplicationABC):
 
     def get_text(self, tag : str) -> str:
         "Return a human-readable text representation of the condition application."
-        print(tag, "GETTING TEXT")
         ca_tree = self.get_tree(tag)
         if ca_tree is not None and len(ca_tree) > 0:
             return self.extract_ca_item(ca_tree[0]).replace("String)",")").replace("( ","(").replace(", )",")") #dangerous replace here.

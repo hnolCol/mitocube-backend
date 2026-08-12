@@ -23,7 +23,7 @@ router = APIRouter(
 
 @router.get("/{submission_tag}/heatmap")
 def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.05, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token)):
-    
+    print("Getting heatmap for submission:", submission_tag, "attribute_tag:", attribute_tag, "annotation_tag:", annotation_tag, "fdr:", fdr, "n_clusters:", n_clusters)
     if not DB.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
     if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
     
@@ -44,6 +44,7 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     sample_tags = condition_applications.index.tolist()
     data_table = DB.get_datatable(tag = submission_tag, annotation_tag = annotation_tag, sample_tags = sample_tags, use_sample_tags=True)
     data_table = data_table.loc[:,condition_applications.index]
+    print("data_table shape:", data_table.shape, "condition_applications shape:", condition_applications.shape, "reached")
     try:
         stats = OneWayANOVA(datatable=data_table, sample_attribute_map=condition_applications).get_stats(fdr= fdr, dropna=True, min_non_nan=3)
     except Exception as e:
