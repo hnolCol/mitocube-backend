@@ -68,7 +68,7 @@ pydantic_core==2.46.4
 pymongo==4.16.0
 pymongo-search-utils==0.3.0
 PyOTP==2.10.0
-pypdf==6.1.0
+pypdf==6.15.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.0
 python-jose==3.3.0
