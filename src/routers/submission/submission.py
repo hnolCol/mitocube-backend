@@ -875,55 +875,59 @@ def create_submission_runlist(
         raise HTTPException(status_code=400, detail=str(e))
 
     runlist.instrument_tag = runlist_props.instrument_tag
-    DB.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
+    rl_tag = DB.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
+    runlist.tag = rl_tag  
 
     return RunListResponseModel(
         **runlist.model_dump(),
         user_email=user.email,
         user_firstname=user.firstname,
         user_lastname=user.lastname,
-        instrument_text=runlist_props.instrument_tag
     )
 
-@router.get("/submissions/{submission_tag}/runlist", response_model=RunListResponseModel, tags=["Runlist"])
-def get_submission_runlist(
-    submission_tag: str,
-    user: UserModel = Depends(get_user_from_token)
-):
+
+@router.get("/submissions/{submission_tag}/runlists", response_model=List[RunListResponseModel], tags=["Runlist"]) 
+def get_submission_runlists(submission_tag: str, user: UserModel = Depends(get_user_from_token)):
     if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
 
-    runlist = DB.submissions.get_runlist(submission_tag=submission_tag)
+    runlists = DB.submissions.list_runlists(submission_tag=submission_tag)
+    responses = []
+    for runlist in runlists:
+        ru = DB.users.get_user_by_tag(tag=runlist.user_tag)
+        responses.append(RunListResponseModel(
+            **runlist.model_dump(),
+            user_email=ru.email if ru else "",
+            user_firstname=ru.firstname if ru else "",
+            user_lastname=ru.lastname if ru else "",
+        ))
+    return responses
+
+
+@router.get("/submissions/{submission_tag}/runlist/{rl_tag}", response_model=RunListResponseModel, tags=["Runlist"]) 
+def get_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = Depends(get_user_from_token)):
+    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+
+    runlist = DB.submissions.get_runlist(submission_tag=submission_tag, rl_tag=rl_tag)
     if runlist is None:
         raise HTTPException(status_code=404, detail="No runlist found.")
 
-    instrument_text = runlist.instrument_tag if runlist.instrument_tag else ""
-
-    runlist_user = DB.users.get_user_by_tag(tag=runlist.user_tag)
-    user_email = runlist_user.email if runlist_user else ""
-    user_firstname = runlist_user.firstname if runlist_user else ""
-    user_lastname = runlist_user.lastname if runlist_user else ""
-
+    ru = DB.users.get_user_by_tag(tag=runlist.user_tag)
     return RunListResponseModel(
         **runlist.model_dump(),
-        user_email=user_email,
-        user_firstname=user_firstname,
-        user_lastname=user_lastname,
-        instrument_text=instrument_text
+        user_email=ru.email if ru else "",
+        user_firstname=ru.firstname if ru else "",
+        user_lastname=ru.lastname if ru else "",
     )
 
-@router.delete("/submissions/{submission_tag}/runlist", tags=["Runlist"])
-def delete_submission_runlist(
-    submission_tag: str,
-    user: UserModel = Depends(is_creator_of_submission_or_curator)
-):
+
+@router.delete("/submissions/{submission_tag}/runlist/{rl_tag}", tags=["Runlist"])  
+def delete_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = Depends(is_creator_of_submission_or_curator)):
     if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
 
-    ok = DB.submissions.delete_runlist(submission_tag=submission_tag)
+    ok = DB.submissions.delete_runlist(submission_tag=submission_tag, rl_tag=rl_tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Could not delete runlist.")
-    
     return True
-
 
 @router.get("/submissions/{submission_tag}/check", tags=["Submissions"])
 def check_submission(

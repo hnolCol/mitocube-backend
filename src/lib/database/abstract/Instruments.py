@@ -64,13 +64,11 @@ class InstrumentsABC(ABC):
 
         
     @abstractmethod
-    def get_samples_by_instrument(self, tags : List[str]) -> Dict:
-        "" 
         
+    def get_samples_by_instrument(self, tags: List[str] = None) -> List[dict]:
+        """Returns sample counts per instrument, grouped by submission, via the runlist path.
+        Each submission's current state is included."""
 
-
-
-
-
-
-    
+    @abstractmethod
+    def get_overview(self, tags: List[str] = None) -> List[dict]:
+        """Per-instrument summary: current state + per-submission sample breakdown."""
