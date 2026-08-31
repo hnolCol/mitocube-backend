@@ -326,20 +326,20 @@ class Neo4JInstruments(InstrumentsABC):
         
         return r
         
-    def get_samples_by_instrument(self, tags: List[str]) -> Dict:
-        ""
+    # def get_samples_by_instrument(self, tags: List[str]) -> Dict:
+    #     ""
         
-        query = (
-            "MATCH (av:AttributeValue) "
-            "WHERE av.tag in $tags "
-            "MATCH (av)<-[:HAS_ATTRIBUTE_VALUE]-(submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
-            "WHERE EXISTS {(sample)-[:QUANTIFIED]->(:Protein)} "
-            "RETURN av.tag as instrument_tag, submission.tag as submission_tag, count(sample) as sample_count"
-        )
+    #     query = (
+    #         "MATCH (av:AttributeValue) "
+    #         "WHERE av.tag in $tags "
+    #         "MATCH (av)<-[:HAS_ATTRIBUTE_VALUE]-(submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
+    #         "WHERE EXISTS {(sample)-[:QUANTIFIED]->(:Protein)} "
+    #         "RETURN av.tag as instrument_tag, submission.tag as submission_tag, count(sample) as sample_count"
+    #     )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tags=tags)
+    #     r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tags=tags)
         
-        return r 
+    #     return r 
         
         
     def get_counts_by_instrument_and_attribute(self, attribute_tags : List[str], tags : List[str] = None):
@@ -394,3 +394,57 @@ class Neo4JInstruments(InstrumentsABC):
                                        result_transformer_ = Result.value)
         if len(r) == 0: return None # No maintenance events found for instrument tag.
         return r[0]
+        
+    def get_samples_by_instrument(self, tags: List[str] = None) -> List[dict]:
+        """Returns sample counts and latest state per submission, per instrument, via the runlist path."""
+        query = "MATCH (inst:Trait) "
+        if tags is not None:
+            query += "WHERE inst.tag IN $tags "
+        query += (
+            "MATCH (inst)<-[:MEASURED_BY]-(rl:RunList)-[:HAS_RUN]->(r:Run)-[:MEASURES]->(sample:Sample) "
+            "MATCH (rl)<-[:HAS_RUNLIST]-(sub:Submission) "
+            "WITH inst, sub, count(DISTINCT sample) AS sample_count "
+            "CALL (sub) { "
+            "    OPTIONAL MATCH (sub)-[sr:IN_STATE]->(sub_state:State) WHERE sr.created_at IS NOT NULL "
+            "    RETURN sub_state.tag AS submission_state "
+            "    ORDER BY sr.created_at DESC "
+            "    LIMIT 1 "
+            "} "
+            "RETURN inst.tag AS instrument_tag, sub.tag AS submission_tag, "
+            "       sub.title AS submission_title, submission_state, sample_count "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tags=tags)
+        return r
+
+    def get_overview(self, tags: List[str] = None) -> List[dict]:
+        """Per-instrument summary: current state + per-submission sample breakdown."""
+        query = (
+            "MATCH (t:Trait)<-[:HAS_TRAIT]-(a:Attribute) WHERE EXISTS {(a)-[:PART_OF]->(ag:AttributeGroup {tag: 'instrument'})} "
+        )
+        if tags is not None:
+            query += "AND t.tag IN $tags "
+        query += (
+            "OPTIONAL MATCH (t)-[r:IN_STATE]->(is:InstrumentState) "
+            "WITH t, is, r ORDER BY r.created_at DESC "
+            "WITH t, head(collect({state: is, created_at: r.created_at})) AS latest "
+            "RETURN t.tag AS tag, t.text AS text, "
+            "       latest.state.tag AS state_tag, latest.state.text AS state_text, "
+            "       latest.state.description AS state_description, latest.state.color AS state_color "
+        )
+        instruments = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tags=tags)
+
+        submissions_by_instrument = {}
+        for row in self.get_samples_by_instrument(tags=tags):
+            submissions_by_instrument.setdefault(row["instrument_tag"], []).append({
+                "submission_tag": row["submission_tag"],
+                "submission_title": row["submission_title"],
+                "submission_state": row["submission_state"],
+                "sample_count": row["sample_count"],
+            })
+
+        for inst in instruments:
+            subs = submissions_by_instrument.get(inst["tag"], [])
+            inst["submissions"] = subs
+            inst["sample_count"] = sum(s["sample_count"] for s in subs)
+
+        return instruments

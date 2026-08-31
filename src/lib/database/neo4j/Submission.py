@@ -1245,17 +1245,17 @@ class Neo4JSubmissions(SubmissionsABC):
                     sample_indices=run.aggregated_samples
                 )
 
-        return True
+        return rl_tag
 
-    def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
+    def get_runlist(self, submission_tag: str, rl_tag: str) -> Optional[RunListModel]: 
         query = (
-            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
         )
-        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
         if not r:
             return None
         row = r[0]
@@ -1264,14 +1264,33 @@ class Neo4JSubmissions(SubmissionsABC):
             key=lambda x: x.measurement_index
         )
         return RunListModel(**row["rl"], runs=runs)
-    
-    def delete_runlist(self, submission_tag: str) -> bool:
+
+    def list_runlists(self, submission_tag: str) -> List[RunListModel]: 
         query = (
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (rl)-[:HAS_RUN]->(r:Run) "
+            "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+            "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
+            "ORDER BY rl.created_at DESC "
+        )
+        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        runlists = []
+        for row in r:
+            runs = sorted(
+                [AnalyticRunModel(**{**dict(run), "name": run.get("text") or run.get("name")}, aggregated_samples=[]) for run in row["runs"]],
+                key=lambda x: x.measurement_index
+            )
+            runlists.append(RunListModel(**row["rl"], runs=runs))
+        return runlists
+
+    def delete_runlist(self, submission_tag: str, rl_tag: str) -> bool:  
+        query = (
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "DETACH DELETE rl "
         )
         try:
-            self._driver.execute_query(query, routing_="w", tag=submission_tag)
+            self._driver.execute_query(query, routing_="w", tag=submission_tag, rl_tag=rl_tag)
             return True
         except Exception as e:
             print(e)

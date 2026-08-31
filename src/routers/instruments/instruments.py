@@ -38,6 +38,10 @@ def get_instrument_permissions(user : UserModel = Depends(get_user_from_token)) 
     "Returns the instrument tags the user has permission to access."
     return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.CURATOR, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, edit= user.role >= UserRolesEnum.CURATOR) 
 
+@router.get("/overview")
+def get_instruments_overview(user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+    "Per-instrument current state and sample count, via the runlist path."
+    return DB.instruments.get_overview()
 
 @router.get("/states/q")
 def get_instrument_state_by_search_string(search_string : str, limit : int = 20):

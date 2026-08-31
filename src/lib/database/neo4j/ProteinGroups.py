@@ -213,7 +213,7 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         return True
     
     
-    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tag : str = None, limit : Optional[int] = 20) -> List[ProteinGroupSubmissionStatisticsModel]:
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[ProteinGroupSubmissionStatisticsModel]:
         ""
         if not self.exists(tag): raise ValueError(f"Protein group with tag {tag} does not exist.")
         
@@ -222,8 +222,8 @@ class Neo4JProteinGroups(ProteinGroupsABC):
             "WHERE a.tag IN $attribute_tags OR $attribute_tags IS NULL "
             "MATCH (stats)<-[:HAS_STATS]-(submission:Submission) "
         )
-        if submission_tag is not None:
-            query += "WHERE submission.tag = $submission_tag "
+        if submission_tags is not None:
+            query += "WHERE submission.tag IN $submission_tags "
         query += (    
             "RETURN stats.tag as tag, a.tag as attribute_tag, stats.mean as mean, stats.F as F, stats.rank as rank, stats.FDR as FDR, stats.exclusively_ca_tags  "
             "as exclusively_ca_tags, stats.p_value as p_value, stats.eta_squared as eta_squared, stats.cohen_f as cohen_f, stats.quantified_in_samples as quantified_in_samples, stats.max_fc as max_fc, stats.std_means as std_means, stats.missingness as missingness, stats.n_groups as n_groups, stats.score as score, stats.exclusively as exclusively, submission.tag as submission_tag "
@@ -232,7 +232,7 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         if limit is not None:
             query += "LIMIT $limit"
         
-        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, limit=limit, result_transformer_=Result.data)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, submission_tags = submission_tags, limit=limit, result_transformer_=Result.data)
         return [ProteinGroupSubmissionStatisticsModel(**ri) for ri in r]
     
     def get_exclusively_quantified(self, submission_tag : str, annotation_tags : List[str] = None, limit : int = None) -> List[ExclusivelyQuantifiedModel]:

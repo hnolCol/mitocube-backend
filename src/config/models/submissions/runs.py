@@ -76,6 +76,7 @@ class RunListModel(BaseModel):
 
     """
     # user_label : str
+    tag : Optional[str] = None
     created_at : float = Field(...,default_factory=get_time_stamp)
     user_tag : Optional[str] = None #user that created the run list 
     dataset_label : str 
