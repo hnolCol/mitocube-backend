@@ -96,7 +96,7 @@ Guidelines:
     ANALYSIS = 3 
     DONE = 4 
     ACTIVE = 5
-Please note that submissions at state (ACTIVE) do have quantitifcation values, the rest does not. 
+Please note that submissions at state (ACTIVE) do have quantification values, the rest does not. 
 And these are the colors of the states:
     CANCELED = "#1e3f49"
     PAUSED = "#484848"
