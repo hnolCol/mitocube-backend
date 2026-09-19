@@ -1,7 +1,7 @@
 aiosmtplib==5.1.2
 annotated-doc==0.0.5
 annotated-types==0.7.0
-anyio==4.9.0
+anyio==4.14.2
 bcrypt==4.0.1
 blinker==1.9.0
 certifi==2025.1.31
