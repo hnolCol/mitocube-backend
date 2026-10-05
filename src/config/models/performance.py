@@ -58,9 +58,9 @@ class QCPrecursorBaseModel(BaseModel):
     """
 
     precursor_tag : str
-    value : Optional[float] = None
+    intensity : Optional[float] = None
     score : Optional[float] = None
-    retention_time : Optional[float] = None
+    rt : Optional[float] = None
 
 
 class QCPrecursorInsertModel(QCPrecursorBaseModel):
