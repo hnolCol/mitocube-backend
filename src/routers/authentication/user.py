@@ -18,7 +18,7 @@ DB = Database.DB()
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/users",
     tags=["Token", "Authentication","UserModel"]
     )

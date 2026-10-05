@@ -9,7 +9,7 @@ from config.models.user import UserModel
 from config.models.performance import QCPeptidesModel, QCPeptideModel
 from services.users import is_user_admin, get_user_from_token
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/performance",
     tags=["Performance"]
     )

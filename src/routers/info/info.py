@@ -27,6 +27,12 @@ DB = Database.DB()
 router = APIRouter(
     prefix="/api/info",
     tags=["App Information"],
+    dependencies=[Depends(get_user_from_token)],
+    )
+
+public_router = APIRouter(
+    prefix="/api/info",
+    tags=["App Information"],
     )
 
 # Statistical Metrics for Protein Differential Analysis
@@ -273,8 +279,8 @@ Focus on:
 `;"""
 
 
-@router.get("/app",summary="Returns basic information about the app.", response_model=InfoResponse)
-def get_application_info(): #user : UserModel = Depends(get_user_from_token)
+@public_router.get("/app",summary="Returns basic information about the app.", response_model=InfoResponse)
+def get_application_info():
     """"""
     return InfoResponse(
         app_name=GENERAL_SETTINGS.app_name, 

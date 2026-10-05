@@ -11,7 +11,7 @@ from config.models.dataset.pca import DatasetPCAResponse
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions/analysis",
     tags=["Submission","Analysis"],
     )

@@ -203,6 +203,8 @@ app.add_middleware(
 for rs in router_sources:
     if hasattr(rs,"router"):
         app.include_router(getattr(rs,"router"))
+    if hasattr(rs,"public_router"):
+        app.include_router(getattr(rs,"public_router"))
 
 ## host the static html of the frontend 
 templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)

@@ -16,7 +16,7 @@ from config.models.instruments import InstrumentStateModel, InstrumentStateHisto
 from lib.database.Database import Database
 
 import numpy as np 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/instruments",
     tags=["Remote Control"]
     )

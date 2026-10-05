@@ -13,7 +13,7 @@ from config.models.calculations.quantile import QuantileModel
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
     tags=["Submission"],
     )

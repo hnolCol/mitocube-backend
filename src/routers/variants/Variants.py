@@ -6,7 +6,7 @@ from services.users import get_user_from_token, is_user_admin
 from lib.database.Database import Database
 
 DB = Database.DB()
-router = APIRouter(prefix="/api/variants", tags=["Variants"])
+router = APIRouter(dependencies=[Depends(get_user_from_token)],prefix="/api/variants", tags=["Variants"])
 not_found = HTTPException(status_code=404, detail="Variant not found.")
 
 @router.get("/{tag}")

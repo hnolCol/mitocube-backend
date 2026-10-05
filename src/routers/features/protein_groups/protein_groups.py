@@ -15,7 +15,7 @@ from config.models.feature import ProteinGroupSubmissionStatisticsModel
 DB = Database.DB()
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/features/protein_groups",
     tags=["Features", "Protein Groups"]
     )

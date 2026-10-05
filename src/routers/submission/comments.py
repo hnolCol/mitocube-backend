@@ -13,7 +13,7 @@ from services.users import get_user_from_token
 DB = Database.DB()
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
     tags=["Submission"],
     )

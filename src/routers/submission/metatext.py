@@ -8,7 +8,7 @@ from services.users import get_user_from_token, is_user_at_least_curator, is_cre
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
     tags=["Metatext", "Submissions"],
     )

@@ -6,7 +6,7 @@ from services.users import get_user_from_token, is_user_admin
 from lib.database.Database import Database
 
 DB = Database.DB()
-router = APIRouter(prefix="/api/diseases", tags=["Diseases"])
+router = APIRouter(dependencies=[Depends(get_user_from_token)],prefix="/api/diseases", tags=["Diseases"])
 not_found = HTTPException(status_code=404, detail="Disease not found.")
 
 @router.get("")

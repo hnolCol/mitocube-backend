@@ -18,7 +18,7 @@ from config.models.permissions import PermissionResponseModel
 
 GENERAL_SETTINGS = get_general_settings()
 EMAIL_SETTINGS = get_email_settings()
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/proteomes",
     tags=["Proteomes"]
     )

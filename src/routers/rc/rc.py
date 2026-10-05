@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 
-from services.users import is_user_admin
+from services.users import get_user_from_token, is_user_admin
 from services.mail import send_email_in_background
 from lib.database.Database import Database 
 from config.models.user import UserModel
@@ -8,7 +8,7 @@ from config.models.user import UserModel
 DB = Database.DB()
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/rc",
     tags=["Proteomes"]
     )

@@ -36,7 +36,7 @@ def transform_for_ui(item : ConditionApplicationTreeModel, r : List = None, ca_i
 
 genotype_not_found = HTTPException(status_code=404, detail="Genotype not associated with tag.")
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/genotypes",
     tags=["Genotypes"]
 )
