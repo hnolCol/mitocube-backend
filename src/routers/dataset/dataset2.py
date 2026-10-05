@@ -25,11 +25,11 @@ DB = Database.DB()
 
 
 router = APIRouter(
-    prefix="/api",
+    prefix="/api/datasets",
     tags=["Dataset"]
     )
 
-@router.get("/datasets/{dataset_tag}/data", response_model=[])
+@router.get("/{dataset_tag}/data", response_model=[])
 def get_dataset_data(dataset_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[Dict[str,str|float]]:
     """Returns the datatable of dataset by its tag. 
 
@@ -51,7 +51,7 @@ def get_dataset_data(dataset_tag : str, user : UserModel = Depends(get_user_from
 # class QCResponse(BaseModel):
 
 
-@router.get("/datasets/{dataset_tag}/qc", 
+@router.get("/{dataset_tag}/qc", 
             response_model=[], 
             summary="Quality control of data set. Includes a statistic summary.")
 def get_dataset_qc(dataset_tag : str):
@@ -105,7 +105,7 @@ def get_dataset_qc(dataset_tag : str):
 
 
 #parameter endpoints 
-@router.get("/datasets/{dataset_tag}/meta",
+@router.get("/{dataset_tag}/meta",
             response_model=List[MinimalMetadataResponseModel]|MinimalMetadataResponseModel,
             tags=["Parameters","Meta data"])
 def get_dataset_params(dataset_tag : str, user : UserModel = Depends(get_user_from_token)):
@@ -120,7 +120,7 @@ def get_dataset_params(dataset_tag : str, user : UserModel = Depends(get_user_fr
     
 
 
-@router.get("/datasets/{dataset_tag}/meta/samples")
+@router.get("/{dataset_tag}/meta/samples")
 def get_dataset_sample_info(dataset_tag : str):
     """Retrieve the meta data annotations for 
     each sample. This includes the sample attributes and

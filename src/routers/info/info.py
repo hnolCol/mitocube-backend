@@ -25,7 +25,7 @@ KEY_FIGURE_SETTINGS = get_key_figure_settings()
 DB = Database.DB()
 
 router = APIRouter(
-    prefix="/api",
+    prefix="/api/info",
     tags=["App Information"],
     )
 
@@ -273,7 +273,7 @@ Focus on:
 `;"""
 
 
-@router.get("/info/app",summary="Returns basic information about the app.", response_model=InfoResponse)
+@router.get("/app",summary="Returns basic information about the app.", response_model=InfoResponse)
 def get_application_info(): #user : UserModel = Depends(get_user_from_token)
     """"""
     return InfoResponse(
@@ -285,12 +285,12 @@ def get_application_info(): #user : UserModel = Depends(get_user_from_token)
 
 
 
-@router.get("/info/statistics/metrics",summary="Returns the defined key figures that are defined in the corresponding settings.")
+@router.get("/statistics/metrics",summary="Returns the defined key figures that are defined in the corresponding settings.")
 def get_stat_metric_text(user : UserModel = Depends(get_user_from_token)) -> str:
     return stats_markdown
 
 
-@router.get("/info/keyfigures",summary="Returns the key figures of the backend")
+@router.get("/keyfigures",summary="Returns the key figures of the backend")
 def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     """Returns the defined key figures that are defined 
     in the corresponding settings.
@@ -324,7 +324,7 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
                                         cache_time = timedelta(hours = 24))
     return keyfigureData
 
-@router.get("/info/terms")
+@router.get("/terms")
 def get_terms_of_use(user : UserModel = Depends(get_user_from_token)):
     path_to_file = GENERAL_SETTINGS.use_terms_file 
     use_of_terms = read_json(path_to_file)

@@ -9,12 +9,12 @@ from lib.database.Database import Database
 DB = Database.DB()
 
 router = APIRouter(
-    prefix="/api",
+    prefix="/api/states",
     tags=["States"],
     )
 
 
-@router.get('/states/{state_tag}/name')
+@router.get('/{state_tag}/name')
 def get_state_name(state_tag : int) -> str:
     "" 
     try: 
@@ -22,7 +22,7 @@ def get_state_name(state_tag : int) -> str:
     except:
         raise HTTPException(status_code=400, detail="The state was not found.")
         
-@router.get('/states/{state_tag}/color')
+@router.get('/{state_tag}/color')
 def get_state_name(state_tag : int) -> str:
     "" 
     try:
