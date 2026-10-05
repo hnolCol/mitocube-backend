@@ -121,7 +121,7 @@ class PrecursorsABC(ABC):
         """
 
     @abstractmethod
-    def insert(self, protein_group_tags: List[str], peptide_sequence: str, charge: int, mz: float = None, rt: float = None, im: float = None) -> bool:
+    def insert(self, protein_group_tags: List[str], peptide_sequence: str, charge: int, mz: float = None, im: float = None) -> bool:
         """Inserts a precursor into the database. The precursor tag is derived from the
         peptide sequence and the charge state (sequence.charge). The precursor is connected
         to the given protein groups. If the precursor already exists, it is merged and the
@@ -137,8 +137,6 @@ class PrecursorsABC(ABC):
             The charge state of the precursor.
         mz : float, optional
             The mass-to-charge ratio of the precursor, by default None.
-        rt : float, optional
-            The retention time of the precursor, by default None.
         im : float, optional
             The ion mobility value of the precursor (e.g. from timsTOF instruments), by default None.
 

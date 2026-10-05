@@ -113,7 +113,7 @@ class Neo4JPrecursors(PrecursorsABC):
             "WITH p, collect(pg.tag) as protein_group_tags "
             "WITH p, protein_group_tags, EXISTS {(p)<-[:QUANTIFIED]-(s:Sample)} as quantified, "
             "[(pg:ProteinGroup)-[:HAS_PRECURSOR]->(p) | [pg.tag, count {(pg)-[:HAS_PROTEINS]->(:Protein)}]][..] as pg_sizes "
-            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, p.mz as mz, p.rt as rt, p.im as im, "
+            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, p.mz as mz, p.im as im, "
             "protein_group_tags, quantified, pg_sizes"
         )
 
@@ -154,7 +154,7 @@ class Neo4JPrecursors(PrecursorsABC):
             query += "WHERE EXISTS {(p)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
 
         query += (
-            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, p.mz as mz, p.rt as rt, p.im as im, "
+            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, p.mz as mz, p.im as im, "
             "pg.tag as protein_group_tag, "
             "EXISTS {(p)<-[:QUANTIFIED]-(s:Sample)} as quantified "
             "ORDER BY p.tag "
@@ -212,7 +212,7 @@ class Neo4JPrecursors(PrecursorsABC):
             self.cache.insert(cache_key, r)
         return r
 
-    def insert(self, protein_group_tags: List[str], peptide_sequence: str, charge: int, mz: float = None, rt: float = None, im: float = None) -> bool:
+    def insert(self, protein_group_tags: List[str], peptide_sequence: str, charge: int, mz: float = None, im: float = None) -> bool:
         """Inserts a precursor into the database. The precursor tag is derived from the
         peptide sequence and the charge state (sequence.charge). The precursor is connected
         to the given protein groups.
@@ -227,8 +227,6 @@ class Neo4JPrecursors(PrecursorsABC):
             The charge state of the precursor.
         mz : float, optional
             The mass-to-charge ratio of the precursor, by default None.
-        rt : float, optional
-            The retention time of the precursor, by default None.
         im : float, optional
             The ion mobility value of the precursor (e.g. from timsTOF instruments), by default None.
 
@@ -243,7 +241,6 @@ class Neo4JPrecursors(PrecursorsABC):
             "MERGE (p:Precursor {tag: $precursor_tag}) "
             "SET p.sequence = $peptide_sequence, p.charge = $charge, p.created_at = timestamp() "
             "SET p.mz = CASE WHEN $mz IS NOT NULL THEN $mz ELSE p.mz END, "
-            "p.rt = CASE WHEN $rt IS NOT NULL THEN $rt ELSE p.rt END, "
             "p.im = CASE WHEN $im IS NOT NULL THEN $im ELSE p.im END "
             "WITH p "
             "UNWIND $protein_group_tags as protein_group_tag "
@@ -253,7 +250,7 @@ class Neo4JPrecursors(PrecursorsABC):
             "RETURN count(p) > 0"
         )
 
-        r = self._driver.execute_query(query, precursor_tag=precursor_tag, peptide_sequence=peptide_sequence, charge=charge, mz=mz, rt=rt, im=im, protein_group_tags=protein_group_tags, routing_="w", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, precursor_tag=precursor_tag, peptide_sequence=peptide_sequence, charge=charge, mz=mz, im=im, protein_group_tags=protein_group_tags, routing_="w", result_transformer_=Result.value)
         return r[0]
 
     def bulk_insert(self, precursors: List[PrecursorInsertModel], batch_size: int = 1000, transaction_batch_size: int = 400) -> int:
@@ -288,7 +285,6 @@ class Neo4JPrecursors(PrecursorsABC):
             MERGE (p:Precursor {{tag: precursor.sequence + '.' + toString(precursor.charge)}})
             SET p.sequence = precursor.sequence, p.charge = precursor.charge, p.created_at = timestamp()
             SET p.mz = CASE WHEN precursor.mz IS NOT NULL THEN precursor.mz ELSE p.mz END,
-                p.rt = CASE WHEN precursor.rt IS NOT NULL THEN precursor.rt ELSE p.rt END,
                 p.im = CASE WHEN precursor.im IS NOT NULL THEN precursor.im ELSE p.im END
             WITH p, precursor
             UNWIND precursor.protein_group_tags as protein_group_tag

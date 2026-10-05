@@ -40,7 +40,7 @@ def insert_precursor(precursor : PrecursorInsertModel, user : UserModel = Depend
     for protein_group_tag in precursor.protein_group_tags:
         if not DB.protein_groups.exists(tag = protein_group_tag):
             raise HTTPException(status_code=404, detail=f"Protein group with tag {protein_group_tag} not found.")
-    return DB.precursors.insert(protein_group_tags = precursor.protein_group_tags, peptide_sequence = precursor.sequence, charge = precursor.charge, mz = precursor.mz, rt = precursor.rt, im = precursor.im)
+    return DB.precursors.insert(protein_group_tags = precursor.protein_group_tags, peptide_sequence = precursor.sequence, charge = precursor.charge, mz = precursor.mz, im = precursor.im)
 
 
 @router.post("/insert/bulk", summary="Bulk inserts a list of precursors into the database. Requires curator rights.")
