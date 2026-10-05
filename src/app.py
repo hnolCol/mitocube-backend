@@ -81,6 +81,7 @@ from routers.crosslink import external_resource as crosslink_external_resource
 from routers.crosslink import crosslink
 from routers.protocols import protocols
 from routers.mfa import mfa
+from routers.policy import policy
 
 # from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
@@ -90,7 +91,7 @@ import argparse
 
 
 #the order of these matters for the functioning of the routes
-router_sources = [
+router_sources = [policy,
                   protein_groups,
                   protein_favorite,
                   protein_find,

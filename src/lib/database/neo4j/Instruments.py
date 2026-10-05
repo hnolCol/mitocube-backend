@@ -1,8 +1,10 @@
 from neo4j import Driver, Result 
 from typing import List, Dict
 import pandas as pd 
+from datetime import datetime
 from services.random_generators import get_random_string
 from config.models.instruments import InstrumentStateModel, InstrumentsStateResponseModel, InstrumentStateHistoryModel
+from config.enums.states import SubmissionStatesEnums  
 
 from lib.database.abstract.Instruments import InstrumentsABC
 from lib.database.abstract.Instruments import InstrumentStatesABC
@@ -110,7 +112,15 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
             "RETURN durations "
         )
         
-        r = self._driver.execute_query(query, instrument_tag = instrument_tag, limit = limit, routing_= "r", result_transformer_=Result.value)
+        r = self._driver.execute_query( query,
+                                        instrument_tag=instrument_tag,
+                                        state_tag=state_tag,
+                                        timestamp_min=timestamp_min,
+                                        timestamp_max=timestamp_max,
+                                        limit=limit,
+                                        routing_="r",
+                                        result_transformer_=Result.value
+                                    )
         return [InstrumentStateHistoryModel(**ri) for ri in r[0]]
     
     
@@ -281,6 +291,36 @@ class Neo4JInstrumentStates(InstrumentStatesABC):
         self._driver.execute_query(query, routing_="w", tag = tag, instrument_tag = instrument_tag, comment = comment, r_tag = unique_tag)
         
 
+    def get_state_duration_summary(self, instrument_tag: str, timestamp_min: float = None, timestamp_max: float = None) -> List[dict]:
+        durations = self.get_state_durations(instrument_tag=instrument_tag, timestamp_min=timestamp_min, timestamp_max=timestamp_max, limit=None)
+        totals_ms = {}
+        for d in durations:
+            totals_ms[d.state_tag] = totals_ms.get(d.state_tag, 0) + (d.duration or 0)
+
+        summary = []
+        for state_tag, total_ms in totals_ms.items():
+            try:
+                state = self.get(tag=state_tag)
+            except Exception:
+                continue
+            total_seconds = total_ms / 1000
+            summary.append({
+                "state_tag": state_tag,
+                "state_text": state.text,
+                "state_color": state.color,
+                "total_seconds": total_seconds,
+                "total_days": round(total_seconds / 86400, 2),
+            })
+        return summary
+
+    def get_all(self) -> List[InstrumentStateModel]:
+        query = (
+            "MATCH (is:InstrumentState) "
+            "RETURN {tag: is.tag, text: is.text, description: is.description, color: is.color} "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        return [InstrumentStateModel(**ri) for ri in r]    
+
 class Neo4JInstruments(InstrumentsABC):
     
     def __init__(self, driver : Driver) -> None:
@@ -417,7 +457,6 @@ class Neo4JInstruments(InstrumentsABC):
         return r
 
     def get_overview(self, tags: List[str] = None) -> List[dict]:
-        """Per-instrument summary: current state + per-submission sample breakdown."""
         query = (
             "MATCH (t:Trait)<-[:HAS_TRAIT]-(a:Attribute) WHERE EXISTS {(a)-[:PART_OF]->(ag:AttributeGroup {tag: 'instrument'})} "
         )
@@ -444,7 +483,144 @@ class Neo4JInstruments(InstrumentsABC):
 
         for inst in instruments:
             subs = submissions_by_instrument.get(inst["tag"], [])
-            inst["submissions"] = subs
+            measuring, queued, past = [], [], []
+            for s in subs:
+                state = s["submission_state"]
+                if state == SubmissionStatesEnums.MEASURING:
+                    measuring.append(s)
+                elif state in (SubmissionStatesEnums.SUBMITTED, SubmissionStatesEnums.PROCESSED, SubmissionStatesEnums.PAUSED):
+                    queued.append(s)
+                else:
+                    past.append(s)
+            inst["submissions_measuring"] = measuring
+            inst["submissions_queued"] = queued
+            inst["submissions_past"] = past
             inst["sample_count"] = sum(s["sample_count"] for s in subs)
 
         return instruments
+        
+    def get_quantification_summary_by_month(self, instrument_tag: str, timestamp_min: float = None, timestamp_max: float = None) -> List[dict]:
+        query = (
+            "MATCH (inst:Trait {tag: $instrument_tag})<-[:MEASURED_BY]-(rl:RunList)-[:HAS_RUN]->(r:Run)-[:MEASURES]->(sample:Sample) "
+            "MATCH (rl)<-[:HAS_RUNLIST]-(sub:Submission) "
+            "OPTIONAL MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+        )
+        where_clauses = []
+        if timestamp_min is not None:
+            where_clauses.append("q.created_at >= $timestamp_min")
+        if timestamp_max is not None:
+            where_clauses.append("q.created_at <= $timestamp_max")
+        if where_clauses:
+            query += "WHERE " + " AND ".join(where_clauses) + " "
+        query += (
+            "WITH sub, sample, count(DISTINCT pg) AS protein_count, "
+            "     apoc.date.format(q.created_at, 'ms', 'yyyy-MM') AS month "
+            "RETURN month, sub.tag AS submission_tag, sub.title AS submission_title, "
+            "       sum(protein_count) AS protein_group_count, count(DISTINCT sample) AS sample_count "
+        )
+        r = self._driver.execute_query(
+            query, routing_="r", result_transformer_=Result.data,
+            instrument_tag=instrument_tag, timestamp_min=timestamp_min, timestamp_max=timestamp_max
+        )
+
+
+        by_key = {}
+        for row in r:
+            m = row["month"]
+            if m is None:
+                continue
+            key = (m, row["submission_tag"])
+            entry = by_key.setdefault(key, {
+                "month": m,
+                "submission_tag": row["submission_tag"],
+                "submission_title": row["submission_title"],
+                "protein_group_count": 0,
+                "sample_count": 0,
+            })
+            entry["protein_group_count"] += row["protein_group_count"] or 0
+            entry["sample_count"] += row["sample_count"] or 0
+
+        return sorted(by_key.values(), key=lambda x: (x["month"], x["submission_tag"]))
+    
+
+    def get_past_submissions_paginated(self, instrument_tag: str, offset: int = 0, limit: int = 20) -> dict:
+        query = (
+            "MATCH (inst:Trait {tag: $instrument_tag})<-[:MEASURED_BY]-(rl:RunList)-[:HAS_RUN]->(r:Run)-[:MEASURES]->(sample:Sample) "
+            "MATCH (rl)<-[:HAS_RUNLIST]-(sub:Submission) "
+            "WITH inst, sub, count(DISTINCT sample) AS sample_count "
+            "CALL (sub) { "
+            "    OPTIONAL MATCH (sub)-[sr:IN_STATE]->(sub_state:State) WHERE sr.created_at IS NOT NULL "
+            "    RETURN sub_state.tag AS submission_state, sr.created_at AS state_created_at "
+            "    ORDER BY sr.created_at DESC "
+            "    LIMIT 1 "
+            "} "
+            "WITH sub, sample_count, submission_state, state_created_at "
+            "WHERE submission_state IS NULL OR NOT submission_state IN $active_states "
+            "RETURN sub.tag AS submission_tag, sub.title AS submission_title, "
+            "       submission_state, sample_count, state_created_at "
+            "ORDER BY state_created_at DESC "
+        )
+        r = self._driver.execute_query(
+            query, routing_="r", result_transformer_=Result.data,
+            instrument_tag=instrument_tag,
+            active_states=[SubmissionStatesEnums.SUBMITTED, SubmissionStatesEnums.PROCESSED, SubmissionStatesEnums.MEASURING, SubmissionStatesEnums.PAUSED]
+        )
+        total = len(r)
+        page = r[offset:offset + limit]
+        return {"items": page, "total": total, "offset": offset, "limit": limit}
+
+
+    def get_unique_protein_group_count_by_year(self, instrument_tag: str, year: int) -> int:
+        """Count of distinct ProteinGroups quantified on this instrument within a given calendar year."""
+        year_start_ms = int(datetime(year, 1, 1).timestamp() * 1000)
+        year_end_ms = int(datetime(year + 1, 1, 1).timestamp() * 1000)
+
+        query = (
+            "MATCH (inst:Trait {tag: $instrument_tag})<-[:MEASURED_BY]-(rl:RunList)-[:HAS_RUN]->(r:Run)-[:MEASURES]->(sample:Sample) "
+            "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "WHERE q.created_at >= $year_start AND q.created_at < $year_end "
+            "RETURN count(DISTINCT pg) AS unique_protein_groups "
+        )
+        r = self._driver.execute_query(
+            query, routing_="r", result_transformer_=Result.value,
+            instrument_tag=instrument_tag, year_start=year_start_ms, year_end=year_end_ms
+        )
+        return r[0] if r else 0
+    
+    def get_measuring_submission_tags(self, instrument_tag: str) -> List[str]:
+        """Tags of submissions on this instrument whose latest state is MEASURING."""
+        query = (
+            "MATCH (inst:Trait {tag: $instrument_tag})<-[:MEASURED_BY]-(rl:RunList)<-[:HAS_RUNLIST]-(sub:Submission) "
+            "WITH DISTINCT sub "
+            "CALL (sub) { "
+            "    MATCH (sub)-[sr:IN_STATE]->(s:State) WHERE sr.created_at IS NOT NULL "
+            "    RETURN s.tag AS state ORDER BY sr.created_at DESC LIMIT 1 "
+            "} "
+            "WITH sub, state WHERE state = $measuring "
+            "RETURN sub.tag "
+        )
+        return self._driver.execute_query(
+            query, routing_="r", result_transformer_=Result.value,
+            instrument_tag=instrument_tag, measuring=SubmissionStatesEnums.MEASURING,
+        )
+    
+    def pause_measuring_submissions(self, instrument_tag: str) -> List[str]:
+        """Set the state of all submissions on this instrument whose latest state is MEASURING to PAUSED, and return their tags."""
+        query = (
+            "MATCH (inst:Trait {tag: $instrument_tag})<-[:MEASURED_BY]-(rl:RunList)<-[:HAS_RUNLIST]-(sub:Submission) "
+            "WITH DISTINCT sub "
+            "CALL (sub) { "
+            "    MATCH (sub)-[sr:IN_STATE]->(s:State) WHERE sr.created_at IS NOT NULL "
+            "    RETURN s.tag AS state ORDER BY sr.created_at DESC LIMIT 1 "
+            "} "
+            "WITH sub, state WHERE state = $measuring "
+            "MATCH (paused:State {tag: $paused}) "
+            "CREATE (sub)-[:IN_STATE {created_at: timestamp()}]->(paused) "
+            "RETURN sub.tag "
+        )
+        return self._driver.execute_query(
+            query, routing_="w", result_transformer_=Result.value,
+            instrument_tag=instrument_tag,
+            measuring=SubmissionStatesEnums.MEASURING,
+            paused=SubmissionStatesEnums.PAUSED,
+        )

@@ -1972,14 +1972,39 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return self._get_users_submission_scope(current_user_tag=user_tag)
 
 
-    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
-        """Checks if a user has access to a submission. 
-            This is useful to check if a user can access a submission before returning the submission data. """
-        user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
-        if user_scope is None: return True #curator or admin, has access to all submissions
-        return submission_tag in user_scope
+    # def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+    #     """Checks if a user has access to a submission. 
+    #         This is useful to check if a user can access a submission before returning the submission data. """
+    #     user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
+    #     if user_scope is None: return True #curator or admin, has access to all submissions
+    #     return submission_tag in user_scope
         
+    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if a user has access to a single submission without building the full submission scope.
+        This is useful to check if a user can access a submission before returning the submission data.
+        """
+        if not self._users.exists(user_tag):
+            return False
 
+        user = self._users.get_user_by_tag(tag=user_tag)
+        if user.role >= UserRolesEnum.CURATOR:
+            return True
+        if user.role == UserRolesEnum.GUEST:
+            return False
+
+        query = (
+            "MATCH (u:User {tag: $user_tag}), (submission:Submission {tag: $submission_tag}) "
+            "RETURN "
+            "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
+            "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
+            "AS has_access "
+        )
+        r = self._driver.execute_query(query, routing_="r",
+                                    user_tag=user_tag,
+                                    submission_tag=submission_tag,
+                                    result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+    
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
             query += "ORDER BY submission_tag DESC "
