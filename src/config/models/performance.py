@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, Field
 from typing import Dict, Optional, List
 from enum import Enum
 
@@ -100,7 +100,7 @@ class QCRunBaseModel(BaseModel):
     quant_peptides : int 
     quant_precursors : int
     quant_protein_groups : int
-    group_attr : Dict[str, List[str]] #the attributes and attribute values that creates a group /e.g. the 
+    group_attr : Dict[str, List[str]] = Field(default={}, deprecated="group_attr is deprecated, use condition_application_tags instead. The condition applications describe the QC run (e.g. column, gradient) via the existing attribute/trait system.") #the attributes and attribute values that creates a group /e.g. the 
     #performance runs are analysed and visualized together. A group attribute should be anything that 
     #has an significant effect on the performance. 
     

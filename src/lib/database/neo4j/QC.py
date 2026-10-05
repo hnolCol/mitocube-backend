@@ -1,4 +1,5 @@
 from typing import List, Tuple, Literal, Dict
+import warnings
 from neo4j import Driver, Result
 from lib.database.abstract.QC import QCABC
 from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCStandardInsertModel, QCStandardResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
@@ -82,6 +83,8 @@ class Neo4JQC(QCABC):
         acquired on, the LC parts (via the group attributes) and the QC standard that
         was used to generate it.
         """
+        if performance_run.group_attr:
+            warnings.warn("group_attr is deprecated, use condition_application_tags instead.", DeprecationWarning, stacklevel=2)
         attribute_values  = [{"tag" : a_tag, "value" : av_tag} for a_tag, av_tags in performance_run.group_attr.items() for av_tag in av_tags]
         condition_applications = list(performance_run.condition_application_tags)
         peptides = [{'tag' : peptide_tag, 'rt' : rt} for peptide_tag, rt in performance_run.rt_peptides.items()]
