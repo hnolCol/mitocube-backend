@@ -40,7 +40,7 @@ def find_precursors_by_query(search_string : str, limit : int = 50, submission_t
 
 
 @router.get("/{precursor_tag}", summary="Retrieves a precursor by its tag.")
-def get_precursor_by_tag(precursor_tag : str) -> PrecursorResponseModel:
+def get_precursor_by_tag(precursor_tag : str, user : UserModel = Depends(get_user_from_token)) -> PrecursorResponseModel:
     """
     Retrieves a precursor by its tag. The protein_group_tag is the protein group
     associated with the precursor that has the least proteins connected to itself
@@ -51,6 +51,8 @@ def get_precursor_by_tag(precursor_tag : str) -> PrecursorResponseModel:
     ----------
     precursor_tag : str
         The tag of the precursor to retrieve.
+    user : UserModel, optional
+        The user making the request, by default Depends(get_user_from_token)
 
     Returns
     -------
