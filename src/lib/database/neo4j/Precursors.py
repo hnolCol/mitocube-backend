@@ -5,7 +5,7 @@ import pandas as pd
 from lib.database.abstract.Precursors import PrecursorsABC
 from lib.database.abstract.Samples import SamplesABC
 from lib.database.abstract.Cache import CacheABC
-from config.models.precursors import PrecursorResponseModel
+from config.models.precursors import PrecursorInsertModel, PrecursorResponseModel
 
 
 class Neo4JPrecursors(PrecursorsABC):
@@ -199,6 +199,56 @@ class Neo4JPrecursors(PrecursorsABC):
 
         r = self._driver.execute_query(query, precursor_tag=precursor_tag, peptide_sequence=peptide_sequence, charge=charge, protein_group_tag=protein_group_tag, routing_="w", result_transformer_=Result.value)
         return r[0]
+
+    def bulk_insert(self, precursors: List[PrecursorInsertModel], batch_size: int = 1000, transaction_batch_size: int = 400) -> int:
+        """Bulk inserts a list of precursors into the database. The precursor tags are derived from the
+        peptide sequence and the charge state (sequence.charge). The precursors are connected
+        to their respective protein groups. Precursors that already exist are merged.
+
+        The input is chunked on the client side (batch_size) and each chunk is inserted using a
+        CALL { ... } IN TRANSACTIONS subquery so that Neo4J commits the insert in smaller
+        transactions (transaction_batch_size), avoiding memory errors for large inputs
+        (e.g. 90K precursors per sample).
+
+        Parameters
+        ----------
+        precursors : List[PrecursorInsertModel]
+            The precursors to insert.
+        batch_size : int, optional
+            The number of precursors sent to the database per query, by default 1000
+        transaction_batch_size : int, optional
+            The number of rows per internal transaction (IN TRANSACTIONS OF ... ROWS), by default 400
+
+        Returns
+        -------
+        int
+            The number of inserted precursors.
+        """
+        precursors_data = [p.model_dump() for p in precursors]
+        total = 0
+        query = f"""
+        CALL () {{
+            UNWIND $precursors as precursor
+            MERGE (p:Precursor {{tag: precursor.sequence + '.' + toString(precursor.charge)}})
+            SET p.sequence = precursor.sequence, p.charge = precursor.charge, p.created_at = timestamp()
+            WITH p, precursor
+            MATCH (pg:ProteinGroup {{tag: precursor.protein_group_tag}})
+            MERGE (p)<-[r:HAS_PRECURSOR]-(pg)
+            SET r.created_at = timestamp()
+            RETURN count(r) AS created
+        }} IN TRANSACTIONS OF {transaction_batch_size} ROWS
+        RETURN sum(created) AS total
+        """
+        with self._driver.session() as session:
+            for i in range(0, len(precursors_data), batch_size):
+                batch = precursors_data[i:i+batch_size]
+                result = session.run(
+                    query,
+                    precursors=batch
+                )
+                record = result.single()
+                total += record["total"] if record else 0
+        return total
 
     def is_quantified(self, precursor_tag: str) -> bool:
         """Checks if a precursor is quantified.
