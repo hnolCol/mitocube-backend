@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
 from typing import List 
 
-from config.models.performance import QCRunModel, QCStandardModel, QCPrecursorModel, QCPrecursorsModel
+from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCStandardInsertModel, QCStandardResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 
 
 class QCABC(ABC):
@@ -40,7 +40,7 @@ class QCABC(ABC):
         """
     
     @abstractmethod
-    def get(self, tags : List[str] = None, instrument : str = None, limit : int = 50) -> QCRunModel:
+    def get(self, tags : List[str] = None, instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50) -> List[QCRunResponseModel]:
         """Returns the perfromance run. 
 
         Parameters
@@ -54,17 +54,17 @@ class QCABC(ABC):
 
         Returns
         -------
-        QCRunModel
+        QCRunInsertModel
             _description_
         """
     
     @abstractmethod
-    def insert(self, performance_run : QCRunModel) -> bool: 
+    def insert(self, performance_run : QCRunInsertModel) -> bool: 
         """Add a new performance run to the database 
 
         Parameters
         ----------
-        performance_run : QCRunModel
+        performance_run : QCRunInsertModel
             _description_
 
         Returns
@@ -89,14 +89,14 @@ class QCABC(ABC):
         """
         
     @abstractmethod
-    def update(self, tag : str, peformance_run : QCRunModel) -> bool:
+    def update(self, tag : str, peformance_run : QCRunInsertModel) -> bool:
         """Updates a specific performance run. 
 
         Parameters
         ----------
         tag : str
             _description_
-        peformance_run : QCRunModel
+        peformance_run : QCRunInsertModel
             _description_
 
         Returns
@@ -122,7 +122,7 @@ class QCABC(ABC):
         """
 
     @abstractmethod
-    def get_standards(self, type : str = None, vendor : str = None) -> List[QCStandardModel]:
+    def get_standards(self, type : str = None, vendor : str = None) -> List[QCStandardResponseModel]:
         """
         Returns the QC standards, optionally filtered by type and vendor.
 
@@ -135,19 +135,19 @@ class QCABC(ABC):
 
         Returns
         -------
-        List[QCStandardModel]
+        List[QCStandardResponseModel]
             The QC standards.
         """
 
     @abstractmethod
-    def insert_standard(self, standard : QCStandardModel) -> bool:
+    def insert_standard(self, standard : QCStandardInsertModel) -> bool:
         """
         Adds a new QC standard to the database. Standards are immutable,
         an existing tag is merged.
 
         Parameters
         ----------
-        standard : QCStandardModel
+        standard : QCStandardInsertModel
             The standard to add.
 
         Returns
@@ -174,7 +174,7 @@ class QCABC(ABC):
         """
 
     @abstractmethod
-    def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorModel]) -> bool:
+    def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorInsertModel]) -> bool:
         """
         Adds the quantified QCPrecursors to a QC run. Only a specific subset of precursors
         is recorded for QC, the full quantification data is not uploaded. Precursors that
@@ -184,7 +184,7 @@ class QCABC(ABC):
         ----------
         run_tag : str
             The tag of the QC run the precursors belong to.
-        precursors : List[QCPrecursorModel]
+        precursors : List[QCPrecursorInsertModel]
             The precursors with their value, score and retention time.
 
         Returns
@@ -194,7 +194,7 @@ class QCABC(ABC):
         """
 
     @abstractmethod
-    def get_qc_precursors(self, run_tag : str) -> List[QCPrecursorModel]:
+    def get_qc_precursors(self, run_tag : str) -> List[QCPrecursorResponseModel]:
         """
         Returns the QCPrecursors that were recorded for a QC run.
 
@@ -205,6 +205,6 @@ class QCABC(ABC):
 
         Returns
         -------
-        List[QCPrecursorModel]
+        List[QCPrecursorResponseModel]
             The recorded precursors of the run.
         """

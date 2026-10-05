@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 
 from lib.database.Database import Database
 
-from config.models.performance import QCRunModel
 from config.models.user import UserModel
 from config.models.performance import QCPeptidesModel, QCPeptideModel
 from services.users import is_user_admin, get_user_from_token

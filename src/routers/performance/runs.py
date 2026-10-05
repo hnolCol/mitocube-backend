@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import Database
-from config.models.performance import QCRunModel, QCPrecursorModel
+from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 from config.models.user import UserModel
 from services.users import is_user_at_least_curator, get_user_from_token
 
@@ -14,7 +14,7 @@ DB = Database.DB()
 
 
 @router.get("/runs", summary="Returns the QC runs.")
-def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCRunModel]:
+def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCRunResponseModel]:
     """
     Returns the QC runs, optionally filtered by instrument and QC standard.
 
@@ -31,7 +31,7 @@ def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str
 
     Returns
     -------
-    List[QCRunModel]
+    List[QCRunResponseModel]
         The QC runs.
     """
     return DB.qc.get(instrument_name_tag = instrument_name_tag, qc_standard_tag = qc_standard_tag, limit = limit)
@@ -58,7 +58,7 @@ def count_performance_runs(by_instrument : bool = False, user : UserModel = Depe
 
 
 @router.get("/runs/{run_tag}", summary="Returns a QC run by its tag.")
-def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> QCRunModel:
+def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> QCRunResponseModel:
     """
     Returns a QC run by its tag.
 
@@ -71,7 +71,7 @@ def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_lea
 
     Returns
     -------
-    QCRunModel
+    QCRunResponseModel
         The run.
 
     Raises
@@ -86,14 +86,14 @@ def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_lea
 
 
 @router.post("/runs/insert", summary="Inserts a QC run. Requires at least curator rights.")
-def insert_performance_run(run : QCRunModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Inserts a QC run into the database. The run is linked to the instrument it was
     acquired on and to the QC standard that was used to generate it.
 
     Parameters
     ----------
-    run : QCRunModel
+    run : QCRunInsertModel
         The run to insert.
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(is_user_at_least_curator)
@@ -113,7 +113,7 @@ def insert_performance_run(run : QCRunModel, user : UserModel = Depends(is_user_
 
 
 @router.post("/runs/{run_tag}/precursors", summary="Adds quantified QCPrecursors to a QC run. Requires at least curator rights.")
-def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorModel], user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Adds the quantified QCPrecursors to a QC run. Only a specific subset of precursors is
     recorded for QC, the full quantification data is not uploaded since it has no biological
@@ -123,7 +123,7 @@ def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorModel], user :
     ----------
     run_tag : str
         The tag of the QC run the precursors belong to.
-    precursors : List[QCPrecursorModel]
+    precursors : List[QCPrecursorInsertModel]
         The precursors with their value, score and retention time.
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(is_user_at_least_curator)
@@ -144,7 +144,7 @@ def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorModel], user :
 
 
 @router.get("/runs/{run_tag}/precursors", summary="Returns the QCPrecursors of a QC run.")
-def get_qc_precursors(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCPrecursorModel]:
+def get_qc_precursors(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCPrecursorResponseModel]:
     """
     Returns the QCPrecursors that were recorded for a QC run.
 
@@ -157,7 +157,7 @@ def get_qc_precursors(run_tag : str, user : UserModel = Depends(is_user_at_least
 
     Returns
     -------
-    List[QCPrecursorModel]
+    List[QCPrecursorResponseModel]
         The recorded precursors of the run.
 
     Raises

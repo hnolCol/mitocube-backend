@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 
 from lib.database.Database import Database
 
-from config.models.performance import QCRunModel
 from config.models.user import UserModel
 from config.models.symptoms import SymptomResponseModel, SymptomInsertModel
 from config.models.permissions import PermissionResponseModel 

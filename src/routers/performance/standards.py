@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
 from config.models.user import UserModel
-from config.models.performance import QCStandardModel, QCStandardType
+from config.models.performance import QCStandardInsertModel, QCStandardResponseModel, QCStandardType
 from services.users import is_user_at_least_curator, get_user_from_token
 from lib.database.Database import Database
 
@@ -21,7 +21,7 @@ def get_standard_types(user : UserModel = Depends(get_user_from_token)) -> List[
 
 
 @router.get("", summary="Returns the QC standards. Requires at least curator rights.")
-def get_standards(type : str = None, vendor : str = None, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCStandardModel]:
+def get_standards(type : str = None, vendor : str = None, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCStandardResponseModel]:
     """
     Returns the QC standards, optionally filtered by type and vendor.
 
@@ -34,7 +34,7 @@ def get_standards(type : str = None, vendor : str = None, user : UserModel = Dep
 
     Returns
     -------
-    List[QCStandardModel]
+    List[QCStandardResponseModel]
         The QC standards.
     """
     if type is not None and type not in [t.value for t in QCStandardType]:
@@ -43,7 +43,7 @@ def get_standards(type : str = None, vendor : str = None, user : UserModel = Dep
 
 
 @router.get("/{standard_tag}", summary="Returns a QC standard by its tag. Requires at least curator rights.")
-def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> QCStandardModel:
+def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> QCStandardResponseModel:
     """
     Returns a QC standard by its tag.
 
@@ -54,7 +54,7 @@ def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least
 
     Returns
     -------
-    QCStandardModel
+    QCStandardResponseModel
         The standard.
 
     Raises
@@ -68,13 +68,13 @@ def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least
 
 
 @router.post("/insert", summary="Inserts a QC standard. Requires at least curator rights.")
-def insert_standard(standard : QCStandardModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def insert_standard(standard : QCStandardInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Inserts a QC standard into the database. Standards are immutable, an existing tag is merged.
 
     Parameters
     ----------
-    standard : QCStandardModel
+    standard : QCStandardInsertModel
         The standard to insert.
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(is_user_at_least_curator)

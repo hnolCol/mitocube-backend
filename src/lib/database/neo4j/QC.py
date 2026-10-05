@@ -1,7 +1,7 @@
 from typing import List, Tuple, Literal
 from neo4j import Driver, Result
 from lib.database.abstract.QC import QCABC
-from config.models.performance import QCRunModel, QCStandardModel, QCPrecursorModel
+from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCStandardInsertModel, QCStandardResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 
 
 class Neo4JQC(QCABC):
@@ -41,7 +41,7 @@ class Neo4JQC(QCABC):
         return r.records[0]
 
 
-    def get(self, tags : List[str] = None, instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50) -> List[QCRunModel]:
+    def get(self, tags : List[str] = None, instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50) -> List[QCRunResponseModel]:
         """
         Returns the QC runs, optionally filtered by tags, instrument and QC standard.
         """
@@ -70,11 +70,11 @@ class Neo4JQC(QCABC):
             run.pop("rt_peptides", None)
             run.pop("group_attr", None)
             run.pop("qc_precursors", None)
-            runs.append(QCRunModel.model_construct(**run))
+            runs.append(QCRunResponseModel.model_construct(**run))
         return runs
 
 
-    def insert(self, performance_run : QCRunModel) -> bool:
+    def insert(self, performance_run : QCRunInsertModel) -> bool:
         """
         Adds a new QC run to the database. The run is linked to the instrument it was
         acquired on, the LC parts (via the group attributes) and the QC standard that
@@ -131,7 +131,7 @@ class Neo4JQC(QCABC):
         return r.records[0] > 0
 
 
-    def update(self, tag: str, performance_run: QCRunModel) -> bool:
+    def update(self, tag: str, performance_run: QCRunInsertModel) -> bool:
         """
         QC runs are immutable, updating is not supported. To change a run, delete it and insert a new one.
         """
@@ -150,7 +150,7 @@ class Neo4JQC(QCABC):
         return r.records[0]
 
 
-    def get_standards(self, type : str = None, vendor : str = None) -> List[QCStandardModel]:
+    def get_standards(self, type : str = None, vendor : str = None) -> List[QCStandardResponseModel]:
         """
         Returns the QC standards, optionally filtered by type and vendor.
         """
@@ -165,10 +165,10 @@ class Neo4JQC(QCABC):
         query += "RETURN std {.*} as standard ORDER BY std.tag "
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value,
                                        type = type, vendor = vendor)
-        return [QCStandardModel.model_construct(**record["standard"]) for record in r.records]
+        return [QCStandardResponseModel.model_construct(**record["standard"]) for record in r.records]
 
 
-    def insert_standard(self, standard : QCStandardModel) -> bool:
+    def insert_standard(self, standard : QCStandardInsertModel) -> bool:
         """
         Adds a new QC standard to the database. Standards are immutable, an existing tag is merged.
         """
@@ -195,7 +195,7 @@ class Neo4JQC(QCABC):
         return r.records[0] > 0
 
 
-    def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorModel]) -> bool:
+    def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorInsertModel]) -> bool:
         """
         Adds the quantified QCPrecursors to a QC run. Only a specific subset of precursors is recorded
         for QC, the full quantification data is not uploaded. Precursors that do not exist in the
@@ -217,7 +217,7 @@ class Neo4JQC(QCABC):
         return True 
 
 
-    def get_qc_precursors(self, run_tag : str) -> List[QCPrecursorModel]:
+    def get_qc_precursors(self, run_tag : str) -> List[QCPrecursorResponseModel]:
         """
         Returns the QCPrecursors that were recorded for a QC run.
         """
@@ -227,4 +227,4 @@ class Neo4JQC(QCABC):
             "ORDER BY pre.tag "
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, run_tag = run_tag)
-        return [QCPrecursorModel(**dict(record)) for record in r.records]
+        return [QCPrecursorResponseModel(**dict(record)) for record in r.records]
