@@ -82,7 +82,7 @@ class Neo4JQC(QCABC):
         """
         attribute_values  = [{"tag" : a_tag, "value" : av_tag} for a_tag, av_tags in performance_run.group_attr.items() for av_tag in av_tags]
         peptides = [{'tag' : peptide_tag, 'rt' : rt} for peptide_tag, rt in performance_run.rt_peptides.items()]
-        precursors = [{'tag' : p.precursor_tag, 'intensity' : p.intensity, 'score' : p.score, 'rt' : p.rt} for p in performance_run.qc_precursors]
+        precursors = [{'tag' : p.precursor_tag, 'intensity' : p.intensity, 'score' : p.score, 'retention_time' : p.retention_time} for p in performance_run.qc_precursors]
         query = (
             "MERGE (qc:QCRun {tag : $performance_run_props.tag}) "
             "SET qc += $performance_run_props "
@@ -108,7 +108,7 @@ class Neo4JQC(QCABC):
             "MATCH (pre:Precursor {tag : precursor.tag}) "
             "MERGE (qc)-[r_pre:QUANTIFIED]->(pre) "
             "SET r_pre.intensity = precursor.intensity, r_pre.score = precursor.score, "
-            "r_pre.rt = precursor.rt, r_pre.created_at = timestamp() "
+            "r_pre.retention_time = precursor.retention_time, r_pre.created_at = timestamp() "
         )
         self._driver.execute_query(query, routing_="w", result_transformer_=Result.value,
                                    performance_run_props = performance_run.model_dump(exclude_none=True, exclude=["rt_peptides","group_attr","qc_precursors"]),
@@ -203,14 +203,14 @@ class Neo4JQC(QCABC):
         """
         if not self.exists(tag = run_tag):
             return False
-        precursor_props = [{'tag' : p.precursor_tag, 'intensity' : p.intensity, 'score' : p.score, 'rt' : p.rt} for p in precursors]
+        precursor_props = [{'tag' : p.precursor_tag, 'intensity' : p.intensity, 'score' : p.score, 'retention_time' : p.retention_time} for p in precursors]
         query = (
             "MATCH (qc:QCRun {tag : $run_tag}) "
             "UNWIND $precursors as precursor "
             "MATCH (pre:Precursor {tag : precursor.tag}) "
             "MERGE (qc)-[r:QUANTIFIED]->(pre) "
             "SET r.intensity = precursor.intensity, r.score = precursor.score, "
-            "r.rt = precursor.rt, r.created_at = timestamp() "
+            "r.retention_time = precursor.retention_time, r.created_at = timestamp() "
         )
         self._driver.execute_query(query, routing_="w", result_transformer_=Result.value,
                                    run_tag = run_tag, precursors = precursor_props)
@@ -223,7 +223,7 @@ class Neo4JQC(QCABC):
         """
         query = (
             "MATCH (qc:QCRun {tag : $run_tag})-[r:QUANTIFIED]->(pre:Precursor) "
-            "RETURN pre.tag as precursor_tag, r.intensity as intensity, r.score as score, r.rt as rt "
+            "RETURN pre.tag as precursor_tag, r.intensity as intensity, r.score as score, r.retention_time as retention_time "
             "ORDER BY pre.tag "
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, run_tag = run_tag)

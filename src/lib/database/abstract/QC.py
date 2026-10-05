@@ -177,7 +177,7 @@ class QCABC(ABC):
     def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorInsertModel]) -> bool:
         """
         Adds the quantified QCPrecursors to a QC run. The precursors are linked to the run via a
-        [:QUANTIFIED] relationship that carries the intensity, score and retention time (rt) of
+        [:QUANTIFIED] relationship that carries the intensity, score and retention time of
         the precursor in this specific run. Only a specific subset of precursors is recorded for
         QC, the full quantification data is not uploaded. Precursors that do not exist in the
         database are skipped.
@@ -187,7 +187,7 @@ class QCABC(ABC):
         run_tag : str
             The tag of the QC run the precursors belong to.
         precursors : List[QCPrecursorInsertModel]
-            The precursors with their intensity, score and retention time (rt).
+            The precursors with their intensity, score and retention time.
 
         Returns
         -------

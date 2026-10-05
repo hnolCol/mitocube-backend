@@ -116,8 +116,9 @@ def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is
 def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
     Adds the quantified QCPrecursors to a QC run. The precursors are linked to the run via
-    a [:QUANTIFIED] relationship that carries the intensity, score and retention time (rt)
-    of the precursor in this specific run. Only a specific subset of precursors is recorded
+    a [:QUANTIFIED] relationship that carries the intensity, score and retention time
+    of the precursor in this specific run, consistent with the Sample-[:QUANTIFIED]->Precursor
+    pattern of the biological quantifications. Only a specific subset of precursors is recorded
     for QC, the full quantification data is not uploaded since it has no biological meaning
     and is too large. Precursors that do not exist in the database are skipped.
 
@@ -126,7 +127,7 @@ def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], 
     run_tag : str
         The tag of the QC run the precursors belong to.
     precursors : List[QCPrecursorInsertModel]
-        The precursors with their intensity, score and retention time (rt).
+        The precursors with their intensity, score and retention time.
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(is_user_at_least_curator)
 
