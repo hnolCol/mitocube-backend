@@ -264,19 +264,19 @@ class RunListCreator:
                 "row_index" : int, 
                 "position_label" : str, 
                 "name" : str,
-                "label" : str,
+                "tag" : str,
                 "aggregated_samples" : List[int]
             }
             ```
         """
-        run_label = get_random_string(N=4)
+        run_tag = get_random_string(N=4)
         return {
                     "plate_index" : plate_index,
                     "column_index" : column_idx, 
                     "row_index" : row_index, 
                     "position_label" : position_label, 
-                    "name" : f"{name}_{run_label}",
-                    "label" : run_label,
+                    "name" : f"{name}_{run_tag}",
+                    "tag" : run_tag,
                     "aggregated_samples" : aggregated_samples
                     }
 
