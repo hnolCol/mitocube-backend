@@ -11,11 +11,24 @@ class PrecursorBaseModel(BaseModel):
 
 class PrecursorResponseModel(PrecursorBaseModel):
     """Model for precursors."""
+    mz: Optional[float] = None
+    rt: Optional[float] = None
+    im: Optional[float] = None
     protein_group_tag: Optional[str] = None
     protein_group_tags: Optional[List[str]] = None
     quantified: bool = False
 
 
 class PrecursorInsertModel(PrecursorBaseModel):
-    """Model for inserting precursors. The precursor is connected to a single protein group."""
-    protein_group_tag: str
+    """Model for inserting precursors. The precursor is connected to one or multiple protein groups.
+    mz is the mass-to-charge ratio of the precursor, rt the (median) retention time and im the optional
+    ion mobility value (e.g. from timsTOF instruments, not all data contains ion mobility). value is the
+    log2 intensity of the precursor quantification. score is the identification score of the precursor
+    (e.g. DIA-NN or Spectronaut score).
+    """
+    mz: Optional[float] = None
+    rt: Optional[float] = None
+    im: Optional[float] = None
+    value: Optional[float] = None  # log2 intensity of the precursor quantification
+    score: Optional[float] = None
+    protein_group_tags: List[str]

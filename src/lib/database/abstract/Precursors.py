@@ -12,7 +12,7 @@ class PrecursorsABC(ABC):
     Precursors are the charge-state specific counterparts of peptides. Hence, a peptide
     can have multiple precursors (e.g. one for charge 2 and one for charge 3). 
     The precursor tag is the peptide sequence followed by the charge state separated by a dot, e.g. PEPTIDEK.2.
-    Each precursor is associated with a protein group tag. 
+    Each precursor is associated with one or multiple protein group tags. 
     """
 
     @abstractmethod
@@ -69,7 +69,9 @@ class PrecursorsABC(ABC):
 
     @abstractmethod
     def get(self, tag: str) -> PrecursorResponseModel:
-        """Returns a precursor by its tag (sequence.charge).
+        """Returns a precursor by its tag (sequence.charge). The protein_group_tag is the protein group
+        associated with the precursor that has the least proteins connected to itself (e.g. the protein group
+        consisting of a single protein). All associated protein groups are returned in protein_group_tags.
 
         Parameters
         ----------
@@ -80,6 +82,25 @@ class PrecursorsABC(ABC):
         -------
         PrecursorResponseModel
             The precursor model.
+        """
+
+    @abstractmethod
+    def get_by_protein_group(self, protein_group_tag: str, submission_tag: str = None, limit: int = None) -> List[PrecursorResponseModel]:
+        """Returns all precursors associated with a given protein group.
+
+        Parameters
+        ----------
+        protein_group_tag : str
+            The tag of the protein group to retrieve precursors for.
+        submission_tag : str, optional
+            If provided, only precursors quantified in the given submission are returned, by default None.
+        limit : int, optional
+            The maximum number of results to return. If None, all precursors are returned.
+
+        Returns
+        -------
+        List[PrecursorResponseModel]
+            The precursor models associated with the protein group.
         """
 
     @abstractmethod
@@ -100,20 +121,26 @@ class PrecursorsABC(ABC):
         """
 
     @abstractmethod
-    def insert(self, protein_group_tag: str, peptide_sequence: str, charge: int) -> bool:
+    def insert(self, protein_group_tags: List[str], peptide_sequence: str, charge: int, mz: float = None, rt: float = None, im: float = None) -> bool:
         """Inserts a precursor into the database. The precursor tag is derived from the
         peptide sequence and the charge state (sequence.charge). The precursor is connected
-        to the given protein group. If the precursor already exists, it is merged and the
-        protein group association is added.
+        to the given protein groups. If the precursor already exists, it is merged and the
+        protein group associations are added.
 
         Parameters
         ----------
-        protein_group_tag : str
-            The tag of the protein group associated with the precursor.
+        protein_group_tags : List[str]
+            The tags of the protein groups associated with the precursor.
         peptide_sequence : str
             The amino acid sequence of the peptide underlying the precursor.
         charge : int
             The charge state of the precursor.
+        mz : float, optional
+            The mass-to-charge ratio of the precursor, by default None.
+        rt : float, optional
+            The retention time of the precursor, by default None.
+        im : float, optional
+            The ion mobility value of the precursor (e.g. from timsTOF instruments), by default None.
 
         Returns
         -------

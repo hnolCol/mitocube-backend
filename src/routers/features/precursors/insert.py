@@ -18,7 +18,7 @@ def insert_precursor(precursor : PrecursorInsertModel, user : UserModel = Depend
     """
     Inserts a precursor into the database. The precursor tag is derived from the
     peptide sequence and the charge state (sequence.charge). The precursor is connected
-    to the given protein group. Requires curator rights.
+    to the given protein groups. Requires curator rights.
 
     Parameters
     ----------
@@ -35,11 +35,12 @@ def insert_precursor(precursor : PrecursorInsertModel, user : UserModel = Depend
     Raises
     ------
     HTTPException
-        If the protein group with the given tag does not exist.
+        If one of the protein groups with the given tags does not exist.
     """
-    if not DB.protein_groups.exists(tag = precursor.protein_group_tag):
-        raise HTTPException(status_code=404, detail=f"Protein group with tag {precursor.protein_group_tag} not found.")
-    return DB.precursors.insert(protein_group_tag = precursor.protein_group_tag, peptide_sequence = precursor.sequence, charge = precursor.charge)
+    for protein_group_tag in precursor.protein_group_tags:
+        if not DB.protein_groups.exists(tag = protein_group_tag):
+            raise HTTPException(status_code=404, detail=f"Protein group with tag {protein_group_tag} not found.")
+    return DB.precursors.insert(protein_group_tags = precursor.protein_group_tags, peptide_sequence = precursor.sequence, charge = precursor.charge, mz = precursor.mz, rt = precursor.rt, im = precursor.im)
 
 
 @router.post("/insert/bulk", summary="Bulk inserts a list of precursors into the database. Requires curator rights.")

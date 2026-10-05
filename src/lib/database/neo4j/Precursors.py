@@ -94,7 +94,9 @@ class Neo4JPrecursors(PrecursorsABC):
             return [ri for ri in r]
 
     def get(self, tag: str) -> PrecursorResponseModel:
-        """Returns a precursor by its tag (sequence.charge).
+        """Returns a precursor by its tag (sequence.charge). The protein_group_tag is the protein group
+        associated with the precursor that has the least proteins connected to itself (e.g. the protein group
+        consisting of a single protein). All associated protein groups are returned in protein_group_tags.
 
         Parameters
         ----------
@@ -109,8 +111,10 @@ class Neo4JPrecursors(PrecursorsABC):
         query = (
             "MATCH (p:Precursor {tag : $tag})<-[:HAS_PRECURSOR]-(pg:ProteinGroup) "
             "WITH p, collect(pg.tag) as protein_group_tags "
-            "WITH p, protein_group_tags, EXISTS {(p)<-[:QUANTIFIED]-(:Sample)} as quantified "
-            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, protein_group_tags, quantified"
+            "WITH p, protein_group_tags, EXISTS {(p)<-[:QUANTIFIED]-(s:Sample)} as quantified, "
+            "[(pg:ProteinGroup)-[:HAS_PRECURSOR]->(p) | [pg.tag, count {(pg)-[:HAS_PROTEINS]->(:Protein)}]][..] as pg_sizes "
+            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, p.mz as mz, p.rt as rt, p.im as im, "
+            "protein_group_tags, quantified, pg_sizes"
         )
 
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.data)
@@ -118,7 +122,49 @@ class Neo4JPrecursors(PrecursorsABC):
         if not r:
             raise ValueError(f"Precursor with tag {tag} not found.")
 
-        return PrecursorResponseModel(**r[0])
+        data = r[0]
+        pg_sizes = data.pop("pg_sizes", [])
+        data["protein_group_tag"] = None
+        if pg_sizes:
+            data["protein_group_tag"] = min(pg_sizes, key=lambda x: x[1])[0]
+        return PrecursorResponseModel(**data)
+
+    def get_by_protein_group(self, protein_group_tag: str, submission_tag: str = None, limit: int = None) -> List[PrecursorResponseModel]:
+        """Returns all precursors associated with a given protein group.
+
+        Parameters
+        ----------
+        protein_group_tag : str
+            The tag of the protein group to retrieve precursors for.
+        submission_tag : str, optional
+            If provided, only precursors quantified in the given submission are returned, by default None.
+        limit : int, optional
+            The maximum number of results to return. If None, all precursors are returned.
+
+        Returns
+        -------
+        List[PrecursorResponseModel]
+            The precursor models associated with the protein group.
+        """
+        query = (
+            "MATCH (pg:ProteinGroup {tag : $protein_group_tag})-[:HAS_PRECURSOR]->(p:Precursor) "
+        )
+
+        if submission_tag is not None:
+            query += "WHERE EXISTS {(p)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
+
+        query += (
+            "RETURN p.tag as tag, p.sequence as sequence, p.charge as charge, p.mz as mz, p.rt as rt, p.im as im, "
+            "pg.tag as protein_group_tag, "
+            "EXISTS {(p)<-[:QUANTIFIED]-(s:Sample)} as quantified "
+            "ORDER BY p.tag "
+        )
+
+        if limit is not None:
+            query += "LIMIT $limit "
+
+        r = self._driver.execute_query(query, protein_group_tag=protein_group_tag, submission_tag=submission_tag, limit=limit, routing_="r", result_transformer_=Result.data)
+        return [PrecursorResponseModel(**ri) for ri in r]
 
     def get_abundance(self, tag: str, submission_tags: List[str] = None) -> pd.DataFrame:
         """Retrieves the abundance data of a precursor by its tag.
@@ -166,19 +212,25 @@ class Neo4JPrecursors(PrecursorsABC):
             self.cache.insert(cache_key, r)
         return r
 
-    def insert(self, protein_group_tag: str, peptide_sequence: str, charge: int) -> bool:
+    def insert(self, protein_group_tags: List[str], peptide_sequence: str, charge: int, mz: float = None, rt: float = None, im: float = None) -> bool:
         """Inserts a precursor into the database. The precursor tag is derived from the
         peptide sequence and the charge state (sequence.charge). The precursor is connected
-        to the given protein group.
+        to the given protein groups.
 
         Parameters
         ----------
-        protein_group_tag : str
-            The tag of the protein group associated with the precursor.
+        protein_group_tags : List[str]
+            The tags of the protein groups associated with the precursor.
         peptide_sequence : str
             The amino acid sequence of the peptide underlying the precursor.
         charge : int
             The charge state of the precursor.
+        mz : float, optional
+            The mass-to-charge ratio of the precursor, by default None.
+        rt : float, optional
+            The retention time of the precursor, by default None.
+        im : float, optional
+            The ion mobility value of the precursor (e.g. from timsTOF instruments), by default None.
 
         Returns
         -------
@@ -190,14 +242,18 @@ class Neo4JPrecursors(PrecursorsABC):
         query = (
             "MERGE (p:Precursor {tag: $precursor_tag}) "
             "SET p.sequence = $peptide_sequence, p.charge = $charge, p.created_at = timestamp() "
+            "SET p.mz = CASE WHEN $mz IS NOT NULL THEN $mz ELSE p.mz END, "
+            "p.rt = CASE WHEN $rt IS NOT NULL THEN $rt ELSE p.rt END, "
+            "p.im = CASE WHEN $im IS NOT NULL THEN $im ELSE p.im END "
             "WITH p "
-            "MATCH (pg:ProteinGroup {tag: $protein_group_tag}) "
+            "UNWIND $protein_group_tags as protein_group_tag "
+            "MATCH (pg:ProteinGroup {tag: protein_group_tag}) "
             "MERGE (p)<-[r:HAS_PRECURSOR]-(pg) "
             "SET r.created_at = timestamp() "
             "RETURN count(p) > 0"
         )
 
-        r = self._driver.execute_query(query, precursor_tag=precursor_tag, peptide_sequence=peptide_sequence, charge=charge, protein_group_tag=protein_group_tag, routing_="w", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, precursor_tag=precursor_tag, peptide_sequence=peptide_sequence, charge=charge, mz=mz, rt=rt, im=im, protein_group_tags=protein_group_tags, routing_="w", result_transformer_=Result.value)
         return r[0]
 
     def bulk_insert(self, precursors: List[PrecursorInsertModel], batch_size: int = 1000, transaction_batch_size: int = 400) -> int:
@@ -231,8 +287,12 @@ class Neo4JPrecursors(PrecursorsABC):
             UNWIND $precursors as precursor
             MERGE (p:Precursor {{tag: precursor.sequence + '.' + toString(precursor.charge)}})
             SET p.sequence = precursor.sequence, p.charge = precursor.charge, p.created_at = timestamp()
+            SET p.mz = CASE WHEN precursor.mz IS NOT NULL THEN precursor.mz ELSE p.mz END,
+                p.rt = CASE WHEN precursor.rt IS NOT NULL THEN precursor.rt ELSE p.rt END,
+                p.im = CASE WHEN precursor.im IS NOT NULL THEN precursor.im ELSE p.im END
             WITH p, precursor
-            MATCH (pg:ProteinGroup {{tag: precursor.protein_group_tag}})
+            UNWIND precursor.protein_group_tags as protein_group_tag
+            MATCH (pg:ProteinGroup {{tag: protein_group_tag}})
             MERGE (p)<-[r:HAS_PRECURSOR]-(pg)
             SET r.created_at = timestamp()
             RETURN count(r) AS created
