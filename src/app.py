@@ -59,6 +59,7 @@ from routers.proteomes import proteomes
 from routers.news import news 
 from routers.news import permissions as news_permissions
 from routers.performance import performance
+from routers.performance import standards as performance_standards
 from routers.users import views as user_views
 from routers.timelines import timelines
 from routers.researchgroups import researchgroup
@@ -133,6 +134,7 @@ router_sources = [
                   news_permissions,
                   news, 
                   performance, 
+                  performance_standards, 
                   timelines,
                   submission_correlation,
                   feature_correlation,

@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
 from typing import List 
 
-from config.models.performance import QCRunModel
+from config.models.performance import QCRunModel, QCStandardModel, QCPrecursorModel, QCPrecursorsModel
 
 
 class QCABC(ABC):
@@ -103,4 +103,108 @@ class QCABC(ABC):
         -------
         bool
             _description_
+        """
+
+    @abstractmethod
+    def standard_exists(self, tag : str) -> bool:
+        """
+        Checks if a tag is associated with a QC standard (e.g. HeLa digest, BSA).
+
+        Parameters
+        ----------
+        tag : str
+            The QC standard tag.
+
+        Returns
+        -------
+        bool
+            If the given tag is associated with a QC standard.
+        """
+
+    @abstractmethod
+    def get_standards(self, type : str = None, vendor : str = None) -> List[QCStandardModel]:
+        """
+        Returns the QC standards, optionally filtered by type and vendor.
+
+        Parameters
+        ----------
+        type : str, optional
+            The type of the standard (Cell lysate, Protein), by default None.
+        vendor : str, optional
+            The vendor of the standard, by default None.
+
+        Returns
+        -------
+        List[QCStandardModel]
+            The QC standards.
+        """
+
+    @abstractmethod
+    def insert_standard(self, standard : QCStandardModel) -> bool:
+        """
+        Adds a new QC standard to the database. Standards are immutable,
+        an existing tag is merged.
+
+        Parameters
+        ----------
+        standard : QCStandardModel
+            The standard to add.
+
+        Returns
+        -------
+        bool
+            True if the standard was added, False otherwise.
+        """
+
+    @abstractmethod
+    def delete_standard(self, tag : str) -> bool:
+        """
+        Deletes a QC standard. A standard can only be deleted if no QC run
+        is linked to it.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the standard to delete.
+
+        Returns
+        -------
+        bool
+            True if the standard was deleted, False if it does not exist or is still in use.
+        """
+
+    @abstractmethod
+    def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorModel]) -> bool:
+        """
+        Adds the quantified QCPrecursors to a QC run. Only a specific subset of precursors
+        is recorded for QC, the full quantification data is not uploaded. Precursors that
+        do not exist in the database are skipped.
+
+        Parameters
+        ----------
+        run_tag : str
+            The tag of the QC run the precursors belong to.
+        precursors : List[QCPrecursorModel]
+            The precursors with their value, score and retention time.
+
+        Returns
+        -------
+        bool
+            True if the precursors were added, False if the run does not exist.
+        """
+
+    @abstractmethod
+    def get_qc_precursors(self, run_tag : str) -> List[QCPrecursorModel]:
+        """
+        Returns the QCPrecursors that were recorded for a QC run.
+
+        Parameters
+        ----------
+        run_tag : str
+            The tag of the QC run.
+
+        Returns
+        -------
+        List[QCPrecursorModel]
+            The recorded precursors of the run.
         """

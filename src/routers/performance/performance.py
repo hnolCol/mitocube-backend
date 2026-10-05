@@ -9,6 +9,8 @@ from config.models.user import UserModel
 from config.models.performance import QCPeptidesModel, QCPeptideModel
 from services.users import is_user_admin, get_user_from_token
 
+from routers.performance import runs as performance_runs
+
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/performance",
     tags=["Performance"]
@@ -57,14 +59,4 @@ def add_qc_peptides(peptides : QCPeptidesModel, user : UserModel = Depends(is_us
     
 
     
-@router.get("runs/q")
-def query_performance_runs():
-    ""
-
-@router.get("/runs/{run_label}")
-def get_performance_run(run_label : str):
-    ""
-@router.post("/runs")
-def add_performance_run(user : UserModel = Depends(is_user_admin)):
-    ""
-    
+router.include_router(performance_runs.router)
