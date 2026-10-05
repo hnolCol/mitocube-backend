@@ -143,10 +143,13 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     DB.submissions.clear_stats_outdated(tag = submission_tag)
     return True
 
-@router.post("/{submission_tag}/quantifications/proteins/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
+@router.post("/{submission_tag}/quantifications/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
 def insert_precursor_quantifications(
     submission_tag: str,
     quantifications: List[PrecursorQuantificationModel],
+    batch_size: int = 600,
+    transaction_batch_size: int = 400,
+    delete_if_exists: bool = False,
     user: UserModel = Depends(is_user_at_least_curator)
 ) -> int:
     """
