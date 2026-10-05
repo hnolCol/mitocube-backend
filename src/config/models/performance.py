@@ -112,6 +112,7 @@ class QCRunInsertModel(QCRunBaseModel):
     provided directly with the run or added separately via the run's precursors endpoint.
     """
     qc_precursors : List[QCPrecursorInsertModel] = []
+    condition_application_tags : List[str] = []
 
 
 class QCRunResponseModel(QCRunBaseModel):

@@ -1,4 +1,4 @@
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Literal, Dict
 from neo4j import Driver, Result
 from lib.database.abstract.QC import QCABC
 from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCStandardInsertModel, QCStandardResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
@@ -41,9 +41,9 @@ class Neo4JQC(QCABC):
         return r.records[0]
 
 
-    def get(self, tags : List[str] = None, instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50) -> List[QCRunResponseModel]:
+    def get(self, tags : List[str] = None, instrument_name_tag : str = None, qc_standard_tag : str = None, condition_application_tag : str = None, limit : int = 50) -> List[QCRunResponseModel]:
         """
-        Returns the QC runs, optionally filtered by tags, instrument and QC standard.
+        Returns the QC runs, optionally filtered by tags, instrument, QC standard and condition application.
         """
         query = "MATCH (qc:QCRun) "
         where = []
@@ -53,6 +53,8 @@ class Neo4JQC(QCABC):
             where.append("(qc)-[:QUALITY_CHECKED]->(:AttributeValue {tag : $instrument_name_tag})")
         if qc_standard_tag is not None:
             where.append("(qc)-[:USED_STANDARD]->(:QCStandard {tag : $qc_standard_tag})")
+        if condition_application_tag is not None:
+            where.append("(qc)-[:HAS_APPLICATION]->(:ConditionApplication {tag : $condition_application_tag})")
         if where:
             query += "WHERE " + " AND ".join(where) + " "
         query += (
@@ -63,7 +65,7 @@ class Neo4JQC(QCABC):
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value,
                                        tags = tags, instrument_name_tag = instrument_name_tag,
-                                       qc_standard_tag = qc_standard_tag, limit = limit)
+                                       qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag, limit = limit)
         runs = []
         for record in r.records:
             run = record["run"]
@@ -81,6 +83,7 @@ class Neo4JQC(QCABC):
         was used to generate it.
         """
         attribute_values  = [{"tag" : a_tag, "value" : av_tag} for a_tag, av_tags in performance_run.group_attr.items() for av_tag in av_tags]
+        condition_applications = list(performance_run.condition_application_tags)
         peptides = [{'tag' : peptide_tag, 'rt' : rt} for peptide_tag, rt in performance_run.rt_peptides.items()]
         precursors = [{'tag' : p.precursor_tag, 'value' : p.value, 'score' : p.score, 'retention_time' : p.retention_time} for p in performance_run.qc_precursors]
         query = (
@@ -92,8 +95,13 @@ class Neo4JQC(QCABC):
             "WHERE ms_instrument.tag = $performance_run_props.instrument_name_tag "
             "MERGE (ms_instrument)<-[:QUALITY_CHECKED]-(qc) "
             "WITH qc "
-            "MATCH (std:QCStandard {tag : $performance_run_props.qc_standard_tag}) "
+"MATCH (std:QCStandard {tag : $performance_run_props.qc_standard_tag}) "
             "MERGE (qc)-[:USED_STANDARD]->(std) "
+            "WITH qc "
+            "UNWIND $condition_applications as ca_tag "
+            "MATCH (ca:ConditionApplication {tag : ca_tag}) "
+            "MERGE (qc)-[r_app:HAS_APPLICATION]->(ca) "
+            "SET r_app.created_at = timestamp() "
             "WITH qc "
             "UNWIND $attribute_values as attribute_value "
             "MATCH (a:Attribute {tag : attribute_value.tag})-[:HAS_VALUE]->(lc_part:AttributeValue {tag : attribute_value.value}) "
@@ -111,7 +119,8 @@ class Neo4JQC(QCABC):
             "r_pre.retention_time = precursor.retention_time, r_pre.created_at = timestamp() "
         )
         self._driver.execute_query(query, routing_="w", result_transformer_=Result.value,
-                                   performance_run_props = performance_run.model_dump(exclude_none=True, exclude=["rt_peptides","group_attr","qc_precursors"]),
+                                   performance_run_props = performance_run.model_dump(exclude_none=True, exclude=["rt_peptides","group_attr","qc_precursors","condition_application_tags"]),
+                                   condition_applications = condition_applications,
                                    peptides = peptides,
                                    attribute_values = attribute_values,
                                    precursors = precursors)
@@ -228,3 +237,34 @@ class Neo4JQC(QCABC):
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, run_tag = run_tag)
         return [QCPrecursorResponseModel(**dict(record)) for record in r.records]
+
+    def get_rt_drift(self, precursor_tag : str, instrument_name_tag : str = None, qc_standard_tag : str = None,
+                     condition_application_tag : str = None, start : int = None, end : int = None) -> List[Dict]:
+        """
+        Returns the retention time drift of a QCPrecursor over QC runs, i.e. the observed
+        retention time per run ordered by the run creation time. Optionally filtered by
+        instrument, QC standard, condition application and a time frame.
+        """
+        query = "MATCH (qc:QCRun)-[r:QUANTIFIED]->(pre:Precursor {tag : $precursor_tag}) "
+        where = []
+        if instrument_name_tag is not None:
+            where.append("(qc)-[:QUALITY_CHECKED]->(:AttributeValue {tag : $instrument_name_tag})")
+        if qc_standard_tag is not None:
+            where.append("(qc)-[:USED_STANDARD]->(:QCStandard {tag : $qc_standard_tag})")
+        if condition_application_tag is not None:
+            where.append("(qc)-[:HAS_APPLICATION]->(:ConditionApplication {tag : $condition_application_tag})")
+        if start is not None:
+            where.append("qc.created_at >= $start")
+        if end is not None:
+            where.append("qc.created_at < $end")
+        if where:
+            query += "WHERE " + " AND ".join(where) + " "
+        query += (
+            "RETURN qc.tag as run_tag, qc.created_at as created_at, r.retention_time as retention_time "
+            "ORDER BY qc.created_at "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value,
+                                       precursor_tag = precursor_tag, instrument_name_tag = instrument_name_tag,
+                                       qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag,
+                                       start = start, end = end)
+        return [dict(record) for record in r.records]

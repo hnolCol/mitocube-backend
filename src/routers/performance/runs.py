@@ -14,7 +14,7 @@ DB = Database.DB()
 
 
 @router.get("/runs", summary="Returns the QC runs.")
-def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCRunResponseModel]:
+def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str = None, condition_application_tag : str = None, limit : int = 50, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCRunResponseModel]:
     """
     Returns the QC runs, optionally filtered by instrument and QC standard.
 
@@ -24,6 +24,8 @@ def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str
         The tag of the instrument the runs were acquired on, by default None
     qc_standard_tag : str, optional
         The tag of the QC standard that was used to generate the runs, by default None
+    condition_application_tag : str, optional
+        The tag of a condition application (e.g. column, gradient) the runs must have applied, by default None
     limit : int, optional
         The maximum number of runs to return, by default 50
     user : UserModel, optional
@@ -34,7 +36,7 @@ def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str
     List[QCRunResponseModel]
         The QC runs.
     """
-    return DB.qc.get(instrument_name_tag = instrument_name_tag, qc_standard_tag = qc_standard_tag, limit = limit)
+    return DB.qc.get(instrument_name_tag = instrument_name_tag, qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag, limit = limit)
 
 
 @router.get("/runs/count", summary="Counts the QC runs.")
@@ -196,3 +198,45 @@ def delete_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_
     """
     if not DB.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
     return DB.qc.delete(tag = run_tag)
+
+
+@router.get("/rt_drift/{precursor_tag}", summary="Returns the RT drift of a QCPrecursor over QC runs.")
+def get_rt_drift(precursor_tag : str, instrument_name_tag : str = None, qc_standard_tag : str = None,
+                condition_application_tag : str = None, start : int = None, end : int = None,
+                user : UserModel = Depends(is_user_at_least_curator)) -> List[dict]:
+    """
+    Returns the retention time drift of a QCPrecursor over QC runs, i.e. the observed retention
+    time per run ordered by the run creation time. This is the primary QC metric to monitor
+    LC performance (e.g. column aging).
+
+    All filters are optional and can be combined:
+    a) time frame via start and end (unix timestamps in milliseconds, start inclusive, end exclusive)
+    b) instrument via instrument_name_tag
+    c) QC standard via qc_standard_tag
+    additionally, condition applications (e.g. column, gradient) via condition_application_tag.
+
+    Parameters
+    ----------
+    precursor_tag : str
+        The tag of the precursor (sequence.charge).
+    instrument_name_tag : str, optional
+        The tag of the instrument the runs were acquired on, by default None
+    qc_standard_tag : str, optional
+        The tag of the QC standard that was used to generate the runs, by default None
+    condition_application_tag : str, optional
+        The tag of a condition application the runs must have applied, by default None
+    start : int, optional
+        The start of the time frame as a unix timestamp in milliseconds (inclusive), by default None
+    end : int, optional
+        The end of the time frame as a unix timestamp in milliseconds (exclusive), by default None
+    user : UserModel, optional
+        The user that is extracted by the token, by default Depends(is_user_at_least_curator)
+
+    Returns
+    -------
+    List[dict]
+        A list of dictionaries with run_tag, created_at and retention_time ordered by created_at.
+    """
+    return DB.qc.get_rt_drift(precursor_tag = precursor_tag, instrument_name_tag = instrument_name_tag,
+                              qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag,
+                              start = start, end = end)

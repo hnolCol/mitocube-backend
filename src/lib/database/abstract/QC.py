@@ -1,5 +1,5 @@
 from abc import abstractmethod, ABC 
-from typing import List 
+from typing import List, Dict 
 
 from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCStandardInsertModel, QCStandardResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 
@@ -209,4 +209,34 @@ class QCABC(ABC):
         -------
         List[QCPrecursorResponseModel]
             The recorded precursors of the run.
+        """
+
+    @abstractmethod
+    def get_rt_drift(self, precursor_tag : str, instrument_name_tag : str = None, qc_standard_tag : str = None,
+                     condition_application_tag : str = None, start : int = None, end : int = None) -> List[Dict]:
+        """
+        Returns the retention time drift of a QCPrecursor over QC runs, i.e. the observed
+        retention time per run ordered by the run creation time. Optionally filtered by
+        instrument, QC standard, condition application and a time frame.
+
+        Parameters
+        ----------
+        precursor_tag : str
+            The tag of the precursor (sequence.charge).
+        instrument_name_tag : str, optional
+            The tag of the instrument the runs were acquired on, by default None.
+        qc_standard_tag : str, optional
+            The tag of the QC standard that was used to generate the runs, by default None.
+        condition_application_tag : str, optional
+            The tag of a condition application (e.g. column, gradient) the runs must have applied, by default None.
+        start : int, optional
+            The start of the time frame as a unix timestamp in milliseconds (inclusive), by default None.
+        end : int, optional
+            The end of the time frame as a unix timestamp in milliseconds (exclusive), by default None.
+
+        Returns
+        -------
+        List[Dict]
+            A list of dictionaries with the run tag, the run creation time (created_at) and
+            the observed retention time (retention_time) ordered by created_at.
         """
