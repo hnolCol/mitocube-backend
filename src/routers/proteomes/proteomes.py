@@ -121,7 +121,7 @@ def add_protein_by_proteome_tag(background_task : BackgroundTasks, proteome_tag:
     return {"message" : f"The proteome {proteome_tag} was added with {N} proteins."}
     
 @router.get("/{proteome_tag}/correlation/{feature_tag}")
-def get_feature_correlation_across_proteome(proteome_tag : str, feature_tag : str , filter_tag : str = None, direction : Literal["positive","negative","both"] = "positive", min_data_points : int = 5, limit : int = 20) -> List:
+def get_feature_correlation_across_proteome(proteome_tag : str, feature_tag : str , filter_tag : str = None, direction : Literal["positive","negative","both"] = "positive", min_data_points : int = 5, limit : int = 20, user : UserModel = Depends(get_user_from_token)) -> List:
     "" 
     if not DB.features.exists(tag=feature_tag):
         raise HTTPException(status_code=404,detail=f"The feature was not found {feature_tag}")
@@ -141,7 +141,7 @@ def get_feature_correlation_across_proteome(proteome_tag : str, feature_tag : st
     
     
 @router.get("/{proteome_tag}/abundance")
-def get_proteome_abundance(proteome_tag : str) -> QuantileModel:
+def get_proteome_abundance(proteome_tag : str, user : UserModel = Depends(get_user_from_token)) -> QuantileModel:
     if not DB.proteomes.exist(tags = proteome_tag): raise HTTPException(status_code=404, detail="Proteome not found.")
     
     qs = DB.proteomes.get_feature_abundance_dist(tag = proteome_tag)

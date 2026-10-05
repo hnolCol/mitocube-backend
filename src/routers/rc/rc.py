@@ -15,7 +15,7 @@ router = APIRouter(
 
     
 @router.post("network")
-def add_network(self):
+def add_network(user : UserModel = Depends(is_user_admin)):
     "" 
     
     

@@ -14,7 +14,7 @@ router = APIRouter(
 
 
 @router.get("/{peptide_tag}")
-def get_peptide_by_tag(peptide_tag : str):
+def get_peptide_by_tag(peptide_tag : str, user : UserModel = Depends(get_user_from_token)):
     """Retrieves a peptide by its tag.
 
     Parameters

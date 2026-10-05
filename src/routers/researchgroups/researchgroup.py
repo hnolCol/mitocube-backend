@@ -75,7 +75,7 @@ def remove_users_from_research_group(research_group_tag : str, user_tags : List[
     
     
 @router.get("/{research_group_tag}/users")
-def get_users_in_research_group(research_group_tag : str) -> List[str]:
+def get_users_in_research_group(research_group_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     "" 
     user_tags = DB.research_groups.get_users(research_group_tag)
     return user_tags

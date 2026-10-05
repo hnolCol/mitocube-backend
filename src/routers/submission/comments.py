@@ -43,12 +43,12 @@ def post_comment_to_submission(submission_tag: str, comment: SubmissionCommentMo
 
     
 @router.get('/{submission_tag}/comments')
-def get_comments_for_submission(submission_tag : str) -> List[SubmissionCommentModel]:
+def get_comments_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[SubmissionCommentModel]:
     "" 
     if not DB.submissions.exists(submission_tag) : raise tag_not_found 
     return DB.submissions.get_comments(tag = submission_tag)
     
     
 @router.get('/{submission_tag}/comments/{tag}')
-def get_comment_by_tag():
+def get_comment_by_tag(user : UserModel = Depends(get_user_from_token)):
     "" 
