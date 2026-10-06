@@ -15,8 +15,9 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.get("/q", summary="Finds PTM sites by search query.")
 def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     """
-    Finds PTM sites by their tag (protein tag followed by position and modification,
-    e.g. P12345_S473_PHOSPHO).
+    Finds PTM sites by their tag. The tag is derived from the protein tag (or the
+    protein group tag for group level identifications), the position and the modification,
+    e.g. P12345_S473_PHOSPHO.
 
     Parameters
     ----------
@@ -61,8 +62,10 @@ def count_ptm_sites(submission_tag : str = None, user : UserModel = Depends(get_
 @router.post("/insert", summary="Inserts a PTM site into the database. Requires at least curator rights.")
 def insert_ptm_site(ptm_site : PTMSiteInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
     """
-    Inserts a PTM site into the database. The site is linked to the protein group via
-    [:OF_PROTEIN_GROUP] and to the supporting modified precursors via [:SUPPORTED_BY].
+    Inserts a PTM site into the database. The tag is derived and validated from the
+    protein tag (or protein group tag), the position and the modification. The site is
+    linked to the protein group via [:OF_PROTEIN_GROUP] and to the supporting modified
+    precursors via [:SUPPORTED_BY].
 
     Parameters
     ----------

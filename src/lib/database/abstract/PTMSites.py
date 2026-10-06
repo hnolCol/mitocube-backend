@@ -9,8 +9,9 @@ class PTMSitesABC(ABC):
     """
     Abstract class to handle post translational modification (PTM) sites.
     A PTM site is a modification at a specific position of a protein, e.g. the
-    phosphorylation of serine 473 in AKT1. The tag is the protein tag followed by the
-    position and the modification, e.g. P12345_S473_PHOSPHO.
+    phosphorylation of serine 473 in AKT1. The tag is derived and validated from the
+    protein tag (or the protein group tag for group level identifications), the position
+    and the modification, e.g. P12345_S473_PHOSPHO.
     A site is linked to the protein group it was identified in via [:OF_PROTEIN_GROUP]
     and is supported by one or multiple modified precursors via [:SUPPORTED_BY].
     Sites are quantified per sample via a [:QUANTIFIED] relationship that carries the
