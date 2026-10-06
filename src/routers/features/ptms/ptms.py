@@ -90,10 +90,12 @@ def insert_ptm_site(ptm_site : PTMSiteInsertModel, user : UserModel = Depends(is
 
 
 @router.post("/insert/bulk", summary="Bulk inserts PTM sites into the database. Requires at least curator rights.")
-def bulk_insert_ptm_sites(ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400, user : UserModel = Depends(is_user_at_least_curator)) -> int:
+def bulk_insert_ptm_sites(ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400, user : UserModel = Depends(is_user_at_least_curator)) -> dict:
     """
-    Bulk inserts PTM sites into the database. Existing tags are merged. Precursors and
-    protein groups that do not exist are skipped.
+    Bulk inserts PTM sites into the database. Existing tags are merged. This is a library
+    level entity insert like the precursor bulk insert; the per submission/sample
+    quantification is inserted separately. Sites whose protein group does not exist are
+    skipped and reported. Supporting precursors that do not exist are skipped and reported.
 
     Parameters
     ----------
@@ -108,8 +110,11 @@ def bulk_insert_ptm_sites(ptm_sites : List[PTMSiteInsertModel], batch_size : int
 
     Returns
     -------
-    int
-        The number of inserted sites.
+    dict
+        A report with the number of inserted sites (valid), the number of skipped
+        sites whose protein group does not exist (not_found) including their tags and
+        the precursor links that could not be created because the precursor does
+        not exist (precursor_links_not_created), so that callers can combine the results.
 
     Raises
     ------

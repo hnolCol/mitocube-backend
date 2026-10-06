@@ -50,9 +50,20 @@ class PTMSitesABC(ABC):
         """
 
     @abstractmethod
-    def bulk_insert(self, ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400) -> int:
+    def bulk_insert(self, ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400) -> Dict:
         """
-        Bulk inserts PTM sites.
+        Bulk inserts PTM sites. Like the precursor bulk insert this is a library level
+        entity insert, the per submission/sample quantification is inserted separately via
+        insert_quantification_data_from_df.
+        Sites whose protein group does not exist are skipped and reported as not_found.
+        Supporting precursors that do not exist are skipped and reported as
+        precursor_links_not_created.
+
+        Returns
+        -------
+        Dict
+            A report with the number of inserted sites (valid), skipped sites (not_found)
+            and skipped precursor links (precursor_links_not_created).
         """
 
     @abstractmethod

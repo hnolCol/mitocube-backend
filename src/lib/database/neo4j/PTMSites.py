@@ -9,9 +9,33 @@ from config.models.ptms import PTMSiteInsertModel, PTMSiteResponseModel
 
 class Neo4JPTMSites(PTMSitesABC):
 
-    def __init__(self, driver : Driver, samples : SamplesABC) -> None:
+    def __init__(self, driver : Driver, samples : SamplesABC, protein_groups = None, precursors = None) -> None:
         self._driver = driver
         self._samples = samples
+        self._protein_groups = protein_groups
+        self._precursors = precursors
+
+
+    def _protein_group_exists(self, tag : str) -> bool:
+        if self._protein_groups is not None:
+            return self._protein_groups.exists(tag = tag)
+        query = (
+            "MATCH (pg:ProteinGroup {tag : $tag}) "
+            "RETURN count(pg) > 0 as exists "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag)
+        return r.records[0]
+
+
+    def _precursor_exists(self, tag : str) -> bool:
+        if self._precursors is not None:
+            return self._precursors.exists(tag = tag)
+        query = (
+            "MATCH (pre:Precursor {tag : $tag}) "
+            "RETURN count(pre) > 0 as exists "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag)
+        return r.records[0]
 
 
     def exists(self, tag : str) -> bool:
@@ -89,9 +113,24 @@ class Neo4JPTMSites(PTMSitesABC):
         return True 
 
 
-    def bulk_insert(self, ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400) -> int:
-        total = 0
-        sites_data = [s.model_dump(exclude_none=True) for s in ptm_sites]
+    def bulk_insert(self, ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400) -> Dict:
+        valid_sites = [s for s in ptm_sites if self._protein_group_exists(s.protein_group_tag)]
+        not_found = [s.tag for s in ptm_sites if s not in valid_sites]
+        precursor_links_not_created = []
+        for s in valid_sites:
+            for precursor_tag in s.precursor_tags:
+                if not self._precursor_exists(precursor_tag):
+                    precursor_links_not_created.append(precursor_tag)
+        report = {
+            "valid" : len(valid_sites) - 0,
+            "not_found" : len(not_found),
+            "not_found_tags" : not_found,
+            "precursor_links_not_created" : precursor_links_not_created,
+            "precursor_links_not_created_count" : len(precursor_links_not_created)
+        }
+        if len(valid_sites) == 0:
+            return report
+        sites_data = [s.model_dump(exclude_none=True) for s in valid_sites]
         query = f"""
         CALL () {{
             UNWIND $ptm_sites as site
@@ -106,10 +145,11 @@ class Neo4JPTMSites(PTMSitesABC):
             MATCH (pre:Precursor {{tag: precursor_tag}})
             MERGE (ptm)-[r_sup:SUPPORTED_BY]->(pre)
             SET r_sup.created_at = timestamp()
-            RETURN count(r_sup) AS created
+            RETURN count(ptm) AS created
         }} IN TRANSACTIONS OF {transaction_batch_size} ROWS
         RETURN sum(created) AS total
         """
+        total = 0
         with self._driver.session() as session:
             for i in range(0, len(sites_data), batch_size):
                 batch = sites_data[i:i+batch_size]
@@ -117,7 +157,8 @@ class Neo4JPTMSites(PTMSitesABC):
                 record = r.single()
                 if record and record["total"] is not None:
                     total += record["total"]
-        return total
+        report["valid"] = total
+        return report
 
 
     def is_quantified(self, tag : str) -> bool:

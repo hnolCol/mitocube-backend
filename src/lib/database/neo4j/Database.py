@@ -78,7 +78,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.samples = Neo4JSamples(driver=self.connection.driver, condition_applications=self.condition_applications, annotations=self.annotations, genotypes=self.genotypes)
         self.peptides = Neo4JPeptides(driver = self.connection.driver, samples=self.samples)
         self.precursors = Neo4JPrecursors(driver = self.connection.driver, samples=self.samples)
-        self.ptm_sites = Neo4JPTMSites(driver = self.connection.driver, samples=self.samples)
+        self.ptm_sites = Neo4JPTMSites(driver = self.connection.driver, samples=self.samples, protein_groups=self.protein_groups, precursors=self.precursors)
         self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
         self.maintenance_events = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.external_service = Neo4JExternalServices(driver=self.connection.driver)
