@@ -42,6 +42,7 @@ from routers.features.proteins import find as protein_find
 from routers.features.proteins import receive as protein_receive
 from routers.features.proteins import favorite as protein_favorite
 from routers.features.precursors import precursors as feature_precursors
+from routers.features.ptms import ptms as feature_ptms
 from routers.features.precursors import count as precursor_count
 from routers.features.precursors import insert as precursor_insert
 from routers.features import correlations as feature_correlation
@@ -102,6 +103,7 @@ router_sources = [
                   precursor_count,
                   precursor_insert,
                   feature_precursors,
+                  feature_ptms,
                   submissions_permissions, 
                   submission_stats, 
                   quantifications,

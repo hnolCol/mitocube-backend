@@ -18,6 +18,7 @@ from lib.database.abstract.Dataset import DatasetABC
 from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.Peptides import PeptidesABC
 from lib.database.abstract.Precursors import PrecursorsABC
+from lib.database.abstract.PTMSites import PTMSitesABC
 from lib.database.abstract.QC import QCABC
 from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesABC
 from lib.database.abstract.Timeline import TimelineABC 
@@ -84,6 +85,7 @@ class DatabaseABC(ABC):
     qc : QCABC = None 
     peptides : PeptidesABC = None 
     precursors : PrecursorsABC = None 
+    ptm_sites : PTMSitesABC = None 
     protein_groups : ProteinGroupsABC = None 
     submission_summary : SubmissionSummaryABC = None
     instruments : InstrumentsABC = None
@@ -193,7 +195,12 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the precursors attribute defined")
         
         if not isinstance(self.precursors,PrecursorsABC):
-            raise TypeError("The precursors class must be an instance of PrecursorsABC")   
+            raise TypeError("The precursors class must be an instance of PrecursorsABC")
+        
+        if self.ptm_sites is None:
+            raise NotImplementedError("A database class must have the ptm_sites attribute defined")
+        if not isinstance(self.ptm_sites,PTMSitesABC):
+            raise TypeError("The ptm_sites class must be an instance of PTMSitesABC")   
          
         if self.instruments is None:
             raise  NotImplementedError("A database class must have the instrument attribute defined")

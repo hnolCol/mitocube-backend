@@ -15,6 +15,7 @@ from lib.database.neo4j.Genotypes import Neo4JGenotype
 from lib.database.neo4j.News import Neo4JNews
 from lib.database.neo4j.Peptides import Neo4JPeptides
 from lib.database.neo4j.Precursors import Neo4JPrecursors
+from lib.database.neo4j.PTMSites import Neo4JPTMSites
 from lib.database.Neo4JDatabase import Neo4JFactory, Neo4JConnection, Neo4JConstructor
 from lib.database.neo4j.QC import Neo4JQC
 from lib.database.neo4j.Instruments import Neo4JInstruments, Neo4JInstrumentStates
@@ -77,6 +78,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.samples = Neo4JSamples(driver=self.connection.driver, condition_applications=self.condition_applications, annotations=self.annotations, genotypes=self.genotypes)
         self.peptides = Neo4JPeptides(driver = self.connection.driver, samples=self.samples)
         self.precursors = Neo4JPrecursors(driver = self.connection.driver, samples=self.samples)
+        self.ptm_sites = Neo4JPTMSites(driver = self.connection.driver, samples=self.samples)
         self.maintenance_procedures = Neo4JMaintenanceProcedure(driver=self.connection.driver)
         self.maintenance_events = Neo4JMaintenanceEvent(driver = self.connection.driver)
         self.external_service = Neo4JExternalServices(driver=self.connection.driver)
