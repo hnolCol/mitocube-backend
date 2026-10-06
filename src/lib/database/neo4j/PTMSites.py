@@ -82,6 +82,7 @@ class Neo4JPTMSites(PTMSitesABC):
             "WITH ptm, pg, collect(pre.tag) as precursor_tags "
             "RETURN ptm.tag as tag, pg.tag as protein_group_tag, ptm.protein_tag as protein_tag, "
             "ptm.position as position, ptm.modification as modification, ptm.residue as residue, "
+            "ptm.sequence_window as sequence_window, "
             "precursor_tags, "
             "EXISTS {(ptm)<-[:QUANTIFIED]-(:Sample)} as quantified "
         )
