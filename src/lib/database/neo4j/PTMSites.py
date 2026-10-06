@@ -98,7 +98,13 @@ class Neo4JPTMSites(PTMSitesABC):
         props = ptm_site.model_dump(exclude_none=True, exclude=["precursor_tags", "value", "score", "site_localization"])
         query = (
             "MERGE (ptm:PTMSite {tag : $props.tag}) "
-            "SET ptm += $props, ptm.created_at = timestamp() "
+            "SET ptm.protein_group_tag = $props.protein_group_tag, "
+            "ptm.protein_tag = $props.protein_tag, "
+            "ptm.position = $props.position, "
+            "ptm.modification = $props.modification, "
+            "ptm.residue = $props.residue, "
+            "ptm.sequence_window = $props.sequence_window, "
+            "ptm.created_at = timestamp() "
             "WITH ptm "
             "MATCH (pg:ProteinGroup {tag : $props.protein_group_tag}) "
             "MERGE (ptm)-[r_pg:OF_PROTEIN_GROUP]->(pg) "
@@ -136,7 +142,13 @@ class Neo4JPTMSites(PTMSitesABC):
         CALL () {{
             UNWIND $ptm_sites as site
             MERGE (ptm:PTMSite {{tag: site.tag}})
-            SET ptm += site, ptm.created_at = timestamp()
+            SET ptm.protein_group_tag = site.protein_group_tag,
+                ptm.protein_tag = site.protein_tag,
+                ptm.position = site.position,
+                ptm.modification = site.modification,
+                ptm.residue = site.residue,
+                ptm.sequence_window = site.sequence_window,
+                ptm.created_at = timestamp()
             WITH ptm, site
             MATCH (pg:ProteinGroup {{tag: site.protein_group_tag}})
             MERGE (ptm)-[r_pg:OF_PROTEIN_GROUP]->(pg)
