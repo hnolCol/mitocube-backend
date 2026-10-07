@@ -118,6 +118,19 @@ class TestDecodeToken:
         except HTTPException as e:
             assert e.status_code == 401
 
+    def test_missing_token_raises_401(self, token_settings):
+        """No Authorization header must not 500-crash the dependency chain."""
+        try:
+            decode_token(None)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 401
+        try:
+            decode_token("")
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 401
+
     def test_garbage_token_raises_401(self, token_settings):
         try:
             decode_token("not-a-token")
