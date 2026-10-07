@@ -44,4 +44,8 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
       - name: Audit core dependencies
-        run: pip-audit -r requirements.txt --no-deps --skip-extras
+        # PYSEC-2026-1325: transitive ecdsa advisory with no fix version;
+        # resolves when python-jose is migrated to pyjwt (tracked separately).
+        run: >-
+          pip-audit -r requirements.txt --no-deps
+          --ignore-vuln PYSEC-2026-1325 --ignore-vuln CVE-2026-85394

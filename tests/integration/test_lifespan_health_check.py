@@ -60,10 +60,26 @@ def stub_runtimes(monkeypatch):
         "mfa": NullRuntime(),
         "cache": NullRuntime(),
     }
-    monkeypatch.setattr(lifespan_module, "ai_agent_runtime", runtimes["ai"])
+    # ai_agent_runtime is imported lazily inside the lifespan; stub the
+    # module it would import from so the stub is picked up either way.
+    import sys, types
+    fake_ai_runtime_module = types.ModuleType("lib.ai.agent.runtime")
+    fake_ai_runtime_module.ai_agent_runtime = runtimes["ai"]
+    real_ai = sys.modules.get("lib.ai.agent.runtime")
+    sys.modules["lib.ai.agent.runtime"] = fake_ai_runtime_module
     monkeypatch.setattr(lifespan_module, "mfa_runtime", runtimes["mfa"])
     monkeypatch.setattr(lifespan_module, "db_cache_runtime", runtimes["cache"])
-    return runtimes
+
+    class _Run:
+        pass
+    import pytest as _pytest
+
+    yield runtimes
+
+    if real_ai is not None:
+        sys.modules["lib.ai.agent.runtime"] = real_ai
+    else:
+        sys.modules.pop("lib.ai.agent.runtime", None)
 
 
 def _make_app():

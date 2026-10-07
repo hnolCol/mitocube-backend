@@ -31,7 +31,12 @@ from lib.database.abstract.Samples import SamplesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from lib.database.abstract.Metatext import MetaTextABC
 from lib.database.abstract.News import NewsABC
-from lib.database.abstract.OpenAi import OpenAIClient
+try:
+    from lib.database.abstract.OpenAi import OpenAIClient
+except ImportError:
+    # The AI stack (requirements-ai.txt) is optional; the abstract DB
+    # interface must import without it.
+    OpenAIClient = None
 from lib.database.abstract.Cache import CacheABC
 from lib.database.abstract.ProteinGroups import ProteinGroupsABC
 from lib.database.abstract.Proteins import ProteinsABC
