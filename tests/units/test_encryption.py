@@ -138,6 +138,43 @@ class TestDecodeToken:
         except HTTPException as e:
             assert e.status_code == 401
 
+    def test_rs256_token_rejected(self, token_settings):
+        """Algorithm confusion: a token claiming RS256 must not be decoded
+        with the HMAC secret (classic jose CVE pattern)."""
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.hazmat.primitives import serialization
+
+        attacker_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        pem = attacker_key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )
+        token = jwt.encode({"tag": "x", "verified": True}, pem, algorithm="RS256")
+        try:
+            decode_token(token)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 401
+
+    def test_alg_mismatch_in_header_rejected(self, token_settings):
+        """A token whose header claims a different algorithm than the
+        configured one must be rejected, not silently re-signed."""
+        import base64, json
+        hs_token = make_user_token()
+        header_b64, payload_b64, sig_b64 = hs_token.split(".")
+        header = json.loads(base64.urlsafe_b64decode(header_b64 + "=="))
+        header["alg"] = "RS256"
+        tampered_header = base64.urlsafe_b64encode(
+            json.dumps(header).encode()
+        ).rstrip(b"=").decode()
+        tampered = f"{tampered_header}.{payload_b64}.{sig_b64}"
+        try:
+            decode_token(tampered)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 401
+
     def test_alg_none_rejected(self, token_settings):
         import base64, json
         header = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).rstrip(b"=")
