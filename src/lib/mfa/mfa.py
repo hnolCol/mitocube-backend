@@ -26,6 +26,13 @@ class MFARuntime:
         self.challenges.create_index("expires_at", expireAfterSeconds=0)
         self.challenges.create_index("user_tag", unique=True)
 
+    def health_check(self) -> bool:
+        """Cheap connectivity probe for startup health checks."""
+        if self.client is None:
+            raise RuntimeError("MFARuntime not started; call startup() first.")
+        self.client.admin.command("ping")
+        return True
+
     async def shutdown(self) -> None:
         if self.client is not None:
             self.client.close()

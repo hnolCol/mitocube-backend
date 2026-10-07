@@ -43,3 +43,22 @@ access is required.
 pip install -r requirements.txt pytest
 python -m pytest
 ```
+
+## Startup behavior (database health checks)
+
+On startup, the application runs explicit health checks against its
+dependencies: **Neo4j** (a connectivity probe plus a trivial `RETURN 1`
+query) and the three **MongoDB**-backed runtimes (AI agent, MFA, query
+cache; each sends a `ping` command). Both use **log-and-continue**
+semantics:
+
+- If a health check **passes**, startup proceeds normally.
+- If a health check **fails**, the error (with full traceback) is logged
+  as `ERROR: <dependency> startup FAILED ... Continuing anyway.`, and
+  the application **still starts**.
+
+The rationale: a transient database outage should not put the whole web
+service down or cause restart loops under a process manager. The trade
+off is that requests touching an unavailable dependency will return
+errors until it recovers — check the logs at startup to see which
+dependencies are reachable.
