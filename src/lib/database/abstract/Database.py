@@ -43,6 +43,7 @@ from lib.database.abstract.Annotations import AnnotationsABC, AnnotationGroupsAB
 from lib.database.abstract.Crosslink import CrosslinkABC
 from lib.database.abstract.external_resource import ExternalResourceABC
 from lib.database.abstract.Protocols import ProtocolsABC
+from lib.database.abstract.Policy import PolicyABC
 
 
 
@@ -110,6 +111,7 @@ class DatabaseABC(ABC):
     crosslinks : CrosslinkABC = None
     external_resources : ExternalResourceABC = None
     protocols : ProtocolsABC = None
+    policy : PolicyABC = None
 
     def __init__(self):
         """The abstract database class that defines
@@ -259,6 +261,10 @@ class DatabaseABC(ABC):
         if not isinstance(self.protocols, ProtocolsABC):
             raise TypeError("The protocols class must be an instance of the ProtocolABC.")
 
+        if self.policy is None:
+            raise NotImplementedError("A database class must have the policy attribute defined.")
+        if not isinstance(self.policy, PolicyABC):
+            raise TypeError("The policy class must be an instance of the PolicyABC.")   
 
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 

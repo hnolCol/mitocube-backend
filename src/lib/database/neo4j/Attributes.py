@@ -1361,3 +1361,45 @@ class Neo4JAttributes(AttributesABC):
             )
 
         return True
+
+
+    def export_attributes_and_traits(self) -> dict:
+        """Exports all attributes and traits in the seed-file JSON format used by _utils_insert_from_file,
+        so it can be fed into a new MitoCube instance."""
+        attributes_query = (
+            "MATCH (a:Attribute) "
+            "OPTIONAL MATCH (a)-[:REQUIRES_STATE]->(s:State) "
+            "OPTIONAL MATCH (a)-[:PART_OF]->(ag:AttributeGroup) "
+            "OPTIONAL MATCH (a)-[:IS_CHILD]->(child:Attribute) "
+            "OPTIONAL MATCH (a)-[:REQUIRES_TRAIT]->(rt:Trait) "
+            "WITH a, s, collect(DISTINCT ag.tag) as group_tags, collect(DISTINCT child.tag) as children, "
+            "collect(DISTINCT rt.tag) as required_trait_tags "
+            "RETURN a.tag as tag, a.text as text, a.priority as priority, a.allow_input as allow_input, "
+            "a.abbr as abbr, s.tag as min_state, group_tags, children, required_trait_tags "
+            "ORDER BY a.priority DESC "
+        )
+        attributes = self._driver.execute_query(attributes_query, routing_="r", result_transformer_=Result.data)
+
+        traits_query = (
+            "MATCH (a:Attribute)-[:HAS_TRAIT]->(t:Trait) "
+            "RETURN a.tag as attribute_tag, t.tag as tag, t.text as text, "
+            "t.description as description, t.value as value, t.priority as priority "
+            "ORDER BY a.tag, t.priority DESC "
+        )
+        traits = self._driver.execute_query(traits_query, routing_="r", result_transformer_=Result.data)
+
+        return {"attributes": attributes, "traits": traits}
+
+
+    def export_traits_by_attribute_tag(self, tag: str) -> List[dict]:
+        """Exports all traits (full properties) for a single attribute."""
+        if not self.exists(tag=tag):
+            raise ValueError(f"Attribute with tag {tag} does not exist.")
+
+        query = (
+            "MATCH (a:Attribute {tag: $tag})-[:HAS_TRAIT]->(t:Trait) "
+            "RETURN t.tag as tag, t.text as text, t.description as description, "
+            "t.value as value, t.priority as priority "
+            "ORDER BY t.priority DESC "
+        )
+        return self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)

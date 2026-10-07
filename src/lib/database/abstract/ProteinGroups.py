@@ -138,7 +138,7 @@ class ProteinGroupsABC(ABC):
         
         
     @abstractmethod
-    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tag : str = None, limit : Optional[int] = 20) -> List[Dict]:
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[Dict]:
         """Returns the statistical ranking for a given protein group.
 
         Parameters
@@ -147,6 +147,8 @@ class ProteinGroupsABC(ABC):
             The protein group tag
         attribute_tags : List[str], optional
             A list of attribute tags to filter the statistics, by default None
+        submission_tags : List[str], optional
+            If provided, restricts the ranking to statistics from these submissions, by default None
         limit : int, optional
             The maximum number of results to return, by default 20
 

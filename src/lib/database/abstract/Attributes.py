@@ -506,3 +506,12 @@ class AttributesABC(ABC):
     def delete_trait(self, trait_tag: str) -> bool:
         """Deletes a trait if it's not connected to any condition appplication by the relationship [:INSTANCE_OF].
            Raises ValueError if the trait is still in use."""
+        
+    @abstractmethod
+    def export_attributes_and_traits(self) -> dict:
+        """Exports all attributes and traits in the seed-file JSON format used by _utils_insert_from_file,
+        so it can be fed into a new MitoCube instance."""
+
+    @abstractmethod
+    def export_traits_by_attribute_tag(self, tag: str) -> List[dict]:
+        """Exports all traits (full properties) for a single attribute."""

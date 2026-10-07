@@ -34,6 +34,7 @@ from routers.dataset import correlation as submission_correlation # volcano
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim, ranking
 from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap, compare
 from routers.submission import permissions as submissions_permissions
+from routers.submission import export as submission_export 
 from routers.authentication import token, user
 from routers.info import info
 from routers.features import features
@@ -81,6 +82,7 @@ from routers.crosslink import external_resource as crosslink_external_resource
 from routers.crosslink import crosslink
 from routers.protocols import protocols
 from routers.mfa import mfa
+from routers.policy import policy
 
 # from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
@@ -90,7 +92,7 @@ import argparse
 
 
 #the order of these matters for the functioning of the routes
-router_sources = [
+router_sources = [policy,
                   protein_groups,
                   protein_favorite,
                   protein_find,
@@ -155,7 +157,8 @@ router_sources = [
                   PhenotypeAssociation,
                   crosslink,
                   crosslink_external_resource,
-                   protocols
+                   protocols,
+                   submission_export
 ]
     
 

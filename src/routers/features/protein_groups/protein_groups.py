@@ -23,13 +23,36 @@ router = APIRouter(
 
 
 @router.get("/{protein_group_tag}/stats", summary="Returns the statistics for a given protein group.")
-def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None, user : UserModel = Depends(get_user_from_token), limit : int = None) -> List[ProteinGroupSubmissionStatisticsModel]:
+def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None, ca_tags : str = None, include_sample_ca : bool = True, user_tags : str = None, user : UserModel = Depends(get_user_from_token), limit : int = None) -> List[ProteinGroupSubmissionStatisticsModel]:
     
     if not DB.protein_groups.exists(tag = protein_group_tag): #check if protein group exists, otherwise raise 404
         raise HTTPException(status_code=404, detail="Protein group not found")
     
-    r = DB.protein_groups.get_statistical_ranking(tag = protein_group_tag, attribute_tags = APIParamString(param=attribute_tags).param, limit = limit)
+    submission_tags = None 
+    parsed_ca_tags = APIParamString(param=ca_tags).param
+    if parsed_ca_tags is not None and len(parsed_ca_tags) > 0:
+        submission_tags = DB.submission_filter.filter_by_condition_applications(
+            ca_tags=parsed_ca_tags,
+            include_sample_ca=include_sample_ca,
+            match_all=True,
+            ordered=False
+        )
+        if len(submission_tags) == 0:
+            return []  # No submissions match the given condition applications
     
+    parsed_user_tags = APIParamString(param=user_tags).param
+    if parsed_user_tags is not None and len(parsed_user_tags) > 0:
+        submission_tags = DB.submission_filter.filter_by_user(
+            user_tags=parsed_user_tags,
+            submission_tags=submission_tags,
+            role="any",
+            ordered=False,
+        )
+        if len(submission_tags) == 0:
+            return [] # No submissions match the given user tags
+
+        
+    r=DB.protein_groups.get_statistical_ranking(tag=protein_group_tag, attribute_tags=APIParamString(param=attribute_tags).param, submission_tags=submission_tags, limit=limit)
     return r
         
     

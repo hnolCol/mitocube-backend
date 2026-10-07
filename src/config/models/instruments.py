@@ -28,7 +28,7 @@ class InstrumentStateHistoryModel(BaseModel):
     @field_validator("duration")
     def validate_duration(cls, v : float, info):
         if v is None:
-            return time.time() - info.data["started_at"]
+            return (time.time() * 1000) - info.data["started_at"]
         return v
 
 class InstrumentStateHistoryResponseModel(InstrumentStateHistoryModel):

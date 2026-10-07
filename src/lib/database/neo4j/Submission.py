@@ -1245,17 +1245,17 @@ class Neo4JSubmissions(SubmissionsABC):
                     sample_indices=run.aggregated_samples
                 )
 
-        return True
+        return rl_tag
 
-    def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
+    def get_runlist(self, submission_tag: str, rl_tag: str) -> Optional[RunListModel]: 
         query = (
-            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
         )
-        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
         if not r:
             return None
         row = r[0]
@@ -1264,14 +1264,33 @@ class Neo4JSubmissions(SubmissionsABC):
             key=lambda x: x.measurement_index
         )
         return RunListModel(**row["rl"], runs=runs)
-    
-    def delete_runlist(self, submission_tag: str) -> bool:
+
+    def list_runlists(self, submission_tag: str) -> List[RunListModel]: 
         query = (
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (rl)-[:HAS_RUN]->(r:Run) "
+            "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+            "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
+            "ORDER BY rl.created_at DESC "
+        )
+        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        runlists = []
+        for row in r:
+            runs = sorted(
+                [AnalyticRunModel(**{**dict(run), "name": run.get("text") or run.get("name")}, aggregated_samples=[]) for run in row["runs"]],
+                key=lambda x: x.measurement_index
+            )
+            runlists.append(RunListModel(**row["rl"], runs=runs))
+        return runlists
+
+    def delete_runlist(self, submission_tag: str, rl_tag: str) -> bool:  
+        query = (
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "DETACH DELETE rl "
         )
         try:
-            self._driver.execute_query(query, routing_="w", tag=submission_tag)
+            self._driver.execute_query(query, routing_="w", tag=submission_tag, rl_tag=rl_tag)
             return True
         except Exception as e:
             print(e)
@@ -1953,14 +1972,39 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return self._get_users_submission_scope(current_user_tag=user_tag)
 
 
-    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
-        """Checks if a user has access to a submission. 
-            This is useful to check if a user can access a submission before returning the submission data. """
-        user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
-        if user_scope is None: return True #curator or admin, has access to all submissions
-        return submission_tag in user_scope
+    # def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+    #     """Checks if a user has access to a submission. 
+    #         This is useful to check if a user can access a submission before returning the submission data. """
+    #     user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
+    #     if user_scope is None: return True #curator or admin, has access to all submissions
+    #     return submission_tag in user_scope
         
+    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if a user has access to a single submission without building the full submission scope.
+        This is useful to check if a user can access a submission before returning the submission data.
+        """
+        if not self._users.exists(user_tag):
+            return False
 
+        user = self._users.get_user_by_tag(tag=user_tag)
+        if user.role >= UserRolesEnum.CURATOR:
+            return True
+        if user.role == UserRolesEnum.GUEST:
+            return False
+
+        query = (
+            "MATCH (u:User {tag: $user_tag}), (submission:Submission {tag: $submission_tag}) "
+            "RETURN "
+            "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
+            "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
+            "AS has_access "
+        )
+        r = self._driver.execute_query(query, routing_="r",
+                                    user_tag=user_tag,
+                                    submission_tag=submission_tag,
+                                    result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+    
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
             query += "ORDER BY submission_tag DESC "

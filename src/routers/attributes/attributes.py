@@ -201,6 +201,18 @@ def get_dataset_attributes(user : UserModel = Depends(get_user_from_token), min_
     return DB.attributes.get_dataset_attributes(min_state=min_state)
 
 
+@router.get("/export", summary="Exports all attributes and traits for seeding a new MitoCube instance.")
+def export_attributes(user: UserModel = Depends(is_user_at_least_curator)) -> dict:
+    "Exports all attributes and traits in the format used by the DB seed script."
+    return DB.attributes.export_attributes_and_traits()
+
+@router.get("/{attribute_tag}/traits/export")
+def export_attribute_traits(attribute_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+    "Exports all traits for a single attribute."
+    if not DB.attributes.exists(tag=attribute_tag):
+        raise HTTPException(status_code=404, detail="Tag not associated with an attribute")
+    return DB.attributes.export_traits_by_attribute_tag(tag=attribute_tag)
+
 
 @router.get("/values")
 def get_attribute_values_by_tag(tag : str) -> List[AttributeValueModel]:

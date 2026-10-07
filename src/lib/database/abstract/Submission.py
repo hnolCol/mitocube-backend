@@ -545,11 +545,15 @@ class SubmissionsABC(ABC):
             True if the runlist was inserted successfully, False otherwise.
         """
     @abstractmethod
-    def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
+    def get_runlist(self, submission_tag: str, rl_tag: str) -> Optional[RunListModel]: 
         "Returns the runlist for a given submission tag. If no runlist is found, None is returned."
 
     @abstractmethod
-    def delete_runlist(self, submission_tag: str) -> bool:
+    def list_runlists(self, submission_tag: str) -> List[RunListModel]: 
+        "Returns a list of all runlists for a given submission tag. If no runlists are found, an empty list is returned."
+
+    @abstractmethod
+    def delete_runlist(self, submission_tag: str, rl_tag: str) -> bool:  
         "Deletes the runlist for a given submission tag. Returns True if the runlist was deleted successfully, False otherwise."
 
     @abstractmethod
@@ -771,4 +775,74 @@ class SubmissionFilterABC(ABC):
         -------
         List[str]
             The sorted list of submission tags by views in descending order.
+        """
+
+    @abstractmethod
+    def filter_by_condition_applications(
+        self,
+        attribute_tag: List[str] = None,
+        trait_tags: List[str] = None,
+        ca_tags: List[str] = None,
+        ca_search_string: str = None,
+        submission_tags: List[str] = None,
+        include_sample_ca: bool = False,
+        match_all: bool = True,
+        limit: int = None,
+        ordered: bool = True,
+    ) -> List[str]:
+        """Filters the submission tags by the condition applications. 
+        The filtering is performed on the given list of submission tags. 
+        If the limit is provided, only the top N submission tags are returned. 
+
+        Parameters
+        ----------
+        attribute_tag : List[str], optional
+            The list of attribute tags to filter by, by default None
+        trait_tags : List[str], optional
+            The list of trait tags to filter by, by default None
+        ca_tags : List[str], optional
+            The list of condition application tags to filter by, by default None
+        ca_search_string : str, optional
+            A string to search for in the condition application tags, by default None
+        submission_tags : List[str], optional
+            The list of submission tags to filter, if None all submission are considered, by default None
+        include_sample_ca : bool, optional
+            If True, the filtering is performed on the sample condition applications as well, by default False
+        match_all : bool, optional
+            If True, all condition applications must match, if False any condition application can match, by default True
+        limit : int, optional
+            The maximum number of submission tags to return, by default None
+        ordered : bool, optional
+            If True, the results are ordered by the submission creation date in descending order, by default True
+
+        Returns
+        -------
+        List[str]
+            The filtered list of submission tags.
+        """
+
+        
+    @abstractmethod
+    def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, role : Literal["creator", "collaborator", "any"] = "any", limit : int = None, ordered : bool = True) -> List[str]:
+        """Filters the submission tags by the user tags. 
+        The filtering is performed on the given list of submission tags. 
+        If the limit is provided, only the top N submission tags are returned. 
+
+        Parameters
+        ----------
+        user_tags : List[str]
+            The list of user tags to filter by.
+        submission_tags : List[str], optional
+            The list of submission tags to filter, if None all submission are considered, by default None
+        role : Literal["creator", "collaborator", "any"], optional
+            The role of the user in the submission, by default "any"
+        limit : int, optional
+            The maximum number of submission tags to return, by default None
+        ordered : bool, optional
+            If True, the results are ordered by the submission creation date in descending order, by default True
+
+        Returns
+        -------
+        List[str]
+            The filtered list of submission tags.
         """
