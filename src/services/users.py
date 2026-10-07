@@ -50,6 +50,26 @@ def are_public_users_allowed(user_tags : List[str], db : DatabaseABC = Depends(g
     return [u.allow_login for u in users_from_db if u is not None]
 
 
+def get_client_ip(request : Request) -> str:
+    """Returns the real client IP, honoring X-Forwarded-For from trusted proxies.
+
+    Production runs behind nginx, so request.client.host is the proxy IP
+    for every request. The forwarded header is only trusted when the
+    direct peer is a configured proxy; otherwise a spoofed header would
+    let attackers rotate fake IPs and evade the rate limit.
+    """
+    from config.settings.token import get_mfa_settings
+
+    direct = request.client.host if request.client else "unknown"
+    trusted = [ip.strip() for ip in get_mfa_settings().TRUSTED_PROXY_IPS.split(",") if ip.strip()]
+    if direct in trusted:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            # first entry = originating client
+            return forwarded.split(",")[0].strip()
+    return direct
+
+
 def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends(), db : DatabaseABC = Depends(get_db), request : Request = None) -> UserModel:
     """Returns the user from a login.
 
@@ -65,7 +85,7 @@ def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends(), db : 
     if mfa_runtime.is_login_rate_limited(email_key):
         raise login_rate_limited
     if request is not None:
-        ip_key = f"ip:{request.client.host if request.client else 'unknown'}"
+        ip_key = f"ip:{get_client_ip(request)}"
         if mfa_runtime.is_login_rate_limited(ip_key):
             raise login_rate_limited
 

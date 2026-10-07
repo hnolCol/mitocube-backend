@@ -357,3 +357,43 @@ class TestIsCreatorOfSubmissionOrCurator:
         with pytest.raises(HTTPException) as e:
             is_creator_of_submission_or_curator("nope", user, db)
         assert e.value.status_code == submission_tag_not_found.status_code
+
+
+class FakeClient:
+    def __init__(self, host):
+        self.host = host
+
+
+class FakeRequest:
+    def __init__(self, host, headers=None):
+        self.client = FakeClient(host)
+        self.headers = headers or {}
+
+
+class TestGetClientIP:
+    def test_direct_connection_uses_peer_ip(self):
+        from services.users import get_client_ip
+        assert get_client_ip(FakeRequest("10.1.2.3")) == "10.1.2.3"
+
+    def test_trusted_proxy_uses_first_forwarded_entry(self):
+        from services.users import get_client_ip
+        req = FakeRequest(
+            "127.0.0.1",
+            headers={"x-forwarded-for": "203.0.113.7, 10.0.0.9"},
+        )
+        assert get_client_ip(req) == "203.0.113.7"
+
+    def test_forwarded_header_ignored_from_untrusted_peer(self):
+        from services.users import get_client_ip
+        req = FakeRequest(
+            "198.51.100.23",
+            headers={"x-forwarded-for": "1.2.3.4"},
+        )
+        # spoofed header from a non-proxy must not be trusted
+        assert get_client_ip(req) == "198.51.100.23"
+
+    def test_missing_client_unknown(self):
+        from services.users import get_client_ip
+        req = FakeRequest("127.0.0.1")
+        req.client = None
+        assert get_client_ip(req) == "unknown"

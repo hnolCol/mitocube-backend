@@ -43,6 +43,19 @@ pip install -r requirements.txt        # core backend
 pip install -r requirements-ai.txt     # optional AI agent stack
 ```
 
+### Login rate limiting
+
+Failed logins are rate limited per email address and per client IP
+(10 attempts / 10 minutes by default, configurable via
+`LOGIN_RATE_LIMIT_MAX_ATTEMPTS` and `LOGIN_RATE_LIMIT_WINDOW_MINUTES`).
+Exceeding the budget returns `429 Too Many Requests` with a
+`Retry-After` header.
+
+Since production runs behind nginx, the client IP is taken from
+`X-Forwarded-For` **only** when the direct peer is a trusted proxy
+(`TRUSTED_PROXY_IPS`, default `127.0.0.1,::1`). Set this to the IP your
+nginx uses to reach uvicorn.
+
 `pip-audit` runs on `requirements.txt` in CI (see
 `.github/workflows/ci.yml`). Known advisories without an upstream fix
 (currently transitive `ecdsa` via `python-jose`) are tracked until the
