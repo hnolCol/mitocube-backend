@@ -984,12 +984,14 @@ class Neo4JSamples(SamplesABC):
         return r[0] if len(r) > 0 else False
 
 
-    def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True) -> pd.DataFrame:
+    def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True,
+                                include_sample_name: bool = False, attribute_separator: str = "_",
+                                value_separator: str = "-") -> pd.DataFrame:
         """
         Returns one row per sample in the submission (including excluded samples) with
-        columns: sample_tag, replicate, genotype, and one column per condition-application
-        attribute tag. Each cell is formatted as "text (tag)"; multiple values for the
-        same attribute on the same sample are joined by `join`.
+        columns: (sample_name), sample_tag, replicate, genotype, and one column per
+        condition-application attribute tag. Each cell contains the resolved text;
+        multiple values for the same attribute on the same sample are joined by `join`.
 
         Parameters
         ----------
@@ -999,11 +1001,18 @@ class Neo4JSamples(SamplesABC):
             Separator used when a sample has multiple values for the same attribute.
         sort_ca_tags : bool, optional
             If True, tags are sorted alphabetically before joining, by default True
+        include_sample_name : bool, optional
+            If True, adds a 'sample_name' column as the first column built as
+            <YYYYMMDD>_<submission_tag>_<id>_<genotype>_<ca text>_<ca text>..., by default False
+        attribute_separator : str, optional
+            Separator between genotype and different attributes in the sample name, by default "_"
+        value_separator : str, optional
+            Separator between multiple values of the same attribute in the sample name, by default "-"
 
         Returns
         -------
         pd.DataFrame
-            Columns: sample_tag, replicate, genotype, <attribute_tag>, <attribute_tag>, ...
+            Columns: (sample_name), sample_tag, replicate, genotype, <attribute_tag>, ...
         """
         query = (
             "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample) "
@@ -1015,15 +1024,11 @@ class Neo4JSamples(SamplesABC):
         )
         df.set_index("sample_tag", inplace=True)
 
-        def format_tags(tags, get_text_fn):
+        def get_texts(tags, get_text_fn):
             ordered_tags = sorted(tags) if sort_ca_tags else tags
-            formatted = []
-            for t in ordered_tags:
-                text = get_text_fn(tag=t)
-                formatted.append(text if text else t)  
-            return join.join(formatted)
+            return [(get_text_fn(tag=t) or t).strip() for t in ordered_tags]
 
-
+        # genotypes
         genotype_query = (
             "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
             "RETURN s.tag as sample_tag, collect(g.tag) as genotype_tags "
@@ -1031,16 +1036,20 @@ class Neo4JSamples(SamplesABC):
         genotype_df = self._driver.execute_query(
             genotype_query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag
         )
+        genotype_map = {}
         if not genotype_df.empty:
-            genotype_df["genotype"] = genotype_df["genotype_tags"].apply(
-                lambda tags: format_tags(tags, self._genotypes.get_text)
+            genotype_df["texts"] = genotype_df["genotype_tags"].apply(
+                lambda tags: get_texts(tags, self._genotypes.get_text)
             )
+            genotype_map = dict(zip(genotype_df["sample_tag"], genotype_df["texts"]))
+            genotype_df["genotype"] = genotype_df["texts"].apply(join.join)
             genotype_df.set_index("sample_tag", inplace=True)
             df = df.join(genotype_df["genotype"], how="left")
         else:
             df["genotype"] = ""
         df["genotype"] = df["genotype"].fillna("")
 
+        # condition applications
         ca_query = (
             "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "RETURN s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as ca_tags "
@@ -1048,14 +1057,41 @@ class Neo4JSamples(SamplesABC):
         ca_df = self._driver.execute_query(
             ca_query, routing_="r", result_transformer_=Result.to_df, submission_tag=submission_tag
         )
+        ca_map = {}
+        attribute_order = []
         if not ca_df.empty:
-            ca_df["formatted"] = ca_df["ca_tags"].apply(
-                lambda tags: format_tags(tags, self._condition_applications.get_text)
+            ca_df["texts"] = ca_df["ca_tags"].apply(
+                lambda tags: get_texts(tags, self._condition_applications.get_text)
             )
+            ca_df["formatted"] = ca_df["texts"].apply(join.join)
             pivot = ca_df.pivot_table(index="sample_tag", columns="attribute_tag", values="formatted", aggfunc="first")
             df = df.join(pivot, how="left")
+
+            for row in ca_df.itertuples():
+                ca_map.setdefault(row.sample_tag, {})[row.attribute_tag] = row.texts
+            attribute_order = list(pivot.columns)
 
         df = df.fillna("")
         df.drop(columns=["sample_index"], inplace=True, errors="ignore")
         df.reset_index(inplace=True)
+
+        if include_sample_name:
+            def compact(text):
+                # '_' is the name separator -> '.', commas -> '.', spaces removed,
+                # keep letters (incl. µ), digits, '.', '-', brackets and '/'
+                text = str(text).strip()
+                text = re.sub(r",\s*", ".", text)
+                text = text.replace("_", ".")
+                return re.sub(r"[^\w.\-µ()/]", "", text)
+
+            def build_sample_name(sample_tag):
+                base = sample_tag.split("|", 1)[-1]  # YYYYMMDD_<submission_tag>_<id>
+                genotype_part = value_separator.join(compact(t) for t in genotype_map.get(sample_tag, []))
+                attrs = ca_map.get(sample_tag, {})
+                ca_parts = [value_separator.join(compact(t) for t in attrs[a])
+                            for a in attribute_order if a in attrs]
+                return attribute_separator.join([p for p in [base, genotype_part, *ca_parts] if p])
+
+            df.insert(0, "sample_name", df["sample_tag"].map(build_sample_name))
+
         return df

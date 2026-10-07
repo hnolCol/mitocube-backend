@@ -297,7 +297,9 @@ class SamplesABC(ABC):
         """Inserts the quantification distribution for a given submission and quantification type. This can be used to store pre-calculated distributions for faster retrieval."""
         
     @abstractmethod
-    def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True) -> pd.DataFrame:
+    def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True,
+                                include_sample_name: bool = False, attribute_separator: str = "_",
+                                value_separator: str = "-") -> pd.DataFrame:
         """
         Returns one row per sample in the submission (including excluded samples) with
         columns: sample_tag, replicate, genotype, and one column per condition-application

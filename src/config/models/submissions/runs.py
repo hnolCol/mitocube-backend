@@ -89,6 +89,7 @@ class RunListModel(BaseModel):
     runs : List[AnalyticRunModel]
     aggregated_on : Optional[str] = None
     instrument_tag : Optional[str] = None
+    instrument_text : Optional[str] = None
     
     # @field_validator('user_tag', mode="after")
     # def check_user(cls, v : List[str]|str, field):

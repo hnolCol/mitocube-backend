@@ -875,6 +875,8 @@ def create_submission_runlist(
         raise HTTPException(status_code=400, detail=str(e))
 
     runlist.instrument_tag = runlist_props.instrument_tag
+    if runlist.instrument_tag:
+        runlist.instrument_text = DB.attributes.get_trait_text(tag=runlist.instrument_tag)
     rl_tag = DB.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
     runlist.tag = rl_tag  
 
@@ -894,6 +896,8 @@ def get_submission_runlists(submission_tag: str, user: UserModel = Depends(get_u
     responses = []
     for runlist in runlists:
         ru = DB.users.get_user_by_tag(tag=runlist.user_tag)
+        if runlist.instrument_tag:
+            runlist.instrument_text = DB.attributes.get_trait_text(tag=runlist.instrument_tag)
         responses.append(RunListResponseModel(
             **runlist.model_dump(),
             user_email=ru.email if ru else "",
@@ -912,6 +916,8 @@ def get_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = D
         raise HTTPException(status_code=404, detail="No runlist found.")
 
     ru = DB.users.get_user_by_tag(tag=runlist.user_tag)
+    if runlist.instrument_tag:
+        runlist.instrument_text = DB.attributes.get_trait_text(tag=runlist.instrument_tag)
     return RunListResponseModel(
         **runlist.model_dump(),
         user_email=ru.email if ru else "",
