@@ -1,5 +1,5 @@
 from fastapi.security import  OAuth2PasswordRequestForm
-from fastapi import Depends
+from fastapi import Depends, Request
 from pydantic import EmailStr
 from typing import List, Tuple
 
@@ -50,13 +50,37 @@ def are_public_users_allowed(user_tags : List[str], db : DatabaseABC = Depends(g
     return [u.allow_login for u in users_from_db if u is not None]
 
 
-def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends(), db : DatabaseABC = Depends(get_db)) -> UserModel:
-    """Returns the user from a login"""
+def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends(), db : DatabaseABC = Depends(get_db), request : Request = None) -> UserModel:
+    """Returns the user from a login.
+
+    Rate limited per email and per client IP: too many failed attempts
+    within the configured window raise 429 instead of hitting the
+    password check, blocking brute-force attempts on both a single
+    account and a single origin.
+    """
+    from lib.mfa.mfa import mfa_runtime
+    from config.exceptions.HTTPExceptions import login_rate_limited
+
+    email_key = f"email:{form_data.username}"
+    if mfa_runtime.is_login_rate_limited(email_key):
+        raise login_rate_limited
+    if request is not None:
+        ip_key = f"ip:{request.client.host if request.client else 'unknown'}"
+        if mfa_runtime.is_login_rate_limited(ip_key):
+            raise login_rate_limited
+
     user  = db.users.get_user_by_email(form_data.username)
     #user verification check
     user_in_db = check_user_allowed(user is not None, user)
     if not verify_password(form_data.password, user_in_db.password.get_secret_value()):
+        mfa_runtime.register_login_failure(email_key)
+        if request is not None:
+            mfa_runtime.register_login_failure(ip_key)
         raise credentials_exception
+
+    mfa_runtime.reset_login_failures(email_key)
+    if request is not None:
+        mfa_runtime.reset_login_failures(ip_key)
     return user_in_db
 
 

@@ -24,14 +24,38 @@ def _no_user_cache(monkeypatch):
     """Bypass the Mongo-backed user cache in unit tests.
 
     get_user_from_token consults the cache first; unit tests exercise the
-    DB path, so the cache is stubbed to always miss.
+    DB path, so the cache is stubbed to always miss. The login rate
+    limiter is stubbed to never limit; dedicated tests cover the limiter.
     """
     monkeypatch.setattr(users_service, "get_cached_user", lambda tag: None)
     monkeypatch.setattr(users_service, "cache_user", lambda user, cache_time=None: None)
 
+    from lib.mfa import mfa as mfa_module
 
-def get_user_from_login(form_data, db):
-    return users_service.get_user_from_login(form_data, db)
+    class _LimiterStub:
+        def __init__(self):
+            self.failures = {}
+            self.limited = False
+            self.resets = []
+
+        def is_login_rate_limited(self, key):
+            return self.limited
+
+        def register_login_failure(self, key):
+            self.failures[key] = self.failures.get(key, 0) + 1
+            return self.failures[key]
+
+        def reset_login_failures(self, key):
+            self.resets.append(key)
+
+    limiter = _LimiterStub()
+    monkeypatch.setattr(mfa_module.mfa_runtime, "is_login_rate_limited", limiter.is_login_rate_limited)
+    monkeypatch.setattr(mfa_module.mfa_runtime, "register_login_failure", limiter.register_login_failure)
+    monkeypatch.setattr(mfa_module.mfa_runtime, "reset_login_failures", limiter.reset_login_failures)
+
+
+def get_user_from_login(form_data, db, request=None):
+    return users_service.get_user_from_login(form_data, db, request)
 
 
 def get_user_from_token(claims, db):
@@ -204,6 +228,87 @@ class TestGetUserFromLogin:
         db = FakeDB()
         with pytest.raises(HTTPException):
             get_user_from_login(self._form("nobody@age.mpg.de", "pw-secret-123"), db)
+
+    def test_rate_limited_email_rejected_before_password_check(self, token_settings, monkeypatch):
+        """A limited email gets 429 without touching the DB or password."""
+        from lib.mfa import mfa as mfa_module
+        from config.exceptions.HTTPExceptions import login_rate_limited
+        import services.users as users_service
+
+        class _Limited:
+            def is_login_rate_limited(self, key):
+                return key.startswith("email:")
+
+            def register_login_failure(self, key):
+                pass
+
+            def reset_login_failures(self, key):
+                pass
+
+        monkeypatch.setattr(mfa_module.mfa_runtime, "is_login_rate_limited", _Limited().is_login_rate_limited)
+
+        db = FakeDB()
+        try:
+            get_user_from_login(self._form("victim@age.mpg.de", "pw-secret-123"), db)
+            assert False, "expected HTTPException"
+        except HTTPException as e:
+            assert e.status_code == 429
+            assert e is login_rate_limited
+
+    def test_rate_limited_ip_rejected(self, token_settings, monkeypatch):
+        from lib.mfa import mfa as mfa_module
+        from fastapi import HTTPException as _HTTP
+
+        class _LimitedIP:
+            def is_login_rate_limited(self, key):
+                return key.startswith("ip:")
+
+            def register_login_failure(self, key):
+                pass
+
+            def reset_login_failures(self, key):
+                pass
+
+        monkeypatch.setattr(mfa_module.mfa_runtime, "is_login_rate_limited", _LimitedIP().is_login_rate_limited)
+
+        class _FakeRequest:
+            class client:
+                host = "10.0.0.1"
+
+        db = FakeDB()
+        try:
+            get_user_from_login(self._form("victim@age.mpg.de", "pw-secret-123"), db, request=_FakeRequest())
+            assert False, "expected HTTPException"
+        except _HTTP as e:
+            assert e.status_code == 429
+
+    def test_failed_password_registers_failure(self, token_settings, monkeypatch):
+        from lib.mfa import mfa as mfa_module
+
+        registered = []
+
+        class _Recording:
+            def __init__(self):
+                self.counts = {}
+
+            def is_login_rate_limited(self, key):
+                return False
+
+            def register_login_failure(self, key):
+                registered.append(key)
+                return len(registered)
+
+            def reset_login_failures(self, key):
+                registered.append(("reset", key))
+
+        monkeypatch.setattr(mfa_module.mfa_runtime, "is_login_rate_limited", _Recording().is_login_rate_limited)
+        monkeypatch.setattr(mfa_module.mfa_runtime, "register_login_failure", lambda key: registered.append(key))
+
+        user = make_user()
+        db = FakeDB(users=FakeUserDB(users_by_email={user.email: user}))
+        with pytest.raises(HTTPException):
+            get_user_from_login(self._form(user.email, "wrong-password"), db)
+        assert any(k == f"email:{user.email}" for k in registered)
 
 
 class TestRoleGates:

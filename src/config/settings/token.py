@@ -46,6 +46,8 @@ class MFASettings(BaseSettings):
     MFA_MAX_ATTEMPTS: int = 5
     MFA_LOCKOUT_MINUTES: int = 15
     MFA_ENCRYPTION_KEY: SecretStr 
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
+    LOGIN_RATE_LIMIT_WINDOW_MINUTES: int = 10
    
     class Config:
         env_file = ".env"

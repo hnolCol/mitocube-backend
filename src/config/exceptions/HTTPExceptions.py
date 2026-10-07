@@ -17,6 +17,11 @@ user_form_data_incorrect = HTTPException(
             detail="User not found or password incorrect.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+login_rate_limited = HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many failed login attempts. Please try again later.",
+            headers={"Retry-After": "600"},
+        )
 
 
 submission_tag_not_found = HTTPException(

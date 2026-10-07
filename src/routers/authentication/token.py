@@ -1,6 +1,6 @@
 import time 
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Body
+from fastapi import APIRouter, BackgroundTasks, Depends, Body, Request
 import pyotp
 
 from config.models.user import UserModel
@@ -36,6 +36,7 @@ fernet = Fernet(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value())
 
 @router.post("/", response_description="Returns a jwt token This token still has to be verified by a one time password.", response_model=TokenResponse)
 def login_for_access_token(background_task : BackgroundTasks, 
+                           request : Request,
                            user : UserModel = Depends(get_user_from_login), 
                            verification_code : str = Depends(lambda : get_random_string(12))) -> TokenResponse:
     """
