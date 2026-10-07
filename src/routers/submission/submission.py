@@ -46,7 +46,7 @@ GENERAL_SETTINGS = get_general_settings()
 DB_SETTINGS = get_db_settings()
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api",
     tags=["Submission"],
     )

@@ -14,7 +14,7 @@ import numpy as np
 import re
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions/analysis",
     tags=["Submission"],
     )

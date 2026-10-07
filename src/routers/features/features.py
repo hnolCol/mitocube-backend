@@ -17,7 +17,7 @@ from collections import OrderedDict
 DB = Database.DB()
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/features",
     tags=["Features"]
     )
@@ -224,7 +224,7 @@ def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_s
 
 
 @router.get("/{feature_tag}/quant_count")
-def get_quantification_counts(feature_tag : str):
+def get_quantification_counts(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
     "Returns the number of samples that quantified the given feature (protein) and the number of samples that used the same proteome."
     if not DB.features.exists(tag = feature_tag): raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
     proteome_tags = DB.features.get_proteome(tags = [feature_tag])
@@ -266,7 +266,7 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None, user :
 
 @router.get("/{feature_tag}/sequence",
             summary="Returns the stored sequence in the annotation database.")
-def get_feature_sequence(feature_tag : str) -> List[FeatureSequenceResponseModel]: #user : UserModel = Depends(get_user_from_token)
+def get_feature_sequence(feature_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[FeatureSequenceResponseModel]:
     """
     Returns the sequence for a specific feature_tag (Uniprot ID)
     

@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
-from typing import List 
+from typing import List, Dict 
 
-from config.models.performance import QCRunModel
+from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCStandardInsertModel, QCStandardResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 
 
 class QCABC(ABC):
@@ -40,7 +40,7 @@ class QCABC(ABC):
         """
     
     @abstractmethod
-    def get(self, tags : List[str] = None, instrument : str = None, limit : int = 50) -> QCRunModel:
+    def get(self, tags : List[str] = None, instrument_name_tag : str = None, qc_standard_tag : str = None, limit : int = 50) -> List[QCRunResponseModel]:
         """Returns the perfromance run. 
 
         Parameters
@@ -54,17 +54,17 @@ class QCABC(ABC):
 
         Returns
         -------
-        QCRunModel
+        QCRunInsertModel
             _description_
         """
     
     @abstractmethod
-    def insert(self, performance_run : QCRunModel) -> bool: 
+    def insert(self, performance_run : QCRunInsertModel) -> bool: 
         """Add a new performance run to the database 
 
         Parameters
         ----------
-        performance_run : QCRunModel
+        performance_run : QCRunInsertModel
             _description_
 
         Returns
@@ -89,18 +89,154 @@ class QCABC(ABC):
         """
         
     @abstractmethod
-    def update(self, tag : str, peformance_run : QCRunModel) -> bool:
+    def update(self, tag : str, peformance_run : QCRunInsertModel) -> bool:
         """Updates a specific performance run. 
 
         Parameters
         ----------
         tag : str
             _description_
-        peformance_run : QCRunModel
+        peformance_run : QCRunInsertModel
             _description_
 
         Returns
         -------
         bool
             _description_
+        """
+
+    @abstractmethod
+    def standard_exists(self, tag : str) -> bool:
+        """
+        Checks if a tag is associated with a QC standard (e.g. HeLa digest, BSA).
+
+        Parameters
+        ----------
+        tag : str
+            The QC standard tag.
+
+        Returns
+        -------
+        bool
+            If the given tag is associated with a QC standard.
+        """
+
+    @abstractmethod
+    def get_standards(self, type : str = None, vendor : str = None) -> List[QCStandardResponseModel]:
+        """
+        Returns the QC standards, optionally filtered by type and vendor.
+
+        Parameters
+        ----------
+        type : str, optional
+            The type of the standard (Cell lysate, Protein), by default None.
+        vendor : str, optional
+            The vendor of the standard, by default None.
+
+        Returns
+        -------
+        List[QCStandardResponseModel]
+            The QC standards.
+        """
+
+    @abstractmethod
+    def insert_standard(self, standard : QCStandardInsertModel) -> bool:
+        """
+        Adds a new QC standard to the database. Standards are immutable,
+        an existing tag is merged.
+
+        Parameters
+        ----------
+        standard : QCStandardInsertModel
+            The standard to add.
+
+        Returns
+        -------
+        bool
+            True if the standard was added, False otherwise.
+        """
+
+    @abstractmethod
+    def delete_standard(self, tag : str) -> bool:
+        """
+        Deletes a QC standard. A standard can only be deleted if no QC run
+        is linked to it.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the standard to delete.
+
+        Returns
+        -------
+        bool
+            True if the standard was deleted, False if it does not exist or is still in use.
+        """
+
+    @abstractmethod
+    def insert_qc_precursors(self, run_tag : str, precursors : List[QCPrecursorInsertModel]) -> bool:
+        """
+        Adds the quantified QCPrecursors to a QC run. The precursors are linked to the run via a
+        [:QUANTIFIED] relationship that carries the value, score and retention time of
+        the precursor in this specific run. Only a specific subset of precursors is recorded for
+        QC, the full quantification data is not uploaded. Precursors that do not exist in the
+        database are skipped.
+
+        Parameters
+        ----------
+        run_tag : str
+            The tag of the QC run the precursors belong to.
+        precursors : List[QCPrecursorInsertModel]
+            The precursors with their value, score and retention time.
+
+        Returns
+        -------
+        bool
+            True if the precursors were added, False if the run does not exist.
+        """
+
+    @abstractmethod
+    def get_qc_precursors(self, run_tag : str) -> List[QCPrecursorResponseModel]:
+        """
+        Returns the QCPrecursors that were recorded for a QC run.
+
+        Parameters
+        ----------
+        run_tag : str
+            The tag of the QC run.
+
+        Returns
+        -------
+        List[QCPrecursorResponseModel]
+            The recorded precursors of the run.
+        """
+
+    @abstractmethod
+    def get_rt_drift(self, precursor_tag : str, instrument_name_tag : str = None, qc_standard_tag : str = None,
+                     condition_application_tag : str = None, start : int = None, end : int = None) -> List[Dict]:
+        """
+        Returns the retention time drift of a QCPrecursor over QC runs, i.e. the observed
+        retention time per run ordered by the run creation time. Optionally filtered by
+        instrument, QC standard, condition application and a time frame.
+
+        Parameters
+        ----------
+        precursor_tag : str
+            The tag of the precursor (sequence.charge).
+        instrument_name_tag : str, optional
+            The tag of the instrument the runs were acquired on, by default None.
+        qc_standard_tag : str, optional
+            The tag of the QC standard that was used to generate the runs, by default None.
+        condition_application_tag : str, optional
+            The tag of a condition application (e.g. column, gradient) the runs must have applied, by default None.
+        start : int, optional
+            The start of the time frame as a unix timestamp in milliseconds (inclusive), by default None.
+        end : int, optional
+            The end of the time frame as a unix timestamp in milliseconds (exclusive), by default None.
+
+        Returns
+        -------
+        List[Dict]
+            A list of dictionaries with the run tag, the run creation time (created_at) and
+            the observed retention time (retention_time) ordered by created_at.
         """

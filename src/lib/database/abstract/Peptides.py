@@ -5,7 +5,7 @@ from abc import abstractmethod, ABC
 from typing import List, Dict, Optional, Tuple, Literal  # , Any
 from deprecated import deprecated
 import pandas as pd
-from config.models.performance import QCPeptidesModel, QCRunModel, QCPeptideModel
+from config.models.performance import QCPeptidesModel, QCPeptideModel
 from config.models.peptides import PeptideResponseModel
 class PeptidesABC(ABC):
     """Abstract class to handle peptides.

@@ -3,7 +3,7 @@ from config.models.user import UserModel
 from services.users import get_user_from_token
 from services.ClinVar import search_clinvar, lookup_variant_by_mutation, search_diseases_clinvar, clinvar_variant_to_genotype_components
 
-router = APIRouter(prefix="/api/clinvar", tags=["ClinVar"])
+router = APIRouter(dependencies=[Depends(get_user_from_token)],prefix="/api/clinvar", tags=["ClinVar"])
 
 
 @router.get("/search")

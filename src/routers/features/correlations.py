@@ -12,7 +12,7 @@ from scipy.stats import false_discovery_control
 DB = Database.DB()
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/features",
     tags=["Proteins","Correlations"]
     )

@@ -13,6 +13,7 @@ from config.settings.email import get_email_settings
 from services.encryption import create_password_hash 
 from services.random_generators import get_random_string 
 from services.mail import async_send_email
+from lib.cache.user_cache import invalidate_cached_user
 
 GENERAL_SETTINGS = get_general_settings()
 EMAIL_SETTINGS = get_email_settings()
@@ -273,6 +274,7 @@ class Neo4JUser(UserABC):
         except Exception as e:
             print("Query finding resulted in an error " + str(e))
             return False
+        invalidate_cached_user(tag)
         return True
     
     def count(self, exclude_inactive : bool = True) -> int:
@@ -506,4 +508,5 @@ class Neo4JUser(UserABC):
         except Exception as e:
             print("Update failed: " + str(e))
             return False
+        invalidate_cached_user(tag)
         return True

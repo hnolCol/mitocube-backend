@@ -27,7 +27,7 @@ DB = Database.DB()
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
 OPEN_AI_SETTINGS = get_open_ai_settings()
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/ai/openai",
     tags=["OpenAI", "ChatGPT"]
     )

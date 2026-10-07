@@ -7,14 +7,14 @@ from config.models.parameter import APIParamString
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/peptides",
     tags=["Peptides"]
     )
 
 
 @router.get("/{peptide_tag}")
-def get_peptide_by_tag(peptide_tag : str):
+def get_peptide_by_tag(peptide_tag : str, user : UserModel = Depends(get_user_from_token)):
     """Retrieves a peptide by its tag.
 
     Parameters

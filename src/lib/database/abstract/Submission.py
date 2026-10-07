@@ -346,7 +346,7 @@ class SubmissionsABC(ABC):
             Number of inserted protein quantifications.
         """
     @abstractmethod
-    def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:   
+    def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel], batch_size : int = 600, transaction_batch_size : int = 400, delete_if_exists : bool = False) -> int:   
         """
         Inserts precursor quantifications for a given submission.
 
@@ -354,8 +354,14 @@ class SubmissionsABC(ABC):
         ----------
         tag : str
             The tag of the submission.
-        quantifications : List[Dict]
+        quantifications : List[PrecursorQuantificationModel]
             List of precursor quantifications to insert.
+        batch_size : int, optional
+            The number of quantifications sent to the database per query, by default 600
+        transaction_batch_size : int, optional
+            The number of rows per internal transaction (IN TRANSACTIONS OF ... ROWS), by default 400
+        delete_if_exists : bool, optional
+            Whether to delete existing precursor quantifications of the submission before inserting, by default False
 
         Returns
         -------

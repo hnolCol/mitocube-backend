@@ -6,12 +6,12 @@ from lib.database.Database import Database
 
 from config.models.user import UserModel
 from config.models.maintenance import ExternalServiceBaseModel, ExternalServiceInsertModel, ExternalServiceModel
-from services.users import is_user_admin, get_user_from_token
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/maintenance/externalservice",
     tags=["Maintenance", "Service"]
     )
@@ -46,7 +46,7 @@ def insert_external_service(service :ExternalServiceInsertModel, maintenance_eve
     return service.tag
 
 @router.delete("/{tag}")
-def delete_external_service(tag: str) -> bool:
+def delete_external_service(tag: str, user: UserModel = Depends(is_user_at_least_curator)) -> bool:
     """Deletes an external maintenance service"""
 
     if not DB.external_service.exists(tag):

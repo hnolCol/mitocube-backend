@@ -15,7 +15,7 @@ from config.models.parameter import APIParamString
 import numpy as np
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/annotations",
     tags=["Annotations"],
 )

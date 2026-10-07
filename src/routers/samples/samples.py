@@ -8,7 +8,7 @@ from typing import List, Dict, Optional
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/samples",
     tags=["Samples", "Condition Applications"],
     )

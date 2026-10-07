@@ -21,7 +21,7 @@ from services.statistics.clustering import cluster_to_dataframe
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions/analysis",
     tags=["Submission","Analysis","Heatmap"],
 )

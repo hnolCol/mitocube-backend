@@ -7,7 +7,7 @@ from config.models.user import UserModel
 from config.models.phenotype import PhenotypeModel, PhenotypeInputModel
 
 DB = Database.DB()
-router = APIRouter(prefix="/api/phenotypes", tags=["Phenotypes"])
+router = APIRouter(dependencies=[Depends(get_user_from_token)],prefix="/api/phenotypes", tags=["Phenotypes"])
 not_found = HTTPException(status_code=404, detail="Phenotype not found.")
 
 @router.get("")
