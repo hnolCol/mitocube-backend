@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List
 from config.models.user import UserModel
 from config.models.performance import QCStandardInsertModel, QCStandardResponseModel, QCStandardType
 from services.users import is_user_at_least_curator, get_user_from_token
-from lib.database.Database import Database
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/standards",
@@ -21,7 +21,7 @@ def get_standard_types(user : UserModel = Depends(get_user_from_token)) -> List[
 
 
 @router.get("", summary="Returns the QC standards. Requires at least curator rights.")
-def get_standards(type : str = None, vendor : str = None, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCStandardResponseModel]:
+def get_standards(type : str = None, vendor : str = None, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[QCStandardResponseModel]:
     """
     Returns the QC standards, optionally filtered by type and vendor.
 
@@ -39,11 +39,11 @@ def get_standards(type : str = None, vendor : str = None, user : UserModel = Dep
     """
     if type is not None and type not in [t.value for t in QCStandardType]:
         raise HTTPException(status_code=400, detail=f"Unknown standard type {type}. Must be one of {[t.value for t in QCStandardType]}.")
-    return DB.qc.get_standards(type = type, vendor = vendor)
+    return db.qc.get_standards(type = type, vendor = vendor)
 
 
 @router.get("/{standard_tag}", summary="Returns a QC standard by its tag. Requires at least curator rights.")
-def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> QCStandardResponseModel:
+def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> QCStandardResponseModel:
     """
     Returns a QC standard by its tag.
 
@@ -62,13 +62,13 @@ def get_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least
     HTTPException
         If the standard does not exist.
     """
-    standards = [s for s in DB.qc.get_standards() if s.tag == standard_tag]
+    standards = [s for s in db.qc.get_standards() if s.tag == standard_tag]
     if not standards: raise HTTPException(status_code=404, detail=f"QC standard with tag {standard_tag} not found.")
     return standards[0]
 
 
 @router.post("/insert", summary="Inserts a QC standard. Requires at least curator rights.")
-def insert_standard(standard : QCStandardInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def insert_standard(standard : QCStandardInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Inserts a QC standard into the database. Standards are immutable, an existing tag is merged.
 
@@ -84,11 +84,11 @@ def insert_standard(standard : QCStandardInsertModel, user : UserModel = Depends
     bool
         True if the standard was inserted.
     """
-    return DB.qc.insert_standard(standard = standard)
+    return db.qc.insert_standard(standard = standard)
 
 
 @router.delete("/{standard_tag}", summary="Deletes a QC standard. Requires at least curator rights.")
-def delete_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def delete_standard(standard_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Deletes a QC standard. A standard can only be deleted if no QC run is linked to it.
 
@@ -109,6 +109,6 @@ def delete_standard(standard_tag : str, user : UserModel = Depends(is_user_at_le
     HTTPException
         If the standard does not exist (404) or is still linked to QC runs (409).
     """
-    if not DB.qc.standard_exists(tag = standard_tag): raise HTTPException(status_code=404, detail=f"QC standard with tag {standard_tag} not found.")
-    if not DB.qc.delete_standard(tag = standard_tag): raise HTTPException(status_code=409, detail=f"QC standard with tag {standard_tag} is still linked to QC runs and cannot be deleted.")
+    if not db.qc.standard_exists(tag = standard_tag): raise HTTPException(status_code=404, detail=f"QC standard with tag {standard_tag} not found.")
+    if not db.qc.delete_standard(tag = standard_tag): raise HTTPException(status_code=409, detail=f"QC standard with tag {standard_tag} is still linked to QC runs and cannot be deleted.")
     return True

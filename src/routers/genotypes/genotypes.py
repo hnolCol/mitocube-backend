@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from collections import OrderedDict
 from typing import Optional, List, Dict
 from config.enums.users.roles import UserRolesEnum
@@ -9,8 +11,6 @@ from config.models.conditions_applications import ConditionApplicationTreeModel
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 
 from services.random_generators import get_random_string
-from lib.database.Database import Database
-DB = Database.DB()
 
 
     
@@ -42,68 +42,68 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 )
 
 @router.get("/{genotype_tag}/proteome")
-def get_genotype_proteome(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> Optional[str]:
+def get_genotype_proteome(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Optional[str]:
     """ 
     Get the proteome of a genotype by its tag. 
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    proteome_tag = DB.genotypes.get_proteome(tag = genotype_tag)
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    proteome_tag = db.genotypes.get_proteome(tag = genotype_tag)
 
     return proteome_tag 
 
 @router.get("/{genotype_tag}/exists")
-def check_genotype_exists(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> bool:
+def check_genotype_exists(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """ 
     Check if a genotype exists by its tag. 
     """
 
-    exists = DB.genotypes.exists(tag = genotype_tag)
+    exists = db.genotypes.exists(tag = genotype_tag)
 
     return exists
 
 
 @router.get("/{genotype_tag}/proteins")
-def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_genotype_proteins(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """ 
     Get the proteins of a genotype by its tag. 
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    protein_tags = DB.genotypes.get_proteins(tag = genotype_tag)
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    protein_tags = db.genotypes.get_proteins(tag = genotype_tag)
 
     return protein_tags
 
 @router.get("/{genotype_tag}/item")
-def get_genotype_item(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+def get_genotype_item(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """ 
     Get the item of a genotype by its tag. 
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    genotype = DB.genotypes.get_item(tag = genotype_tag)
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype = db.genotypes.get_item(tag = genotype_tag)
 
     return genotype
 
 @router.get("/{genotype_tag}/description")
-def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> str:
+def get_genotype_description(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
     """ 
     Get the description of a genotype by its tag. 
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    genotype_description = DB.genotypes.get_description(tag = genotype_tag)
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype_description = db.genotypes.get_description(tag = genotype_tag)
 
     return genotype_description
 
 @router.get("/{genotype_tag}/text") 
-def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> str:
+def get_genotype_text(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
     """ 
     Get the full text information of a genotype by its tag. 
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    genotype_text = DB.genotypes.get_text(tag = genotype_tag)
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    genotype_text = db.genotypes.get_text(tag = genotype_tag)
 
     return genotype_text
 
@@ -112,7 +112,7 @@ def get_genotype_by_query(search_string : str = None,
                           user_tag : str = None, 
                           limit : int = None, 
                           used_in_submission : bool = False,   
-                          user : UserModel = Depends(get_user_from_token)) -> List[str]:
+                          user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Finds genotype tags that match the search string.
     Parameters
@@ -126,7 +126,7 @@ def get_genotype_by_query(search_string : str = None,
     used_in_submission : bool, optional
         If True, only genotypes that are actually attached to a submission (via a Sample) are returned., by default False
     """
-    return DB.genotypes.find(search_string=search_string, user_tag=user_tag, limit=limit, used_in_submission=used_in_submission)
+    return db.genotypes.find(search_string=search_string, user_tag=user_tag, limit=limit, used_in_submission=used_in_submission)
 
 @router.get("/{genotype_tag}")
 def get_genotype_by_label(genotype_tag : str):
@@ -140,7 +140,7 @@ def get_genotype_by_label(genotype_tag : str):
     
 
 @router.get("", response_model=List[MinimalGenotypeModel])
-def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[str] = None, user : UserModel = Depends(get_user_from_token)):
+def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[str] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the genotypes defined using the params: ``proteome_id`` or ``feature_key``. 
     If feature_key is provided, the proteome_id is ingored. If ``proteome_id`` is given, then
     all genotypes that are defined for a given proteome_id is provided. 
@@ -152,7 +152,7 @@ def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[s
     feature_key : Optional[str], optional
         The feature key can be used to access genotypes that affect a certain feature_key, by default Optional[str]=None
     """
-    r = DB.genotypes.get(
+    r = db.genotypes.get(
         proteome_tags=APIParamString(param = proteome_tags).param, 
         protein_tags=APIParamString(param = feature_tag).param
         )
@@ -169,20 +169,20 @@ def get_genotypes(proteome_tags : Optional[str] = None, feature_tag : Optional[s
 #         The defined genotype.
 #     """
     
-#     ok = DB.genotypes.insert(genotype, user_tag = user.tag)
+#     ok = db.genotypes.insert(genotype, user_tag = user.tag)
 #     if not ok:
 #         raise HTTPException(status_code=400, detail="Genotype already exists in the database or another error occurred.")
 
 #     return True 
 @router.post("")
-def insert_genotype(genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token)):
+def insert_genotype(genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     from services.encryption import create_hierarchical_hash
     tag = create_hierarchical_hash([d.model_dump() for d in genotype.components])
-    DB.genotypes.insert(genotype, user_tag=user.tag)
+    db.genotypes.insert(genotype, user_tag=user.tag)
     return tag
 
 @router.put("/{tag}")
-def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token)):
+def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """
     Parameters
     ----------
@@ -191,7 +191,7 @@ def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserM
     genotype : InsertGeneticApplicationModel
         The updated genotype data.
     """
-    edit = DB.genotypes.edit(tag = tag, data = genotype, user_tag = user.tag)
+    edit = db.genotypes.edit(tag = tag, data = genotype, user_tag = user.tag)
 
     if not edit:
         raise HTTPException(status_code=400, detail="Failed to update genotype.")
@@ -199,67 +199,67 @@ def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserM
     return edit
 
 @router.get("/{genotype_tag}/samples/count")
-def get_genotype_relationship_count(genotype_tag: str,user: UserModel = Depends(get_user_from_token)):
+def get_genotype_relationship_count(genotype_tag: str,user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """
     Count how many relationships (e.g., samples) are linked to the given genotype.
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    count = DB.samples.count(genotype_tag=genotype_tag)
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    count = db.samples.count(genotype_tag=genotype_tag)
 
     return count
 
 
 @router.get("/{genotype_tag}/condition_applications/data")
-def get_ca_tree_for_genotype(genotype_tag : str, user : UserModel = Depends(get_user_from_token)) -> List:
+def get_ca_tree_for_genotype(genotype_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List:
     """
     Get the condition application tree data for a given genotype.
     """
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    ca_tags = DB.genotypes.get_condition_applications(tag = genotype_tag)
-    print([transform_for_ui(DB.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags])
-    return [transform_for_ui(DB.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags]
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    ca_tags = db.genotypes.get_condition_applications(tag = genotype_tag)
+    print([transform_for_ui(db.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags])
+    return [transform_for_ui(db.condition_applications.get_tree(tag=ca_tag)[0], ca_id=get_random_string(4)) for ca_tag in ca_tags]
 
 @router.delete("/{genotype_tag}", response_model=bool)
-def delete_genotype(genotype_tag: str,  user : UserModel = Depends(is_user_admin)) -> bool:
+def delete_genotype(genotype_tag: str,  user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Delete a genotype by its tag.
     """
-    # deleted = DB.genotypes.delete(genotype_tag)
+    # deleted = db.genotypes.delete(genotype_tag)
 
     # if not deleted:
     #     raise genotype_not_found
     
     # return {f"Genotype '{genotype_tag}' deleted."}
 
-    if not DB.genotypes.exists(tag=genotype_tag):
+    if not db.genotypes.exists(tag=genotype_tag):
         raise HTTPException(status_code=404, detail="Genotype not found.")
     
     print(f"Deleting genotype with tag: {genotype_tag}")
-    ok = DB.genotypes.delete(tag = genotype_tag)
+    ok = db.genotypes.delete(tag = genotype_tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Could not delete genotype from the database.")
     return ok
 
 @router.get("/{genotype_tag}/condition_applications")
-def genotype_condition_applications(genotype_tag: str, user: UserModel = Depends(get_user_from_token)):
+def genotype_condition_applications(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
 
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
 
-    ca = DB.genotypes.get_condition_applications(tag=genotype_tag)
+    ca = db.genotypes.get_condition_applications(tag=genotype_tag)
     return ca
 
 @router.get("/{tag}/condition_applications/data")
-def genotype_condition_applications_data(tag: str, user: UserModel = Depends(get_user_from_token)):
+def genotype_condition_applications_data(tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
 
-    if not DB.genotypes.exists(tag=tag): raise genotype_not_found
+    if not db.genotypes.exists(tag=tag): raise genotype_not_found
 
-    data = DB.genotypes.get_condition_application_data(tag=tag)
+    data = db.genotypes.get_condition_application_data(tag=tag)
     return data
 
 
 @router.get("/{genotype_tag}/creator")
-def get_genotype_creator(genotype_tag: str, user: UserModel = Depends(get_user_from_token)) -> str | None:
-    if not DB.genotypes.exists(tag=genotype_tag): raise genotype_not_found
-    return DB.genotypes.get_creator(tag=genotype_tag)
+def get_genotype_creator(genotype_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str | None:
+    if not db.genotypes.exists(tag=genotype_tag): raise genotype_not_found
+    return db.genotypes.get_creator(tag=genotype_tag)

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
 
 # 
-from lib.database.Database import Database
 import pandas as pd 
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
@@ -12,7 +13,6 @@ from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -23,14 +23,14 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/proteins/{feature_tag}/views ")
-def get_protein_views(feature_tag: str, user: UserModel = Depends(get_user_from_token)) -> int:
+def get_protein_views(feature_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     """
     Returns the number of views for a given protein feature tag.
     """
-    if DB.features.exists(tag=feature_tag) is False:
+    if db.features.exists(tag=feature_tag) is False:
         raise HTTPException(status_code=404, detail="Protein not found")
 
-    views = DB.features.get_protein_views(tag=feature_tag)
+    views = db.features.get_protein_views(tag=feature_tag)
 
     return views
 

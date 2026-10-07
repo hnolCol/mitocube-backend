@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List
 from config.models.user import UserModel
 from services.users import is_user_at_least_curator, get_user_from_token
-from lib.database.Database import Database
 from config.models.precursors import PrecursorInsertModel
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/features/precursors",
@@ -14,7 +14,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.post("/insert", summary="Inserts a precursor into the database. Requires curator rights.")
-def insert_precursor(precursor : PrecursorInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def insert_precursor(precursor : PrecursorInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Inserts a precursor into the database. The precursor tag is derived from the
     peptide sequence and the charge state (sequence.charge). The precursor is connected
@@ -38,13 +38,13 @@ def insert_precursor(precursor : PrecursorInsertModel, user : UserModel = Depend
         If one of the protein groups with the given tags does not exist.
     """
     for protein_group_tag in precursor.protein_group_tags:
-        if not DB.protein_groups.exists(tag = protein_group_tag):
+        if not db.protein_groups.exists(tag = protein_group_tag):
             raise HTTPException(status_code=404, detail=f"Protein group with tag {protein_group_tag} not found.")
-    return DB.precursors.insert(protein_group_tags = precursor.protein_group_tags, peptide_sequence = precursor.sequence, charge = precursor.charge, mz = precursor.mz, im = precursor.im)
+    return db.precursors.insert(protein_group_tags = precursor.protein_group_tags, peptide_sequence = precursor.sequence, charge = precursor.charge, mz = precursor.mz, im = precursor.im)
 
 
 @router.post("/insert/bulk", summary="Bulk inserts a list of precursors into the database. Requires curator rights.")
-def bulk_insert_precursors(precursors : List[PrecursorInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400, user : UserModel = Depends(is_user_at_least_curator)) -> int:
+def bulk_insert_precursors(precursors : List[PrecursorInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> int:
     """
     Bulk inserts a list of precursors into the database. The precursor tags are derived from the
     peptide sequence and the charge state (sequence.charge). The precursors are connected
@@ -82,4 +82,4 @@ def bulk_insert_precursors(precursors : List[PrecursorInsertModel], batch_size :
         raise HTTPException(status_code=400, detail="batch_size must be at least 1.")
     if transaction_batch_size < 1:
         raise HTTPException(status_code=400, detail="transaction_batch_size must be at least 1.")
-    return DB.precursors.bulk_insert(precursors = precursors, batch_size = batch_size, transaction_batch_size = transaction_batch_size)
+    return db.precursors.bulk_insert(precursors = precursors, batch_size = batch_size, transaction_batch_size = transaction_batch_size)

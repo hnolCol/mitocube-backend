@@ -39,13 +39,13 @@ def get_instrument_permissions(user : UserModel = Depends(get_user_from_token), 
     return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.CURATOR, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, edit= user.role >= UserRolesEnum.CURATOR) 
 
 @router.get("/overview")
-def get_instruments_overview(user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+def get_instruments_overview(user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[dict]:
     "Per-instrument current state and sample count, via the runlist path."
-    return DB.instruments.get_overview()
+    return db.instruments.get_overview()
 
 @router.get("/states/all")
-def get_all_instrument_states(user: UserModel = Depends(get_user_from_token)) -> List[InstrumentStateModel]:
-    return DB.instrument_states.get_all()
+def get_all_instrument_states(user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentStateModel]:
+    return db.instrument_states.get_all()
 
 
 @router.get("/states/q")
@@ -123,8 +123,9 @@ def get_instrument_quantification_summary(
     timestamp_min: float = None,
     timestamp_max: float = None,
     user: UserModel = Depends(get_user_from_token),
+    db : DatabaseABC = Depends(get_db),
 ) -> List[dict]:
-    return DB.instruments.get_quantification_summary_by_month(
+    return db.instruments.get_quantification_summary_by_month(
         instrument_tag=instrument_tag, timestamp_min=timestamp_min, timestamp_max=timestamp_max
     )
 
@@ -135,7 +136,7 @@ def get_instrument_state_duration_summary(
     timestamp_max: float = None,
     user: UserModel = Depends(get_user_from_token),
 ) -> List[dict]:
-    return DB.instrument_states.get_state_duration_summary(
+    return db.instrument_states.get_state_duration_summary(
         instrument_tag=instrument_tag, timestamp_min=timestamp_min, timestamp_max=timestamp_max
     )
 
@@ -191,8 +192,9 @@ def get_instrument_past_submissions(
     offset: int = 0,
     limit: int = 20,
     user: UserModel = Depends(get_user_from_token),
+    db : DatabaseABC = Depends(get_db),
 ) -> dict:
-    return DB.instruments.get_past_submissions_paginated(instrument_tag=instrument_tag, offset=offset, limit=limit)
+    return db.instruments.get_past_submissions_paginated(instrument_tag=instrument_tag, offset=offset, limit=limit)
 
 
 @router.get("/{instrument_tag}/quantification/unique-count")
@@ -200,5 +202,6 @@ def get_instrument_unique_protein_group_count(
     instrument_tag: str,
     year: int,
     user: UserModel = Depends(get_user_from_token),
+    db : DatabaseABC = Depends(get_db),
 ) -> int:
-    return DB.instruments.get_unique_protein_group_count_by_year(instrument_tag=instrument_tag, year=year)
+    return db.instruments.get_unique_protein_group_count_by_year(instrument_tag=instrument_tag, year=year)

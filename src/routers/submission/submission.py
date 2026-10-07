@@ -1,5 +1,7 @@
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Annotated, Literal, Dict, Optional
 from collections import OrderedDict
 from neo4j.exceptions import ConstraintError
@@ -9,7 +11,6 @@ import pandas as pd
 from lib.data.runs.runs import RunListCreator
 
 
-from lib.database.Database import Database
 
 from config.settings.general import get_general_settings
 from config.settings.db import get_db_settings
@@ -39,7 +40,6 @@ from services.users import get_user_from_token, is_user_at_least_curator, is_use
 
 from services.mail import send_email_in_background
 
-DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
@@ -55,12 +55,12 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.get("/submissions/tag",
     summary = "Returns a unique tag for a new submission.",
     response_model = SubmissionIDResponse)
-def get_submission_tag(user : UserModel = Depends(get_user_from_token)):
+def get_submission_tag(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """
     A unique id that cannot be changed for a project/data/submission.
     TODO Check if its really unique ;) dummy func. 
     """
-    tag = DB.submissions.get_unique_tag()
+    tag = db.submissions.get_unique_tag()
     return SubmissionIDResponse(tag = tag)   
 
 
@@ -83,7 +83,7 @@ def get_submission_by_query(state : str|int = None,
                             group_by_user : bool = False,
                             group_by_date : bool = False,
                             user : UserModel = Depends(get_user_from_token)
-                            ) -> List[str]| Dict[str|int, List[str]]: 
+, db : DatabaseABC = Depends(get_db)) -> List[str]| Dict[str|int, List[str]]: 
     """Returns the submissions that match a given filter. 
 
     Parameters
@@ -129,8 +129,8 @@ def get_submission_by_query(state : str|int = None,
         ordered = False 
         limit = None 
         
-    N = DB.submissions.count()
-    tags = DB.submission_filter.find(
+    N = db.submissions.count()
+    tags = db.submission_filter.find(
             current_user_tag=user.tag,
             search_string = search_string,
             state = APIParamInt(param = state).param, 
@@ -151,17 +151,17 @@ def get_submission_by_query(state : str|int = None,
     
     if sort_by_views:
         #sort by views
-        tags = DB.submission_filter.sort_by_views(tags = tags)
+        tags = db.submission_filter.sort_by_views(tags = tags)
 
     if group_by_state:
         #group by state
-        tags = DB.submission_filter.group_by_state(tags = tags)
+        tags = db.submission_filter.group_by_state(tags = tags)
     elif group_by_user:
         #group by user
-        tags = DB.submission_filter.group_by_user(tags = tags)
+        tags = db.submission_filter.group_by_user(tags = tags)
     elif group_by_date:
         #group by date
-        tags = DB.submission_filter.group_by_date(tags = tags)
+        tags = db.submission_filter.group_by_date(tags = tags)
     return tags 
 
 
@@ -185,7 +185,7 @@ def get_submission_by_query(state : str|int = None,
 
 
 @router.get("/submissions/trending", summary="Returns the trending submissions based on the view score.", response_model=List[str])
-def get_trending_submissions(limit : int, user = Depends(get_user_from_token)): 
+def get_trending_submissions(limit : int, user = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)): 
     """Returns the trending submissions based on the view score.
 
     Parameters
@@ -201,60 +201,60 @@ def get_trending_submissions(limit : int, user = Depends(get_user_from_token)):
         A list of submission tags ordered by their view score in descending order.
     """
     
-    return DB.submission_filter.get_trending(limit = limit)
+    return db.submission_filter.get_trending(limit = limit)
 
 
 @router.get("/submissions/{submission_tag}/exists")
-def check_submission_exists(submission_tag: str) -> bool:
+def check_submission_exists(submission_tag: str, db : DatabaseABC = Depends(get_db)) -> bool:
     "Checks if a submission exists by its tag."
-    return DB.submissions.exists(tag=submission_tag)    
+    return db.submissions.exists(tag=submission_tag)    
 
 @router.get("/submissions/{submission_tag}/genotypes/exists")
-def check_submission_genotypes_exists(submission_tag: str) -> bool:
+def check_submission_genotypes_exists(submission_tag: str, db : DatabaseABC = Depends(get_db)) -> bool:
     "Checks if genotypes are associated with a submission by its tag."
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
-    return DB.submissions.has_genotypes(tag=submission_tag)
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
+    return db.submissions.has_genotypes(tag=submission_tag)
 
 
 @router.get("/submissions/{submission_tag}/title")
-def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
     "Returns the submission title by its tag."
-    if not DB.submissions.exists(tag = submission_tag):
+    if not db.submissions.exists(tag = submission_tag):
         return tag_not_found
-    return DB.submissions.get_title(tag = submission_tag)
+    return db.submissions.get_title(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/attributes")
-def get_submission_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_submission_attributes(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the submission attributes by its tag."
-    if not DB.submissions.exists(tag = submission_tag):
+    if not db.submissions.exists(tag = submission_tag):
         return tag_not_found
-    return DB.submissions.get_attributes(tag = submission_tag)
+    return db.submissions.get_attributes(tag = submission_tag)
 
 @router.patch("/submissions/{submission_tag}/title")
-def update_submission_title(submission_tag : str, title : str, user : UserModel = Depends(is_creator_of_submission_or_curator)) -> bool:
+def update_submission_title(submission_tag : str, title : str, user : UserModel = Depends(is_creator_of_submission_or_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Updates the submission title by its tag."
-    if not DB.submissions.exists(tag = submission_tag):
+    if not db.submissions.exists(tag = submission_tag):
         return tag_not_found
-    return DB.submissions.set_title(tag = submission_tag, title = title)
+    return db.submissions.set_title(tag = submission_tag, title = title)
 
 @router.get("/submissions/{submission_tag}/createdat")
-def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> float:
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> float:
     "Returns the submission created at by its tag."
-    if not DB.submissions.exists(tag = submission_tag):
+    if not db.submissions.exists(tag = submission_tag):
         return tag_not_found
-    return DB.submissions.get_created_at(tag = submission_tag)
+    return db.submissions.get_created_at(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/metatext")
-def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the metatext tags associated with the given submission"
-    return DB.metatexts.find(submission_tag = submission_tag)
+    return db.metatexts.find(submission_tag = submission_tag)
 
 
 @router.get("/submissions/{submission_tag}/metatext/{metatext_tag}")
-def get_metatext_by_tag(submission_tag : str, metatext_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_metatext_by_tag(submission_tag : str, metatext_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     ""
     print(submission_tag,metatext_tag)
-    meta_text = DB.meta.get_metatext(tags = APIParamString(param=submission_tag).param, metatext_tag = metatext_tag)
+    meta_text = db.meta.get_metatext(tags = APIParamString(param=submission_tag).param, metatext_tag = metatext_tag)
     if len(meta_text) == 0: raise HTTPException(status_code=404, detail="No meta text found.")
     return meta_text.to_dict(orient="records")[0]
 
@@ -268,19 +268,19 @@ def get_meta_text(user : UserModel = Depends(get_user_from_token)):
 
 
 @router.get("/submissions/states", summary="Returns the states enum as well as colors associated with the state.")
-def get_states(user : UserModel = Depends(get_user_from_token)):
+def get_states(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """"""
-    return DB.submissions.get_states()
+    return db.submissions.get_states()
 
 @router.get("/submissions/{submission_tag}/state/history")
-def get_submission_state_history(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[Dict]:
+def get_submission_state_history(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     """Returns the complete state change history for a submission."""
-    if not DB.submissions.exists(tag=submission_tag):
+    if not db.submissions.exists(tag=submission_tag):
         raise tag_not_found
-    return DB.submissions.get_state_history(tag=submission_tag)
+    return db.submissions.get_state_history(tag=submission_tag)
 
 @router.get("/submissions/{submission_tag}/users")
-def get_users_associated_with_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_users_associated_with_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """Returns all users that are associated with a submission. 
 
     Parameters
@@ -302,12 +302,12 @@ def get_users_associated_with_submission(submission_tag : str, user : UserModel 
     tag_not_found
         
     """
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    return DB.submissions.get_users(tag=submission_tag)
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found
+    return db.submissions.get_users(tag=submission_tag)
 
 
 @router.post("/submissions/{submission_tag}/collaborators")
-def add_collaborators(submission_tag: str, collaborators: str, replace: bool = True, user: UserModel = Depends(is_creator_of_submission_or_curator)):
+def add_collaborators(submission_tag: str, collaborators: str, replace: bool = True, user: UserModel = Depends(is_creator_of_submission_or_curator), db : DatabaseABC = Depends(get_db)):
     """Adds or replaces the collaborators for a submission.
 
     Parameters
@@ -326,7 +326,7 @@ def add_collaborators(submission_tag: str, collaborators: str, replace: bool = T
     _type_
         _description_
     """
-    if not DB.submission_exists(tag=submission_tag): raise tag_not_found
+    if not db.submission_exists(tag=submission_tag): raise tag_not_found
 
     collaborator_tags = APIParamString(param=collaborators).param or []
 
@@ -334,16 +334,16 @@ def add_collaborators(submission_tag: str, collaborators: str, replace: bool = T
         raise HTTPException(status_code=400, detail="No collaborator tags provided to add.")
 
     for user_tag in collaborator_tags:
-        if not DB.users.exists(tag=user_tag):
+        if not db.users.exists(tag=user_tag):
             raise user_not_found
 
-    ok = DB.submissions.set_collaborators(tag=submission_tag, collaborator_tags=collaborator_tags, replace=replace)
+    ok = db.submissions.set_collaborators(tag=submission_tag, collaborator_tags=collaborator_tags, replace=replace)
     if not ok:
         raise HTTPException(status_code=500, detail="There was an error when updating the collaborators.")
     return True
 
 @router.get("/submissions/{submission_tag}/owner")
-def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str | None:
+def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str | None:
     """_summary_
 
     Parameters
@@ -366,18 +366,18 @@ def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_us
         If the user is not found in the database.
     """
     
-    # if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
-    # user = DB.meta.get_owner(dataset_tag=submission_tag)
+    # if not db.submission_exists(tag = submission_tag): raise tag_not_found 
+    # user = db.meta.get_owner(dataset_tag=submission_tag)
     # return user 
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
-    return DB.submissions.get_creator(tag = submission_tag)
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found 
+    return db.submissions.get_creator(tag = submission_tag)
     
 
 @router.post("/submissions/{submission_tag}/owner")
 def change_submission_owner(submission_tag : str, 
                             user_tag : str, 
                             add_prev_user_to_collaborators : bool = False, 
-                            user : UserModel = Depends(is_user_admin)):
+                            user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)):
     """_summary_
 
     Parameters
@@ -410,23 +410,23 @@ def change_submission_owner(submission_tag : str,
         If the user that is supposed to be the new owner is blocked (not allowed for login)
     """
     
-    # if not DB.users.exists(tag = user_tag): raise user_not_found 
-    # if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    # ok = DB.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
+    # if not db.users.exists(tag = user_tag): raise user_not_found 
+    # if not db.submission_exists(tag = submission_tag): raise tag_not_found
+    # ok = db.meta.update_owner(dataset_tag = submission_tag, user_tag = user_tag)
     # if not ok:
     #     raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
     # return True
 
 
-    if not DB.users.exists(tag = user_tag): raise user_not_found 
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    ok = DB.submissions.update_owner(tag=submission_tag, user_tag=user_tag, add_prev_user_to_collaborators=add_prev_user_to_collaborators)
+    if not db.users.exists(tag = user_tag): raise user_not_found 
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found
+    ok = db.submissions.update_owner(tag=submission_tag, user_tag=user_tag, add_prev_user_to_collaborators=add_prev_user_to_collaborators)
     if not ok:
         raise HTTPException(status_code=500,detail="There was an error when updating the owner.")
     return True
 
 @router.get("/submissions/{submission_tag}/state", response_model=SubmissionStatesEnums)
-def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the state of a submission. 
 
     Parameters
@@ -445,11 +445,11 @@ def get_submission_owner(submission_tag : str, user : UserModel = Depends(get_us
        The submission_tag was not found.
     """
     
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found 
-    return DB.submissions.get_state(tag = submission_tag)
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found 
+    return db.submissions.get_state(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/view_score", response_model=float)
-def get_submission_view_score(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_submission_view_score(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the view score of a submission.
 
     Parameters
@@ -467,11 +467,11 @@ def get_submission_view_score(submission_tag : str, user : UserModel = Depends(g
     tag_not_found
        The submission_tag was not found.
     """
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    return DB.submissions.get_view_score(tag = submission_tag)
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found
+    return db.submissions.get_view_score(tag = submission_tag)
 
 @router.get("/submissions/{submission_tag}/views")
-def get_submission_views(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_submission_views(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the view count of a submission.
 
     Parameters
@@ -489,12 +489,12 @@ def get_submission_views(submission_tag : str, user : UserModel = Depends(get_us
     tag_not_found
        The submission_tag was not found.
     """
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    return DB.submissions.get_views(tag = submission_tag)
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found
+    return db.submissions.get_views(tag = submission_tag)
 
 
 @router.post("/submissions/{submission_tag}/views")
-def insert_submission_view(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+def insert_submission_view(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Inserts a view for a submission.
 
     Parameters
@@ -512,12 +512,12 @@ def insert_submission_view(submission_tag : str, user : UserModel = Depends(get_
     tag_not_found
        The submission_tag was not found.
     """
-    if not DB.submission_exists(tag = submission_tag): raise tag_not_found
-    DB.submissions.insert_view(tag = submission_tag, user_tag = user.tag)
+    if not db.submission_exists(tag = submission_tag): raise tag_not_found
+    db.submissions.insert_view(tag = submission_tag, user_tag = user.tag)
     return True
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
-def get_submissions_by_user_label(tags : str = None, group : Literal["state","user","attribute","attribute_value","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token)):
+def get_submissions_by_user_label(tags : str = None, group : Literal["state","user","attribute","attribute_value","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the the number submissions by a property. 
 
 
@@ -530,68 +530,68 @@ def get_submissions_by_user_label(tags : str = None, group : Literal["state","us
     ------
     """
     
-    counts = DB.submission_filter.get_counts(by = group, 
+    counts = db.submission_filter.get_counts(by = group, 
                                              tags = APIParamString(param=tags).param)
     return counts.to_dict(orient="index")
    
 
 
 @router.get("/submission/ftquery")
-def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)] = None, user : UserModel = Depends(get_user_from_token)):
+def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Filters submisson by full text searches"
-    matches : List[FulltextSearchResult] = DB.submission_filter.full_dataset_text_search(query)
+    matches : List[FulltextSearchResult] = db.submission_filter.full_dataset_text_search(query)
     print(matches)
 
 
     
 @router.post("/submissions", summary="Add submission to the database")
-def add_submission(background_task : BackgroundTasks , submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token)) -> bool:
+def add_submission(background_task : BackgroundTasks , submission : NewSubmissionModel, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Adds a submission to the database
     """    
-    if DB.submission_exists(tag = submission.tag):
+    if db.submission_exists(tag = submission.tag):
         raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update the submission or use a different tag (/api/submissions/tag).")
-    DB.submissions.insert(tag = submission.tag,
+    db.submissions.insert(tag = submission.tag,
                           title = submission.title,
                           user_tag = user.tag,
                           collaborators = submission.collaborators)
     #set the state to submitted
-    DB.submissions.set_state(tag = submission.tag, state = SubmissionStatesEnums.SUBMITTED, user_tag = user.tag) 
-    DB.submissions.insert_attributes(tag = submission.tag, traits = submission.dataset_attributes) 
+    db.submissions.set_state(tag = submission.tag, state = SubmissionStatesEnums.SUBMITTED, user_tag = user.tag) 
+    db.submissions.insert_attributes(tag = submission.tag, traits = submission.dataset_attributes) 
     #insert samples and sample conditions (attributes/traits)
     for idx,sample_name in enumerate(submission.sample_names):
-            sample_tag = DB.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
+            sample_tag = db.samples.insert(submission_tag = submission.tag, sample_name = sample_name, sample_index = idx)
             sample_attributes = submission.samples_attributes[idx] 
-            DB.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
+            db.samples.insert_condition_application(sample_tag = sample_tag, sample_data = sample_attributes)
             if submission.replicates and idx < len(submission.replicates):
-                DB.samples.set_replicate(tag=sample_tag, replicate=submission.replicates[idx])
+                db.samples.set_replicate(tag=sample_tag, replicate=submission.replicates[idx])
     
             if submission.genotypes and idx < len(submission.genotypes):
                 genotype_tags = submission.genotypes[idx] 
                 if isinstance(genotype_tags, list):
                     for genotype_tag in genotype_tags: 
-                        if DB.genotypes.exists(genotype_tag):  
-                            DB.samples.insert_genotype(
+                        if db.genotypes.exists(genotype_tag):  
+                            db.samples.insert_genotype(
                                 sample_tags=[sample_tag],
                                 genotype_tag=genotype_tag
                             )
     ## add meta text 
-    DB.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
+    db.submissions.insert_research_aim(tag = submission.tag, research_aim = submission.research_aim, user_tag = user.tag)
     for title, text in submission.metatext.items():
         if "research_aim" in title.lower():
             continue
-        DB.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
+        db.metatexts.insert(submission_tag= submission.tag, title = title, text = text, user_tag = user.tag)
     
     try:
     #get features of genotypes ? 
-        DB.news.insert(NewsInsertModel(user_tag=user.tag,
+        db.news.insert(NewsInsertModel(user_tag=user.tag,
                                 title="New Submission!",
                                 content = f"New submission created: {submission.title} by {user.firstname}.", 
                                 submission_tags=[submission.tag])) 
     except Exception as e:
         print("Error when inserting news: ", e)
     
-    ccs = [DB.users.get_user_by_tag(tag = user_tag).email for user_tag in submission.collaborators if DB.users.exists(tag = user_tag)]
+    ccs = [db.users.get_user_by_tag(tag = user_tag).email for user_tag in submission.collaborators if db.users.exists(tag = user_tag)]
     send_email_in_background(background_tasks=background_task,
                         subject=f"Submission Complete : {submission.title} ({submission.tag})",
                         email_to=[user.email],
@@ -609,7 +609,7 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     
     # #save_json(metadata.model_dump(),"MODEL.json")
     # try:
-    #     DB.insert_meta(meta_data=metadata)
+    #     db.insert_meta(meta_data=metadata)
     # except ConstraintError:
     #     #should not happen, since it is controlled before, delete?
     #     raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update a submission.")
@@ -619,12 +619,12 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     # check_collaborators = are_public_users_allowed(user_tags=metadata.collaborators)
     
     if not submission.includes_data:
-        DB.news.insert(NewsModel(user_tag=user.tag,
+        db.news.insert(NewsModel(user_tag=user.tag,
                              title="New Submission!",
                              content = f"New sample submission: {metadata.title} by {user.firstname}.", 
                              submission_tags=[metadata.tag])) 
     else:
-         DB.news.insert(NewsModel(user_tag=user.tag,
+         db.news.insert(NewsModel(user_tag=user.tag,
                              title="New dataset!",
                              content = f"New dataset online: {metadata.title} by {user.firstname}.", 
                              submission_tags=[metadata.tag])) 
@@ -635,9 +635,9 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
     
 @router.get("/submissions/{submission_tag}/datasetattributes",summary="Returns the dataset attributes of a submission.")
 def get_submission_attributes(submission_tag : str,
-                              user : UserModel = Depends(get_user_from_token)) -> DatasetAttributesResponse:
+                              user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> DatasetAttributesResponse:
     
-    dataset_attribute_tags = DB.meta.get_dataset_attributes(tag = submission_tag)
+    dataset_attribute_tags = db.meta.get_dataset_attributes(tag = submission_tag)
 
     return {'tags' : dataset_attribute_tags, 
             'tag' : submission_tag,
@@ -647,7 +647,7 @@ def get_submission_attributes(submission_tag : str,
 def update_submission_state(background_task : BackgroundTasks, 
                           submission_tag : str, 
                           state_tag : SubmissionStatesEnums, 
-                          user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+                          user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Updates the state of a submission. The user must be at least curator to update the state.
     Returns the updated version of the complete submission.
@@ -674,14 +674,14 @@ def update_submission_state(background_task : BackgroundTasks,
         If the submission with the given tag does not exist or if there is an error during the update.
     """
     
-    if not DB.submissions.exists(tag = submission_tag): raise tag_not_found
+    if not db.submissions.exists(tag = submission_tag): raise tag_not_found
   
-    ok = DB.submissions.update_state(tag = submission_tag, new_state = state_tag, user_tag = user.tag)
+    ok = db.submissions.update_state(tag = submission_tag, new_state = state_tag, user_tag = user.tag)
 
     if ok:
-        submission_title = DB.submissions.get_title(tag = submission_tag) # to check if the submission exists and to get the title
-        submission_user_tags = DB.submissions.get_users(tag = submission_tag)
-        submission_users = [DB.users.get_user_by_tag(tag = user_tag) for user_tag in submission_user_tags if DB.users.exists(tag = user_tag)]
+        submission_title = db.submissions.get_title(tag = submission_tag) # to check if the submission exists and to get the title
+        submission_user_tags = db.submissions.get_users(tag = submission_tag)
+        submission_users = [db.users.get_user_by_tag(tag = user_tag) for user_tag in submission_user_tags if db.users.exists(tag = user_tag)]
         
         
         if len(submission_users) == 0:
@@ -711,7 +711,7 @@ def update_submission(background_task : BackgroundTasks,
                       state_change : StateChangeModel,  
                       dataset_attributes : Dict[str,List[str]], # attribute_tag, List[trait_tag] 
                       dataset_attribute_input : Optional[Dict[str,Dict[str,Dict]]] = None,
-                      user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+                      user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Update datas etattribute along with the state if user is at least curator.
     Returns the updated version of the complete submission.
@@ -722,13 +722,13 @@ def update_submission(background_task : BackgroundTasks,
     # dataset_attributes = dict([(attribute_tag, [attribute_value.tag for attribute_value in attribute_values]) 
     #                       for attribute_tag, attribute_values in datasetAttributes.datasetAttributeValues.items() ])  
     try:  
-        if not DB.submissions.exists(tag = submission_tag): return tag_not_found
+        if not db.submissions.exists(tag = submission_tag): return tag_not_found
         
-        ok = DB.submissions.update_state(tag = submission_tag, new_state = state_change.state, user_tag = user.tag)
+        ok = db.submissions.update_state(tag = submission_tag, new_state = state_change.state, user_tag = user.tag)
         if ok:
-            dataset_update_stats = DB.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes, dataset_attribute_input = dataset_attribute_input)       
+            dataset_update_stats = db.meta.update_dataset_attributes(tag = submission_tag, dataset_attributes = dataset_attributes, dataset_attribute_input = dataset_attribute_input)       
         
-            DB.timeline.insert(TimelineInputModel(content=f"Dataset attributes have been updated by {user.firstname}. {dataset_update_stats['number_deleted_traits']} traits were removed. ({', '.join(dataset_update_stats['deleted_trait_tags'])}). {dataset_update_stats['number_added_traits']} traits were added. ({', '.join(dataset_update_stats['added_trait_tags'])}).", 
+            db.timeline.insert(TimelineInputModel(content=f"Dataset attributes have been updated by {user.firstname}. {dataset_update_stats['number_deleted_traits']} traits were removed. ({', '.join(dataset_update_stats['deleted_trait_tags'])}). {dataset_update_stats['number_added_traits']} traits were added. ({', '.join(dataset_update_stats['added_trait_tags'])}).", 
                                             submission_tag=submission_tag, 
                                             submission_state=state_change.state,
                                             user_tag=user.tag))
@@ -738,46 +738,46 @@ def update_submission(background_task : BackgroundTasks,
 
 
 @router.get("/submissions/{submission_tag}/proteomes")
-def get_submission_proteomes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
-    proteomes = DB.submissions.get_proteomes(tag=submission_tag)
+def get_submission_proteomes(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    proteomes = db.submissions.get_proteomes(tag=submission_tag)
     return proteomes
 
 
 
 @router.get("/submissions/{submission_tag}/sampleattributes")
-def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_sample_attributes(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     
-    sample_attrs, sample_map = DB.meta.get_sample_attributes_and_genotypes(tag = submission_tag) #: Dict[str,Dict[str,List[int]]], pd.DatafRmae
+    sample_attrs, sample_map = db.meta.get_sample_attributes_and_genotypes(tag = submission_tag) #: Dict[str,Dict[str,List[int]]], pd.DatafRmae
     
     return {"sample_attributes" : sample_attrs, "sample_map" : sample_map }
 
 
 @router.get("/submissions/{submission_tag}/summary")
-def get_submission_summary_string(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
+def get_submission_summary_string(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
     "Returns a string with dataset and sample attributes"
-    summary_strings = DB.submission_summary.get(submission_tag)
+    summary_strings = db.submission_summary.get(submission_tag)
     
     return "\n".join(summary_strings)
 
 @router.post("/submissions/{submission_tag}/samples")
-def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(get_user_from_token)) -> bool:
+def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     "Adds samples to a submission. The sample names are added to the existing samples. Returns true if the samples were added successfully."
     
-    if not DB.submissions.exists(tag = submission_tag): raise tag_not_found
+    if not db.submissions.exists(tag = submission_tag): raise tag_not_found
     
-    existing_samples = DB.submissions.get_samples(tag=submission_tag)
+    existing_samples = db.submissions.get_samples(tag=submission_tag)
     
     sample_names = [sample_name for sample_name in sample_names if sample_name not in existing_samples]
     
     for idx, sample_name in enumerate(sample_names):
-        DB.samples.insert(submission_tag = submission_tag, sample_name = sample_name, sample_index = len(existing_samples) + idx)
+        db.samples.insert(submission_tag = submission_tag, sample_name = sample_name, sample_index = len(existing_samples) + idx)
     
     return True
 
 @router.post("/submissions/{submission_tag}/samples/{sample_name}/proteins")
-def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags: List[str],user: UserModel = Depends(get_user_from_token)):
+def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags: List[str],user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     
-    DB.samples.insert_proteins(
+    db.samples.insert_proteins(
         submission_tag=submission_tag,
         sample_name=sample_name,
         protein_tags=protein_tags
@@ -786,15 +786,15 @@ def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags
 
 
 @router.get("/submissions/{submission_tag}/samples")
-def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the samples tags associated with the submission"
-    sample_tags = DB.submissions.get_samples(tag=submission_tag)
-    sample = DB.samples.get(tag=sample_tags[0])
+    sample_tags = db.submissions.get_samples(tag=submission_tag)
+    sample = db.samples.get(tag=sample_tags[0])
     return sample_tags
 
 @router.get("/submissions/{submission_tag}/samplelist")
-def get_sample_list_as_tsv(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> str:
-    samples = DB.submissions.get_sample_list(tag=submission_tag)
+def get_sample_list_as_tsv(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
+    samples = db.submissions.get_sample_list(tag=submission_tag)
     samples_string = pd.DataFrame.from_dict(samples).sort_values(by="index")
     return samples_string.to_csv(sep="\t", index = None)
 
@@ -812,23 +812,23 @@ def get_submission(labels : str = None, user : UserModel = Depends(get_user_from
 
 
 @router.get("/submissions/{submission_tag}/samples/full")
-def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(get_user_from_token)):
+def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Returns full sample details including traits and genotypes."
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
     
-    sample_tags = DB.submissions.get_samples(tag=submission_tag)
+    sample_tags = db.submissions.get_samples(tag=submission_tag)
     result = []
     
     for sample_tag in sample_tags:
-        sample = DB.samples.get(tag=sample_tag)
-        genotype = DB.samples.get_sample_genotype(tag=sample_tag)
-        condition_apps = DB.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)
+        sample = db.samples.get(tag=sample_tag)
+        genotype = db.samples.get_sample_genotype(tag=sample_tag)
+        condition_apps = db.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)
         
         attributes = {}
         for ca in condition_apps:
             trees = []
             for ca_tag in ca.condition_application_tags:
-                tree = DB.condition_applications.get_tree(tag=ca_tag)
+                tree = db.condition_applications.get_tree(tag=ca_tag)
                 trees.extend([node.model_dump() for node in tree])
             attributes[ca.attribute_tag] = trees
         result.append({
@@ -837,17 +837,17 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
             "excluded": sample.get("excluded", False) if sample else False,
             "genotype": genotype,
             "attributes": attributes,
-            "replicate": DB.samples.get_replicate(tag=sample_tag),
+            "replicate": db.samples.get_replicate(tag=sample_tag),
         })
 
     return result
 
 
 @router.get("/submissions/{submission_tag}/protocols")
-def get_submission_protocols(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+def get_submission_protocols(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
     
-    protocol_tags = DB.protocols.find(submission_tags = [submission_tag])
+    protocol_tags = db.protocols.find(submission_tags = [submission_tag])
     return protocol_tags
 
 
@@ -856,10 +856,10 @@ def create_submission_runlist(
     submission_tag: str,
     runlist_props: RunListRequestPropsModel,
     user: UserModel = Depends(is_creator_of_submission_or_curator)
-):
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+, db : DatabaseABC = Depends(get_db)):
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
 
-    samples_df = DB.samples.get_sample_list(submission_tag=submission_tag)
+    samples_df = db.samples.get_sample_list(submission_tag=submission_tag)
 
     if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in samples_df.columns:
         raise HTTPException(status_code=400, detail="aggregate_on attribute tag not found.")
@@ -876,8 +876,8 @@ def create_submission_runlist(
 
     runlist.instrument_tag = runlist_props.instrument_tag
     if runlist.instrument_tag:
-        runlist.instrument_text = DB.attributes.get_trait_text(tag=runlist.instrument_tag)
-    rl_tag = DB.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
+        runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
+    rl_tag = db.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
     runlist.tag = rl_tag  
 
     return RunListResponseModel(
@@ -889,15 +889,15 @@ def create_submission_runlist(
 
 
 @router.get("/submissions/{submission_tag}/runlists", response_model=List[RunListResponseModel], tags=["Runlist"]) 
-def get_submission_runlists(submission_tag: str, user: UserModel = Depends(get_user_from_token)):
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+def get_submission_runlists(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
 
-    runlists = DB.submissions.list_runlists(submission_tag=submission_tag)
+    runlists = db.submissions.list_runlists(submission_tag=submission_tag)
     responses = []
     for runlist in runlists:
-        ru = DB.users.get_user_by_tag(tag=runlist.user_tag)
+        ru = db.users.get_user_by_tag(tag=runlist.user_tag)
         if runlist.instrument_tag:
-            runlist.instrument_text = DB.attributes.get_trait_text(tag=runlist.instrument_tag)
+            runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
         responses.append(RunListResponseModel(
             **runlist.model_dump(),
             user_email=ru.email if ru else "",
@@ -908,16 +908,16 @@ def get_submission_runlists(submission_tag: str, user: UserModel = Depends(get_u
 
 
 @router.get("/submissions/{submission_tag}/runlist/{rl_tag}", response_model=RunListResponseModel, tags=["Runlist"]) 
-def get_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = Depends(get_user_from_token)):
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+def get_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
 
-    runlist = DB.submissions.get_runlist(submission_tag=submission_tag, rl_tag=rl_tag)
+    runlist = db.submissions.get_runlist(submission_tag=submission_tag, rl_tag=rl_tag)
     if runlist is None:
         raise HTTPException(status_code=404, detail="No runlist found.")
 
-    ru = DB.users.get_user_by_tag(tag=runlist.user_tag)
+    ru = db.users.get_user_by_tag(tag=runlist.user_tag)
     if runlist.instrument_tag:
-        runlist.instrument_text = DB.attributes.get_trait_text(tag=runlist.instrument_tag)
+        runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
     return RunListResponseModel(
         **runlist.model_dump(),
         user_email=ru.email if ru else "",
@@ -927,10 +927,10 @@ def get_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = D
 
 
 @router.delete("/submissions/{submission_tag}/runlist/{rl_tag}", tags=["Runlist"])  
-def delete_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = Depends(is_creator_of_submission_or_curator)):
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+def delete_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = Depends(is_creator_of_submission_or_curator), db : DatabaseABC = Depends(get_db)):
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
 
-    ok = DB.submissions.delete_runlist(submission_tag=submission_tag, rl_tag=rl_tag)
+    ok = db.submissions.delete_runlist(submission_tag=submission_tag, rl_tag=rl_tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Could not delete runlist.")
     return True
@@ -939,20 +939,20 @@ def delete_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel 
 def check_submission(
     submission_tag: str,
     user: UserModel = Depends(get_user_from_token)
-):
-    if not DB.submissions.exists(tag=submission_tag): raise tag_not_found
+, db : DatabaseABC = Depends(get_db)):
+    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
     
-    state = DB.submissions.get_state(tag=submission_tag)
+    state = db.submissions.get_state(tag=submission_tag)
     
-    mandatory_tags = DB.attributes.get(
+    mandatory_tags = db.attributes.get(
         attribute_groups="mandatory", 
         min_state=state
     )
-    ca_defined_attributes = DB.submissions.get_defined_attributes(tag=submission_tag)
+    ca_defined_attributes = db.submissions.get_defined_attributes(tag=submission_tag)
     
     
     missing_tags = [tag for tag in mandatory_tags if tag not in ca_defined_attributes]
-    missing = [{"tag": tag, "text": DB.attributes.attribute(tag=tag).text} for tag in missing_tags]
+    missing = [{"tag": tag, "text": db.attributes.attribute(tag=tag).text} for tag in missing_tags]
 
     return {
         "total": len(mandatory_tags),
@@ -976,7 +976,7 @@ def get_submission_query_count(
     include_sample_ca : bool = False,
     ca_search_string : str = None,
     user : UserModel = Depends(get_user_from_token)
-) -> Dict[str, int]:
+, db : DatabaseABC = Depends(get_db)) -> Dict[str, int]:
     """Returns counts for submission queries.
     
     Returns
@@ -987,10 +987,10 @@ def get_submission_query_count(
     """
     
     # Total count (all submissions)
-    total_count = DB.submissions.count()
+    total_count = db.submissions.count()
     
     # Query count (matching filters, no limit)
-    matching_tags = DB.submission_filter.find(
+    matching_tags = db.submission_filter.find(
         current_user_tag=user.tag,
         search_string = search_string,
         state = APIParamInt(param = state).param, 

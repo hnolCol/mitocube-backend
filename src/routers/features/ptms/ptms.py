@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List
 from config.models.user import UserModel
 from config.models.ptms import PTMSiteInsertModel, PTMSiteResponseModel
 from services.users import is_user_at_least_curator, get_user_from_token
-from lib.database.Database import Database
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/features/ptms",
@@ -13,7 +13,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", summary="Finds PTM sites by search query.")
-def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Finds PTM sites by their tag. The tag is derived from the protein tag (or the
     protein group tag for group level identifications), the position and the modification,
@@ -36,11 +36,11 @@ def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_ta
         PTM site tags.
     """
     submission_tags = submission_tags.split(";") if submission_tags else None
-    return DB.ptm_sites.find(search_string = search_string, submission_tag = submission_tags[0] if submission_tags else None, limit = limit)
+    return db.ptm_sites.find(search_string = search_string, submission_tag = submission_tags[0] if submission_tags else None, limit = limit)
 
 
 @router.get("/count", summary="Counts the PTM sites.")
-def count_ptm_sites(submission_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> int:
+def count_ptm_sites(submission_tag : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     """
     Counts the PTM sites, optionally within a submission.
 
@@ -56,11 +56,11 @@ def count_ptm_sites(submission_tag : str = None, user : UserModel = Depends(get_
     int
         The number of PTM sites.
     """
-    return DB.ptm_sites.count(submission_tag = submission_tag)
+    return db.ptm_sites.count(submission_tag = submission_tag)
 
 
 @router.post("/insert", summary="Inserts a PTM site into the database. Requires at least curator rights.")
-def insert_ptm_site(ptm_site : PTMSiteInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def insert_ptm_site(ptm_site : PTMSiteInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Inserts a PTM site into the database. The tag is derived and validated from the
     protein tag (or protein group tag), the position and the modification. The site is
@@ -84,16 +84,16 @@ def insert_ptm_site(ptm_site : PTMSiteInsertModel, user : UserModel = Depends(is
     HTTPException
         If the protein group or one of the supporting precursors does not exist.
     """
-    if not DB.protein_groups.exists(tag = ptm_site.protein_group_tag):
+    if not db.protein_groups.exists(tag = ptm_site.protein_group_tag):
         raise HTTPException(status_code=404, detail=f"Protein group with tag {ptm_site.protein_group_tag} not found.")
     for precursor_tag in ptm_site.precursor_tags:
-        if not DB.precursors.exists(tag = precursor_tag):
+        if not db.precursors.exists(tag = precursor_tag):
             raise HTTPException(status_code=404, detail=f"Precursor with tag {precursor_tag} not found.")
-    return DB.ptm_sites.insert(ptm_site = ptm_site)
+    return db.ptm_sites.insert(ptm_site = ptm_site)
 
 
 @router.post("/insert/bulk", summary="Bulk inserts PTM sites into the database. Requires at least curator rights.")
-def bulk_insert_ptm_sites(ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400, user : UserModel = Depends(is_user_at_least_curator)) -> dict:
+def bulk_insert_ptm_sites(ptm_sites : List[PTMSiteInsertModel], batch_size : int = 1000, transaction_batch_size : int = 400, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> dict:
     """
     Bulk inserts PTM sites into the database. Existing tags are merged. This is a library
     level entity insert like the precursor bulk insert; the per submission/sample
@@ -130,11 +130,11 @@ def bulk_insert_ptm_sites(ptm_sites : List[PTMSiteInsertModel], batch_size : int
         raise HTTPException(status_code=400, detail="batch_size must be at least 1.")
     if transaction_batch_size < 1:
         raise HTTPException(status_code=400, detail="transaction_batch_size must be at least 1.")
-    return DB.ptm_sites.bulk_insert(ptm_sites = ptm_sites, batch_size = batch_size, transaction_batch_size = transaction_batch_size)
+    return db.ptm_sites.bulk_insert(ptm_sites = ptm_sites, batch_size = batch_size, transaction_batch_size = transaction_batch_size)
 
 
 @router.get("/{ptm_site_tag}", summary="Retrieves a PTM site by its tag.")
-def get_ptm_site_by_tag(ptm_site_tag : str, user : UserModel = Depends(get_user_from_token)) -> PTMSiteResponseModel:
+def get_ptm_site_by_tag(ptm_site_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> PTMSiteResponseModel:
     """
     Retrieves a PTM site by its tag.
 
@@ -155,12 +155,12 @@ def get_ptm_site_by_tag(ptm_site_tag : str, user : UserModel = Depends(get_user_
     HTTPException
         If the PTM site with the given tag does not exist.
     """
-    if not DB.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
-    return DB.ptm_sites.get(tag = ptm_site_tag)
+    if not db.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
+    return db.ptm_sites.get(tag = ptm_site_tag)
 
 
 @router.get("/{ptm_site_tag}/abundance", summary="Retrieves the abundance of a PTM site by its tag.")
-def get_ptm_site_abundance_by_tag(ptm_site_tag : str, submission_tags : str = None, user : UserModel = Depends(get_user_from_token)):
+def get_ptm_site_abundance_by_tag(ptm_site_tag : str, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """
     Retrieves the abundance of a PTM site by its tag.
 
@@ -183,12 +183,12 @@ def get_ptm_site_abundance_by_tag(ptm_site_tag : str, submission_tags : str = No
     HTTPException
         If the PTM site with the given tag does not exist.
     """
-    if not DB.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
-    return DB.ptm_sites.get_abundance(tag = ptm_site_tag, submission_tags = submission_tags.split(";") if submission_tags else None)
+    if not db.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
+    return db.ptm_sites.get_abundance(tag = ptm_site_tag, submission_tags = submission_tags.split(";") if submission_tags else None)
 
 
 @router.get("/{ptm_site_tag}/is_quantified", summary="Checks if a PTM site is quantified.")
-def get_ptm_site_is_quantified(ptm_site_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+def get_ptm_site_is_quantified(ptm_site_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Checks if a PTM site is quantified.
 
@@ -209,5 +209,5 @@ def get_ptm_site_is_quantified(ptm_site_tag : str, user : UserModel = Depends(ge
     HTTPException
         If the PTM site with the given tag does not exist.
     """
-    if not DB.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
-    return DB.ptm_sites.is_quantified(tag = ptm_site_tag)
+    if not db.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
+    return db.ptm_sites.is_quantified(tag = ptm_site_tag)

@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
-from lib.database.Database import Database
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.models.permissions import PermissionResponseModel 
 from config.enums.users.roles import UserRolesEnum
 from services.users import get_user_from_token
 from typing import List, Dict
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/maintenance/permissions",

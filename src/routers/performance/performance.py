@@ -1,8 +1,9 @@
 from typing import List 
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 
-from lib.database.Database import Database
 
 from config.models.user import UserModel
 from config.models.performance import QCPeptidesModel, QCPeptideModel
@@ -16,7 +17,6 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     )
 
 
-DB = Database.DB()
 
 
 
@@ -40,18 +40,18 @@ def get_performance_metrices():
             {"text" : "quant_peptides","description" : "Number of quantified peptides."}]
 
 @router.get("/peptides")
-def get_performance_metrices() -> List[QCPeptideModel]:
+def get_performance_metrices(db : DatabaseABC = Depends(get_db)) -> List[QCPeptideModel]:
     """Returns the peptides for which the retention time 
     should be recorded for a qc run. 
     """
-    return DB.peptides.get_qc_peptides()
+    return db.peptides.get_qc_peptides()
 
 
 @router.post("/peptides")
-def add_qc_peptides(peptides : QCPeptidesModel, user : UserModel = Depends(is_user_admin)):
+def add_qc_peptides(peptides : QCPeptidesModel, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)):
     "Add peptides to the database that are used to run quality control"
     
-    DB.peptides.set_qc_peptides()
+    db.peptides.set_qc_peptides()
     
     
     

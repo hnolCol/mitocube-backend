@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from collections import OrderedDict
 from typing import List 
 
-from lib.database.Database import Database
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 
@@ -14,7 +15,6 @@ from config.models.filter import FilterModel, FilterProps
 from services.users import get_user_from_token, is_user_admin
 
 
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -50,21 +50,22 @@ def get_available_filters(proteome_tags : str = None,
         Filters available in the database.
     """
     
-    filter_tags = DB.filters.find(proteome_tags = APIParamString(param=proteome_tags).param,
+    filter_tags = db.filters.find(proteome_tags = APIParamString(param=proteome_tags).param,
                              submission_tags = APIParamString(param=submission_tag).param,
                             protein_tag = protein_tag)
     return filter_tags
 
 
 @router.get("/{filter_tag}")
-def get_filter(filter_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[FilterModel]:
+def get_filter(filter_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[FilterModel]:
     ""
-    filter = DB.filters.get (tag = filter_tag)
+    filter = db.filters.get (tag = filter_tag)
     return filter 
 
 @router.post("") 
 def add_filter(filterProps : FilterProps,
-               user : UserModel = Depends(is_user_admin)) -> bool :
+               user : UserModel = Depends(is_user_admin),
+               db : DatabaseABC = Depends(get_db)) -> bool :
     """Adds a filter from a list of protein tags. Tags are not created if not existance, therefore you may 
     have to add a proteome prior to setting up the filter. 
     This function can only be executed by an admin. 
@@ -80,11 +81,11 @@ def add_filter(filterProps : FilterProps,
     user : UserModel, optional
         The user model inferred from the token, by default Depends(is_user_admin)
     """
-    if DB.filters.exists(tag = filterProps.tag):
+    if db.filters.exists(tag = filterProps.tag):
         raise HTTPException(status_code=409, detail = "The tag exists already. Please delete the filter first if you want to replace it.")
 
 
-    ok, msg = DB.filters.add(protein_tags = filterProps.protein_tags,
+    ok, msg = db.filters.add(protein_tags = filterProps.protein_tags,
                           proteome_tag = filterProps.proteome_tag, 
                           filter_text = filterProps.text,
                           filter_tag = filterProps.tag, 

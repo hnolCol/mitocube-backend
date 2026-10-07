@@ -1,6 +1,7 @@
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
-from lib.database.Database import Database
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
@@ -12,7 +13,6 @@ from config.models.dataset.pca import DatasetPCAResponse
 import pandas as pd 
 import numpy as np 
 import re
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions/analysis",
@@ -20,8 +20,8 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     )
 
 
-def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float):
-    dt = DB.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
+def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float, db : DatabaseABC = Depends(get_db)):
+    dt = db.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
     if dt.empty:
         raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.") 
     if sample_tags_left.size < 2 or sample_tags_right.size < 2:
@@ -60,7 +60,7 @@ def get_dataset_volcano(submission_tag : str,
                         equal_variance : bool = True,
                         fdr : float = 0.05,
                         user : UserModel = Depends(get_user_from_token)
-                  ):# ):#) #
+                  ):# ):#, db : DatabaseABC = Depends(get_db)) #
     """
     Returns the result for a volcano plot
     
@@ -84,12 +84,12 @@ def get_dataset_volcano(submission_tag : str,
 
     
     
-    data_exist = DB.submissions.quantification_exists(tag = submission_tag, type = "protein_groups")
+    data_exist = db.submissions.quantification_exists(tag = submission_tag, type = "protein_groups")
     if not data_exist:  return no_data_found_http_exception
         
     if ca_tag_left == ca_tag_right:
         raise HTTPException(status_code=400, detail="Left and right condition application tags must be different.")
-    sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag =  DB.samples.handle_comparison(submission_tag=submission_tag, ca_tag_left=ca_tag_left, ca_tag_right=ca_tag_right, within_attribute_tags=within_attribute_tags, within_ca_tags=within_ca_tags, annotation_tag=annotation_tag)
+    sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag =  db.samples.handle_comparison(submission_tag=submission_tag, ca_tag_left=ca_tag_left, ca_tag_right=ca_tag_right, within_attribute_tags=within_attribute_tags, within_ca_tags=within_ca_tags, annotation_tag=annotation_tag)
         
     # check if sample tags not empty 
 
@@ -108,7 +108,7 @@ def get_dataset_volcano(submission_tag : str,
     # within_attribute_value_tag = APIParamString(param=within_attribute_value_tag).param 
     
     comparison_suffix = f"{attribute_value_tag_left} vs. {attribute_value_tag_right} ({within_attribute_value_tag}) ({filter_tag})"
-    datatable = DB.datasets.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
+    datatable = db.datasets.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
     stats = Ttest(datatable, sample_map).get_stats(sample_attribute_tag=sample_attribute_tag, 
                                      attribute_value_left=attribute_value_tag_left, 
                                      attribute_value_right=attribute_value_tag_right, 
@@ -118,7 +118,7 @@ def get_dataset_volcano(submission_tag : str,
                                      within_attribute_value_tag=within_attribute_value_tag)
 
     
-    #features = DB.features.get_protein_by_tags(tags = datatable.index.to_list(), as_data_frame=True)
+    #features = db.features.get_protein_by_tags(tags = datatable.index.to_list(), as_data_frame=True)
     #join features to the stat results
     stats_and_feature_data = stats.join(features,how="left").reset_index()
     print(stats_and_feature_data)

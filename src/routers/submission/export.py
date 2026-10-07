@@ -3,11 +3,12 @@ Router for exporting submission metadata to markdown format.
 """
 
 import traceback
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse, Response
 
-from lib.database.Database import Database
 
 from config.models.user import UserModel
 from config.exceptions.HTTPExceptions import tag_not_found
@@ -15,7 +16,6 @@ from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
 from services.export_submissions import export_submission_to_markdown
 
-DB = Database.DB()
 
 router = APIRouter(
     prefix="/api",
@@ -23,11 +23,11 @@ router = APIRouter(
 )
 
 
-def _check_access(submission_tag: str, user: UserModel) -> None:
+def _check_access(submission_tag: str, user: UserModel, db : DatabaseABC = Depends(get_db)) -> None:
     """Raises if the submission does not exist or the user has no access."""
-    if not DB.submissions.exists(tag=submission_tag):
+    if not db.submissions.exists(tag=submission_tag):
         raise tag_not_found
-    if not DB.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
+    if not db.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
         raise HTTPException(
             status_code=403,
             detail=f"User '{user.tag}' does not have access to submission '{submission_tag}'."

@@ -1,8 +1,9 @@
 
 from fastapi import APIRouter, Depends
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List 
 
-from lib.database.Database import Database
 from config.models.user import UserModel
 from config.models.submissions.comments import SubmissionCommentModel 
 from config.exceptions.HTTPExceptions import tag_not_found
@@ -10,7 +11,6 @@ from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
 
 
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -32,21 +32,21 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 #         _description_
 #     """
 
-#     DB.submissions.insert_comment(tag = submission_tag, comment = SubmissionCommentModel(user_tag = user.tag, content = content, tags = tags))
+#     db.submissions.insert_comment(tag = submission_tag, comment = SubmissionCommentModel(user_tag = user.tag, content = content, tags = tags))
 
 @router.post('/{submission_tag}/comments')
-def post_comment_to_submission(submission_tag: str, comment: SubmissionCommentModel, user: UserModel = Depends(get_user_from_token)):
-    if not DB.submissions.exists(submission_tag):
+def post_comment_to_submission(submission_tag: str, comment: SubmissionCommentModel, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    if not db.submissions.exists(submission_tag):
         raise tag_not_found
     comment.user_tag = user.tag
-    DB.submissions.insert_comment(tag=submission_tag, comment=comment)
+    db.submissions.insert_comment(tag=submission_tag, comment=comment)
 
     
 @router.get('/{submission_tag}/comments')
-def get_comments_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[SubmissionCommentModel]:
+def get_comments_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[SubmissionCommentModel]:
     "" 
-    if not DB.submissions.exists(submission_tag) : raise tag_not_found 
-    return DB.submissions.get_comments(tag = submission_tag)
+    if not db.submissions.exists(submission_tag) : raise tag_not_found 
+    return db.submissions.get_comments(tag = submission_tag)
     
     
 @router.get('/{submission_tag}/comments/{tag}')

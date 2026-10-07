@@ -1,13 +1,13 @@
 
 from typing import List
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
-from lib.database.Database import Database
 from config.models.user import UserModel
 from services.users import get_user_from_token
 from config.models.feature import ExclusivelyQuantifiedModel
 from config.models.parameter import APIParamString
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
@@ -15,13 +15,13 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     )
 
 @router.get("/{tag}/ranking")
-def get_ranking(tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+def get_ranking(tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     "Create a new metatext for a given submission."
-    DB.protein_groups.get_statistical_ranking()
+    db.protein_groups.get_statistical_ranking()
     
     
     
 @router.get("/{tag}/ranking/exclusively_quantified")
-def get_exclusively_quantified(tag : str, annotation_tags : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[ExclusivelyQuantifiedModel]:
+def get_exclusively_quantified(tag : str, annotation_tags : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ExclusivelyQuantifiedModel]:
     "Get the exclusively quantified proteins for a given submission."
-    return DB.protein_groups.get_exclusively_quantified(submission_tag = tag, annotation_tags = APIParamString(param=annotation_tags).param, limit = limit)
+    return db.protein_groups.get_exclusively_quantified(submission_tag = tag, annotation_tags = APIParamString(param=annotation_tags).param, limit = limit)

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
 
 # 
-from lib.database.Database import Database
 import pandas as pd 
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
@@ -12,7 +13,6 @@ from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -22,7 +22,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.post("/", summary="Bulk insert of new protein features. Requires curator rights.")
-def bulk_insert_protein_features(features: List, user: UserModel = Depends(is_user_at_least_curator)) -> int:
+def bulk_insert_protein_features(features: List, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> int:
     """
     Bulk insert of new protein features. Requires curator rights.
     
@@ -40,5 +40,5 @@ def bulk_insert_protein_features(features: List, user: UserModel = Depends(is_us
     if not is_user_at_least_curator(user):
         raise HTTPException(status_code=403, detail="Not enough permissions")
 
-    return DB.features.bulk_insert_proteins(features)
+    return db.features.bulk_insert_proteins(features)
     

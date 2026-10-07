@@ -1,7 +1,8 @@
 import colorsys
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
-from lib.database.Database import Database
 from config.models.user import UserModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
@@ -11,7 +12,6 @@ from collections import OrderedDict
 import numpy as np
 from config.models.calculations.quantile import QuantileModel
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
@@ -31,7 +31,7 @@ class ProteinGroupQuantificationCountModel(BaseModel):
     created_at : float
     
 @router.get("/quantifications/protein_groups/count", summary="Get the number of protein group quantifications for a given submission.")
-def get_protein_group_quantification_count(user : UserModel = Depends(get_user_from_token)) -> List[ProteinGroupQuantificationCountModel]:
+def get_protein_group_quantification_count(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ProteinGroupQuantificationCountModel]:
     """
     Get the number of protein group quantifications for a given submission.
 
@@ -45,11 +45,11 @@ def get_protein_group_quantification_count(user : UserModel = Depends(get_user_f
         A list of ProteinGroupQuantificationCountModel objects, each containing the submission tag, the number of protein group quantifications, and the user tag of the creator of the submission.
     """
 
-    return [ProteinGroupQuantificationCountModel(**record) for record in DB.submissions.get_protein_group_quantification_count().to_dict(orient="records")]
+    return [ProteinGroupQuantificationCountModel(**record) for record in db.submissions.get_protein_group_quantification_count().to_dict(orient="records")]
     
     
 @router.get("/{submission_tag}/quantifications/exists", summary="Checks if quantification data for this submission exists.")
-def get_submission_quant_exists(submission_tag : str, quantification_type :  Literal["proteins","protein_groups","precursors","any"], user : UserModel = Depends(get_user_from_token)) -> bool:
+def get_submission_quant_exists(submission_tag : str, quantification_type :  Literal["proteins","protein_groups","precursors","any"], user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Checks if quantification data for this submission exists.
 
@@ -65,10 +65,10 @@ def get_submission_quant_exists(submission_tag : str, quantification_type :  Lit
         True if quantification data exists, False otherwise.
     """
 
-    if DB.submissions.exists(tag=submission_tag) is False:
+    if db.submissions.exists(tag=submission_tag) is False:
         raise submission_tag_not_found
 
-    return DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type)
+    return db.submissions.quantification_exists(tag=submission_tag, type=quantification_type)
 
 
 
@@ -79,7 +79,7 @@ def insert_protein_quantifications(
     quantifications: ProteinQuantificationBulkInsertModel,
     apply_statistics : bool = False,
     user: UserModel = Depends(is_user_at_least_curator)
-) -> int:
+, db : DatabaseABC = Depends(get_db)) -> int:
     """
     Insert protein quantifications for a given submission. Requires curator rights.
 
@@ -97,25 +97,25 @@ def insert_protein_quantifications(
         Number of inserted protein quantifications.
     """
 
-    if DB.submissions.exists(tag=submission_tag) is False:
+    if db.submissions.exists(tag=submission_tag) is False:
         raise submission_tag_not_found
 
     ##first check if all proteins exist
-    N = DB.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
-    num_quantifications = DB.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**q) for q in quantifications.model_dump().get("quantifications", []) if np.isfinite(q["value"])])
+    N = db.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
+    num_quantifications = db.submissions.insert_protein_quantifications(tag=submission_tag, quantifications=[ProteinGroupQuantificationModel(**q) for q in quantifications.model_dump().get("quantifications", []) if np.isfinite(q["value"])])
     #if num_quantifications != len(quantifications.quantifications):
     
     if apply_statistics:
         print("Calculating statistics...")
-        DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
-        DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
-        DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
-        DB.submissions.transform_quantification_to_log2(tag = submission_tag)
+        db.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
+        db.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
+        db.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+        db.submissions.transform_quantification_to_log2(tag = submission_tag)
     return num_quantifications
 
 
 @router.patch("/{submission_tag}/protein_groups/statistics", summary="Calculate and insert the statistics for the protein groups of a given submission. Requires curator rights.")
-def calculate_protein_group_statistics(submission_tag : str, user : UserModel = Depends(is_user_at_least_curator)):
+def calculate_protein_group_statistics(submission_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
     """
     Calculate and insert the statistics for the protein groups of a given submission. Requires curator rights.
 
@@ -130,17 +130,17 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     bool
         True if the statistics were calculated and inserted successfully, False otherwise.
     """
-    if DB.submissions.exists(tag=submission_tag) is False:
+    if db.submissions.exists(tag=submission_tag) is False:
         raise submission_tag_not_found
     
-    ok = DB.submissions.remove_multiple_comparison_metrices(tag = submission_tag)
+    ok = db.submissions.remove_multiple_comparison_metrices(tag = submission_tag)
     if not ok:
         raise HTTPException(status_code=500, detail="Failed to remove existing statistics. Aborting calculation of new statistics.")
-    DB.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
-    DB.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
-    DB.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
-    DB.submissions.transform_quantification_to_log2(tag = submission_tag)
-    DB.submissions.clear_stats_outdated(tag = submission_tag)
+    db.submissions.calculate_multiple_comparison_metrices(tag = submission_tag)
+    db.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
+    db.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
+    db.submissions.transform_quantification_to_log2(tag = submission_tag)
+    db.submissions.clear_stats_outdated(tag = submission_tag)
     return True
 
 @router.post("/{submission_tag}/quantifications/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
@@ -151,7 +151,7 @@ def insert_precursor_quantifications(
     transaction_batch_size: int = 400,
     delete_if_exists: bool = False,
     user: UserModel = Depends(is_user_at_least_curator)
-) -> int:
+, db : DatabaseABC = Depends(get_db)) -> int:
     """
     Bulk insert of precursor quantifications for a given submission. Requires curator rights.
 
@@ -180,7 +180,7 @@ def insert_precursor_quantifications(
     HTTPException
         If the submission with the given tag does not exist, the request body is empty or the batch sizes are invalid.
     """
-    if DB.submissions.exists(tag=submission_tag) is False:
+    if db.submissions.exists(tag=submission_tag) is False:
         raise submission_tag_not_found
     if len(quantifications) == 0:
         raise HTTPException(status_code=400, detail="No precursor quantifications provided.")
@@ -188,13 +188,13 @@ def insert_precursor_quantifications(
         raise HTTPException(status_code=400, detail="batch_size must be at least 1.")
     if transaction_batch_size < 1:
         raise HTTPException(status_code=400, detail="transaction_batch_size must be at least 1.")
-    return DB.submissions.insert_precursor_quantifications(submission_tag=submission_tag, quantifications=quantifications, batch_size=batch_size, transaction_batch_size=transaction_batch_size, delete_if_exists=delete_if_exists)
+    return db.submissions.insert_precursor_quantifications(submission_tag=submission_tag, quantifications=quantifications, batch_size=batch_size, transaction_batch_size=transaction_batch_size, delete_if_exists=delete_if_exists)
 
 
 
 
 @router.get("/{submission_tag}/quantifications/distribution", summary="Get the distribution of quantification values for a given submission and quantification type.")
-def get_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> QuantileModel:
+def get_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> QuantileModel:
     """     
     Get the distribution of quantification values for a given submission and quantification type.
 
@@ -214,11 +214,11 @@ def get_quantification_distribution(submission_tag : str, quantification_type : 
         A dictionary where the keys are quantification identifiers and the values are QuantileModel instances representing the distribution of quantification values.
     """
     
-    if not DB.submission_exists(tag=submission_tag): 
+    if not db.submission_exists(tag=submission_tag): 
         raise submission_tag_not_found
-    if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
+    if not db.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
-    return DB.submissions.get_quantification_distribution(submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+    return db.submissions.get_quantification_distribution(submission_tag=submission_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
 
 
 
@@ -233,7 +233,7 @@ def calculate_test_quantification_distribution(submission_tag : str,
                                                quantification_type : Literal["protein_groups","precursors"] = "protein_groups", 
                                                annotation_tag : str = None,
                                                annotation_group_tag : str = None,
-                                               user : UserModel = Depends(get_user_from_token)) -> Dict:
+                                               user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict:
     """     
     Calculate the distribution of quantification values for a given submission and quantification type based on a test (e.g. log2FC). This can be used to calculate the distribution for specific subsets of the data (e.g. only for significantly regulated protein groups).
 
@@ -251,12 +251,12 @@ def calculate_test_quantification_distribution(submission_tag : str,
     #             within_ca_tags=testParam.get("within_ca_tags", None), 
     #             annotation_tag=testParam.get("annotation_tag", None)
     
-    if not DB.submission_exists(tag=submission_tag): 
+    if not db.submission_exists(tag=submission_tag): 
         raise submission_tag_not_found
-    if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
+    if not db.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
     
-    return DB.samples.calculate_test_quantification_distribution(
+    return db.samples.calculate_test_quantification_distribution(
         submission_tag=submission_tag,
         attribute_tag=attribute_tag,
         ca_tag_left=ca_left_tag,
@@ -269,15 +269,15 @@ def calculate_test_quantification_distribution(submission_tag : str,
     )
 
 @router.get("/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
-def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token)) -> bool:
-    if not DB.submissions.exists(tag=submission_tag):
+def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    if not db.submissions.exists(tag=submission_tag):
         raise submission_tag_not_found
-    return DB.submissions.get_stats_outdated(tag=submission_tag)
+    return db.submissions.get_stats_outdated(tag=submission_tag)
 
 
 
 @router.get("/{submission_tag}/samples/quantifications/distribution", summary="Get the distribution of quantification values for a given submission and quantification type.")
-def get_sample_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> List[Tuple[str, QuantileModel, str]]:
+def get_sample_quantification_distribution(submission_tag : str, quantification_type : Literal["protein_groups","precursors"] = "protein_groups", annotation_tag : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Tuple[str, QuantileModel, str]]:
     """     
     Get the distribution of quantification values for a given submission and quantification type.
 
@@ -292,11 +292,11 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(get_user_from_token)        
         """   
-    DB.submission_exists(tag=submission_tag) or submission_tag_not_found
-    if not DB.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
+    db.submission_exists(tag=submission_tag) or submission_tag_not_found
+    if not db.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
-    sample_tags = DB.submissions.get_samples(tag=submission_tag)
-    ca = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, return_sample_index = False)  # Preload condition applications for efficiency
+    sample_tags = db.submissions.get_samples(tag=submission_tag)
+    ca = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, return_sample_index = False)  # Preload condition applications for efficiency
     #unique_ca_tags = 
         
     # 1. Combine all columns into one "||"-joined key
@@ -328,6 +328,6 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
     ca['color'] = ca['combo'].map(color_mapper)
     qs = []
     for sample_tag in sample_tags:
-        q = DB.samples.get_quantification_distribution(tag=sample_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        q = db.samples.get_quantification_distribution(tag=sample_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
         qs.append((sample_tag, q, ca.loc[ca.index == sample_tag, 'color'].values[0] if sample_tag in ca.index else '#000000'))  # Default to black if not found
     return qs

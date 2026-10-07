@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
 import pandas as pd 
 from typing import Dict 
@@ -10,11 +12,9 @@ from services.users import get_user_from_token
 from config.models.parameter import APIParamString
 from config.models.calculations.quantile import QuantileModel 
 
-from lib.database.Database import Database
 
 from config.exceptions.HTTPExceptions import protein_not_found
 from collections import OrderedDict
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -24,7 +24,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q")
-def find_feature_by_query(search_string : str = None, submission_tag : str = None, include_types : str = None, exclude_types : str = None, limit : int = 30, sort_by_stat : str = None, annotation_tags : str = None, user : UserModel = Depends(get_user_from_token)):
+def find_feature_by_query(search_string : str = None, submission_tag : str = None, include_types : str = None, exclude_types : str = None, limit : int = 30, sort_by_stat : str = None, annotation_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
 
     include_types = APIParamString(param=include_types).param
     exclude_types = APIParamString(param=exclude_types).param
@@ -32,9 +32,9 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
 
     
     if submission_tag is not None:
-        if not DB.submissions.exists(tag=submission_tag):
+        if not db.submissions.exists(tag=submission_tag):
             raise HTTPException(status_code=404, detail=f"Submission {submission_tag} not found")
-        if not DB.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
+        if not db.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
             raise HTTPException(status_code=403, detail=f"User {user.tag} does not have access to submission {submission_tag}")
     
     if include_types is not None:
@@ -55,13 +55,13 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     peptides = []
     pg_peptides = {}
     if "protein_groups" in include_types:
-        pgs_search_result = DB.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag, sort_by_stat_attribute=sort_by_stat, annotation_tags=annotation_tags)
+        pgs_search_result = db.protein_groups.find(search_string=search_string, limit=limit, submission_tag=submission_tag, sort_by_stat_attribute=sort_by_stat, annotation_tags=annotation_tags)
     else:
         pgs_search_result = []
     
     if "peptides" in include_types:
         
-        peptides = DB.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)
+        peptides = db.peptides.find(search_string=search_string, limit=limit, provide_protein_info=True, submission_tag=submission_tag)
         
         for peptide, pgs in peptides:
             for pg in pgs:
@@ -80,7 +80,7 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
     
         
 @router.get("/{feature_tag}/d")
-def get_feature_data(feature_tag : str, submission_tag : str, append_condition_procedure : bool = True, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
+def get_feature_data(feature_tag : str, submission_tag : str, append_condition_procedure : bool = True, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the data for a specific feature in a specific submission. This includes the quantification values for the feature in all samples of the submission and, if append_condition_procedure is True, also the condition applications for the samples. 
     This Endpoint combines peptide and protein group features. If you know what type the 
     feature has, you should likely use the more specific endpoints (proteins/{protein_tag}/d). 
@@ -108,31 +108,31 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
     
     """
     
-    if not DB.features.exists(tag = feature_tag):
+    if not db.features.exists(tag = feature_tag):
         raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
-    if not DB.submissions.exists(tag = submission_tag):
+    if not db.submissions.exists(tag = submission_tag):
         raise HTTPException(status_code=404, detail = "Submission tag not found in the database.")
     
-    if not DB.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
+    if not db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
         raise HTTPException(status_code=403, detail = "User does not have access to the submission.")
     
-    sample_tags = DB.submissions.get_samples(tag = submission_tag, ignore_excluded=True) # check if submission has samples
+    sample_tags = db.submissions.get_samples(tag = submission_tag, ignore_excluded=True) # check if submission has samples
     if not sample_tags:
         raise HTTPException(status_code=404, detail = "No samples found for submission tag.")
     d = []
     attribute_tags = set()
     for sample_tag in sample_tags:
         di = {"tag" : sample_tag, "value" : None}
-        if not DB.samples.exists(tag = sample_tag):
+        if not db.samples.exists(tag = sample_tag):
             continue 
-        if DB.samples.is_excluded(tag = sample_tag):
+        if db.samples.is_excluded(tag = sample_tag):
             continue  # Skip excluded samples
-        quantified_value = DB.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag, metrics=metrics)
+        quantified_value = db.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag, metrics=metrics)
         di["value"] = quantified_value
         if append_condition_procedure:
-            condition_applications = DB.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
-            if DB.submissions.has_genotypes(tag = submission_tag):
-                genotypes = DB.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
+            condition_applications = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+            if db.submissions.has_genotypes(tag = submission_tag):
+                genotypes = db.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
                 condition_applications = condition_applications.join(genotypes, how="outer")
             for attribute_tag in condition_applications.columns:
                 attribute_tags.add(attribute_tag)
@@ -147,13 +147,13 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
 
     
 @router.get("/{tag_x}/{tag_y}/pairwise_quant")
-def get_pairwise_quantification(tag_x : str, tag_y : str, user : UserModel = Depends(get_user_from_token)): 
+def get_pairwise_quantification(tag_x : str, tag_y : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)): 
     "Returns all the quantification values for two features. For example to visualize a correlation."
-    tag_not_exists = [tag for tag in [tag_x,tag_y] if not DB.features.exists(tag = tag)] 
+    tag_not_exists = [tag for tag in [tag_x,tag_y] if not db.features.exists(tag = tag)] 
     if len(tag_not_exists) > 0:
         raise HTTPException(status_code=404, detail=f"The tag(s) do(es) not exits: {tag_not_exists} in the database.")
 
-    df = DB.features.get_pairwise_feature_quant(feature_tag_x=tag_x, feature_tag_y=tag_y)
+    df = db.features.get_pairwise_feature_quant(feature_tag_x=tag_x, feature_tag_y=tag_y)
                         
     return df.to_dict(orient="records")
 
@@ -161,22 +161,22 @@ def get_pairwise_quantification(tag_x : str, tag_y : str, user : UserModel = Dep
 
 
 @router.get("/{feature_tag}")
-def get_feature_by_tag(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_feature_by_tag(feature_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "" 
-    if DB.proteins.exists(tag = feature_tag):
-        return DB.proteins.get(tag = feature_tag)
-    if DB.protein_groups.exists(tag = feature_tag):
-        return DB.protein_groups.get(tag = feature_tag)
-    if DB.peptides.exists(tag = feature_tag):
-        return DB.peptides.get(tag = feature_tag)
+    if db.proteins.exists(tag = feature_tag):
+        return db.proteins.get(tag = feature_tag)
+    if db.protein_groups.exists(tag = feature_tag):
+        return db.protein_groups.get(tag = feature_tag)
+    if db.peptides.exists(tag = feature_tag):
+        return db.peptides.get(tag = feature_tag)
     
     raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
     
 
 @router.get("/{feature_tag}/i")
-def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "" 
-    protein = DB.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False) 
+    protein = db.features.get_protein_by_tags(tags = [feature_tag], as_data_frame=False) 
     if len(protein) == 0: raise protein_not_found
 
     return {
@@ -188,35 +188,35 @@ def get_feature_info(feature_tag : str, user : UserModel = Depends(get_user_from
     
     
 @router.get("/{feature_tag}/annotations") 
-def get_feature_annotations(feature_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_feature_annotations(feature_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     
-    if DB.proteins.exists(tag = feature_tag):
+    if db.proteins.exists(tag = feature_tag):
         p_tags = [feature_tag]
-    elif DB.protein_groups.exists(tag = feature_tag):
+    elif db.protein_groups.exists(tag = feature_tag):
         p_tags = feature_tag.split(";")
     else:
         raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
     
-    return DB.annotations.find(protein_tags=p_tags, limit = None)
+    return db.annotations.find(protein_tags=p_tags, limit = None)
     
     
 @router.get("/{feature_tag}/abundance") 
 def get_feature_abundance(feature_tag : str, 
                           attribute_tag : str = None,
                           value : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", 
-                          user : UserModel = Depends(get_user_from_token)) -> QuantileModel|List[QuantileModel]|Dict[str,QuantileModel]:
+                          user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> QuantileModel|List[QuantileModel]|Dict[str,QuantileModel]:
     
-    return DB.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag, value = value)
+    return db.features.get_abundance_distribution(tag = feature_tag, attribute_tag = attribute_tag, value = value)
 
 
 @router.get("/{feature_tag}/abundance/samples")
-def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token)):
-    if not DB.features.exists(tag=feature_tag):
+def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    if not db.features.exists(tag=feature_tag):
         raise HTTPException(status_code=404, detail=f"The feature tag does not exist: {feature_tag} in the database.")
-    submission_scope_tags = DB.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
+    submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
     if len(submission_scope_tags) == 0:
         raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
-    df =  DB.features.get_quantification_per_sample(tag = feature_tag, metrics = metrics, submission_tags = submission_scope_tags)
+    df =  db.features.get_quantification_per_sample(tag = feature_tag, metrics = metrics, submission_tags = submission_scope_tags)
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No quantification data found for feature tag: {feature_tag} in the database.")
     df.loc[:,"value"] = df["value"].astype(float)
@@ -224,20 +224,20 @@ def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_s
 
 
 @router.get("/{feature_tag}/quant_count")
-def get_quantification_counts(feature_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_quantification_counts(feature_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Returns the number of samples that quantified the given feature (protein) and the number of samples that used the same proteome."
-    if not DB.features.exists(tag = feature_tag): raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
-    proteome_tags = DB.features.get_proteome(tags = [feature_tag])
-    counts = DB.features.count_samples_quantifying_protein(tags=[feature_tag])
+    if not db.features.exists(tag = feature_tag): raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
+    proteome_tags = db.features.get_proteome(tags = [feature_tag])
+    counts = db.features.count_samples_quantifying_protein(tags=[feature_tag])
     if not feature_tag in counts.index:
         raise HTTPException(status_code=404, detail="Counting the samples that quantified the protein resulted in an error." )
-    n_samples = DB.samples.count(trait_tag = proteome_tags.loc[feature_tag,"proteome_tag"])
+    n_samples = db.samples.count(trait_tag = proteome_tags.loc[feature_tag,"proteome_tag"])
     
     return {"samples" : int(counts.loc[feature_tag,"n_samples"]), "total_samples" : int(n_samples)}
 
 
 @router.get("/{feature_tag}/variance")
-def get_feature_variance(feature_tag : str, submission_tags : str = None, user : UserModel = Depends(get_user_from_token)):
+def get_feature_variance(feature_tag : str, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """_summary_
 
     Parameters
@@ -250,7 +250,7 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None, user :
     _type_
         _description_
     """
-    submission_scope_tags = DB.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+    submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
         
     if submission_tags is not None:
         submission_tags = [submission_tag for submission_tag in APIParamString(param=submission_tags).param if submission_tag in submission_scope_tags]
@@ -258,15 +258,15 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None, user :
         submission_tags = submission_scope_tags
     if len(submission_tags) == 0:
         raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
-    submission_scope_tags = DB.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
-    f_stats = DB.features.get_f_value(tags=[feature_tag], submission_tags=APIParamString(submission_tags).param)
+    submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+    f_stats = db.features.get_f_value(tags=[feature_tag], submission_tags=APIParamString(submission_tags).param)
     return f_stats.to_dict(orient="records")
     
 
 
 @router.get("/{feature_tag}/sequence",
             summary="Returns the stored sequence in the annotation database.")
-def get_feature_sequence(feature_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[FeatureSequenceResponseModel]:
+def get_feature_sequence(feature_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[FeatureSequenceResponseModel]:
     """
     Returns the sequence for a specific feature_tag (Uniprot ID)
     
@@ -288,7 +288,7 @@ def get_feature_sequence(feature_tag : str, user : UserModel = Depends(get_user_
     Please use the api endpoint /annotations to submit a list of feature_ids to 
     retrieve annotations efficiently. 
     """
-    return DB.features.get_protein_sequence(tags = APIParamString(param=feature_tag).param)
+    return db.features.get_protein_sequence(tags = APIParamString(param=feature_tag).param)
     
     
     
