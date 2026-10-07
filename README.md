@@ -32,6 +32,22 @@ class General(BaseSettings):
 
 Here you can specify if you would like to restrict the user registration to a certain domain of emails preventing users to use private emails using the ```allowed_email_domains``` parameter. 
 If the you leave this empty, in prinicple everyone can register and have access to the data. Hence, for security reasons, this should not be an empty list. 
+## Dependencies
+
+Core dependencies live in `requirements.txt`. The optional AI agent stack
+(langchain/langgraph/openai) is split into `requirements-ai.txt` — install
+it only if you use the AI features:
+
+```bash
+pip install -r requirements.txt        # core backend
+pip install -r requirements-ai.txt     # optional AI agent stack
+```
+
+`pip-audit` runs on `requirements.txt` in CI (see
+`.github/workflows/ci.yml`). Known advisories without an upstream fix
+(currently transitive `ecdsa` via `python-jose`) are tracked until the
+JWT library is migrated to a maintained alternative.
+
 ## Tests
 
 A pytest suite lives in `tests/`. Unit tests cover password hashing, JWT
