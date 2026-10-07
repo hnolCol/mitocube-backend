@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
-from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator, get_db
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from lib.database.Database import get_db
 
 
 

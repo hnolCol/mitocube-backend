@@ -14,14 +14,9 @@ from config.exceptions.HTTPExceptions import (
 )
 from config.models.user import UserModel, UserRolesEnum, PublicUser
 from lib.database.abstract.Database import DatabaseABC
-from lib.database.Database import Database
+from lib.database.Database import get_db
 
 from lib.cache.user_cache import get_cached_user, cache_user
-
-
-def get_db() -> DatabaseABC:
-    """Resolve the database lazily so importing this module never opens a connection."""
-    return Database.DB()
 
 
 def check_mfa_setup_token(token: dict = Depends(get_decoded_token)) -> dict:

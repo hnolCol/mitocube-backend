@@ -38,3 +38,15 @@ class Database:
 
 
 _shared_lazy_db = _LazyDB()
+
+
+def get_db() -> DatabaseABC:
+    """
+    FastAPI dependency that resolves the database lazily.
+
+    Importing this module never opens a connection; the lazy proxy only
+    connects on first actual use. This is the canonical injection point
+    for routers and services — tests override it via
+    ``app.dependency_overrides[get_db]``.
+    """
+    return Database.DB()

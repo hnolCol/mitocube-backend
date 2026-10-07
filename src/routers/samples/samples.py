@@ -3,7 +3,8 @@ from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleResponseModel, SampleUpdateModel
-from services.users import get_user_from_token, get_db
+from services.users import get_user_from_token
+from lib.database.Database import get_db
 from typing import List, Dict, Optional
 
 

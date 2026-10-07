@@ -17,7 +17,8 @@ sys.path.insert(0, str(SRC_DIR))
 
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel
-from services.users import get_db, get_user_from_token
+from services.users import get_user_from_token
+from lib.database.Database import get_db
 
 
 class FakeUserDB:
