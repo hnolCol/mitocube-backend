@@ -9,7 +9,7 @@ from config.models.feature import ExclusivelyQuantifiedModel
 from config.models.parameter import APIParamString
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
     tags=["Ranking", "Submissions"],
     )

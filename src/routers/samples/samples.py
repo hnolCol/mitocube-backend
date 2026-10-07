@@ -7,7 +7,7 @@ from services.users import get_user_from_token, get_db
 from typing import List, Dict, Optional
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/samples",
     tags=["Samples", "Condition Applications"],
     )
@@ -79,10 +79,10 @@ def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_f
         raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
     return db.submissions.get_stats_outdated(tag=submission_tag)
 
-@router.get("/submissions/{submission_tag}/export", summary="Get sample export data (sample_tag, replicate, genotype, condition applications) for download.")
+@router.get("/submissions/{submission_tag}/export", summary="Get sample export data (sample_tag, sample_name, replicate, genotype, condition applications) for download.")
 def get_samples_export(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     "Returns one row per sample with resolved genotype/condition-application text for CSV/TSV export."
     if not db.submissions.exists(tag=submission_tag):
         raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
-    df = db.samples.get_samples_export_data(submission_tag=submission_tag)
+    df = db.samples.get_samples_export_data(submission_tag=submission_tag, include_sample_name=True)
     return df.to_dict(orient="records")

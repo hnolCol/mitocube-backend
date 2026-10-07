@@ -18,19 +18,19 @@ DB = Database.DB()
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
 
-router = APIRouter(
-    prefix="/api",
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
+    prefix="/api/users",
     tags=["Token", "Authentication","UserModel"]
     )
 
 
 
-@router.get("/users",summary="Returns the user tags in the database")
+@router.get("",summary="Returns the user tags in the database")
 def get_user_tags(limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     return DB.users.get_tags(limit=limit)
 
 
-@router.post("/users", summary="Add a new user to the database.")
+@router.post("", summary="Add a new user to the database.")
 def add_user_to_the_database(background_task : BackgroundTasks, user_props : UserCreateModel, user : UserModel = Depends(is_user_admin)):
     """
     Adds a user to the database. Currently requires admin rights.
@@ -67,7 +67,7 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Use
 
 
 
-@router.get("/users/count", summary="Returns the number of users in the database.")
+@router.get("/count", summary="Returns the number of users in the database.")
 def count_user_db(exclude_inactive : bool = True, user : UserModel = Depends(get_user_from_token)) -> int:
     """Returns the number of users in the database.
     
@@ -83,7 +83,7 @@ def count_user_db(exclude_inactive : bool = True, user : UserModel = Depends(get
     """
     return DB.users.count(exclude_inactive=exclude_inactive)
 
-@router.get("/users/q")
+@router.get("/q")
 def query_user_db(search_string : str = None, limit : int = 40, user : UserModel = Depends(get_user_from_token)) -> List[str]:
     """Query user in the database and returns the tags 
 
@@ -102,7 +102,7 @@ def query_user_db(search_string : str = None, limit : int = 40, user : UserModel
 
     return DB.users.find(search_string, limit=limit)
     
-@router.post("/users/pw", summary="Allows users to change the password for themselves.")
+@router.post("/pw", summary="Allows users to change the password for themselves.")
 def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_user_from_token)):
     """Change the authenticated user's password."""
     old_password = updated_pw.get("old_password")
@@ -129,7 +129,7 @@ def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_us
         raise HTTPException(400, "Could not update password.")
     
 
-@router.get("/users/full",  response_model=UsersAdminResponse)
+@router.get("/full",  response_model=UsersAdminResponse)
 def get_users(user : UserModel = Depends(is_user_admin)):
     """
     Returns a list of users, requires admin rights.
@@ -140,7 +140,7 @@ def get_users(user : UserModel = Depends(is_user_admin)):
 
 
 
-@router.get("/users/public", response_model=List[PublicUser])
+@router.get("/public", response_model=List[PublicUser])
 def get_collaborators(tags : str = None, user : UserModel = Depends(get_user_from_token)):
     """
     Returns collaborators, which is essential Users with a different response model (e.g. non sensitive information.)
@@ -150,13 +150,13 @@ def get_collaborators(tags : str = None, user : UserModel = Depends(get_user_fro
     
 
 
-@router.get("/users/roles", summary="Returns the available user roles and names", response_model=UseRoleReponseModel)
+@router.get("/roles", summary="Returns the available user roles and names", response_model=UseRoleReponseModel)
 def get_user_roles(user : UserModel = Depends(get_user_from_token)):
     """Returns the user role enumerator."""
     return UseRoleReponseModel()
 
 
-@router.get("/users/{user_tag}", summary="Returns the public user information of a user by its label.", response_model=PublicUser)
+@router.get("/{user_tag}", summary="Returns the public user information of a user by its label.", response_model=PublicUser)
 def get_user(user_tag : str, user : UserModel = Depends(get_user_from_token)):
     """Deletes specific user. Returns an error if token does not belong to admin"""
     user_from_db = DB.users.get_user_by_tag(user_tag)
@@ -164,18 +164,18 @@ def get_user(user_tag : str, user : UserModel = Depends(get_user_from_token)):
     return user_from_db
 
 
-@router.delete("/users/{user_tag}", summary="Deletes a user. Requires admin rights.")
+@router.delete("/{user_tag}", summary="Deletes a user. Requires admin rights.")
 def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Deletes specific user. Returns an error if token does not belong to admin"""    
     
 
-@router.get("/users/roles/{user_tag}", summary="Returns the roles of a user by its tag.", response_model=int)
+@router.get("/roles/{user_tag}", summary="Returns the roles of a user by its tag.", response_model=int)
 def get_user_role(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
     """Returns the role of a user by its tag."""
     return user.role 
 
 
-@router.get("/users/{user_tag}/submissions/count", summary="Returns the number of submissions of a user by its tag.")
+@router.get("/{user_tag}/submissions/count", summary="Returns the number of submissions of a user by its tag.")
 def count_user_submissions(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
     """Counts the number of submissions for a user by its tag."""
     if not DB.users.exists(tag = user_tag): raise user_not_found
@@ -183,26 +183,26 @@ def count_user_submissions(user_tag : str, user : UserModel = Depends(get_user_f
 
 ## inconsistent!  - change to have user_label in url 
 
-@router.post("/users/{user_tag}/block", summary="Block a user. Requires admin rights.")
+@router.post("/{user_tag}/block", summary="Block a user. Requires admin rights.")
 def block_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     """Blocks the user. Limited to admin users."""
     DB.users.block_user_by_tag(tag = user_tag)
     #UserDB.block_user_by_label(user_props.label)
     
     
-@router.get("/users/{user_tag}/exists", summary="Checks if a user exists by its tag.")
+@router.get("/{user_tag}/exists", summary="Checks if a user exists by its tag.")
 def check_if_user_exists(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
     """Checks if a user exists by its tag."""
     return DB.users.exists(tag = user_tag)
 
-@router.get("/users/{user_tag}/is_active", summary="Checks if a user is active by its tag.")
+@router.get("/{user_tag}/is_active", summary="Checks if a user is active by its tag.")
 def check_if_user_is_active(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
     """Checks if a user is active by its tag."""
     return DB.users.is_user_active(tag = user_tag)
 
     
     
-@router.post("/users/{user_tag}/useterms", summary="Accept useterms. Can only be done by the user itself.")
+@router.post("/{user_tag}/useterms", summary="Accept useterms. Can only be done by the user itself.")
 def accept_use_terms(user_tag : str, accept : bool, user : UserModel = Depends(get_user_from_token)):
     """_summary_
 

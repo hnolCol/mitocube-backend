@@ -12,7 +12,7 @@ from services.random_generators import get_random_string
 from lib.database.Database import Database
 
 DB = Database.DB()
-router = APIRouter(prefix="/api/phenotype_associations", tags=["PhenotypeAssociations"])
+router = APIRouter(dependencies=[Depends(get_user_from_token)],prefix="/api/phenotype_associations", tags=["PhenotypeAssociations"])
 not_found = HTTPException(status_code=404, detail="PhenotypeAssociation not found.")
 
 

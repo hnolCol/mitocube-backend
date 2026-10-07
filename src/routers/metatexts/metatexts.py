@@ -6,7 +6,7 @@ from lib.database.abstract.Database import DatabaseABC
 
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/metatexts",
     tags=["Metatexts"],
     )

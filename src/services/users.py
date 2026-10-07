@@ -16,6 +16,8 @@ from config.models.user import UserModel, UserRolesEnum, PublicUser
 from lib.database.abstract.Database import DatabaseABC
 from lib.database.Database import Database
 
+from lib.cache.user_cache import get_cached_user, cache_user
+
 
 def get_db() -> DatabaseABC:
     """Resolve the database lazily so importing this module never opens a connection."""
@@ -95,10 +97,18 @@ def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
 
 
 def get_user_from_token(token = Depends(check_token_verified), db : DatabaseABC = Depends(get_db)) -> UserModel:
-    """Extracts the user from a token"""
+    """Extracts the user from a token. The user is looked up in the Mongo
+    user cache first (short TTL) and only fetched from Neo4j on a cache miss.
+    Secrets (password, mfa_secret) are never cached."""
     if "tag" not in token : raise token_not_valid_exception
+    user = get_cached_user(token["tag"])
+    if user is not None:
+        return check_user_allowed(user is not None, user)
     user_in_db = db.users.get_user_by_tag(tag = token["tag"])
+
     user  = check_user_allowed(user_in_db is not None,user_in_db)
+    if user is not None:
+        cache_user(user)
     return user 
 
 

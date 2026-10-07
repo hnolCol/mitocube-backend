@@ -698,8 +698,79 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else 0
 
 
-    def insert_precursor_quantifications(self, tag : str, quantifications : List[PrecursorQuantificationModel]) -> int:
-        raise NotImplementedError("insert_precursor_quantifications is not implemented yet.")
+    def insert_precursor_quantifications(
+        self,
+        tag: str,
+        quantifications: List[PrecursorQuantificationModel],
+        batch_size: int = 600,
+        transaction_batch_size: int = 400,
+        delete_if_exists: bool = False
+    ) -> int:
+        """
+        Inserts precursor quantifications for a given submission. The precursor must already
+        exist in the database, quantifications for precursors that do not exist are skipped.
+        The value is the log2 intensity of the precursor quantification.
+
+        The input is chunked on the client side (batch_size) and each chunk is inserted using a
+        CALL { ... } IN TRANSACTIONS subquery so that Neo4J commits the insert in smaller
+        transactions (transaction_batch_size), avoiding memory errors for large inputs
+        (e.g. 90K precursors per sample).
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the submission.
+        quantifications : List[PrecursorQuantificationModel]
+            List of precursor quantifications to insert.
+        batch_size : int, optional
+            The number of quantifications sent to the database per query, by default 600
+        transaction_batch_size : int, optional
+            The number of rows per internal transaction (IN TRANSACTIONS OF ... ROWS), by default 400
+        delete_if_exists : bool, optional
+            Whether to delete existing precursor quantifications of the submission before inserting, by default False
+
+        Returns
+        -------
+        int
+            Number of inserted precursor quantifications.
+        """
+        if delete_if_exists:
+            if self.quantification_exists(tag, type="precursors"):
+                query_delete = (
+                    "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(p:Precursor) "
+                    "DELETE q "
+                )
+                self._driver.execute_query(query_delete, routing_="w", tag=tag)
+
+        quantifications_data = [x.model_dump() for x in quantifications]
+        total = 0
+        query = f"""
+        CALL () {{
+            MATCH (submission:Submission {{tag: $tag}})
+            UNWIND $qs as q
+            MATCH (sample:Sample {{tag: q.sample_tag}})<-[:HAS_SAMPLE]-(submission)
+            MATCH (p:Precursor {{tag: q.tag}})
+            MERGE (sample)-[r:QUANTIFIED]->(p)
+            SET r.value = q.value,
+                r.created_at = timestamp(),
+                r.score = q.score,
+                r.retention_time = CASE WHEN q.rt IS NOT NULL THEN q.rt ELSE r.retention_time END,
+                r.ion_mobility = CASE WHEN q.im IS NOT NULL THEN q.im ELSE r.ion_mobility END
+            RETURN count(r) AS created
+        }} IN TRANSACTIONS OF {transaction_batch_size} ROWS
+        RETURN sum(created) AS total
+        """
+        with self._driver.session() as session:
+            for i in range(0, len(quantifications_data), batch_size):
+                batch = quantifications_data[i:i+batch_size]
+                result = session.run(
+                    query,
+                    tag=tag,
+                    qs=batch
+                )
+                record = result.single()
+                total += record["total"] if record else 0
+        return total
     
     def get_views(self, tag : str) -> int:
         
@@ -1245,17 +1316,17 @@ class Neo4JSubmissions(SubmissionsABC):
                     sample_indices=run.aggregated_samples
                 )
 
-        return True
+        return rl_tag
 
-    def get_runlist(self, submission_tag: str) -> Optional[RunListModel]:
+    def get_runlist(self, submission_tag: str, rl_tag: str) -> Optional[RunListModel]: 
         query = (
-            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
         )
-        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
         if not r:
             return None
         row = r[0]
@@ -1264,14 +1335,33 @@ class Neo4JSubmissions(SubmissionsABC):
             key=lambda x: x.measurement_index
         )
         return RunListModel(**row["rl"], runs=runs)
-    
-    def delete_runlist(self, submission_tag: str) -> bool:
+
+    def list_runlists(self, submission_tag: str) -> List[RunListModel]: 
         query = (
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "MATCH (rl)-[:HAS_RUN]->(r:Run) "
+            "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+            "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
+            "ORDER BY rl.created_at DESC "
+        )
+        r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
+        runlists = []
+        for row in r:
+            runs = sorted(
+                [AnalyticRunModel(**{**dict(run), "name": run.get("text") or run.get("name")}, aggregated_samples=[]) for run in row["runs"]],
+                key=lambda x: x.measurement_index
+            )
+            runlists.append(RunListModel(**row["rl"], runs=runs))
+        return runlists
+
+    def delete_runlist(self, submission_tag: str, rl_tag: str) -> bool:  
+        query = (
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "DETACH DELETE rl "
         )
         try:
-            self._driver.execute_query(query, routing_="w", tag=submission_tag)
+            self._driver.execute_query(query, routing_="w", tag=submission_tag, rl_tag=rl_tag)
             return True
         except Exception as e:
             print(e)
@@ -1953,14 +2043,39 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return self._get_users_submission_scope(current_user_tag=user_tag)
 
 
-    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
-        """Checks if a user has access to a submission. 
-            This is useful to check if a user can access a submission before returning the submission data. """
-        user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
-        if user_scope is None: return True #curator or admin, has access to all submissions
-        return submission_tag in user_scope
+    # def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+    #     """Checks if a user has access to a submission. 
+    #         This is useful to check if a user can access a submission before returning the submission data. """
+    #     user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
+    #     if user_scope is None: return True #curator or admin, has access to all submissions
+    #     return submission_tag in user_scope
         
+    def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if a user has access to a single submission without building the full submission scope.
+        This is useful to check if a user can access a submission before returning the submission data.
+        """
+        if not self._users.exists(user_tag):
+            return False
 
+        user = self._users.get_user_by_tag(tag=user_tag)
+        if user.role >= UserRolesEnum.CURATOR:
+            return True
+        if user.role == UserRolesEnum.GUEST:
+            return False
+
+        query = (
+            "MATCH (u:User {tag: $user_tag}), (submission:Submission {tag: $submission_tag}) "
+            "RETURN "
+            "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
+            "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
+            "AS has_access "
+        )
+        r = self._driver.execute_query(query, routing_="r",
+                                    user_tag=user_tag,
+                                    submission_tag=submission_tag,
+                                    result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+    
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
             query += "ORDER BY submission_tag DESC "

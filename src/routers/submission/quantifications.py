@@ -13,7 +13,7 @@ from config.models.calculations.quantile import QuantileModel
 
 DB = Database.DB()
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions",
     tags=["Submission"],
     )
@@ -143,10 +143,13 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     DB.submissions.clear_stats_outdated(tag = submission_tag)
     return True
 
-@router.post("/{submission_tag}/quantifications/proteins/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
+@router.post("/{submission_tag}/quantifications/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
 def insert_precursor_quantifications(
     submission_tag: str,
     quantifications: List[PrecursorQuantificationModel],
+    batch_size: int = 600,
+    transaction_batch_size: int = 400,
+    delete_if_exists: bool = False,
     user: UserModel = Depends(is_user_at_least_curator)
 ) -> int:
     """
@@ -157,19 +160,35 @@ def insert_precursor_quantifications(
     submission_tag : str
         The tag of the submission.  
     quantifications : List[PrecursorQuantificationModel]
-        List of precursor quantifications to insert.
+        List of precursor quantifications to insert. The precursor tags are the peptide sequence followed
+        by the charge state (e.g. PEPTIDEK.2) and the precursors must already exist in the database.
+        The value is the log2 intensity of the precursor quantification.
+    batch_size : int, optional
+        The number of quantifications sent to the database per query, by default 600
+    transaction_batch_size : int, optional
+        The number of rows per internal transaction (IN TRANSACTIONS OF ... ROWS), by default 400
+    delete_if_exists : bool, optional
+        Whether to delete existing precursor quantifications of the submission before inserting, by default False
     user : UserModel, optional
-        The user that is extracted by the token, by default Depends(get_user_from_token)
+        The user that is extracted by the token, by default Depends(is_user_at_least_curator)
     Returns
     -------
     int
         Number of inserted precursor quantifications.
+    Raises
+    ------
+    HTTPException
+        If the submission with the given tag does not exist, the request body is empty or the batch sizes are invalid.
     """
-
     if DB.submissions.exists(tag=submission_tag) is False:
         raise submission_tag_not_found
-
-    return DB.submissions.insert_precursor_quantifications(submission_tag=submission_tag, quantifications=quantifications)
+    if len(quantifications) == 0:
+        raise HTTPException(status_code=400, detail="No precursor quantifications provided.")
+    if batch_size < 1:
+        raise HTTPException(status_code=400, detail="batch_size must be at least 1.")
+    if transaction_batch_size < 1:
+        raise HTTPException(status_code=400, detail="transaction_batch_size must be at least 1.")
+    return DB.submissions.insert_precursor_quantifications(submission_tag=submission_tag, quantifications=quantifications, batch_size=batch_size, transaction_batch_size=transaction_batch_size, delete_if_exists=delete_if_exists)
 
 
 

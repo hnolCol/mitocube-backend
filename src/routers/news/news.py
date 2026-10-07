@@ -13,7 +13,7 @@ from services.users import is_user_admin, get_user_from_token, is_user_at_least_
 
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/news",
     tags=["News"]
     )

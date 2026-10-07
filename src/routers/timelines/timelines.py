@@ -7,7 +7,7 @@ from services.users import get_user_from_token, is_user_at_least_curator, get_db
 from lib.database.abstract.Database import DatabaseABC
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/timelines",
     tags=["Timeline","Submission"],
     )

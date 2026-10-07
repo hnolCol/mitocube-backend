@@ -16,7 +16,7 @@ from config.models.instruments import InstrumentStateModel, InstrumentStateHisto
 from lib.database.abstract.Database import DatabaseABC
 
 import numpy as np 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/instruments",
     tags=["Remote Control"]
     )
@@ -33,9 +33,18 @@ def get_instruments(type: str = None, user: UserModel = Depends(get_user_from_to
     return db.instruments.get(instrument_type=type)
 
 @router.get("/permissions") 
-def get_instrument_permissions(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def get_instrument_permissions(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> PermissionResponseModel:
     "Returns the instrument tags the user has permission to access."
     return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.CURATOR, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, edit= user.role >= UserRolesEnum.CURATOR) 
+
+@router.get("/overview")
+def get_instruments_overview(user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+    "Per-instrument current state and sample count, via the runlist path."
+    return DB.instruments.get_overview()
+
+@router.get("/states/all")
+def get_all_instrument_states(user: UserModel = Depends(get_user_from_token)) -> List[InstrumentStateModel]:
+    return DB.instrument_states.get_all()
 
 
 @router.get("/states/q")
@@ -61,14 +70,15 @@ def get_instrument_state(instrument_tag : str, limit : int = 1, user : UserModel
     if not db.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
     return db.instrument_states.get_instrument_state(instrument_tag = instrument_tag , limit = limit)
 
-
+RUNNING_INSTRUMENT_STATE = "state.instrument.running"
 @router.post("/{instrument_tag}/states/{state_tag}")
-def set_instrument_state(instrument_tag : str, state_tag : str, user : UserModel = Depends(is_user_at_least_curator)): 
+def set_instrument_state(instrument_tag : str, state_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> dict:
     "Sets the state of an instrument. The state is added to the history of the instrument. The state is not overwritten, but added as a new entry in the history. The duration of the previous state is calculated and stored in the database."
     if not db.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
     if not db.instrument_states.exists(tag = state_tag): raise HTTPException(status_code=404, detail="State not found.")
     db.instrument_states.set_state(tag = state_tag, instrument_tag = instrument_tag)
-
+    paused = db.instruments.pause_measuring_submissions(instrument_tag) if state_tag != RUNNING_INSTRUMENT_STATE else []
+    return {"paused_submissions": paused}
 
 @router.get("/{instrument_tag}/states/durations") 
 def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentStateHistoryResponseModel]:
@@ -78,9 +88,8 @@ def get_instrument_state_durations(instrument_tag : str, timestamp_min : float =
 
 @router.get("/{instrument_tag}/states/durations/fraction")
 def get_fractional_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[dict]:
-    "Returns the duration of all states for an instrument as a fraction of the total time." 
     fractions = db.instrument_states.get_fractional_state_durations(instrument_tag=instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
-    return fractions
+    return fractions.to_dict(orient="records")
 
 @router.get("/{instrument_tag}/states") 
 def get_instrument_states(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentsStateResponseModel]:
@@ -107,7 +116,27 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
     return db.samples.count(instrument_tag = instrument_tag)
     return 12 #db.samples.count(instrument_tag = instrument_tag)
 
+@router.get("/{instrument_tag}/quantification/summary")
+def get_instrument_quantification_summary(
+    instrument_tag: str,
+    timestamp_min: float = None,
+    timestamp_max: float = None,
+    user: UserModel = Depends(get_user_from_token),
+) -> List[dict]:
+    return DB.instruments.get_quantification_summary_by_month(
+        instrument_tag=instrument_tag, timestamp_min=timestamp_min, timestamp_max=timestamp_max
+    )
 
+@router.get("/{instrument_tag}/state/durations/summary")
+def get_instrument_state_duration_summary(
+    instrument_tag: str,
+    timestamp_min: float = None,
+    timestamp_max: float = None,
+    user: UserModel = Depends(get_user_from_token),
+) -> List[dict]:
+    return DB.instrument_states.get_state_duration_summary(
+        instrument_tag=instrument_tag, timestamp_min=timestamp_min, timestamp_max=timestamp_max
+    )
 
     
 @router.get("/{instrument_tag}/stats")
@@ -155,4 +184,20 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
         "relative_number_datasets" : len(instrument_dataset_labels)/len(total_dataset_labels_with_instrument)}
 
     
-    
+@router.get("/{instrument_tag}/submissions/past")
+def get_instrument_past_submissions(
+    instrument_tag: str,
+    offset: int = 0,
+    limit: int = 20,
+    user: UserModel = Depends(get_user_from_token),
+) -> dict:
+    return DB.instruments.get_past_submissions_paginated(instrument_tag=instrument_tag, offset=offset, limit=limit)
+
+
+@router.get("/{instrument_tag}/quantification/unique-count")
+def get_instrument_unique_protein_group_count(
+    instrument_tag: str,
+    year: int,
+    user: UserModel = Depends(get_user_from_token),
+) -> int:
+    return DB.instruments.get_unique_protein_group_count_by_year(instrument_tag=instrument_tag, year=year)

@@ -17,12 +17,12 @@ from services.users import get_user_from_token, is_user_admin
 DB = Database.DB()
 
 
-router = APIRouter(
-    prefix="/api",
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
+    prefix="/api/filters",
     tags=["Heatmap"]
 )
 #heatmap endpoints 
-@router.get("/filters/q", response_model=List[str],
+@router.get("/q", response_model=List[str],
             tags=["Filter"])
 def get_available_filters(proteome_tags : str = None, 
                           protein_tag : str = None, 
@@ -56,13 +56,13 @@ def get_available_filters(proteome_tags : str = None,
     return filter_tags
 
 
-@router.get("filters/{filter_tag}")
+@router.get("/{filter_tag}")
 def get_filter(filter_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[FilterModel]:
     ""
     filter = DB.filters.get (tag = filter_tag)
     return filter 
 
-@router.post("/filters") 
+@router.post("") 
 def add_filter(filterProps : FilterProps,
                user : UserModel = Depends(is_user_admin)) -> bool :
     """Adds a filter from a list of protein tags. Tags are not created if not existance, therefore you may 

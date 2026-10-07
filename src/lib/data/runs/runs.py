@@ -264,19 +264,19 @@ class RunListCreator:
                 "row_index" : int, 
                 "position_label" : str, 
                 "name" : str,
-                "label" : str,
+                "tag" : str,
                 "aggregated_samples" : List[int]
             }
             ```
         """
-        run_label = get_random_string(N=4)
+        run_tag = get_random_string(N=4)
         return {
                     "plate_index" : plate_index,
                     "column_index" : column_idx, 
                     "row_index" : row_index, 
                     "position_label" : position_label, 
-                    "name" : f"{name}_{run_label}",
-                    "label" : run_label,
+                    "name" : f"{name}_{run_tag}",
+                    "tag" : run_tag,
                     "aggregated_samples" : aggregated_samples
                     }
 
@@ -297,17 +297,17 @@ class RunListCreator:
             The run name of a pooled list of samples. 
 
         """
-        today_as_string = datetime.today().strftime('%Y%m%d')
+        # today_as_string = datetime.today().strftime('%Y%m%d')
         leading_zeros = len(str(total_runs)) if total_runs >= 10 else 2
         sample_idces = [f'{agg_sample_idx:0{leading_zeros}d}' for agg_sample_idx in aggregated_samples]
         aggregated_sample_idcs = f"samples-{'-'.join(sample_idces) if len(sample_idces) < 5 else len(sample_idces)}"
-        if self._add_user_initials:
-            user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-            return f"{today_as_string}_{self._dataset_label}_{user_initials}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
-        else:
-            return f"{today_as_string}_{self._dataset_label}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
-        
+        # if self._add_user_initials:
+        #     user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
+        #     return f"{today_as_string}_{self._dataset_label}_{user_initials}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
+        # else:
+        #     return f"{today_as_string}_{self._dataset_label}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
 
+        return self._base_run_name(f"{index:0{leading_zeros}d}_{str(groupName).replace(' ','-')}_{aggregated_sample_idcs}")
     def _get_fraction_runs(self, run_names : List[str]) -> List[str]:
         """
         Repeats the run names by self.n_fractions and adds a -frac-{frac-index} 
@@ -323,16 +323,36 @@ class RunListCreator:
         List[str]
             The run names in a list of size self._n_fractions *  len(run_names). 
         """
-        today_as_string = datetime.today().strftime('%Y%m%d')
+        # today_as_string = datetime.today().strftime('%Y%m%d')
         leading_zeros = len(str(self._n_fractions)) if self._n_fractions >= 10 else 2
+        # if self._add_user_initials:
+        #     user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
+        #     return list(chain.from_iterable([[f"{today_as_string}_{self._dataset_label}_{user_initials}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
+        #                                         for run_name in run_names]))
+        # else:
+        #     return list(chain.from_iterable([[f"{today_as_string}_{self._dataset_label}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
+        #                                         for run_name in run_names]))
+
+        return list(chain.from_iterable(
+            [f"{run_name}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1, self._n_fractions + 1)]
+            for run_name in run_names))
+
+    def _base_run_name(self, suffix : str) -> str:
+        "date_dataset_(initials_)suffix"
+        today_as_string = datetime.today().strftime('%Y%m%d')
         if self._add_user_initials:
             user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-            return list(chain.from_iterable([[f"{today_as_string}_{self._dataset_label}_{user_initials}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
-                                                for run_name in run_names]))
-        else:
-            return list(chain.from_iterable([[f"{today_as_string}_{self._dataset_label}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
-                                                for run_name in run_names]))
+            return f"{today_as_string}_{self._dataset_label}_{user_initials}_{suffix}"
+        return f"{today_as_string}_{self._dataset_label}_{suffix}"
 
+    def _sample_suffixes(self) -> List[str]:
+        "'<index>_<label>' per sample, index = position in sample list (ordered by sample_index)."
+        width = max(2, len(str(len(self._sample_list.index))))
+        suffixes = []
+        for i, sample_name in enumerate(self._sample_list.index):
+            label = sample_name.split('_', maxsplit=2)[-1].rsplit('_', 1)[0]   # "kXeMa_02" -> "kXeMa"
+            suffixes.append(f"{i + 1:0{width}d}_{label}")
+        return suffixes
 
     def create(self) -> RunListModel:
         """
@@ -346,17 +366,19 @@ class RunListCreator:
         n_plates = len(self._free_plate_positions) 
         aggregated_samples = []
         if self._aggregated_on is None and not self._fractionate:
-            #sample  names equal run names 
-            #TO DO : maxsplit=2 - dangerous for changing the file name creating method.. 
-            #find another solution here. 
-            today_as_string = datetime.today().strftime('%Y%m%d')
-            if self._add_user_initials:
-                user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-                run_names = [f"{today_as_string}_{self._dataset_label}_{user_initials}_{sample_name.split('_',maxsplit=2)[-1]}" for sample_name in self._sample_list.index]
-            else:
-                run_names = [f"{today_as_string}_{self._dataset_label}_{sample_name.split('_')[-1]}_{sample_name.split('_')[2]}" for sample_name in self._sample_list.index] # was max split
+            # #sample  names equal run names 
+            # #TO DO : maxsplit=2 - dangerous for changing the file name creating method.. 
+            # #find another solution here. 
+            # today_as_string = datetime.today().strftime('%Y%m%d')
+            # if self._add_user_initials:
+            #     user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
+            #     run_names = [f"{today_as_string}_{self._dataset_label}_{user_initials}_{sample_name.split('_',maxsplit=2)[-1]}" for sample_name in self._sample_list.index]
+            # else:
+            #     run_names = [f"{today_as_string}_{self._dataset_label}_{sample_name.split('_')[-1]}_{sample_name.split('_')[2]}" for sample_name in self._sample_list.index] # was max split
+            run_names = [self._base_run_name(s) for s in self._sample_suffixes()]
         elif self._aggregated_on is None and self._fractionate:
-            run_names = self._get_fraction_runs(self._sample_list.index.to_list())
+            # run_names = self._get_fraction_runs(self._sample_list.index.to_list())
+            run_names = self._get_fraction_runs([self._base_run_name(s) for s in self._sample_suffixes()])
             
         elif self._aggregated_on is not None:
             #groupby the sample list by the aggregate_on column => pooling 

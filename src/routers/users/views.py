@@ -5,7 +5,8 @@ from config.models.conditions_applications import ConditionApplicationAttributeM
 from services.users import get_user_from_token, get_db
 from typing import List, Dict, Literal
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
+
     prefix="/api/users",
     tags=["Condition Applications"],
     

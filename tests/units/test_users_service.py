@@ -11,15 +11,35 @@ from tests.units.conftest import TEST_JWT_KEY
 from fastapi import HTTPException
 from jose import jwt
 
-from services.users import (
-    check_token_verified,
-    check_user_allowed,
-    get_user_from_login,
-    get_user_from_token,
-    is_user_admin,
-    is_user_at_least_curator,
-    is_creator_of_submission_or_curator,
-)
+import services.users as users_service
+
+check_token_verified = users_service.check_token_verified
+check_user_allowed = users_service.check_user_allowed
+is_user_admin = users_service.is_user_admin
+is_user_at_least_curator = users_service.is_user_at_least_curator
+
+
+@pytest.fixture(autouse=True)
+def _no_user_cache(monkeypatch):
+    """Bypass the Mongo-backed user cache in unit tests.
+
+    get_user_from_token consults the cache first; unit tests exercise the
+    DB path, so the cache is stubbed to always miss.
+    """
+    monkeypatch.setattr(users_service, "get_cached_user", lambda tag: None)
+    monkeypatch.setattr(users_service, "cache_user", lambda user, cache_time=None: None)
+
+
+def get_user_from_login(form_data, db):
+    return users_service.get_user_from_login(form_data, db)
+
+
+def get_user_from_token(claims, db):
+    return users_service.get_user_from_token(claims, db)
+
+
+def is_creator_of_submission_or_curator(submission_tag, user, db):
+    return users_service.is_creator_of_submission_or_curator(submission_tag, user, db)
 
 
 class FakeUserDB:
