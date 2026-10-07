@@ -2,13 +2,25 @@ from fastapi.security import  OAuth2PasswordRequestForm
 from fastapi import Depends
 from pydantic import EmailStr
 from typing import List, Tuple
+
 from services.encryption import verify_password, get_decoded_token
-from config.exceptions.HTTPExceptions import user_form_data_incorrect, credentials_exception, user_blocked, user_role_too_low, token_not_valid_exception, submission_tag_not_found
+from config.exceptions.HTTPExceptions import (
+    user_form_data_incorrect,
+    credentials_exception,
+    user_blocked,
+    user_role_too_low,
+    token_not_valid_exception,
+    submission_tag_not_found,
+)
 from config.models.user import UserModel, UserRolesEnum, PublicUser
-
-
+from lib.database.abstract.Database import DatabaseABC
 from lib.database.Database import Database
-DB = Database.DB()
+
+
+def get_db() -> DatabaseABC:
+    """Resolve the database lazily so importing this module never opens a connection."""
+    return Database.DB()
+
 
 def check_mfa_setup_token(token: dict = Depends(get_decoded_token)) -> dict:
     if token.get("purpose") != "mfa_setup":
@@ -17,9 +29,9 @@ def check_mfa_setup_token(token: dict = Depends(get_decoded_token)) -> dict:
         raise token_not_valid_exception
     return token
 
+
 def check_pending_mfa_token(token: dict = Depends(get_decoded_token)) -> dict:
-    """
-    Ensures the token is a pending-MFA token (issued by /token, not yet verified).
+    """Ensures the token is a pending-MFA token (issued by /token, not yet verified).
     Rejects fully verified tokens, share tokens, or anything else — this token
     type should only ever be usable against /verify.
     """
@@ -30,31 +42,30 @@ def check_pending_mfa_token(token: dict = Depends(get_decoded_token)) -> dict:
     return token
 
 
-def are_public_users_allowed(user_tags  : List[str]) -> List[bool]:
+def are_public_users_allowed(user_tags : List[str], db : DatabaseABC = Depends(get_db)) -> List[bool]:
     """Checks if a list of Users are allowed to login."""
-    #user_tags = [u.tag for u in users]
-    users_from_db = DB.users.get_users_by_tags(tags = user_tags)
+    users_from_db = db.users.get_users_by_tags(tags = user_tags)
     return [u.allow_login for u in users_from_db if u is not None]
 
-def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends()) -> UserModel:
+
+def get_user_from_login(form_data : OAuth2PasswordRequestForm = Depends(), db : DatabaseABC = Depends(get_db)) -> UserModel:
     """Returns the user from a login"""
-    user  = DB.users.get_user_by_email(form_data.username)
+    user  = db.users.get_user_by_email(form_data.username)
     #user verification check
     user_in_db = check_user_allowed(user is not None, user)
-
     if not verify_password(form_data.password, user_in_db.password.get_secret_value()):
         raise credentials_exception
     return user_in_db
 
+
 def check_user_allowed(user_exists : bool, user : UserModel) -> UserModel:
-    """
-    Checks if user is allowed to login
-    
+    """Checks if user is allowed to login
+
     Parameters
     ----------
     user_exists : bool 
         If the user exists. 
-    user : UserModel 
+    user : UserModel
         The user to check
 
     Returns
@@ -64,7 +75,7 @@ def check_user_allowed(user_exists : bool, user : UserModel) -> UserModel:
 
     Raises
     ------
-        HTTP Exception 
+        HTTP Exception
             if user form data is incorrect
         HTTP Exception
             if user param allow_login is False 
@@ -73,7 +84,8 @@ def check_user_allowed(user_exists : bool, user : UserModel) -> UserModel:
         raise user_form_data_incorrect
     if not user.allow_login:
         raise user_blocked
-    return user 
+    return user
+
 
 def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
     """Check if the token is verified. Raises an exception if not."""
@@ -81,13 +93,14 @@ def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
         return token 
     raise token_not_valid_exception
 
-def get_user_from_token(token = Depends(check_token_verified)) -> UserModel:
+
+def get_user_from_token(token = Depends(check_token_verified), db : DatabaseABC = Depends(get_db)) -> UserModel:
     """Extracts the user from a token"""
-    #DB.get_user_by_id()
     if "tag" not in token : raise token_not_valid_exception
-    user_in_db = DB.users.get_user_by_tag(tag = token["tag"])
+    user_in_db = db.users.get_user_by_tag(tag = token["tag"])
     user  = check_user_allowed(user_in_db is not None,user_in_db)
     return user 
+
 
 def is_user_at_least_curator(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     """Checks if the user is at least curator.
@@ -95,6 +108,7 @@ def is_user_at_least_curator(user : UserModel = Depends(get_user_from_token)) ->
     if (user.role >= UserRolesEnum.CURATOR):
         return user
     raise user_role_too_low
+
 
 def is_user_admin(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     """Checks if the user is at least admin.
@@ -104,13 +118,12 @@ def is_user_admin(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     raise user_role_too_low
 
 
-def is_creator_of_submission_or_curator(submission_tag : str, user : UserModel = Depends(get_user_from_token)) -> UserModel:
-    """Checks if the user is the creator of a submission.
+def is_creator_of_submission_or_curator(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> UserModel:
+    """Checks if the user is the creator of the submission.
     raises an exception if the user is not the creator of the submission."""
-    print(user.tag, submission_tag, "IN DEPENDS")
-    if not DB.submissions.exists(tag = submission_tag):
+    if not db.submissions.exists(tag = submission_tag):
         raise submission_tag_not_found
-    creator_tag = DB.submissions.get_creator(tag = submission_tag)
+    creator_tag = db.submissions.get_creator(tag = submission_tag)
     if user.tag == creator_tag:
         return user 
     else:

@@ -32,3 +32,14 @@ class General(BaseSettings):
 
 Here you can specify if you would like to restrict the user registration to a certain domain of emails preventing users to use private emails using the ```allowed_email_domains``` parameter. 
 If the you leave this empty, in prinicple everyone can register and have access to the data. Hence, for security reasons, this should not be an empty list. 
+## Tests
+
+A pytest suite lives in `tests/`. Unit tests cover password hashing, JWT
+creation/decoding, login and role-gate logic in `services.users`, user model
+validation and the MFA runtime (lockout + challenges). No database or network
+access is required.
+
+```bash
+pip install -r requirements.txt pytest
+python -m pytest
+```
