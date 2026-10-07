@@ -56,6 +56,25 @@ Since production runs behind nginx, the client IP is taken from
 (`TRUSTED_PROXY_IPS`, default `127.0.0.1,::1`). Set this to the IP your
 nginx uses to reach uvicorn.
 
+### Required nginx configuration
+
+For the per-IP rate limit to see real client IPs, the nginx site config
+**must** forward the original client address. Without the
+`X-Forwarded-For` header, every user reaches the backend as the nginx
+IP and all users share a single rate-limit budget. The essential
+directive:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8000;
+    # REQUIRED for login rate limiting:
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+```
+
+A complete, commented example config is in
+[`docs/nginx.conf.example`](docs/nginx.conf.example).
+
 `pip-audit` runs on `requirements.txt` in CI (see
 `.github/workflows/ci.yml`). Known advisories without an upstream fix
 (currently transitive `ecdsa` via `python-jose`) are tracked until the
