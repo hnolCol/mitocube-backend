@@ -2,11 +2,9 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from config.enums.states import SubmissionStatesEnums, SubmissionStateColors
 
 
-from lib.database.Database import Database
 
 
 
-DB = Database.DB()
 
 router = APIRouter(
     prefix="/api",

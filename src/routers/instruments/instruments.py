@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List
-from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator, get_db
 
 
 
@@ -13,7 +13,7 @@ from config.models.permissions import PermissionResponseModel
 from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel, InstrumentsStateResponseModel
 
 
-from lib.database.Database import Database
+from lib.database.abstract.Database import DatabaseABC
 
 import numpy as np 
 router = APIRouter(
@@ -21,98 +21,97 @@ router = APIRouter(
     tags=["Remote Control"]
     )
 
-DB = Database.DB()
 
 @router.get("/types")
-def get_instrument_type_tags(user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+def get_instrument_type_tags(user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[dict]:
     """Instruments are grouped by type."""
-    return DB.instruments.get_types()
+    return db.instruments.get_types()
 
 @router.get("")
-def get_instruments(type: str = None, user: UserModel = Depends(get_user_from_token)) -> List[dict]:
+def get_instruments(type: str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[dict]:
     """Get instruments with their display text, optionally filtered by type"""
-    return DB.instruments.get(instrument_type=type)
+    return db.instruments.get(instrument_type=type)
 
 @router.get("/permissions") 
-def get_instrument_permissions(user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_instrument_permissions(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the instrument tags the user has permission to access."
     return PermissionResponseModel(user_tag=user.tag, create= user.role >= UserRolesEnum.CURATOR, archive= user.role >= UserRolesEnum.CURATOR, comment = user.role >= UserRolesEnum.STANDARD, edit= user.role >= UserRolesEnum.CURATOR) 
 
 
 @router.get("/states/q")
-def get_instrument_state_by_search_string(search_string : str, limit : int = 20):
-    return DB.instrument_states.find(search_string)
+def get_instrument_state_by_search_string(search_string : str, limit : int = 20, db : DatabaseABC = Depends(get_db)):
+    return db.instrument_states.find(search_string)
 
 
 @router.get("/states/{state_tag}")
-def get_instrument_state_by_tag(state_tag : str) -> InstrumentStateModel:
-    return DB.instrument_states.get(tag = state_tag)
+def get_instrument_state_by_tag(state_tag : str, db : DatabaseABC = Depends(get_db)) -> InstrumentStateModel:
+    return db.instrument_states.get(tag = state_tag)
 
 
 @router.get("/{instrument_tag}")
-def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)) -> TraitModel:
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> TraitModel:
     "Since instruments are also traits in the database, we can use the attributes route."
-    if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
-    instrument = DB.attributes.trait(trait_tag = instrument_tag)
+    if not db.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
+    instrument = db.attributes.trait(trait_tag = instrument_tag)
     return instrument
 
 @router.get("/{instrument_tag}/states")
-def get_instrument_state(instrument_tag : str, limit : int = 1, user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def get_instrument_state(instrument_tag : str, limit : int = 1, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the states of an instrument. The states are always ordered by the creation time, with the most recent state first."
-    if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
-    return DB.instrument_states.get_instrument_state(instrument_tag = instrument_tag , limit = limit)
+    if not db.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
+    return db.instrument_states.get_instrument_state(instrument_tag = instrument_tag , limit = limit)
 
 
 @router.post("/{instrument_tag}/states/{state_tag}")
 def set_instrument_state(instrument_tag : str, state_tag : str, user : UserModel = Depends(is_user_at_least_curator)): 
     "Sets the state of an instrument. The state is added to the history of the instrument. The state is not overwritten, but added as a new entry in the history. The duration of the previous state is calculated and stored in the database."
-    if not DB.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
-    if not DB.instrument_states.exists(tag = state_tag): raise HTTPException(status_code=404, detail="State not found.")
-    DB.instrument_states.set_state(tag = state_tag, instrument_tag = instrument_tag)
+    if not db.attributes.exists(trait = instrument_tag): raise HTTPException(status_code=404, detail="Instrument not found.")
+    if not db.instrument_states.exists(tag = state_tag): raise HTTPException(status_code=404, detail="State not found.")
+    db.instrument_states.set_state(tag = state_tag, instrument_tag = instrument_tag)
 
 
 @router.get("/{instrument_tag}/states/durations") 
-def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
+def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentStateHistoryResponseModel]:
     "Returns the duration of all states for an instrument." 
-    return DB.instrument_states.get_state_durations(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+    return db.instrument_states.get_state_durations(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
 
 
 @router.get("/{instrument_tag}/states/durations/fraction")
-def get_fractional_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[dict]:
+def get_fractional_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[dict]:
     "Returns the duration of all states for an instrument as a fraction of the total time." 
-    fractions = DB.instrument_states.get_fractional_state_durations(instrument_tag=instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+    fractions = db.instrument_states.get_fractional_state_durations(instrument_tag=instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
     return fractions
 
 @router.get("/{instrument_tag}/states") 
-def get_instrument_states(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentsStateResponseModel]:
+def get_instrument_states(instrument_tag : str, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentsStateResponseModel]:
     "Returns the state tags for an instrument." 
-    return DB.instrument_states.get_instrument_state(instrument_tag = instrument_tag, limit = limit)
+    return db.instrument_states.get_instrument_state(instrument_tag = instrument_tag, limit = limit)
     
-    #return DB.instrument_states.get_states(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+    #return db.instrument_states.get_states(instrument_tag = instrument_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
 
 
 @router.get("/{instrument_tag}/states/{state_tag}/durations") 
-def get_instrument_specific_state_durations(instrument_tag : str, state_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token)) -> List[InstrumentStateHistoryResponseModel]:
+def get_instrument_specific_state_durations(instrument_tag : str, state_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentStateHistoryResponseModel]:
     "Returns the duration of a specific state for an instrument." 
-    return DB.instrument_states.get_state_durations(instrument_tag = instrument_tag, state_tag = state_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
+    return db.instrument_states.get_state_durations(instrument_tag = instrument_tag, state_tag = state_tag, timestamp_min = timestamp_min, timestamp_max = timestamp_max, limit = limit)
 
 
 @router.get("/{instrument_tag}/projects/count")
-def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Return the number of projects the instrument was used in."
     return 9 
 
 @router.get("/{instrument_tag}/samples/count")
-def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Return the number of samples the instrument measured."
-    return DB.samples.count(instrument_tag = instrument_tag)
-    return 12 #DB.samples.count(instrument_tag = instrument_tag)
+    return db.samples.count(instrument_tag = instrument_tag)
+    return 12 #db.samples.count(instrument_tag = instrument_tag)
 
 
 
     
 @router.get("/{instrument_tag}/stats")
-def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     ""
 
     
