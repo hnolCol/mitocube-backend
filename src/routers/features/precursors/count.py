@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from services.users import get_user_from_token
-from lib.database.Database import Database
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/features/precursors",
@@ -12,7 +12,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/count", summary="Counts the number of precursors.")
-def count_precursors(submission_tag : str = None, user : UserModel = Depends(get_user_from_token)) -> int:
+def count_precursors(submission_tag : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     """
     Counts the number of precursors. If a submission tag is given, only precursors
     quantified in that submission are counted.
@@ -34,6 +34,6 @@ def count_precursors(submission_tag : str = None, user : UserModel = Depends(get
     HTTPException
         If the submission with the given tag does not exist.
     """
-    if submission_tag is not None and not DB.submissions.exists(tag = submission_tag):
+    if submission_tag is not None and not db.submissions.exists(tag = submission_tag):
         raise HTTPException(status_code=404, detail=f"Submission with tag {submission_tag} not found.")
-    return DB.precursors.count(submission_tag = submission_tag)
+    return db.precursors.count(submission_tag = submission_tag)

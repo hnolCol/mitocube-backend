@@ -49,6 +49,17 @@ class MCNeo4JDatabase(DatabaseABC):
         
         self.connection = Neo4JConnection()
         self._driver = self.connection.driver
+
+    def health_check(self) -> bool:
+        """Cheap connectivity probe for startup health checks.
+
+        Opens the underlying driver on first call (the Database.DB() proxy is
+        lazy) and runs a trivial query so a broken connection surfaces at
+        startup instead of on the first user request.
+        """
+        self._driver.verify_connectivity()
+        self._driver.execute_query(query_="RETURN 1", routing_="r", database_="neo4j")
+        return True
         
         self.factory = Neo4JFactory(driver=self.connection.driver)
         self.constructor = Neo4JConstructor(driver=self.connection.driver)

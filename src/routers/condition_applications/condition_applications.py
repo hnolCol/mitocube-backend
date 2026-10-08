@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 import pandas as pd 
 import numpy as np 
 from typing import List, Dict, OrderedDict, defaultdict
 
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationTreeResponseModel, ConditionApplicationTreeModel
-from lib.database.Database import Database
 
 from services.users import get_user_from_token
 
 from services.condition_application import build_condition_application_tree
 from config.models.parameter import APIParamString
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -28,7 +28,7 @@ def query_condition_applications(search_string : str = None,
                                  attribute_tag : str = None, 
                                  trait_tag : str = None, 
                                  sort_by_frequency : bool = True, 
-                                 limit : int = None, user : UserModel = Depends(get_user_from_token)):
+                                 limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Query condition applications based on different criteria.
     
     Parameters
@@ -54,27 +54,27 @@ def query_condition_applications(search_string : str = None,
         
     """
 
-    ca_tags = DB.condition_applications.find(search_string = search_string, samples_only = samples_only, protein_tags = protein_tags, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
+    ca_tags = db.condition_applications.find(search_string = search_string, samples_only = samples_only, protein_tags = protein_tags, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
 
     return ca_tags
 
 @router.get("/q/hierarchy")
-def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group: str = None, user: UserModel = Depends(get_user_from_token)) -> List[Dict]:
+def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group: str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     
     ca_tags_with_protein_value = []
-    protein_tags = DB.proteins.find(search_string=search_string, is_condition_value=True)
+    protein_tags = db.proteins.find(search_string=search_string, is_condition_value=True)
     
     
     exclude_list = APIParamString(param=exclude_attribute_group).param
     
     if len(protein_tags) > 0:
-        ca_tags_with_protein_value = DB.condition_applications.find(protein_tags=protein_tags, 
+        ca_tags_with_protein_value = db.condition_applications.find(protein_tags=protein_tags, 
                                                                     sort_by_frequency=True,
                                                                     exclude_attribute_group=exclude_list,
                                                                     limit = limit
                                                                 )
     
-    ca_tags_by_search_string = DB.condition_applications.find( search_string=search_string, 
+    ca_tags_by_search_string = db.condition_applications.find( search_string=search_string, 
                                                                 samples_only=False, 
                                                                 sort_by_frequency=True,
                                                                 exclude_attribute_group=exclude_list,
@@ -85,8 +85,8 @@ def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group:
     tree = defaultdict(lambda: defaultdict(list))
 
     for ca in ca_tags:
-        attr = DB.condition_applications.get_attribute(ca)  # ideally pre-fetched
-        trait = DB.condition_applications.get_trait(ca)
+        attr = db.condition_applications.get_attribute(ca)  # ideally pre-fetched
+        trait = db.condition_applications.get_trait(ca)
 
         tree[attr][trait].append(ca)
     
@@ -116,7 +116,7 @@ def ca_hierarchy(search_string: str, limit: int = None, exclude_attribute_group:
     
  
 @router.get("/{ca_tag}")
-def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> List[ConditionApplicationTreeResponseModel]:
+def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ConditionApplicationTreeResponseModel]:
     """Returns the condition application by its tag. 
 
     Parameters
@@ -130,15 +130,15 @@ def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token))
         The condition application as a pydantic model
         
     """
-    if not DB.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
-    ca = DB.condition_applications.get(tag = ca_tag)
+    if not db.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
+    ca = db.condition_applications.get(tag = ca_tag)
 
     return build_condition_application_tree(ca)
 
 
  
 @router.get("/{ca_tag}/value_exists")
-def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> bool:
+def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """Returns if the condition application has a condition value. 
 
     Parameters
@@ -152,11 +152,11 @@ def get_ca_by_tag(ca_tag : str, user : UserModel = Depends(get_user_from_token))
         Condition Value exists for the condition application or not.
         
     """
-    if not DB.condition_applications.exists(tag = ca_tag): return False
-    return DB.condition_applications.has_value(tag = ca_tag)
+    if not db.condition_applications.exists(tag = ca_tag): return False
+    return db.condition_applications.has_value(tag = ca_tag)
 
 @router.get("/{ca_tag}/text")
-def get_ca_name_by_tag(ca_tag : str, handle_genotypes : bool = True, user : UserModel = Depends(get_user_from_token)) -> str:
+def get_ca_name_by_tag(ca_tag : str, handle_genotypes : bool = True, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
     """Returns the text representation of the condition application by its tag. 
 
     Parameters
@@ -170,17 +170,17 @@ def get_ca_name_by_tag(ca_tag : str, handle_genotypes : bool = True, user : User
         The text representation of the condition application.
         
     """
-    if handle_genotypes and DB.genotypes.exists(tag = ca_tag):
-        return DB.genotypes.get_text(tag = ca_tag)
-    if not DB.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
-    return DB.condition_applications.get_text(tag = ca_tag)    
+    if handle_genotypes and db.genotypes.exists(tag = ca_tag):
+        return db.genotypes.get_text(tag = ca_tag)
+    if not db.condition_applications.exists(tag = ca_tag): raise HTTPException(status_code=404, detail=f"No condition application found for tag {ca_tag}")
+    return db.condition_applications.get_text(tag = ca_tag)    
 
 
 @router.get("/{tag}/tree_for_ui")
-def get_tree_for_ui(ca_tag : str, user : UserModel = Depends(get_user_from_token)) -> Dict:
+def get_tree_for_ui(ca_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict:
     """
     Returns the condition application tree transformed for UI display.
     """
-    ca = DB.condition_applications.get_tree(tag= ca_tag)
-    ui_tree = DB.condition_applications.transform_for_ui(ca)
+    ca = db.condition_applications.get_tree(tag= ca_tag)
+    ui_tree = db.condition_applications.transform_for_ui(ca)
     return [ui_tree]

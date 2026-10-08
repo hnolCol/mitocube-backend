@@ -1,6 +1,7 @@
 from typing import List
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from fastapi import APIRouter, Depends, HTTPException
-from lib.database.Database import Database
 from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 from config.models.user import UserModel
 from services.users import is_user_at_least_curator, get_user_from_token
@@ -10,11 +11,10 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     tags=["Performance"]
 )
 
-DB = Database.DB()
 
 
 @router.get("/runs", summary="Returns the QC runs.")
-def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str = None, condition_application_tag : str = None, limit : int = 50, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCRunResponseModel]:
+def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str = None, condition_application_tag : str = None, limit : int = 50, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[QCRunResponseModel]:
     """
     Returns the QC runs, optionally filtered by instrument and QC standard.
 
@@ -36,11 +36,11 @@ def get_performance_runs(instrument_name_tag : str = None, qc_standard_tag : str
     List[QCRunResponseModel]
         The QC runs.
     """
-    return DB.qc.get(instrument_name_tag = instrument_name_tag, qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag, limit = limit)
+    return db.qc.get(instrument_name_tag = instrument_name_tag, qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag, limit = limit)
 
 
 @router.get("/runs/count", summary="Counts the QC runs.")
-def count_performance_runs(by_instrument : bool = False, user : UserModel = Depends(is_user_at_least_curator)):
+def count_performance_runs(by_instrument : bool = False, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
     """
     Counts the QC runs, optionally grouped by instrument.
 
@@ -56,11 +56,11 @@ def count_performance_runs(by_instrument : bool = False, user : UserModel = Depe
     int | List[Tuple[str,int]]
         The number of runs or a list of instrument tag and count tuples.
     """
-    return DB.qc.count(by_instrument = by_instrument)
+    return db.qc.count(by_instrument = by_instrument)
 
 
 @router.get("/runs/{run_tag}", summary="Returns a QC run by its tag.")
-def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> QCRunResponseModel:
+def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> QCRunResponseModel:
     """
     Returns a QC run by its tag.
 
@@ -81,14 +81,14 @@ def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_lea
     HTTPException
         If the run does not exist.
     """
-    if not DB.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
-    runs = DB.qc.get(tags = [run_tag], limit = 1)
+    if not db.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
+    runs = db.qc.get(tags = [run_tag], limit = 1)
     if not runs: raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
     return runs[0]
 
 
 @router.post("/runs/insert", summary="Inserts a QC run. Requires at least curator rights.")
-def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Inserts a QC run into the database. The run is linked to the instrument it was
     acquired on and to the QC standard that was used to generate it.
@@ -110,12 +110,12 @@ def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is
     HTTPException
         If the QC standard does not exist (404).
     """
-    if not DB.qc.standard_exists(tag = run.qc_standard_tag): raise HTTPException(status_code=404, detail=f"QC standard with tag {run.qc_standard_tag} not found.")
-    return DB.qc.insert(performance_run = run)
+    if not db.qc.standard_exists(tag = run.qc_standard_tag): raise HTTPException(status_code=404, detail=f"QC standard with tag {run.qc_standard_tag} not found.")
+    return db.qc.insert(performance_run = run)
 
 
 @router.post("/runs/{run_tag}/precursors", summary="Adds quantified QCPrecursors to a QC run. Requires at least curator rights.")
-def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Adds the quantified QCPrecursors to a QC run. The precursors are linked to the run via
     a [:QUANTIFIED] relationship that carries the value, score and retention time
@@ -143,13 +143,13 @@ def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], 
     HTTPException
         If the run does not exist (404) or no precursors are provided (400).
     """
-    if not DB.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
+    if not db.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
     if len(precursors) == 0: raise HTTPException(status_code=400, detail="No precursors provided.")
-    return DB.qc.insert_qc_precursors(run_tag = run_tag, precursors = precursors)
+    return db.qc.insert_qc_precursors(run_tag = run_tag, precursors = precursors)
 
 
 @router.get("/runs/{run_tag}/precursors", summary="Returns the QCPrecursors of a QC run.")
-def get_qc_precursors(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> List[QCPrecursorResponseModel]:
+def get_qc_precursors(run_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[QCPrecursorResponseModel]:
     """
     Returns the QCPrecursors that were recorded for a QC run.
 
@@ -170,12 +170,12 @@ def get_qc_precursors(run_tag : str, user : UserModel = Depends(is_user_at_least
     HTTPException
         If the run does not exist.
     """
-    if not DB.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
-    return DB.qc.get_qc_precursors(run_tag = run_tag)
+    if not db.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
+    return db.qc.get_qc_precursors(run_tag = run_tag)
 
 
 @router.delete("/runs/{run_tag}", summary="Deletes a QC run. Requires at least curator rights.")
-def delete_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_least_curator)) -> bool:
+def delete_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Deletes a QC run and all its relationships.
 
@@ -196,14 +196,14 @@ def delete_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_
     HTTPException
         If the run does not exist.
     """
-    if not DB.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
-    return DB.qc.delete(tag = run_tag)
+    if not db.qc.exists(tag = run_tag): raise HTTPException(status_code=404, detail=f"QC run with tag {run_tag} not found.")
+    return db.qc.delete(tag = run_tag)
 
 
 @router.get("/rt_drift/{precursor_tag}", summary="Returns the RT drift of a QCPrecursor over QC runs.")
 def get_rt_drift(precursor_tag : str, instrument_name_tag : str = None, qc_standard_tag : str = None,
                 condition_application_tag : str = None, start : int = None, end : int = None,
-                user : UserModel = Depends(is_user_at_least_curator)) -> List[dict]:
+                user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[dict]:
     """
     Returns the retention time drift of a QCPrecursor over QC runs, i.e. the observed retention
     time per run ordered by the run creation time. This is the primary QC metric to monitor
@@ -237,6 +237,6 @@ def get_rt_drift(precursor_tag : str, instrument_name_tag : str = None, qc_stand
     List[dict]
         A list of dictionaries with run_tag, created_at and retention_time ordered by created_at.
     """
-    return DB.qc.get_rt_drift(precursor_tag = precursor_tag, instrument_name_tag = instrument_name_tag,
+    return db.qc.get_rt_drift(precursor_tag = precursor_tag, instrument_name_tag = instrument_name_tag,
                               qc_standard_tag = qc_standard_tag, condition_application_tag = condition_application_tag,
                               start = start, end = end)

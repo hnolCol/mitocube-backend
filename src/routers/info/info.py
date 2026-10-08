@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List
 from collections import OrderedDict
 import json 
@@ -11,7 +13,6 @@ from config.models.info.info import InfoResponse
 from config.settings.general import get_general_settings
 from config.settings.keyfigures import get_key_figure_settings
 
-from lib.database.Database import Database 
 
 from datetime import timedelta
 from lib.cache.cache import db_cache_runtime
@@ -22,7 +23,6 @@ GENERAL_SETTINGS  = get_general_settings()
 KEY_FIGURE_SETTINGS = get_key_figure_settings()
 
 
-DB = Database.DB()
 
 router = APIRouter(
     prefix="/api/info",
@@ -297,7 +297,7 @@ def get_stat_metric_text(user : UserModel = Depends(get_user_from_token)) -> str
 
 
 @router.get("/keyfigures",summary="Returns the key figures of the backend")
-def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
+def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the defined key figures that are defined 
     in the corresponding settings.
 
@@ -306,21 +306,21 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token)):
     user : UserModel, optional
         the user that is inferred from the token, by default Depends(get_user_from_token)
     """
-    def _get_keyfigures(user : UserModel):
+    def _get_keyfigures(user : UserModel, db : DatabaseABC = Depends(get_db)):
         key_figures = OrderedDict()
         if KEY_FIGURE_SETTINGS.number_submissions:
-            key_figures["Submissions"] = len(DB.get_submission_tags())
+            key_figures["Submissions"] = len(db.get_submission_tags())
         if KEY_FIGURE_SETTINGS.number_published_datasets:
-            published_datasets = DB.submission_filter.find(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE], limit = None)
+            published_datasets = db.submission_filter.find(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE], limit = None)
             key_figures["Active Submissions"] = len(published_datasets)
         if KEY_FIGURE_SETTINGS.number_proteins:
-            key_figures["Quantified Proteins"] = DB.protein_groups.count()
+            key_figures["Quantified Proteins"] = db.protein_groups.count()
         if KEY_FIGURE_SETTINGS.number_quant_values:
-            key_figures["Quantified Values"] = DB.protein_groups.count_quant_values()
+            key_figures["Quantified Values"] = db.protein_groups.count_quant_values()
         if KEY_FIGURE_SETTINGS.number_genotypes:
-            key_figures["Genotypes"] = DB.genotypes.count()
+            key_figures["Genotypes"] = db.genotypes.count()
         if KEY_FIGURE_SETTINGS.number_users:
-            key_figures["Users"] = DB.users.count()
+            key_figures["Users"] = db.users.count()
         keyfigureData = [{"label" : k, "metric" : v} for k,v in key_figures.items()]
         return keyfigureData
 

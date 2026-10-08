@@ -1,8 +1,9 @@
 
 from datetime import timedelta
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends,  HTTPException
-from lib.database.Database import Database
 from config.models.user import UserModel
 from services.users import get_user_from_token
 from config.exceptions.HTTPExceptions import submission_tag_not_found
@@ -12,7 +13,6 @@ import random
 from typing import Dict, Any, List
 from lib.cache.cache import db_cache_runtime
 from collections import deque
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions/analysis",
@@ -470,26 +470,26 @@ def make_graph(graph_data : List[tuple] = None) -> nx.Graph:
     return G
 
 @router.get("/{submission_tag}/annotations/network")
-def get_annotation_network(submission_tag : str, annotation_group_tag : str = None, show_quantified_proteins_only : bool = True, min_proteins : int = 0, user : UserModel = Depends(get_user_from_token)):
+def get_annotation_network(submission_tag : str, annotation_group_tag : str = None, show_quantified_proteins_only : bool = True, min_proteins : int = 0, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "" 
     
     
-    if not DB.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
-    if not DB.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
+    if not db.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
+    if not db.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
     cache_key = db_cache_runtime.make_cache_key(key_data = ["db.submission.get_network",submission_tag, annotation_group_tag, show_quantified_proteins_only, min_proteins])  
     cached_result =  db_cache_runtime.get(cache_key)
     if cached_result is not None:
         return cached_result
-    if DB.annotation_groups.exists(tag = annotation_group_tag):
-        annotation_tags = DB.annotation_groups.get_annotations(group_tag = annotation_group_tag)
+    if db.annotation_groups.exists(tag = annotation_group_tag):
+        annotation_tags = db.annotation_groups.get_annotations(group_tag = annotation_group_tag)
         graph_data = []
         for annotation_tag in annotation_tags:
-            if DB.annotations.exists(tag = annotation_tag): 
-                if DB.annotations.count_proteins(tag = annotation_tag) >= min_proteins:
+            if db.annotations.exists(tag = annotation_tag): 
+                if db.annotations.count_proteins(tag = annotation_tag) >= min_proteins:
                     #get the annotation data and add it to the network
                     #TO DO : add the annotation data to the network
-                    protein_tags = DB.annotations.get_protein_tags(tag = annotation_tag)
-                    isin = DB.submissions.is_quantified(tag = submission_tag, quant_tags = protein_tags, quantification_type = "proteins")
+                    protein_tags = db.annotations.get_protein_tags(tag = annotation_tag)
+                    isin = db.submissions.is_quantified(tag = submission_tag, quant_tags = protein_tags, quantification_type = "proteins")
                     #at least on protein must be quantified
                     if isin.sum() > 0:
                         if show_quantified_proteins_only:

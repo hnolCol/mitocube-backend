@@ -1,4 +1,6 @@
 import pyotp
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, BackgroundTasks,  HTTPException
 from routers.authentication.token import create_access_token, get_time_stamp
@@ -13,9 +15,7 @@ from config.exceptions.HTTPExceptions import (
 )
 from cryptography.fernet import Fernet
 
-from lib.database.Database import Database
 from config.models.token.token import TokenResponse
-DB = Database.DB()
 GENERAL_SETTINGS = get_general_settings()
 TOKEN_SETTINGS = get_user_token_settings()
 MFA_SETTINGS = get_mfa_settings()
@@ -33,17 +33,17 @@ def get_mfa_status(user: UserModel = Depends(get_user_from_token)):
     return MFAStatusResponse(mfa_enabled=user.mfa_enabled)
 
 @router.post("/setup", response_model=MFASetupResponse)
-def setup_mfa(token: dict = Depends(check_mfa_setup_token)):
+def setup_mfa(token: dict = Depends(check_mfa_setup_token), db : DatabaseABC = Depends(get_db)):
     user_tag = token["tag"]
-    if not DB.users.exists(tag=user_tag):
+    if not db.users.exists(tag=user_tag):
         raise user_not_found
-    user = DB.users.get_user_by_tag(user_tag)
+    user = db.users.get_user_by_tag(user_tag)
     if user is None:
         raise user_blocked
 
     secret = pyotp.random_base32()
     encrypted_secret = fernet.encrypt(secret.encode()).decode()
-    if not DB.users.update(tag=user_tag, user_props={"mfa_secret": encrypted_secret}):
+    if not db.users.update(tag=user_tag, user_props={"mfa_secret": encrypted_secret}):
         raise HTTPException(status_code=500, detail="Could not store MFA secret.")
 
     totp = pyotp.TOTP(secret)
@@ -53,9 +53,9 @@ def setup_mfa(token: dict = Depends(check_mfa_setup_token)):
 
 
 @router.post("/enable", response_model=TokenResponse)
-def enable_mfa(payload: MFAEnableRequest, token: dict = Depends(check_mfa_setup_token)):
+def enable_mfa(payload: MFAEnableRequest, token: dict = Depends(check_mfa_setup_token), db : DatabaseABC = Depends(get_db)):
     user_tag = token["tag"]
-    db_user = DB.users.get_user_by_tag(user_tag)
+    db_user = db.users.get_user_by_tag(user_tag)
     if db_user is None or not db_user.mfa_secret:
         raise mfa_not_setup
     # Decrypt the MFA secret
@@ -65,11 +65,11 @@ def enable_mfa(payload: MFAEnableRequest, token: dict = Depends(check_mfa_setup_
     if not totp.verify(payload.code, valid_window=1):
         raise mfa_code_invalid
 
-    if not DB.users.update(tag=user_tag, user_props={"mfa_enabled": True}):
+    if not db.users.update(tag=user_tag, user_props={"mfa_enabled": True}):
         raise HTTPException(status_code=500, detail="Could not enable MFA.")
 
     # Enrollment complete — mint the real, fully verified session now.
-    user = DB.users.get_user_by_tag(user_tag)
+    user = db.users.get_user_by_tag(user_tag)
     jwt_token = create_access_token(
         user.model_dump(), key_subset=["tag"],
         add_dict={"verified": True, "verified_at": get_time_stamp()},
@@ -81,7 +81,7 @@ def enable_mfa(payload: MFAEnableRequest, token: dict = Depends(check_mfa_setup_
 
 
 @router.post("/disable", response_description="Disables MFA. Requires password and a valid current MFA code.")
-def disable_mfa(payload: MFADisableRequest, user: UserModel = Depends(get_user_from_token)):
+def disable_mfa(payload: MFADisableRequest, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """
     Requires both password and a valid TOTP code — disabling MFA is
     security-sensitive, so a single factor (just the session token)
@@ -90,7 +90,7 @@ def disable_mfa(payload: MFADisableRequest, user: UserModel = Depends(get_user_f
     if not user.mfa_enabled:
         raise mfa_not_enabled
 
-    db_user = DB.users.get_user_by_tag(user.tag)
+    db_user = db.users.get_user_by_tag(user.tag)
     if db_user is None or db_user.password is None:
         raise HTTPException(status_code=404, detail="User not found.")
 
@@ -101,7 +101,7 @@ def disable_mfa(payload: MFADisableRequest, user: UserModel = Depends(get_user_f
     if not totp.verify(payload.code, valid_window=1):
         raise mfa_code_invalid
 
-    if not DB.users.update(tag=user.tag, user_props={"mfa_enabled": False, "mfa_secret": None}):
+    if not db.users.update(tag=user.tag, user_props={"mfa_enabled": False, "mfa_secret": None}):
         raise HTTPException(status_code=500, detail="Could not disable MFA.")
 
     return {"success": True, "message": "MFA disabled successfully."}

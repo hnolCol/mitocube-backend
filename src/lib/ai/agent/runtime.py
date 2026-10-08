@@ -10,6 +10,7 @@ place for that; see app/main.py.
 from __future__ import annotations
 
 
+from pymongo import MongoClient
 from langgraph.checkpoint.mongodb import MongoDBSaver
 
 from lib.ai.agent.agent import build_agent
@@ -28,6 +29,17 @@ class AgentRuntime:
         # Sync __enter__/__exit__ — this is intentional, see module docstring.
         checkpointer = self._checkpointer_cm.__enter__()
         self.agent = build_agent(checkpointer=checkpointer)
+
+    def health_check(self) -> bool:
+        """Cheap connectivity probe for startup health checks."""
+        if self._checkpointer_cm is None:
+            raise RuntimeError("AgentRuntime not started; call startup() first.")
+        client = MongoClient(settings.AGENT_MONGO_URI, serverSelectionTimeoutMS=5000)
+        try:
+            client.admin.command("ping")
+        finally:
+            client.close()
+        return True
 
     async def shutdown(self) -> None:
         if self._checkpointer_cm is not None:

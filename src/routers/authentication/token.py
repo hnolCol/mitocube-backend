@@ -1,6 +1,8 @@
 import time 
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Body
+from fastapi import APIRouter, BackgroundTasks, Depends, Body, Request
 import pyotp
 
 from config.models.user import UserModel
@@ -17,10 +19,8 @@ from config.exceptions.HTTPExceptions import verification_code_incorrect, share_
 from lib.mfa.mfa import mfa_runtime
 from config.settings.token import get_mfa_settings
 from config.settings.token import get_user_token_settings
-from lib.database.Database import Database
 from cryptography.fernet import Fernet
 
-DB = Database.DB()
 
 EMAIL_SETTINGS = get_email_settings()
 GENERAL_SETTINGS = get_general_settings()
@@ -36,6 +36,7 @@ fernet = Fernet(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value())
 
 @router.post("/", response_description="Returns a jwt token This token still has to be verified by a one time password.", response_model=TokenResponse)
 def login_for_access_token(background_task : BackgroundTasks, 
+                           request : Request,
                            user : UserModel = Depends(get_user_from_login), 
                            verification_code : str = Depends(lambda : get_random_string(12))) -> TokenResponse:
     """
@@ -114,13 +115,13 @@ def check_token(user : UserModel = Depends(get_user_from_token)):
     
 @router.post("/verify", response_model=TokenResponse)
 def verify_token_by_code(verification: TokenVerificationCode,
-                         decoded_token: dict = Depends(check_pending_mfa_token)):
+                         decoded_token: dict = Depends(check_pending_mfa_token), db : DatabaseABC = Depends(get_db)):
     user_tag = decoded_token["tag"]
 
     if mfa_runtime.is_locked_out(user_tag):
         raise mfa_locked_out
 
-    db_user = DB.users.get_user_by_tag(user_tag)
+    db_user = db.users.get_user_by_tag(user_tag)
     if db_user is None:
         raise user_blocked
 
@@ -143,7 +144,7 @@ def verify_token_by_code(verification: TokenVerificationCode,
 
     mfa_runtime.reset_attempts(user_tag)
 
-    allowed, user = DB.users.is_user_allowed(tag=user_tag)
+    allowed, user = db.users.is_user_allowed(tag=user_tag)
     if not allowed:
         raise user_blocked
 
@@ -173,7 +174,7 @@ def verify_token_by_code(verification: TokenVerificationCode,
              response_description="Returns a jwt that is verified by a one-time password and is valid for 48 hours.", 
              response_model=TokenResponse)
 def verify_token_by_code(verification : TokenVerificationCode,
-                         decoded_token: dict = Depends(check_for_verification_code_in_token)):
+                         decoded_token: dict = Depends(check_for_verification_code_in_token), db : DatabaseABC = Depends(get_db)):
     """
     Verifies jwt by comparing the verification code that has been sent by mail to the one hidden in the jwt token.
     
@@ -191,7 +192,7 @@ def verify_token_by_code(verification : TokenVerificationCode,
 
     mfa_runtime.reset(user_tag)
 
-    allowed, user = DB.users.is_user_allowed(tag=user_tag)
+    allowed, user = db.users.is_user_allowed(tag=user_tag)
     if not allowed:
         raise user_blocked
 

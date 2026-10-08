@@ -4,7 +4,8 @@ from typing import List, Dict, Literal
 from fastapi import APIRouter, Depends, HTTPException
 from collections import OrderedDict
  
-from lib.database.Database import Database
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
  
 from lib.data.statistic.ANOVA import OneWayANOVA
 from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
@@ -19,15 +20,14 @@ from scipy.stats import ttest_ind, false_discovery_control
 import numpy as np
 from services.statistics.clustering import cluster_to_dataframe
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/submissions/analysis",
     tags=["Submission","Analysis","Heatmap"],
 )
 # --- 1. fix handle_pairwise index -------------------------------------------------
-def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float):
-    dt = DB.get_datatable(tag=submission_tag, annotation_tag=annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
+def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float, db : DatabaseABC = Depends(get_db)):
+    dt = db.get_datatable(tag=submission_tag, annotation_tag=annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
     if dt.empty:
         raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.")
     if sample_tags_left.size < 2 or sample_tags_right.size < 2:
@@ -75,15 +75,15 @@ def compute_trend_subset(pivot: pd.DataFrame, increase: bool = True, strict: boo
            (diffs <= 0).all(axis=1)
     return pivot.index[mask]
  
-def _annotation_analysis(annotation_tag: str, submission_tag : str) -> Dict:
+def _annotation_analysis(annotation_tag: str, submission_tag : str, db : DatabaseABC = Depends(get_db)) -> Dict:
     
 
-    protein_tags = DB.annotations.get_protein_tags(tag = annotation_tag, submission_tag = submission_tag)
+    protein_tags = db.annotations.get_protein_tags(tag = annotation_tag, submission_tag = submission_tag)
     return {"ids" : pd.Index(protein_tags)}
     
  
-def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[str]], increase: bool = True, strict: bool = True, protein_group_tags: List[str] = None) -> Dict:
-    condition_applications = DB.samples.get_sample_condition_application_map_for_submission(submission_tag=submission_tag)
+def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[str]], increase: bool = True, strict: bool = True, protein_group_tags: List[str] = None, db : DatabaseABC = Depends(get_db)) -> Dict:
+    condition_applications = db.samples.get_sample_condition_application_map_for_submission(submission_tag=submission_tag)
     sample_groups, group_labels = [], []
     for ca_tag in ca_tags:
         ca_tag_i = ca_tag[0] if len(ca_tag) == 1 else ";".join(ca_tag)
@@ -91,14 +91,14 @@ def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[
         sample_groups.append((ca_tag, ca_tag_i, sample_tags.values.tolist()))
         group_labels.append(ca_tag_i)
  
-    df = DB.protein_groups.find_trend_values(sample_group_tags=sample_groups, tags=protein_group_tags)
+    df = db.protein_groups.find_trend_values(sample_group_tags=sample_groups, tags=protein_group_tags)
     pivot = _build_trend_pivot(df, n_groups=len(sample_groups))
     computed_ids = compute_trend_subset(pivot, increase=increase, strict=strict)
     if not pivot.empty:
         # log2FC of every group vs. the first (baseline) group — data is already log2 LFQ
         baseline = pivot.iloc[:, 0]
         log2fc = pivot.iloc[:, 1:].sub(baseline, axis=0)
-        log2fc.columns = [f"{DB.condition_applications.get_text(group_labels[i])} vs {DB.condition_applications.get_text(group_labels[0])}" for i in range(1, len(group_labels))]
+        log2fc.columns = [f"{db.condition_applications.get_text(group_labels[i])} vs {db.condition_applications.get_text(group_labels[0])}" for i in range(1, len(group_labels))]
     else:
         log2fc = pd.DataFrame()
  
@@ -113,8 +113,8 @@ def _pairwise_analysis(submission_tag: str,
                         within_attribute_tags: str,
                         within_ca_tags: str,
                         annotation_tag: str = None,
-                        protein_group_tags: List[str] = None) -> Dict:
-    sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag = DB.samples.handle_comparison(
+                        protein_group_tags: List[str] = None, db : DatabaseABC = Depends(get_db)) -> Dict:
+    sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag = db.samples.handle_comparison(
         submission_tag=submission_tag,
         ca_tag_left=ca_tag_left,
         ca_tag_right=ca_tag_right,
@@ -159,6 +159,7 @@ def _process_comparison_children(
     operator: Literal["and", "or", "not"] = "and",
     protein_tag_results: Dict = None,
     leaf_data: Dict = None,
+    db : DatabaseABC = Depends(get_db),
 ):
     if protein_tag_results is None:
         protein_tag_results = {"operator": operator, "children": [], "id": comparisons.id}
@@ -203,7 +204,7 @@ def _process_comparison_children(
                 "type": "annotation",
                 "ids": annotation_results["ids"],
             })
-            leaf_data[leaf_id] = {"type": "annotation", "description": f"Proteins in annotation: {DB.annotations.get_text(child_comp.props['annotation_tag'])}", "log2fc": pd.DataFrame()}
+            leaf_data[leaf_id] = {"type": "annotation", "description": f"Proteins in annotation: {db.annotations.get_text(child_comp.props['annotation_tag'])}", "log2fc": pd.DataFrame()}
  
         elif child_comp.type == "pairwise":
             pairwise_result = _pairwise_analysis(

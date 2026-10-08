@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal, Dict
 
 # 
-from lib.database.Database import Database
 import pandas as pd 
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
@@ -12,7 +13,6 @@ from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 from config.enums.states import SubmissionStatesEnums 
 from config.models.feature import ProteinGroupSubmissionStatisticsModel
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -23,15 +23,15 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/{protein_group_tag}/stats", summary="Returns the statistics for a given protein group.")
-def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None, ca_tags : str = None, include_sample_ca : bool = True, user_tags : str = None, user : UserModel = Depends(get_user_from_token), limit : int = None) -> List[ProteinGroupSubmissionStatisticsModel]:
+def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None, ca_tags : str = None, include_sample_ca : bool = True, user_tags : str = None, user : UserModel = Depends(get_user_from_token), limit : int = None, db : DatabaseABC = Depends(get_db)) -> List[ProteinGroupSubmissionStatisticsModel]:
     
-    if not DB.protein_groups.exists(tag = protein_group_tag): #check if protein group exists, otherwise raise 404
+    if not db.protein_groups.exists(tag = protein_group_tag): #check if protein group exists, otherwise raise 404
         raise HTTPException(status_code=404, detail="Protein group not found")
     
     submission_tags = None 
     parsed_ca_tags = APIParamString(param=ca_tags).param
     if parsed_ca_tags is not None and len(parsed_ca_tags) > 0:
-        submission_tags = DB.submission_filter.filter_by_condition_applications(
+        submission_tags = db.submission_filter.filter_by_condition_applications(
             ca_tags=parsed_ca_tags,
             include_sample_ca=include_sample_ca,
             match_all=True,
@@ -42,7 +42,7 @@ def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None
     
     parsed_user_tags = APIParamString(param=user_tags).param
     if parsed_user_tags is not None and len(parsed_user_tags) > 0:
-        submission_tags = DB.submission_filter.filter_by_user(
+        submission_tags = db.submission_filter.filter_by_user(
             user_tags=parsed_user_tags,
             submission_tags=submission_tags,
             role="any",
@@ -52,14 +52,14 @@ def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None
             return [] # No submissions match the given user tags
 
         
-    r=DB.protein_groups.get_statistical_ranking(tag=protein_group_tag, attribute_tags=APIParamString(param=attribute_tags).param, submission_tags=submission_tags, limit=limit)
+    r=db.protein_groups.get_statistical_ranking(tag=protein_group_tag, attribute_tags=APIParamString(param=attribute_tags).param, submission_tags=submission_tags, limit=limit)
     return r
         
     
     
 
 @router.get("/{protein_group_tag}/text}", summary="Get the protein group text.")
-def get_protein_group_text(protein_group_tag : str, user: UserModel = Depends(get_user_from_token)) -> str:
+def get_protein_group_text(protein_group_tag : str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> str:
     """_summary_
 
     Parameters
@@ -72,13 +72,13 @@ def get_protein_group_text(protein_group_tag : str, user: UserModel = Depends(ge
     str
         _description_
     """
-    protein_tags = DB.protein_groups.get_proteins(tag = protein_group_tag)
-    t = ", ".join([DB.proteins.get(tag = pt).gene_name for pt in protein_tags])
+    protein_tags = db.protein_groups.get_proteins(tag = protein_group_tag)
+    t = ", ".join([db.proteins.get(tag = pt).gene_name for pt in protein_tags])
     return t 
 
     
 @router.get("/protein/{protein_tag}", summary="Get protein groups containing a given protein.")
-def get_protein_groups_by_protein(protein_tag: str, user: UserModel = Depends(get_user_from_token)) -> List[str]:
-    if not DB.proteins.exists(protein_tag):
+def get_protein_groups_by_protein(protein_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    if not db.proteins.exists(protein_tag):
         raise HTTPException(status_code=404, detail="Protein not found")
-    return DB.protein_groups.get_protein(protein_tag)
+    return db.protein_groups.get_protein(protein_tag)

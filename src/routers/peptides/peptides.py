@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from config.models.user import UserModel
 from services.users import get_user_from_token
-from lib.database.Database import Database
 from config.models.parameter import APIParamString
 
-DB = Database.DB()
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/peptides",
@@ -14,7 +14,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/{peptide_tag}")
-def get_peptide_by_tag(peptide_tag : str, user : UserModel = Depends(get_user_from_token)):
+def get_peptide_by_tag(peptide_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Retrieves a peptide by its tag.
 
     Parameters
@@ -32,12 +32,12 @@ def get_peptide_by_tag(peptide_tag : str, user : UserModel = Depends(get_user_fr
     HTTPException
         If the peptide with the given tag does not exist.
     """
-    if not DB.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail="Peptide not found.")
-    return DB.peptides.get(tag = peptide_tag)
+    if not db.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail="Peptide not found.")
+    return db.peptides.get(tag = peptide_tag)
 
 
 @router.get("/{peptide_tag}/abundance")
-def get_peptide_abundance_by_tag(peptide_tag : str, submission_tags : str  = None, user : UserModel = Depends(get_user_from_token)):
+def get_peptide_abundance_by_tag(peptide_tag : str, submission_tags : str  = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Retrieves the abundance of a peptide by its tag.
 
     Parameters
@@ -58,8 +58,8 @@ def get_peptide_abundance_by_tag(peptide_tag : str, submission_tags : str  = Non
         If the peptide with the given tag does not exist.
     """
 
-    if not DB.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail="Peptide not found.")
-    return DB.peptides.get_abundance(tag = peptide_tag, submission_tags = APIParamString(submission_tags).param) 
+    if not db.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail="Peptide not found.")
+    return db.peptides.get_abundance(tag = peptide_tag, submission_tags = APIParamString(submission_tags).param) 
 
 
 
@@ -71,7 +71,7 @@ def get_peptide_by_tag(peptide_tag : str,
                        filter_tag : str = None,
                        exclude_within_protein_correlation : bool = True, 
                        limit : int = None,
-                       user : UserModel = Depends(get_user_from_token)):
+                       user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Retrieves correlations for a peptide by its tag correlating to other peptides.
     Filter the proteins by the filter tag if required.
 
@@ -101,8 +101,8 @@ def get_peptide_by_tag(peptide_tag : str,
         If the peptide with the given tag does not exist.
     """
 
-    if not DB.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail=f"Peptide with tag {peptide_tag}not found.")
-    df = DB.peptides.correlate_to(tag=peptide_tag, limit = limit, min_size = min_size, exclude_within_protein_correlation = exclude_within_protein_correlation, filter_tag = filter_tag)
+    if not db.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail=f"Peptide with tag {peptide_tag}not found.")
+    df = db.peptides.correlate_to(tag=peptide_tag, limit = limit, min_size = min_size, exclude_within_protein_correlation = exclude_within_protein_correlation, filter_tag = filter_tag)
     if df is None or df.empty:
         raise HTTPException(status_code=404, detail=f"No correlations found for peptide {peptide_tag} with the given parameters." )
     return df.to_dict(orient="records") if df is not None else []

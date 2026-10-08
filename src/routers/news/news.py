@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from typing import List, Literal
 
 # 
-from lib.database.Database import Database
+from lib.database.abstract.Database import DatabaseABC
 
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
@@ -10,8 +10,8 @@ from config.models.user import UserModel
 from config.models.news.news import  NewsModel, NewsInsertModel
 from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from lib.database.Database import get_db
 
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -22,7 +22,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("")
-def find_news(limit : int = 10, order : Literal["asc", "desc"] = "desc", user : UserModel = Depends(get_user_from_token)) -> List[str]:
+def find_news(limit : int = 10, order : Literal["asc", "desc"] = "desc", user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """_summary_
 
     Parameters
@@ -40,11 +40,11 @@ def find_news(limit : int = 10, order : Literal["asc", "desc"] = "desc", user : 
         List of tags of the latest news item
     """
 
-    return DB.news.find(order=order, limit=limit)
+    return db.news.find(order=order, limit=limit)
 
 
 @router.post("" , summary="Create a news item. Requires admin rights.")
-def create_news_item(news_item: NewsInsertModel, user: UserModel = Depends(is_user_at_least_curator)):
+def create_news_item(news_item: NewsInsertModel, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
     """Creates a new news item.
 
     Parameters
@@ -63,10 +63,10 @@ def create_news_item(news_item: NewsInsertModel, user: UserModel = Depends(is_us
         #add user from the token, only if it is not present
         news_item = NewsInsertModel(**news_item.model_dump(exclude={"user_tag"}), user_tag=user.tag)
 
-    return DB.news.insert(news = news_item)
+    return db.news.insert(news = news_item)
 
 @router.get("/{news_tag}")
-def get_news_by_tag(news_tag : str, user : UserModel = Depends(get_user_from_token)) -> NewsModel:
+def get_news_by_tag(news_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> NewsModel:
     """Retrieves a news item by its tag.
 
     Parameters
@@ -86,11 +86,11 @@ def get_news_by_tag(news_tag : str, user : UserModel = Depends(get_user_from_tok
     HTTPException
         If the news item with the given tag does not exist.
     """
-    if not DB.news.exists(tag = news_tag): raise HTTPException(status_code=404, detail="News item not found.")
-    return DB.news.get(tag = news_tag)
+    if not db.news.exists(tag = news_tag): raise HTTPException(status_code=404, detail="News item not found.")
+    return db.news.get(tag = news_tag)
 
 @router.put("/{news_tag}", summary="Update a news item. Requires at least curator rights.")
-def update_news_item( news_tag: str,  news_update: NewsModel, user: UserModel = Depends(is_user_at_least_curator)) -> NewsModel:
+def update_news_item( news_tag: str,  news_update: NewsModel, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> NewsModel:
     """Updates an existing news item.
     Parameters
     ----------
@@ -105,19 +105,19 @@ def update_news_item( news_tag: str,  news_update: NewsModel, user: UserModel = 
     NewsModel
         The updated news item
     """
-    if not DB.news.exists(tag=news_tag):
+    if not db.news.exists(tag=news_tag):
         raise HTTPException(status_code=404, detail="News item not found.")
     
     news_update.tag = news_tag
-    success = DB.news.update(news=news_update)
+    success = db.news.update(news=news_update)
     
     if not success:
         raise HTTPException(status_code=500, detail="Failed to update news item.")
     
-    return DB.news.get(tag=news_tag)
+    return db.news.get(tag=news_tag)
 
 @router.delete("/{news_tag}", summary="Delete a news item. Requires at least curator rights.")
-def delete_news_item(news_tag: str, user: UserModel = Depends(is_user_at_least_curator)) -> bool:
+def delete_news_item(news_tag: str, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """Deletes a news item by its tag.
 
     Parameters
@@ -132,8 +132,8 @@ def delete_news_item(news_tag: str, user: UserModel = Depends(is_user_at_least_c
     dict
         A message indicating the result of the deletion.
     """
-    if not DB.news.exists(tag=news_tag):
+    if not db.news.exists(tag=news_tag):
         raise HTTPException(status_code=404, detail="News item not found.")
 
-    ok = DB.news.delete(tag=news_tag)
+    ok = db.news.delete(tag=news_tag)
     return ok 

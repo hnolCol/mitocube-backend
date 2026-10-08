@@ -176,6 +176,11 @@ def get_decoded_share_token(token : str = Depends(oauth2_scheme_share)):
 
 def decode_token(token : str) -> dict:
     """Decode jwt token"""
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated. Please provide a bearer token.",
+            headers={"WWW-Authenticate": "Bearer"})
     try:
         token_data = jwt.decode(token, user_token_settings.jwt_key.get_secret_value(), 
                                 algorithms=[user_token_settings.jwt_algorithm])
@@ -186,11 +191,6 @@ def decode_token(token : str) -> dict:
             detail="Token expired. Please login again.",
             headers={"WWW-Authenticate": "Bearer"})
     except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token not valid.",
-            headers={"WWW-Authenticate": "Bearer"})
-    except:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token not valid.",

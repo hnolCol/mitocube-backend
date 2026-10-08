@@ -46,6 +46,11 @@ class MFASettings(BaseSettings):
     MFA_MAX_ATTEMPTS: int = 5
     MFA_LOCKOUT_MINUTES: int = 15
     MFA_ENCRYPTION_KEY: SecretStr 
+    LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
+    LOGIN_RATE_LIMIT_WINDOW_MINUTES: int = 10
+    # Comma-separated list of reverse-proxy IPs whose X-Forwarded-For
+    # header may be trusted (production runs behind nginx).
+    TRUSTED_PROXY_IPS: str = "127.0.0.1,::1"
    
     class Config:
         env_file = ".env"

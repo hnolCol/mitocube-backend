@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
 import httpx
 # 
-from lib.database.Database import Database
 import pandas as pd 
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
@@ -13,7 +14,6 @@ from services.users import is_user_admin, get_user_from_token, is_user_at_least_
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel
 from config.models.feature import FeatureNeoModel
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -23,7 +23,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/{tag}", summary="Returns the protein information model.")
-def get_protein_features(tag: str, user: UserModel = Depends(get_user_from_token)) -> FeatureNeoModel:
+def get_protein_features(tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> FeatureNeoModel:
     """
     Returns the protein information model.
     
@@ -38,9 +38,9 @@ def get_protein_features(tag: str, user: UserModel = Depends(get_user_from_token
     FeatureNeoModel
         The protein information model.
     """
-    if not DB.proteins.exists(tag = tag):
+    if not db.proteins.exists(tag = tag):
         raise HTTPException(status_code=404, detail=f"No protein found for tag {tag}")
-    return DB.proteins.get(tag = tag)
+    return db.proteins.get(tag = tag)
     
 
 @router.get("/{tag}/interpro")

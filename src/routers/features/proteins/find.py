@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
 
 # 
-from lib.database.Database import Database
 import pandas as pd 
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
@@ -12,7 +13,6 @@ from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel
-DB = Database.DB()
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -22,7 +22,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", summary="Finds proteins by search query.")
-def bulk_insert_protein_features(search_string : str, limit : int = 50, submission_tags : str = None, proteome_tags : str = None, user: UserModel = Depends(get_user_from_token)) -> List[str]:
+def bulk_insert_protein_features(search_string : str, limit : int = 50, submission_tags : str = None, proteome_tags : str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Bulk insert of new protein features. Requires curator rights.
     
@@ -43,5 +43,5 @@ def bulk_insert_protein_features(search_string : str, limit : int = 50, submissi
     List[str]
        Protein tags
     """
-    return DB.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param, submission_tags=APIParamString(param=submission_tags).param)
+    return db.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param, submission_tags=APIParamString(param=submission_tags).param)
 
