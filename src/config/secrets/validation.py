@@ -17,10 +17,10 @@ Usage:
 """
 
 import re
-from typing import Dict, List, Callable
-from pydantic import SecretStr
 import os
 import logging
+from typing import Dict, List, Callable
+from pydantic import SecretStr
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +115,11 @@ def validate_required_secrets() -> List[str]:
         value = os.environ.get(secret_name)
         
         if value is None:
-            errors.append(f"❌ Missing required secret: {secret_name}")
+            errors.append(f"Missing required secret: {secret_name}")
             continue
         
         if not validator(value):
-            errors.append(f"❌ Invalid {secret_name}: does not meet requirements")
+            errors.append(f"Invalid {secret_name}: does not meet requirements")
     
     return errors
 
@@ -137,7 +137,7 @@ def validate_optional_secrets() -> List[str]:
         value = os.environ.get(secret_name)
         
         if value is not None and not validator(value):
-            warnings.append(f"⚠️  Invalid {secret_name}: does not meet requirements")
+            warnings.append(f"Invalid {secret_name}: does not meet requirements")
     
     return warnings
 
@@ -153,9 +153,19 @@ def check_secrets_on_startup():
     3. Warn about invalid optional secrets
     4. Raise ValueError if any required secrets are missing or invalid
     
+    Note: Validation is skipped if MITOCUBE_SKIP_SECRET_VALIDATION is set to '1' or 'true'.
+    This is useful for testing environments.
+    
     Raises:
         ValueError: If any required secrets are missing or invalid
     """
+    # Skip validation in test environments
+    skip_validation = os.environ.get("MITOCUBE_SKIP_SECRET_VALIDATION", "").lower() in ("1", "true", "yes")
+    
+    if skip_validation:
+        logger.debug("Skipping secret validation (MITOCUBE_SKIP_SECRET_VALIDATION is set)")
+        return
+    
     errors = validate_required_secrets()
     warnings = validate_optional_secrets()
     
@@ -168,8 +178,8 @@ def check_secrets_on_startup():
         logger.error(f"Secret validation failed:\n{error_msg}")
         raise ValueError(f"Secret validation failed:\n{error_msg}")
     
-    logger.info("✅ All required secrets are valid")
-    print("✅ All required secrets are valid")
+    logger.info("All required secrets are valid")
+    print("All required secrets are valid")
 
 
 def get_missing_secrets() -> List[str]:
