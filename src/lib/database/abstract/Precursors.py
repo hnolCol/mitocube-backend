@@ -46,13 +46,13 @@ class PrecursorsABC(ABC):
         """
 
     @abstractmethod
-    def find(self, search_string: str, submission_tag: str = None, limit: int = None, provide_protein_info: bool = False) -> List[str] | List[Tuple[str, List[str]]]:
+    def find(self, search_string: Optional[str] = None, submission_tag: str = None, limit: int = None, provide_protein_info: bool = False) -> List[str] | List[Tuple[str, List[str]]]:
         """Finds all precursors matching the search string.
 
         Parameters
         ----------
-        search_string : str
-            The search string to match against precursor tags (sequence followed by charge state).
+        search_string : str, optional
+            The search string to match against precursor tags (sequence followed by charge state). If None, the first precursor tags up to the limit are returned, by default None.
         submission_tag : str, optional
             If provided, only precursors associated/quantified in the given submission are returned, by default None.
         limit : int, optional

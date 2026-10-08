@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List
+from typing import List, Optional
 from config.models.user import UserModel
 from config.models.ptms import PTMSiteInsertModel, PTMSiteResponseModel
 from services.users import is_user_at_least_curator, get_user_from_token
@@ -13,7 +13,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", summary="Finds PTM sites by search query.")
-def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def find_ptm_sites_by_query(search_string : Optional[str] = None, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Finds PTM sites by their tag. The tag is derived from the protein tag (or the
     protein group tag for group level identifications), the position and the modification,
@@ -21,8 +21,8 @@ def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_ta
 
     Parameters
     ----------
-    search_string : str
-        The search string to match against the PTM site tags.
+    search_string : str, optional
+        The search string to match against the PTM site tags. If None, the first PTM site tags up to the limit are returned, by default None
     limit : int, optional
         The limit of PTM sites to return, by default 50
     submission_tags : str, optional
