@@ -32,6 +32,11 @@ class General(BaseSettings):
 
 Here you can specify if you would like to restrict the user registration to a certain domain of emails preventing users to use private emails using the ```allowed_email_domains``` parameter. 
 If the you leave this empty, in prinicple everyone can register and have access to the data. Hence, for security reasons, this should not be an empty list. 
+## Database setup
+
+Setting up the database and migrating data is documented in
+[docs/SETUP.md](docs/SETUP.md) (steps, flags, common scenarios).
+
 ## Dependencies
 
 Core dependencies live in `requirements.txt`. The optional AI agent stack
