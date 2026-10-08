@@ -37,6 +37,31 @@ class Neo4JPrecursors(PrecursorsABC):
         r = self._driver.execute_query(query, submission_tag=submission_tag, result_transformer_=Result.value)
         return r[0]
 
+    def count_by_protein_group(self, protein_group_tag: str, submission_tag: str = None) -> int:
+        """Counts the number of precursors associated with a given protein group.
+        If a submission tag is given, only precursors quantified in that submission are counted.
+
+        Parameters
+        ----------
+        protein_group_tag : str
+            The tag of the protein group to count precursors for.
+        submission_tag : str, optional
+            If provided, only precursors quantified in the given submission are counted, by default None.
+
+        Returns
+        -------
+        int
+            The number of precursors associated with the protein group.
+        """
+        query = "MATCH (pg:ProteinGroup {tag : $protein_group_tag})-[:HAS_PRECURSOR]->(p:Precursor) "
+
+        if submission_tag is not None:
+            query += "WHERE EXISTS {(p)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(submission:Submission {tag : $submission_tag})} "
+        query += "RETURN count(p) "
+
+        r = self._driver.execute_query(query, protein_group_tag=protein_group_tag, submission_tag=submission_tag, result_transformer_=Result.value)
+        return r[0]
+
     def exists(self, tag: str) -> bool:
         query = (
             "WITH EXISTS {(p:Precursor {tag : $tag})} as precursor_exists "
