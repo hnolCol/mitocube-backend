@@ -23,7 +23,7 @@ router = APIRouter(
 )
 
 
-def _check_access(submission_tag: str, user: UserModel, db : DatabaseABC = Depends(get_db)) -> None:
+def _check_access(submission_tag: str, user: UserModel, db: DatabaseABC) -> None:
     """Raises if the submission does not exist or the user has no access."""
     if not db.submissions.exists(tag=submission_tag):
         raise tag_not_found
@@ -34,10 +34,10 @@ def _check_access(submission_tag: str, user: UserModel, db : DatabaseABC = Depen
         )
 
 
-def _build_markdown(submission_tag: str, **include_flags) -> str:
+def _build_markdown(submission_tag: str, db: DatabaseABC, **include_flags) -> str:
     """Builds the markdown export and converts failures into a 500."""
     try:
-        return export_submission_to_markdown(submission_tag=submission_tag, db=DB, **include_flags)
+        return export_submission_to_markdown(submission_tag=submission_tag, db=db, **include_flags)
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(
@@ -58,7 +58,8 @@ def export_submission_md(
     include_samples: bool = True,
     include_metatext: bool = True,
     include_timeline: bool = True,
-    user: UserModel = Depends(get_user_from_token)
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db)
 ) -> PlainTextResponse:
     """
     Export submission metadata to markdown format.
@@ -107,10 +108,11 @@ def export_submission_md(
     HTTPException
         403 if the user does not have access, 500 if the export fails
     """
-    _check_access(submission_tag, user)
+    _check_access(submission_tag, user, db)
 
     markdown_content = _build_markdown(
         submission_tag,
+        db,
         include_condition_applications=include_condition_applications,
         include_protocols=include_protocols,
         include_protocol_text=include_protocol_text,
@@ -133,7 +135,8 @@ def download_submission_md_file(
     include_samples: bool = True,
     include_metatext: bool = True,
     include_timeline: bool = True,
-    user: UserModel = Depends(get_user_from_token)
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db)
 ) -> Response:
     """
     Download submission metadata as a markdown file.
@@ -173,10 +176,11 @@ def download_submission_md_file(
     HTTPException
         403 if the user does not have access, 500 if the export fails
     """
-    _check_access(submission_tag, user)
+    _check_access(submission_tag, user, db)
 
     markdown_content = _build_markdown(
         submission_tag,
+        db,
         include_condition_applications=include_condition_applications,
         include_protocols=include_protocols,
         include_protocol_text=include_protocol_text,
