@@ -245,7 +245,6 @@ if __name__ == "__main__":
     proteomes_to_add = args.proteomes 
     user_path = args.users
     add_mitocarta_annotations = args.mitocarta_annotations
-    lead_user = DB.users.get_lead_user() 
     add_control_proteome = args.add_control_proteome
     reviewed_proteins_only = args.reviewed_proteins_only
     add_xlms_external_resources = args.external_resources_xl
@@ -254,8 +253,12 @@ if __name__ == "__main__":
     lead_user_tag = args.lead_user_tag
     if setup_db_default:
         
+        # Ensure a lead user exists (creates the lead-contact user on an
+        # empty database), then fetch the lead user tag.
         DB.users.check(lead_tag = lead_user_tag)
         lead_user = DB.users.get_lead_user() 
+        if lead_user is None:
+            raise ValueError("Setup failed: no lead user exists in the database and none could be created.")
         
         research_group_file = os.path.join(args.resources_path, "research_groups/research_groups.txt") if os.path.exists(os.path.join(args.resources_path, "research_groups/research_groups.txt")) else None
         if research_group_file is not None and research_groups_to_add:
