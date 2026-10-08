@@ -31,6 +31,23 @@ class PrecursorsABC(ABC):
         """
 
     @abstractmethod
+    def count_by_protein_group(self, protein_group_tag: str, submission_tag: str = None) -> int:
+        """Counts the number of precursors associated with a given protein group.
+
+        Parameters
+        ----------
+        protein_group_tag : str
+            The tag of the protein group to count precursors for.
+        submission_tag : str, optional
+            If provided, only precursors quantified in the given submission are counted, by default None.
+
+        Returns
+        -------
+        int
+            The number of precursors associated with the protein group.
+        """
+
+    @abstractmethod
     def exists(self, tag: str) -> bool:
         """Checks if a given tag is associated with a precursor (e.g. SEQUENCE.CHARGE).
 
