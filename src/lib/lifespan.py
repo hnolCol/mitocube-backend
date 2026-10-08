@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from lib.mfa.mfa import mfa_runtime
 from lib.cache.cache import db_cache_runtime
 from lib.database.Database import Database
+from config.secrets.validation import check_secrets_on_startup
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,13 @@ async def _safe_startup(name: str, startup_coro, health_check=None) -> None:
 
 @asynccontextmanager
 async def lifespan(app):
+    # Validate all required secrets on startup
+    try:
+        check_secrets_on_startup()
+    except ValueError as e:
+        logger.error(f"Secret validation failed: {e}")
+        raise
+    
     await _safe_startup("Database (Neo4j)", None, Database.DB().health_check)
 
     # The AI agent stack (requirements-ai.txt) is optional. Import lazily so

@@ -3,6 +3,7 @@ from functools import lru_cache
 from pydantic import EmailStr
 from pydantic import SecretStr
 from pydantic import DirectoryPath
+from pydantic import Field
 from pydantic_settings import BaseSettings 
 
 from typing import List
@@ -20,7 +21,10 @@ class Email(BaseSettings):
     mail_use_tls_ssl: bool = False
     mail_start_tls : bool = True
     mail_default_sender : EmailStr =  "mitocube@age.mpg.de"
-    mail_password : SecretStr 
+    mail_password : SecretStr = Field(
+        ...,
+        description="Email password - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --password"
+    )
     mail_use_crendentials : bool = True
     mail_validate_certs : bool = False
     mail_from_name : str = "MitoCube Support"

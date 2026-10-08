@@ -3,12 +3,16 @@
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from pydantic import SecretStr, Field
 
 from pydantic_settings import BaseSettings 
 
 class Settings(BaseSettings):
     MONGO_USER: str = "ai"
-    MONGO_PASSWORD: str = os.environ.get("MONGO_PASSWORD", "password")
+    MONGO_PASSWORD: SecretStr = Field(
+        ..., 
+        description="MongoDB password - REQUIRED, no default provided for security"
+    )
     MONGO_HOST: str = "localhost"
     MONGO_PORT: int = 27017
     MONGO_AUTH_DB: str = "admin"
