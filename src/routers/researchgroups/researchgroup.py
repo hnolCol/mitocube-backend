@@ -6,6 +6,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_at_least_curator
+from services.submission import check_submission_tags_access
 from services.encryption import create_hierarchical_hash
 from config.models.researchgroup import ResearchGroupInput, ResearchGroupResponseModel, ResearchGroupResponseModel
 from config.models.parameter import APIParamString
@@ -22,6 +23,7 @@ research_group_not_found_exception = HTTPException(status_code=404, detail="Rese
 def find_research_groups(search_string: Optional[str] = None, user_tags: Optional[str] = None, submission_tags: Optional[str] = None, limit: int = 40, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """Finds research groups matching the search criteria."""
     
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.research_groups.find(
         search_string=search_string,
         user_tags=APIParamString(param=user_tags).param,

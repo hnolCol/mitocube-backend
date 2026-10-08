@@ -3,6 +3,7 @@ from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -36,4 +37,6 @@ def count_precursors(submission_tag : str = None, user : UserModel = Depends(get
     """
     if submission_tag is not None and not db.submissions.exists(tag = submission_tag):
         raise HTTPException(status_code=404, detail=f"Submission with tag {submission_tag} not found.")
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.precursors.count(submission_tag = submission_tag)

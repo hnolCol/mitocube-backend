@@ -5,6 +5,7 @@ from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from config.exceptions.HTTPExceptions import submission_tag_not_found, no_data_found_http_exception
 
 from lib.data.statistic.Ttest import Ttest
@@ -59,8 +60,9 @@ def get_dataset_volcano(submission_tag : str,
                         annotation_tag : str = None, 
                         equal_variance : bool = True,
                         fdr : float = 0.05,
-                        user : UserModel = Depends(get_user_from_token)
-                  ):# ):#, db : DatabaseABC = Depends(get_db)) #
+                        user : UserModel = Depends(get_user_from_token),
+                        db : DatabaseABC = Depends(get_db)
+                  ):
     """
     Returns the result for a volcano plot
     
@@ -84,6 +86,7 @@ def get_dataset_volcano(submission_tag : str,
 
     
     
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     data_exist = db.submissions.quantification_exists(tag = submission_tag, type = "protein_groups")
     if not data_exist:  return no_data_found_http_exception
         

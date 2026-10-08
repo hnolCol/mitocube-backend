@@ -52,6 +52,11 @@ def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None
             return [] # No submissions match the given user tags
 
         
+    user_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+    if submission_tags is not None:
+        submission_tags = [tag for tag in submission_tags if tag in user_scope_tags]
+    else:
+        submission_tags = user_scope_tags
     r=db.protein_groups.get_statistical_ranking(tag=protein_group_tag, attribute_tags=APIParamString(param=attribute_tags).param, submission_tags=submission_tags, limit=limit)
     return r
         

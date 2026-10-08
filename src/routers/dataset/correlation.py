@@ -11,6 +11,7 @@ from config.models.user import UserModel
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 
 
 
@@ -32,6 +33,7 @@ def get_correlation(submission_tag : str,
                     user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Returns the correlated features within the given submission tag."
     
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if not db.submission_has_dataset(tag = submission_tag): no_data_found_http_exception 
     if annotation_tag is not None:
         if not db.annotations.exists(tag = annotation_tag): raise HTTPException(status_code=404, detail=f"Annotation tag {annotation_tag} not found.")

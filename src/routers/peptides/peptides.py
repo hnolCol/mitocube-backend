@@ -4,6 +4,7 @@ from lib.database.abstract.Database import DatabaseABC
 
 from config.models.user import UserModel
 from services.users import get_user_from_token
+from services.submission import check_submission_tags_access
 from config.models.parameter import APIParamString
 
 
@@ -59,6 +60,7 @@ def get_peptide_abundance_by_tag(peptide_tag : str, submission_tags : str  = Non
     """
 
     if not db.peptides.exists(tag = peptide_tag): raise HTTPException(status_code=404, detail="Peptide not found.")
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.peptides.get_abundance(tag = peptide_tag, submission_tags = APIParamString(submission_tags).param) 
 
 

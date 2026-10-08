@@ -5,6 +5,7 @@ from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 
 from lib.data.transform.PCA import PCATransform
@@ -21,7 +22,7 @@ def get_dataset_pca(submission_tag : str, annotation_tag : str = None, scale : b
     """
     Returns the result of a Principal component analysis (PCA).
     """
-    if not db.submissions.exists(tag = submission_tag): raise submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if not db.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
 
 

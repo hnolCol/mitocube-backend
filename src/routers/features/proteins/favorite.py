@@ -9,6 +9,7 @@ from config.models.user import UserModel
 
 from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from services.submission import check_submission_tags_access
 
 
 
@@ -40,6 +41,7 @@ def get_favorite_proteins(submission_tags : str = None, annotation_tags : str = 
     List[str]
         A list of favorite protein tags.
     """
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.proteins.get_favorite_proteins(
         limit = limit,
         submission_tags=APIParamString(param=submission_tags).param, 

@@ -7,6 +7,7 @@ from config.models.user import UserModel
 from config.models.permissions import PermissionResponseModel 
 from config.enums.users.roles import UserRolesEnum
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from typing import List, Dict
 
 
@@ -23,9 +24,8 @@ def get_permissions(user: UserModel = Depends(get_user_from_token)) -> Permissio
 @router.get("/{submission_tag}/permissions")
 def get_submission_permissions(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> PermissionResponseModel:
     # Fetch and return the permissions for the specified submission
-    if not db.submissions.exists(tag = submission_tag):
-        raise HTTPException(status_code=404, detail=f"Submission with tag {submission_tag} not found")
-    has_access = db.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag)
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    has_access = True
     user_tag = db.submissions.get_creator(tag = submission_tag) # Ensure the submission exists
     is_creator = (user.tag == user_tag)
     is_at_least_curator = (user.role >= UserRolesEnum.CURATOR)  # Assuming curator has access to all submissions

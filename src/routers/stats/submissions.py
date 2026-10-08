@@ -11,6 +11,7 @@ from config.models.user import UserModel
 from config.models.news.news import  NewsModel, NewsInsertModel
 from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from services.submission import check_submission_access
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel
 
@@ -28,6 +29,7 @@ def get_submission_views(submission_tag : str, user: UserModel = Depends(get_use
     """
     Returns the view statistics for submissions.
     """
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.get_views(tag=submission_tag)
 
 
