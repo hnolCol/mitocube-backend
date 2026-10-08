@@ -3,15 +3,16 @@
 import os
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Optional
 from pydantic import SecretStr, Field
 
 from pydantic_settings import BaseSettings 
 
 class Settings(BaseSettings):
     MONGO_USER: str = "ai"
-    MONGO_PASSWORD: SecretStr = Field(
-        ..., 
-        description="MongoDB password - REQUIRED, no default provided for security"
+    MONGO_PASSWORD: Optional[SecretStr] = Field(
+        default=None,
+        description="MongoDB password - REQUIRED for production AI features, optional for development"
     )
     MONGO_HOST: str = "localhost"
     MONGO_PORT: int = 27017
@@ -21,7 +22,9 @@ class Settings(BaseSettings):
     MFA_MONGO_DB_NAME: str = os.environ.get("MFA_MONGO_DB_NAME", "auth")
 
     @property
-    def AGENT_MONGO_URI(self) -> str:
+    def AGENT_MONGO_URI(self) -> Optional[str]:
+        if self.MONGO_PASSWORD is None:
+            return None
         return (
             f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD}"
             f"@{self.MONGO_HOST}:{self.MONGO_PORT}"
