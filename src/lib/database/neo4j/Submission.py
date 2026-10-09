@@ -1437,6 +1437,13 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN true "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, result_transformer_=Result.value)
+        from lib.cache.scope_cache import invalidate_cached_scope
+        invalidate_cached_scope(user_tag)
+        if not add_prev_user_to_collaborators:
+            # the previous owner may lose access if no other membership grants it
+            prev = self.get_creator(tag)
+            if prev is not None:
+                invalidate_cached_scope(prev)
         return r[0] if len(r) > 0 else False
 
 
@@ -2096,9 +2103,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     #     """Checks if a user has access to a submission. 
     #         This is useful to check if a user can access a submission before returning the submission data. """
     #     user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
-    #     if user_scope is None: return True
-        from lib.cache.scope_cache import invalidate_cached_scope
-        invalidate_cached_scope(user_tag) #curator or admin, has access to all submissions
+    #     if user_scope is None: return True #curator or admin, has access to all submissions
     #     return submission_tag in user_scope
         
     def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
