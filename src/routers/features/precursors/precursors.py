@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List
+from typing import List, Optional
 from config.models.user import UserModel
 from config.models.precursors import PrecursorInsertModel, PrecursorResponseModel
 from services.users import is_user_at_least_curator, get_user_from_token
@@ -15,14 +15,14 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", summary="Finds precursors by search query.")
-def find_precursors_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def find_precursors_by_query(search_string : Optional[str] = None, limit : int = 50, submission_tags : str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Finds precursors by their tag (sequence followed by charge state, e.g. PEPTIDEK.2).
 
     Parameters
     ----------
-    search_string : str
-        The search string to match against the precursor tags.
+    search_string : str, optional
+        The search string to match against the precursor tags. If None, the first precursor tags up to the limit are returned, by default None
     limit : int, optional
         The limit of precursors to return, by default 50
     submission_tags : str, optional
