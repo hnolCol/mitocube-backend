@@ -112,6 +112,8 @@ def set_research_group_head(research_group_tag : str, user_tag : str, user : Use
         raise research_group_not_found_exception
     if not db.users.exists(tag = user_tag):
         raise HTTPException(status_code=404, detail=f"User with tag {user_tag} not found.")
+    if user_tag not in db.research_groups.get_users(tag = research_group_tag):
+        raise HTTPException(status_code=400, detail=f"User with tag {user_tag} is not a member of the research group with tag {research_group_tag} and can therefore not be made a head (PI) of it.")
     db.research_groups.set_head(group_tag = research_group_tag, user_tag = user_tag)
     return True
     
