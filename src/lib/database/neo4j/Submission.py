@@ -481,6 +481,10 @@ class Neo4JSubmissions(SubmissionsABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators, created_at = created_at)
         return True
+        from lib.cache.scope_cache import invalidate_cached_scope
+        invalidate_cached_scope(user_tag)
+        for collaborator_tag in (collaborators or []):
+            invalidate_cached_scope(collaborator_tag)
 
     def insert_view(self, tag : str, user_tag : str, decay_rate : float = math.log(2)/(5 * 24)) -> bool:
         """Inserts a view for a submission.
@@ -1448,6 +1452,9 @@ class Neo4JSubmissions(SubmissionsABC):
         if len(collaborator_tags) == 0:
             query += "RETURN true "
             r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
+            from lib.cache.scope_cache import invalidate_cached_scope
+            for collaborator_tag in collaborator_tags:
+                invalidate_cached_scope(collaborator_tag)
             return r[0] if len(r) > 0 else False
 
         query += (
@@ -1458,6 +1465,9 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN true "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, collaborator_tags=collaborator_tags, result_transformer_=Result.value)
+        from lib.cache.scope_cache import invalidate_cached_scope
+        for collaborator_tag in collaborator_tags:
+            invalidate_cached_scope(collaborator_tag)
         return len(r) > 0
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
@@ -2040,7 +2050,14 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         )
         
     def _get_users_submission_scope(self, current_user_tag: str) -> List[str]:
-        """Get the submission scope for the current user."""
+        """Get the submission scope for the current user. Cached with a short TTL;
+        invalidate_cached_scope / invalidate_all_cached_scopes are called on every
+        membership-changing write. The None (curator, unrestricted) and [] (guest,
+        no access) cases are derived from the role on each request and are not cached."""
+        from lib.cache.scope_cache import get_cached_scope, cache_scope
+        cached = get_cached_scope(current_user_tag)
+        if cached is not None:
+            return cached
         tags = set()
         if not self._users.exists(current_user_tag): raise ValueError(f"User {current_user_tag} does not exist.")
         
@@ -2066,7 +2083,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         submission_user_tags = self.filter_by_user(user_tags=[current_user_tag], submission_tags=None, limit=None, ordered=True)
         for submission_tag in submission_user_tags:
             tags.add(submission_tag)    
-        return list(tags)
+        scope = list(tags)
+        cache_scope(current_user_tag, scope)
+        return scope
         
     def get_user_submission_scope_tags(self, user_tag : str) -> List[str]:
         """Get the submission scope for a given user."""
@@ -2077,7 +2096,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     #     """Checks if a user has access to a submission. 
     #         This is useful to check if a user can access a submission before returning the submission data. """
     #     user_scope = self._get_users_submission_scope(current_user_tag=user_tag)
-    #     if user_scope is None: return True #curator or admin, has access to all submissions
+    #     if user_scope is None: return True
+        from lib.cache.scope_cache import invalidate_cached_scope
+        invalidate_cached_scope(user_tag) #curator or admin, has access to all submissions
     #     return submission_tag in user_scope
         
     def has_user_access(self, user_tag : str, submission_tag : str) -> bool:

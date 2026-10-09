@@ -42,6 +42,9 @@ class Neo4JResearchGroup(ResearchGroupABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
         
+        from lib.cache.scope_cache import invalidate_cached_scope
+        for user_tag in user_tags:
+            invalidate_cached_scope(user_tag)
     def delete(self, tag: str) -> bool:
         return super().delete(tag)
        
@@ -211,6 +214,10 @@ class Neo4JResearchGroup(ResearchGroupABC):
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
+        
+        from lib.cache.scope_cache import invalidate_cached_scope
+        for user_tag in user_tags:
+            invalidate_cached_scope(user_tag)
         
         
         
