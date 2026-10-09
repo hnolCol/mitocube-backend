@@ -29,6 +29,7 @@ from itertools import islice
 
 
 from config.models.calculations.quantile import QuantileModel
+from lib.cache.scope_cache import invalidate_cached_scope, get_cached_scope, cache_scope
 
 
 def chunk_dict(d, size):
@@ -480,6 +481,9 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators, created_at = created_at)
+        invalidate_cached_scope(user_tag)
+        for collaborator_tag in (collaborators or []):
+            invalidate_cached_scope(collaborator_tag)
         return True
 
     def insert_view(self, tag : str, user_tag : str, decay_rate : float = math.log(2)/(5 * 24)) -> bool:
@@ -1433,6 +1437,12 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN true "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, result_transformer_=Result.value)
+        invalidate_cached_scope(user_tag)
+        if not add_prev_user_to_collaborators:
+            # the previous owner may lose access if no other membership grants it
+            prev = self.get_creator(tag)
+            if prev is not None:
+                invalidate_cached_scope(prev)
         return r[0] if len(r) > 0 else False
 
 
@@ -1448,6 +1458,8 @@ class Neo4JSubmissions(SubmissionsABC):
         if len(collaborator_tags) == 0:
             query += "RETURN true "
             r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
+            for collaborator_tag in collaborator_tags:
+                invalidate_cached_scope(collaborator_tag)
             return r[0] if len(r) > 0 else False
 
         query += (
@@ -1458,6 +1470,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN true "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, collaborator_tags=collaborator_tags, result_transformer_=Result.value)
+        for collaborator_tag in collaborator_tags:
+            invalidate_cached_scope(collaborator_tag)
         return len(r) > 0
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
@@ -2040,7 +2054,13 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         )
         
     def _get_users_submission_scope(self, current_user_tag: str) -> List[str]:
-        """Get the submission scope for the current user."""
+        """Get the submission scope for the current user. Cached with a short TTL;
+        invalidate_cached_scope / invalidate_all_cached_scopes are called on every
+        membership-changing write. The None (curator, unrestricted) and [] (guest,
+        no access) cases are derived from the role on each request and are not cached."""
+        cached = get_cached_scope(current_user_tag)
+        if cached is not None:
+            return cached
         tags = set()
         if not self._users.exists(current_user_tag): raise ValueError(f"User {current_user_tag} does not exist.")
         
@@ -2066,7 +2086,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         submission_user_tags = self.filter_by_user(user_tags=[current_user_tag], submission_tags=None, limit=None, ordered=True)
         for submission_tag in submission_user_tags:
             tags.add(submission_tag)    
-        return list(tags)
+        scope = list(tags)
+        cache_scope(current_user_tag, scope)
+        return scope
         
     def get_user_submission_scope_tags(self, user_tag : str) -> List[str]:
         """Get the submission scope for a given user."""
@@ -2125,6 +2147,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_tags : List[str] = None, 
             user_role : Literal["creator", "collaborator", "any"] = "any",  
             genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
             ca_match_all : bool = True,
@@ -2139,7 +2162,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             print(f"Error: {e}")
             return []
         
-        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags])
+        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags, consortium_tags])
         if search_string is not None:
             limit_ = limit if all(attr is None for attr in [state, trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
             tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered, submission_tags=tags)
@@ -2175,6 +2198,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             limit_ = limit
             tags = self.filter_by_quantified_protein(protein_tags,submission_tags=tags,limit=limit_, ordered=ordered)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
+        if consortium_tags is not None:
+            tags = self.filter_by_consortium(consortium_tags, submission_tags=tags, limit=limit, ordered=ordered)
+            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if not filter_defined: #none defined, then just return all. 
             if tags is None: #then it must be admin or curator, so return all tags.
                 tags = self.get_all_tags(limit=limit, ordered=ordered)
@@ -2186,6 +2212,245 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return tags 
     
     
+
+    def _build_v2_where(self, scope_tags, search_string, state, trait_tags, attribute_tag,
+                        ca_tags, protein_tags, ca_search_string, user_tags, user_role,
+                        genotype_tag, consortium_tags, include_sample_ca, ca_match_all):
+        """Builds the WHERE conditions and query parameters shared by find_v2 and count_v2.
+        scope_tags is the requesting users submission scope (None = unrestricted, e.g. curator)."""
+        where = []
+        params = {}
+
+        # ---- scope (single query equivalent of _get_users_submission_scope) ----
+        if scope_tags is not None:
+            where.append("submission.tag IN $scope_tags")
+            params["scope_tags"] = scope_tags
+
+        # ---- search string: title or tag contains ----
+        if search_string is not None:
+            where.append("(toLower(submission.title) CONTAINS $search_string OR toLower(submission.tag) CONTAINS $search_string)")
+            params["search_string"] = search_string.lower()
+
+        # ---- state: latest IN_STATE relationship must point to one of the states ----
+        if state is not None:
+            where.append(
+                "EXISTS { MATCH (submission)-[sr:IN_STATE]->(st:State) "
+                "WITH submission, sr, st ORDER BY sr.created_at DESC "
+                "WITH submission, collect({c_at: sr.created_at, s: st.tag})[0] AS latest "
+                "WHERE latest.s IN $states }"
+            )
+            params["states"] = state
+
+        # ---- genotype tags: all requested genotypes must be present in the submissions samples ----
+        if genotype_tag is not None:
+            where.append(
+                "ALL(g IN $genotype_tag WHERE EXISTS { MATCH (submission)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(gen:Genotype {tag : g}) })"
+            )
+            params["genotype_tag"] = genotype_tag
+
+        # ---- condition applications ----
+        if ca_tags is not None and len(ca_tags) > 0:
+            if ca_match_all:
+                per_ca = ["EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication {tag : t}) }"]
+                if include_sample_ca:
+                    per_ca.append("EXISTS { MATCH (submission)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication {tag : t}) }")
+                where.append(f"ALL(t IN $ca_tags WHERE ({' OR '.join(per_ca)}))")
+            else:
+                if include_sample_ca:
+                    where.append(
+                        "(EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags } "
+                        "OR EXISTS { MATCH (submission)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags })"
+                    )
+                else:
+                    where.append(
+                        "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags }"
+                    )
+            params["ca_tags"] = ca_tags
+        elif ca_search_string is not None:
+            text_match = "(toLower(t.s) CONTAINS toLower($ca_search_string) OR toLower(a.s) CONTAINS toLower($ca_search_string))"
+            submission_ca = (
+                "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait), "
+                "(ca)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE " + text_match + " }"
+            )
+            if include_sample_ca:
+                sample_ca = (
+                    "EXISTS { MATCH (submission)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait), "
+                    "(ca)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE " + text_match + " }"
+                )
+                where.append(f"({submission_ca} OR {sample_ca})")
+            else:
+                where.append(submission_ca)
+            params["ca_search_string"] = ca_search_string
+        elif attribute_tag is not None or trait_tags is not None:
+            def _attr_exists(subject : str) -> str:
+                block = (
+                    "EXISTS { MATCH (" + subject + ")-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(attr:Attribute)"
+                )
+                conditions = []
+                if attribute_tag is not None:
+                    conditions.append("attr.tag IN $attribute_tag")
+                if trait_tags is not None:
+                    block += " MATCH (ca)-[:INSTANCE_OF]->(trait:Trait)"
+                    conditions.append("trait.tag IN $trait_tags")
+                if conditions:
+                    block += " WHERE " + " AND ".join(conditions)
+                block += " }"
+                return block
+
+            submission_ca = _attr_exists("submission")
+            if include_sample_ca:
+                sample_ca = _attr_exists("submission)-[:HAS_SAMPLE]->(:Sample")
+                where.append(f"({submission_ca} OR {sample_ca})")
+            else:
+                where.append(submission_ca)
+            if attribute_tag is not None: params["attribute_tag"] = attribute_tag
+            if trait_tags is not None: params["trait_tags"] = trait_tags
+
+        # ---- user filter ----
+        if user_tags is not None:
+            rel = {"creator": "CREATED", "collaborator": "COLLABORATES", "any": "CREATED|COLLABORATES"}[user_role]
+            where.append(f"EXISTS {{ MATCH (u:User)-[:{rel}]->(submission) WHERE u.tag IN $user_tags }}")
+            params["user_tags"] = user_tags
+
+        # ---- quantified protein ----
+        if protein_tags is not None:
+            where.append(
+                "EXISTS { MATCH (p:Protein)<-[:HAS_PROTEINS]-(pg:ProteinGroup) "
+                "WHERE p.tag IN $protein_tags "
+                "MATCH (pg)<-[:QUANTIFIED]-(sm:Sample)<-[:HAS_SAMPLE]-(submission) }"
+            )
+            params["protein_tags"] = protein_tags
+
+        # ---- consortium shares (approved) ----
+        if consortium_tags is not None:
+            where.append(
+                "EXISTS { MATCH (submission)-[sh:SHARED_WITH]->(c:Consortium) "
+                "WHERE c.tag IN $consortium_tags AND sh.status = 'approved' }"
+            )
+            params["consortium_tags"] = consortium_tags
+
+        return where, params
+
+    def count_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            user_role : Literal["creator", "collaborator", "any"] = "any",
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ca_match_all : bool = True) -> int:
+        """Single-query count variant. Counts the submissions matching all given filters
+        in ONE Cypher query without materializing the tags (unlike the legacy count that
+        runs find() with limit=None and takes len())."""
+        scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+        if scope_tags is not None and len(scope_tags) == 0: return 0
+
+        where, params = self._build_v2_where(
+            scope_tags = scope_tags,
+            search_string = search_string,
+            state = state,
+            trait_tags = trait_tags,
+            attribute_tag = attribute_tag,
+            ca_tags = ca_tags,
+            protein_tags = protein_tags,
+            ca_search_string = ca_search_string,
+            user_tags = user_tags,
+            user_role = user_role,
+            genotype_tag = genotype_tag,
+            consortium_tags = consortium_tags,
+            include_sample_ca = include_sample_ca,
+            ca_match_all = ca_match_all,
+        )
+
+        query = "MATCH (submission:Submission) "
+        if where:
+            query += "WHERE " + " AND ".join(where) + " "
+        query += "RETURN count(DISTINCT submission.tag) AS n "
+
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, **params)
+        return r[0] if len(r) > 0 else 0
+
+    def find_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            user_role : Literal["creator", "collaborator", "any"] = "any",
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ordered : bool = True,
+            ca_match_all : bool = True,
+            limit : int = 10) -> List[str]:
+        """Single-query variant of find(). Composes every filter into one Cypher query
+        instead of chaining per-filter round trips. Intended to replace find() once the
+        results are confirmed to be identical.
+        """
+        # ---- user scope: None means unrestricted (curator/admin), [] means no access ----
+        scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+        if scope_tags is not None and len(scope_tags) == 0: return []
+
+        where, params = self._build_v2_where(
+            scope_tags = scope_tags,
+            search_string = search_string,
+            state = state,
+            trait_tags = trait_tags,
+            attribute_tag = attribute_tag,
+            ca_tags = ca_tags,
+            protein_tags = protein_tags,
+            ca_search_string = ca_search_string,
+            user_tags = user_tags,
+            user_role = user_role,
+            genotype_tag = genotype_tag,
+            consortium_tags = consortium_tags,
+            include_sample_ca = include_sample_ca,
+            ca_match_all = ca_match_all,
+        )
+
+        query = "MATCH (submission:Submission) "
+        if where:
+            query += "WHERE " + " AND ".join(where) + " "
+        query += "RETURN DISTINCT submission.tag AS submission_tag "
+        if ordered:
+            query += "ORDER BY submission.created_at DESC "
+        query = self._add_limit(query, limit)
+
+        r = self._driver.execute_query(query, routing_="r", limit = limit, result_transformer_=Result.value, **params)
+        return r
+
+    def filter_by_consortium(self, consortium_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+        """Returns the submission tags that are shared (approved) with any of the given consortiums."""
+        query = (
+            "MATCH (c:Consortium) "
+            "WHERE c.tag IN $consortium_tags "
+            "MATCH (c)<[r:SHARED_WITH]-(s:Submission) "
+            "WHERE r.status = 'approved' "
+        )
+        if submission_tags is not None:
+            query += "AND s.tag IN $submission_tags "
+        query += "RETURN s.tag as tag "
+        if ordered:
+            query += "ORDER BY s.created_at DESC "
+        query = self._add_limit(query, limit)
+        r = self._driver.execute_query(query, routing_="r",
+                                       consortium_tags = consortium_tags,
+                                       submission_tags = submission_tags,
+                                       limit = limit,
+                                       result_transformer_=Result.value)
+        return r
+
     def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
         """Sorts the submission tags by the number of views in descending order."""
         query = (

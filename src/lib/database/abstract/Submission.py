@@ -692,6 +692,67 @@ class SubmissionFilterABC(ABC):
     
     
     @abstractmethod
+    def find_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ordered : bool = True,
+            ca_match_all : bool = True,
+            limit : int = 10) -> List[str]:
+        """Single-query variant of find(). Returns the submission tags that match
+        all given filters. Intended as the replacement for find() once the results
+        are confirmed to be identical."""
+
+    @abstractmethod
+    def count_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            user_role : Literal["creator", "collaborator", "any"] = "any",
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ca_match_all : bool = True) -> int:
+        """Single-query count variant of the find_v2 filtering. Counts the matching
+        submissions without materializing the tags."""
+
+    @abstractmethod
+    def filter_by_consortium(self, consortium_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+        """Returns the submission tags that are shared (approved) with the given consortiums.
+
+        Parameters
+        ----------
+        consortium_tags : List[str]
+            The tags of the consortiums. A submission is returned if it is shared with any of them.
+        submission_tags : List[str], optional
+            If given, the filter is applied only to these submission tags, by default None
+        limit : int, optional
+            The maximum number of tags to return, by default None
+        ordered : bool, optional
+            If True, the tags are ordered by creation date, by default True
+
+        Returns
+        -------
+        List[str]
+            The submission tags shared with the consortium.
+        """
+
+    @abstractmethod
     def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
         """Checks if a user has access to a submission. 
         This is useful to check if a user can access a submission before returning the submission data. 
@@ -722,6 +783,7 @@ class SubmissionFilterABC(ABC):
             ca_search_string : str = None,
             user_tags : List[str] = None, 
             genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
             ca_match_all : bool = True,

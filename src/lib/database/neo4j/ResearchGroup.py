@@ -4,6 +4,7 @@ import pandas as pd
 from services.encryption import create_hierarchical_hash
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from config.models.researchgroup import ResearchGroupInput, ResearchGroupModel
+from lib.cache.scope_cache import invalidate_cached_scope
 
 
 class Neo4JResearchGroup(ResearchGroupABC):
@@ -42,6 +43,8 @@ class Neo4JResearchGroup(ResearchGroupABC):
         
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
         
+        for user_tag in user_tags:
+            invalidate_cached_scope(user_tag)
     def delete(self, tag: str) -> bool:
         return super().delete(tag)
        
@@ -211,6 +214,9 @@ class Neo4JResearchGroup(ResearchGroupABC):
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
+        
+        for user_tag in user_tags:
+            invalidate_cached_scope(user_tag)
         
         
         
