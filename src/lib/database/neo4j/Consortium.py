@@ -193,9 +193,9 @@ class Neo4JConsortium(ConsortiumABC):
                                        status = status,
                                        user_tag = user_tag,
                                        result_transformer_=Result.value)
-        return r[0] > 0
         from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
+        return r[0] > 0
 
     def get_pending_share_requests_for_head(self, user_tag : str) -> List[Dict]:
         """Returns the pending share requests that the given research group head (PI) can approve.
@@ -223,9 +223,9 @@ class Neo4JConsortium(ConsortiumABC):
                                        submission_tag = submission_tag,
                                        user_tag = user_tag,
                                        result_transformer_=Result.value)
-        return r[0] > 0
         from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
+        return r[0] > 0
 
     def deny_share_request(self, consortium_tag : str, submission_tag : str) -> bool:
         """Denies a pending share request, removing the pending relation"""
@@ -239,9 +239,9 @@ class Neo4JConsortium(ConsortiumABC):
                                        consortium_tag = consortium_tag,
                                        submission_tag = submission_tag,
                                        result_transformer_=Result.value)
-        return r[0] > 0
         from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
+        return r[0] > 0
 
     def unshare_submission(self, consortium_tag : str, submission_tag : str) -> bool:
         """Removes a submission from the consortium"""
@@ -254,6 +254,6 @@ class Neo4JConsortium(ConsortiumABC):
                                        consortium_tag = consortium_tag,
                                        submission_tag = submission_tag,
                                        result_transformer_=Result.value)
-        return r[0] > 0
         from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
+        return r[0] > 0

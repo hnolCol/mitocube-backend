@@ -480,11 +480,11 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators, created_at = created_at)
-        return True
         from lib.cache.scope_cache import invalidate_cached_scope
         invalidate_cached_scope(user_tag)
         for collaborator_tag in (collaborators or []):
             invalidate_cached_scope(collaborator_tag)
+        return True
 
     def insert_view(self, tag : str, user_tag : str, decay_rate : float = math.log(2)/(5 * 24)) -> bool:
         """Inserts a view for a submission.
