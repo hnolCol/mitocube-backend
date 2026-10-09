@@ -206,7 +206,8 @@ class Neo4JResearchGroup(ResearchGroupABC):
             "UNWIND $user_tags as user_tag "
             "MATCH (u:User {tag : user_tag}) "
             "MATCH (rg)<-[r:MEMBER_OF]-(u) "
-            "DELETE r"
+            "OPTIONAL MATCH (u)-[h:HEAD_OF]->(rg) "
+            "DELETE r, h"
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
