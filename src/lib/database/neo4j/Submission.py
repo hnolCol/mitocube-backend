@@ -2103,6 +2103,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_tags : List[str] = None, 
             user_role : Literal["creator", "collaborator", "any"] = "any",  
             genotype_tag : List[str] = None,
+            consortium_tag : str = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
             ca_match_all : bool = True,
@@ -2117,7 +2118,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             print(f"Error: {e}")
             return []
         
-        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags])
+        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags, consortium_tag])
         if search_string is not None:
             limit_ = limit if all(attr is None for attr in [state, trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
             tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered, submission_tags=tags)
@@ -2153,6 +2154,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             limit_ = limit
             tags = self.filter_by_quantified_protein(protein_tags,submission_tags=tags,limit=limit_, ordered=ordered)
             if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
+        if consortium_tag is not None:
+            tags = self.filter_by_consortium(consortium_tag, submission_tags=tags, limit=limit, ordered=ordered)
+            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
         if not filter_defined: #none defined, then just return all. 
             if tags is None: #then it must be admin or curator, so return all tags.
                 tags = self.get_all_tags(limit=limit, ordered=ordered)
@@ -2164,6 +2168,25 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return tags 
     
     
+    def filter_by_consortium(self, consortium_tag : str, submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+        """Returns the submission tags that are shared (approved) with the given consortium."""
+        query = (
+            "MATCH (c:Consortium {tag : $consortium_tag})<[r:SHARED_WITH]-(s:Submission) "
+            "WHERE r.status = 'approved' "
+        )
+        if submission_tags is not None:
+            query += "AND s.tag IN $submission_tags "
+        query += "RETURN s.tag as tag "
+        if ordered:
+            query += "ORDER BY s.created_at DESC "
+        query = self._add_limit(query, limit)
+        r = self._driver.execute_query(query, routing_="r",
+                                       consortium_tag = consortium_tag,
+                                       submission_tags = submission_tags,
+                                       limit = limit,
+                                       result_transformer_=Result.value)
+        return r
+
     def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
         """Sorts the submission tags by the number of views in descending order."""
         query = (

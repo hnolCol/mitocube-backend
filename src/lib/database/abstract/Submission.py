@@ -692,6 +692,27 @@ class SubmissionFilterABC(ABC):
     
     
     @abstractmethod
+    def filter_by_consortium(self, consortium_tag : str, submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+        """Returns the submission tags that are shared (approved) with the given consortium.
+
+        Parameters
+        ----------
+        consortium_tag : str
+            The tag of the consortium.
+        submission_tags : List[str], optional
+            If given, the filter is applied only to these submission tags, by default None
+        limit : int, optional
+            The maximum number of tags to return, by default None
+        ordered : bool, optional
+            If True, the tags are ordered by creation date, by default True
+
+        Returns
+        -------
+        List[str]
+            The submission tags shared with the consortium.
+        """
+
+    @abstractmethod
     def has_user_access(self, user_tag : str, submission_tag : str) -> bool:
         """Checks if a user has access to a submission. 
         This is useful to check if a user can access a submission before returning the submission data. 
@@ -722,6 +743,7 @@ class SubmissionFilterABC(ABC):
             ca_search_string : str = None,
             user_tags : List[str] = None, 
             genotype_tag : List[str] = None,
+            consortium_tag : str = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
             ca_match_all : bool = True,
