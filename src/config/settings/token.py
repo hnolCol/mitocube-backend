@@ -1,13 +1,27 @@
 from datetime import datetime, timedelta
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic_settings import BaseSettings 
-from pydantic import SecretStr, Field
+from pydantic import SecretStr, Field, BeforeValidator
+
+def _duration_from_hours(value):
+    if isinstance(value, str) and value.strip().isdigit():
+        return timedelta(hours=int(value.strip()))
+    return value
+
+def _duration_from_minutes(value):
+    if isinstance(value, str) and value.strip().isdigit():
+        return timedelta(minutes=int(value.strip()))
+    return value
+
+HoursDuration = Annotated[timedelta, BeforeValidator(_duration_from_hours)]
+MinutesDuration = Annotated[timedelta, BeforeValidator(_duration_from_minutes)]
 
 class UserToken(BaseSettings):
     """BaseSettings for a user token"""
-    expires_after_hours : timedelta = timedelta(hours=48)
-    expires_after_minutes : timedelta = timedelta(minutes=15)
+    expires_after_hours : HoursDuration = timedelta(hours=48)
+    expires_after_minutes : MinutesDuration = timedelta(minutes=15)
     jwt_key : SecretStr = Field(
         ...,
         description="JWT signing key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
@@ -25,7 +39,7 @@ class ShareToken(BaseSettings):
     or datasets to the application.
     The BaseSettings define the security settings. 
     """
-    expires_after_hours : timedelta = timedelta(days = 120) #4 months 
+    expires_after_hours : HoursDuration = Field(default=timedelta(days=120), validation_alias="SHARE_EXPIRES_AFTER_HOURS") #4 months 
     jwt_share_key : SecretStr = Field(
         ...,
         description="JWT share key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
