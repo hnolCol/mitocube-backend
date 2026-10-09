@@ -864,12 +864,21 @@ def create_submission_runlist(
     if runlist_props.aggregate_on is not None and runlist_props.aggregate_on not in samples_df.columns:
         raise HTTPException(status_code=400, detail="aggregate_on attribute tag not found.")
 
+    if runlist_props.plate_tags:
+        if len(runlist_props.plate_tags) != len(runlist_props.free_plate_positions):
+            raise HTTPException(status_code=400, detail="Number of plates does not match the well selection.")
+        try:
+            for plate_tag, positions in zip(runlist_props.plate_tags, runlist_props.free_plate_positions):
+                db.plates.check_positions(tag=plate_tag, positions=positions)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     try:
         runlist = RunListCreator(
             dataset_label=submission_tag,
             sample_list=samples_df,
             user=user,
-            **runlist_props.model_dump(exclude={"instrument_tag"})
+            **runlist_props.model_dump(exclude={"instrument_tag", "plate_tags"})
         ).create()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -877,6 +886,13 @@ def create_submission_runlist(
     runlist.instrument_tag = runlist_props.instrument_tag
     if runlist.instrument_tag:
         runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
+
+    if runlist_props.plate_tags:
+        plate_names = {t: db.plates.get(tag=t).name for t in runlist_props.plate_tags}
+        for run in runlist.runs:
+            run.plate_tag = runlist_props.plate_tags[run.plate_index]
+            run.plate_name = plate_names[run.plate_tag]
+
     rl_tag = db.submissions.insert_runlist(submission_tag=submission_tag, runlist=runlist, user_tag=user.tag)
     runlist.tag = rl_tag  
 

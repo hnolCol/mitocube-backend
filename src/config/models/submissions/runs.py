@@ -50,6 +50,7 @@ class RunListRequestPropsModel(BaseModel):
     n_fractions : int = 0 
     free_plate_positions : List[List[List[bool]]]
     instrument_tag : str
+    plate_tags : Optional[List[str]] = None  
 
 
 class AnalyticRunModel(BaseModel):
@@ -66,8 +67,12 @@ class AnalyticRunModel(BaseModel):
     plate_index : int #
     column_index : int # the index of column in the plate (e.g. integer)
     row_index : int # the index of rows in the plate (e.g. integer)
-    position_label : str # the label of the position
+    position : str # the label of the position
     aggregated_samples : List[int]
+    sample_index : Optional[int] = None    # Sample.sample_index (0-based), None for pooled runs
+    fraction_index : Optional[int] = None  # 1..n_fractions, 0 if not fractionated
+    plate_tag : Optional[str] = None
+    plate_name : Optional[str] = None
 
 
 class RunListModel(BaseModel):

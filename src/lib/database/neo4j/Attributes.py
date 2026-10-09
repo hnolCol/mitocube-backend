@@ -1040,7 +1040,8 @@ class Neo4JAttributes(AttributesABC):
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
             "WITH a "
             "UNWIND $group_tags as group_tag "
-            "MATCH (ag:AttributeGroup {tag : group_tag}) "
+            "MERGE (ag:AttributeGroup {tag : group_tag}) "
+            "ON CREATE SET ag.created_at = timestamp() "
             "MERGE (a)-[:PART_OF]->(ag) "
             "WITH a "
         )
@@ -1080,7 +1081,8 @@ class Neo4JAttributes(AttributesABC):
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
             "WITH a "
             "UNWIND $group_tags as group_tag "
-            "MATCH (ag:AttributeGroup {tag : group_tag}) "
+            "MERGE (ag:AttributeGroup {tag : group_tag}) "
+            "ON CREATE SET ag.created_at = timestamp() "
             "MERGE (a)-[:PART_OF]->(ag) "
             "WITH a "
         )
