@@ -256,7 +256,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
             "MATCH (u:User {tag : $user_tag}) "
             "MERGE (u)-[r:HEAD_OF]->(rg) "
             "ON CREATE "
-            "SET r.since = timestamp() "
+            "SET r.created_at = timestamp() "
         )
         self._driver.execute_query(query, routing_="w", group_tag = group_tag, user_tag = user_tag)
 

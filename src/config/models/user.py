@@ -73,7 +73,7 @@ class UserInsertModel(BaseModel):
     firstname : str 
     lastname : str 
     institute : Optional[str] = None  
-    research_group : str  
+    research_group_tags : List[str]  
     email : EmailStr 
     agreed_to_terms : Optional[bool] = False
     expires_after : float = None
@@ -90,7 +90,7 @@ class UserCreateModel(BaseModel):
     firstname : str 
     lastname : str 
     institute : Optional[str] = None 
-    research_group : Optional[str] = None  
+    research_group_tags : List[str]  
     email : EmailStr 
     role : UserRolesEnum = UserRolesEnum.STANDARD
     allow_login : bool = True 

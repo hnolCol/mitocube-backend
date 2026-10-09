@@ -155,7 +155,7 @@ class Neo4JUser(UserABC):
                 firstname=GENERAL_SETTINGS.lead_contact_first_name,
                 lastname=GENERAL_SETTINGS.lead_contact_last_name,
                 email=GENERAL_SETTINGS.lead_contact,
-                research_group=GENERAL_SETTINGS.lead_contact_group,
+                research_group_tags=[GENERAL_SETTINGS.lead_contact_group],
                 institute=GENERAL_SETTINGS.lead_contact_institute,  
                 role=UserRolesEnum.ADMIN,
                 is_lead_admin=True,
