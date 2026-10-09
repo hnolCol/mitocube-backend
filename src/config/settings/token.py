@@ -25,7 +25,7 @@ class ShareToken(BaseSettings):
     or datasets to the application.
     The BaseSettings define the security settings. 
     """
-    expires_after_hours : timedelta = timedelta(days = 120) #4 months 
+    expires_after_hours : timedelta = Field(default=timedelta(days=120), validation_alias="SHARE_EXPIRES_AFTER_HOURS") #4 months 
     jwt_share_key : SecretStr = Field(
         ...,
         description="JWT share key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
