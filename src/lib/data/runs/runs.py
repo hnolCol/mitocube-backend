@@ -173,7 +173,7 @@ class RunListCreator:
                 "plate_index" : int, #the plate index if multiple are required
                 "column_index" : int, #the column index inferred from 'free_plate_positions'
                 "row_index" : int, #the row index inferred from 'free_plate_positions'
-                "position_label" : str, #position label such as A1 for row_index = 0 and column_index = 0 
+                "position" : str, #position label such as A1 for row_index = 0 and column_index = 0 
                 "name" : str, #the name of the run, if aggregate_on  or fractionate is enabled, not equal to sample name
                 "aggregated_samples" : list #the sample indices that were aggregated.
             }
@@ -195,13 +195,13 @@ class RunListCreator:
                         if index == len(run_names):
                             break 
                         if is_well_free:
-                            position_label  = f"{row_labels[row_index]}{column_labels[column_idx]}"
+                            position = f"{row_labels[row_index]}{column_labels[column_idx]}"
                             assigned_runs.append(
                                 self._get_run_well_assignment(
                                         plate_index,
                                         column_idx,
                                         row_index,
-                                        position_label,
+                                        position,
                                         run_names[index],
                                         aggregated_samples[index] if len(aggregated_samples) else []))
                             index += 1
@@ -213,13 +213,13 @@ class RunListCreator:
                         if index == len(run_names):
                             break 
                         if is_well_free:
-                            position_label = f"{row_labels[row_index]}{column_labels[column_idx]}"
+                            position = f"{row_labels[row_index]}{column_labels[column_idx]}"
                             assigned_runs.append(
                                 self._get_run_well_assignment(
                                         plate_index,
                                         column_idx,
                                         row_index,
-                                        position_label,
+                                        position,
                                         run_names[index],
                                         aggregated_samples[index] if len(aggregated_samples) else []))
                             index += 1
@@ -230,7 +230,7 @@ class RunListCreator:
                                   plate_index : int, 
                                   column_idx : int, 
                                   row_index : int, 
-                                  position_label : str, 
+                                  position : str, 
                                   name : str, 
                                   aggregated_samples : List[int]) -> Dict[str,Any]:
         """
@@ -245,7 +245,7 @@ class RunListCreator:
             The column index on the plate. 
         row_index : int
             The row index on the plate. 
-        position_label : str 
+        position : str 
             The position label. row_index = 0 and column_index = 1 equals 'A2', row_index=2, column_index = 0 equals 'C0'. 
         name : str 
             The run name. Note that the run is prefixed by the label which is generated here.
@@ -262,7 +262,7 @@ class RunListCreator:
                 "plate_index" : int,
                 "column_index" : int, 
                 "row_index" : int, 
-                "position_label" : str, 
+                "position" : str, 
                 "name" : str,
                 "tag" : str,
                 "aggregated_samples" : List[int]
@@ -274,7 +274,7 @@ class RunListCreator:
                     "plate_index" : plate_index,
                     "column_index" : column_idx, 
                     "row_index" : row_index, 
-                    "position_label" : position_label, 
+                    "position" : position, 
                     "name" : f"{name}_{run_tag}",
                     "tag" : run_tag,
                     "aggregated_samples" : aggregated_samples
@@ -366,42 +366,41 @@ class RunListCreator:
         n_plates = len(self._free_plate_positions) 
         aggregated_samples = []
         if self._aggregated_on is None and not self._fractionate:
-            # #sample  names equal run names 
-            # #TO DO : maxsplit=2 - dangerous for changing the file name creating method.. 
-            # #find another solution here. 
-            # today_as_string = datetime.today().strftime('%Y%m%d')
-            # if self._add_user_initials:
-            #     user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-            #     run_names = [f"{today_as_string}_{self._dataset_label}_{user_initials}_{sample_name.split('_',maxsplit=2)[-1]}" for sample_name in self._sample_list.index]
-            # else:
-            #     run_names = [f"{today_as_string}_{self._dataset_label}_{sample_name.split('_')[-1]}_{sample_name.split('_')[2]}" for sample_name in self._sample_list.index] # was max split
             run_names = [self._base_run_name(s) for s in self._sample_suffixes()]
+            n = len(run_names)
+            sample_indices, fraction_indices = list(range(n)), [0] * n
+
         elif self._aggregated_on is None and self._fractionate:
-            # run_names = self._get_fraction_runs(self._sample_list.index.to_list())
             run_names = self._get_fraction_runs([self._base_run_name(s) for s in self._sample_suffixes()])
-            
+            n, nf = len(self._sample_list.index), self._n_fractions
+            sample_indices = [i for i in range(n) for _ in range(nf)]
+            fraction_indices = [f for _ in range(n) for f in range(1, nf + 1)]
+
         elif self._aggregated_on is not None:
             #groupby the sample list by the aggregate_on column => pooling 
             groupByAggregate = self._sample_list.groupby(by=self._aggregated_on, sort=False)
             aggregated_samples = [[self._sample_list.index.get_loc(sample_name) for sample_name in groupData.index] for _, groupData in groupByAggregate]
             run_names = [self._get_runname_on_aggregate(n + 1, groupByAggregate.ngroups, groupName, aggregated_samples[n]) for n, (groupName, _) in enumerate(groupByAggregate)]
-                         
+            sample_indices, fraction_indices = [None] * len(run_names), [0] * len(run_names)
+
             if self._fractionate:
                 #if fractionated create run names with the respective fraction index 
                 aggregated_samples = [[self._sample_list.index.get_loc(sample_name) for sample_name in groupData.index] for _, groupData in groupByAggregate for frac in range(self._n_fractions)]
-                #aggregated_samples = [agg_samples * self._n_fractions for agg_samples in aggregated_samples]
                 run_names = self._get_fraction_runs(run_names)
-        
-        #finally assign ach run to a plate run 
-        assigned_runs = self._assign_runs_to_plate_wells(run_names,aggregated_samples)
-       # run_idces = assigned_runs.index.tolist()
+                sample_indices = [None] * len(run_names)
+                fraction_indices = [f for _ in range(groupByAggregate.ngroups) for f in range(1, self._n_fractions + 1)]
+
+        #finally assign each run to a plate well 
+        assigned_runs = self._assign_runs_to_plate_wells(run_names, aggregated_samples)
+        assigned_runs["sample_index"] = sample_indices
+        assigned_runs["fraction_index"] = fraction_indices
+
         if self._scramble:
             #if scramble within one plate, first group by plate_index, then scramble
             if self._scramble_across_plates:
                 scrambled_runs = assigned_runs.sample(frac=1.0)
             else:
                 scrambled_runs = assigned_runs.groupby(by = "plate_index").apply(lambda df : df.sample(frac=1.0)).reset_index(drop=True)
-            #reset_index to get the original run order 
             run_list = scrambled_runs.reset_index(drop=True).to_dict(orient="records")
         else:
             run_list = assigned_runs.reset_index(drop=True).to_dict(orient="records")

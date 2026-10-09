@@ -42,6 +42,7 @@ from lib.database.neo4j.Crosslink import Neo4jCrosslinks
 from lib.database.neo4j.external_resource import Neo4jExternalResources
 from lib.database.neo4j.Protocols import Neo4JProtocols
 from lib.database.neo4j.Policy import Neo4JPolicy
+from lib.database.neo4j.Plates import Neo4JPlates
 import pandas as pd 
 class MCNeo4JDatabase(DatabaseABC):
     
@@ -97,6 +98,7 @@ class MCNeo4JDatabase(DatabaseABC):
                                                          condition_applications=self.condition_applications)
         
         self.metatexts = Neo4JMetaText(driver=self.connection.driver)
+        self.plates = Neo4JPlates(driver=self.connection.driver, condition_applications=self.condition_applications)
         
         self.cache = Neo4JCache()
         self.openai = Neo4JOpenAI(driver = self.connection.driver)
@@ -120,6 +122,17 @@ class MCNeo4JDatabase(DatabaseABC):
         #self.constructor.set_up_units()
         #self.constructor.set_up_attributes()
         #self.constructor._add_
+
+    def health_check(self) -> bool:
+        """Cheap connectivity probe for startup health checks.
+
+        Opens the underlying driver on first call (the Database.DB() proxy is
+        lazy) and runs a trivial query so a broken connection surfaces at
+        startup instead of on the first user request.
+        """
+        self._driver.verify_connectivity()
+        self._driver.execute_query(query_="RETURN 1", routing_="r", database_="neo4j")
+        return True
     def __create_fulltext_search(self):
         """Creates the fulltext search index for the database. 
         This includes submission and research aim fulltext search, as well as metatext

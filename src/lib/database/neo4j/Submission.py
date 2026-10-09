@@ -1227,8 +1227,8 @@ class Neo4JSubmissions(SubmissionsABC):
                 "CREATE (r:Run {tag: randomUUID(), text: run.name, "
                 "   index: run.index, measurement_index: run.measurement_index, "
                 "   plate_index: run.plate_index, row_index: run.row_index, "
-                "   column_index: run.column_index, position_label: run.position_label, "
-                "   sample_index: run.index}) "
+                "   column_index: run.column_index, position: run.position, "
+                "   sample_index: run.sample_index, fraction_index: run.fraction_index}) "
                 "MERGE (rl)-[:HAS_RUN]->(r) "
             )
             params = {
@@ -1264,8 +1264,8 @@ class Neo4JSubmissions(SubmissionsABC):
                 "CREATE (r:Run {tag: randomUUID(), text: run.name, "
                 "   index: run.index, measurement_index: run.measurement_index, "
                 "   plate_index: run.plate_index, row_index: run.row_index, "
-                "   column_index: run.column_index, position_label: run.position_label, "
-                "   sample_index: run.index}) "
+                "   column_index: run.column_index, position: run.position, "
+                "   sample_index: run.sample_index, fraction_index: run.fraction_index}) "
                 "MERGE (rl)-[:HAS_RUN]->(r) "
             )
             params = {
@@ -1284,8 +1284,25 @@ class Neo4JSubmissions(SubmissionsABC):
             }
         
         self._driver.execute_query(query, routing_="w", **params)
+
+        # Link runs to their physical plate, the well position is stored on the relationship
+        plate_links = [
+            {"index": r.index, "plate_tag": r.plate_tag, "row_index": r.row_index,
+             "column_index": r.column_index, "position": r.position}
+            for r in runlist.runs if r.plate_tag is not None
+        ]
+        if plate_links:
+            query_plates = (
+                "UNWIND $links AS link "
+                "MATCH (:RunList {tag: $rl_tag})-[:HAS_RUN]->(r:Run {index: link.index}) "
+                "MATCH (p:Plate {tag: link.plate_tag}) "
+                "MERGE (r)-[o:ON_PLATE]->(p) "
+                "SET o.row_index = link.row_index, o.column_index = link.column_index, "
+                "    o.position = link.position "
+            )
+            self._driver.execute_query(query_plates, routing_="w", rl_tag=rl_tag, links=plate_links)
         
-        # Link each Run to its Sample via sample_index
+        # Link each Run to its Sample via sample_index (pooled runs have no sample_index and are skipped here)
         query_measures = (
             "MATCH (submission:Submission {tag: $submission_tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
@@ -1325,7 +1342,9 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
-            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
+            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
         )
         r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
         if not r:
@@ -1343,7 +1362,9 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
-            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, collect(r{.*}) as runs "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
+            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
             "ORDER BY rl.created_at DESC "
         )
         r = self._driver.execute_query(query, tag=submission_tag, result_transformer_=Result.data)
@@ -1359,7 +1380,8 @@ class Neo4JSubmissions(SubmissionsABC):
     def delete_runlist(self, submission_tag: str, rl_tag: str) -> bool:  
         query = (
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
-            "DETACH DELETE rl "
+            "OPTIONAL MATCH (rl)-[:HAS_RUN]->(r:Run) "
+            "DETACH DELETE r, rl "
         )
         try:
             self._driver.execute_query(query, routing_="w", tag=submission_tag, rl_tag=rl_tag)

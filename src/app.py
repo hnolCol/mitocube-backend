@@ -83,6 +83,9 @@ from routers.crosslink import crosslink
 from routers.protocols import protocols
 from routers.mfa import mfa
 from routers.policy import policy
+from routers.plates import plates
+
+# from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
 import sys 
 
@@ -158,7 +161,8 @@ router_sources = [policy,
                   crosslink,
                   crosslink_external_resource,
                   protocols,
-                  submission_export
+                  submission_export,
+                  plates
 ]
     
 

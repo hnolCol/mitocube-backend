@@ -3,12 +3,12 @@ Router for exporting submission metadata to markdown format.
 """
 
 import traceback
-from lib.database.Database import get_db
-from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import Response
 
+from lib.database.Database import get_db
+from lib.database.abstract.Database import DatabaseABC
 
 from config.models.user import UserModel
 from config.exceptions.HTTPExceptions import tag_not_found
@@ -18,7 +18,7 @@ from services.export_submissions import export_submission_to_markdown
 from services.submission import check_submission_access
 
 
-router = APIRouter(
+router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api",
     tags=["Submission", "Export"],
 )
@@ -131,12 +131,10 @@ def download_submission_md_file(
     include_metatext: bool = True,
     include_timeline: bool = True,
     user: UserModel = Depends(get_user_from_token),
-    db: DatabaseABC = Depends(get_db)
+    db: DatabaseABC = Depends(get_db),
 ) -> Response:
     """
     Download submission metadata as a markdown file.
-
-    This endpoint is similar to /export/md but returns the content as a downloadable file.
 
     Parameters
     ----------
@@ -155,9 +153,11 @@ def download_submission_md_file(
     include_metatext : bool, optional
         Whether to include the research aim and other metatexts, by default True
     include_timeline : bool, optional
-        Whether to include the state history and timeline events, by default True
+        Whether to include the timeline (state history), by default True
     user : UserModel, optional
         The user making the request, by default Depends(get_user_from_token)
+    db : DatabaseABC, optional
+        The database, by default Depends(get_db)
 
     Returns
     -------
