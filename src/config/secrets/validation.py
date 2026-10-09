@@ -21,6 +21,7 @@ import os
 import logging
 from typing import Dict, List, Callable
 from pydantic import SecretStr
+from dotenv import dotenv_values
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,20 @@ REQUIRED_SECRETS: Dict[str, Callable[[str], bool]] = {
     "SHARE_TOKEN_PW": SecretValidator.validate_password,
 }
 
+def _get_secret(secret_name: str) -> str | None:
+    """
+    Read a secret from the process environment, falling back to the .env file.
+
+    pydantic-settings loads .env values into the settings objects but does not
+    export them to os.environ, so a .env-only secret would otherwise be reported
+    as missing by this module.
+    """
+    value = os.environ.get(secret_name)
+    if value is not None:
+        return value
+    return dotenv_values(".env").get(secret_name)
+
+
 # Optional secrets with validators (warn if invalid, but don't fail)
 OPTIONAL_SECRETS: Dict[str, Callable[[str], bool]] = {
     "OPENAI_API_KEY": SecretValidator.validate_api_key,
@@ -111,8 +126,7 @@ def validate_required_secrets() -> List[str]:
     errors = []
     
     for secret_name, validator in REQUIRED_SECRETS.items():
-        # Check environment variable
-        value = os.environ.get(secret_name)
+        value = _get_secret(secret_name)
         
         if value is None:
             errors.append(f"Missing required secret: {secret_name}")
@@ -134,7 +148,7 @@ def validate_optional_secrets() -> List[str]:
     warnings = []
     
     for secret_name, validator in OPTIONAL_SECRETS.items():
-        value = os.environ.get(secret_name)
+        value = _get_secret(secret_name)
         
         if value is not None and not validator(value):
             warnings.append(f"Invalid {secret_name}: does not meet requirements")
@@ -191,6 +205,6 @@ def get_missing_secrets() -> List[str]:
     """
     missing = []
     for secret_name in REQUIRED_SECRETS.keys():
-        if os.environ.get(secret_name) is None:
+        if _get_secret(secret_name) is None:
             missing.append(secret_name)
     return missing
