@@ -692,13 +692,13 @@ class SubmissionFilterABC(ABC):
     
     
     @abstractmethod
-    def filter_by_consortium(self, consortium_tag : str, submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
-        """Returns the submission tags that are shared (approved) with the given consortium.
+    def filter_by_consortium(self, consortium_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
+        """Returns the submission tags that are shared (approved) with the given consortiums.
 
         Parameters
         ----------
-        consortium_tag : str
-            The tag of the consortium.
+        consortium_tags : List[str]
+            The tags of the consortiums. A submission is returned if it is shared with any of them.
         submission_tags : List[str], optional
             If given, the filter is applied only to these submission tags, by default None
         limit : int, optional
@@ -743,7 +743,7 @@ class SubmissionFilterABC(ABC):
             ca_search_string : str = None,
             user_tags : List[str] = None, 
             genotype_tag : List[str] = None,
-            consortium_tag : str = None,
+            consortium_tags : List[str] = None,
             include_sample_ca : bool = False,   
             ordered : bool = True,
             ca_match_all : bool = True,
