@@ -37,6 +37,14 @@ class ConsortiumABC(ABC):
         """Returns the research group tags that are members of the consortium"""
 
     @abstractmethod
+    def get_user_tags(self, tag : str) -> List[str]:
+        """Returns the user tags of all users that are members of the consortiums research groups"""
+
+    @abstractmethod
+    def find_by_user(self, user_tag : str, limit : int = 40) -> List[str]:
+        """Returns the tags of all consortiums the users research groups are members of"""
+
+    @abstractmethod
     def insert_groups(self, tag : str, group_tags : List[str]):
         """Adds research groups to the consortium"""
 

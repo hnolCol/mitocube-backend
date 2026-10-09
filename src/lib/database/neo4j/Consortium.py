@@ -103,6 +103,26 @@ class Neo4JConsortium(ConsortiumABC):
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return r[0] if len(r) > 0 else []
 
+    def get_user_tags(self, tag : str) -> List[str]:
+        """Returns the user tags of all users that are members of the consortiums research groups"""
+        query = (
+            "MATCH (c:Consortium {tag : $tag})<-[:MEMBER_OF]-(rg:ResearchGroup)<-[:MEMBER_OF]-(u:User) "
+            "RETURN DISTINCT u.tag ORDER BY u.tag "
+        )
+        r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+        return r
+
+    def find_by_user(self, user_tag : str, limit : int = 40) -> List[str]:
+        """Returns the tags of all consortiums the users research groups are member of"""
+        query = (
+            "MATCH (u:User {tag : $user_tag})-[:MEMBER_OF]->(rg:ResearchGroup)-[:MEMBER_OF]->(c:Consortium) "
+            "RETURN DISTINCT c.tag ORDER BY c.created_at DESC "
+        )
+        if limit is not None:
+            query += "LIMIT $limit"
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, limit = limit, result_transformer_=Result.value)
+        return r
+
     def insert_groups(self, tag : str, group_tags : List[str]):
         """Adds research groups to the consortium"""
         if not self.exists(tag): raise ValueError(f"Consortium with tag {tag} does not exist.")

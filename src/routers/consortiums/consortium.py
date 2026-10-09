@@ -54,6 +54,26 @@ def add_consortium(consortium : ConsortiumInput, user : UserModel = Depends(is_u
     return tag
 
 
+@router.get("/user", summary="Returns the consortiums the current user is a member of (via their research groups).")
+def get_my_consortiums(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """"
+    Returns the tags of all consortiums that one of the users research groups is a member of.
+    A user can be part of multiple consortiums through different research groups.
+    """
+    return db.consortiums.find_by_user(user_tag = user.tag, limit = None)
+
+
+
+@router.get("/users/{user_tag}", summary="Returns the consortiums of a given user. Requires at least curator rights.")
+def get_consortiums_by_user(user_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """"
+    Returns the tags of all consortiums that one of the given users research groups is a member of.
+    Requires at least curator rights.
+    """
+    return db.consortiums.find_by_user(user_tag = user_tag, limit = None)
+
+
+
 @router.get("/{consortium_tag}")
 def get_consortium_by_tag(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ConsortiumResponseModel:
     """"
@@ -80,6 +100,15 @@ def get_consortium_groups(consortium_tag : str, user : UserModel = Depends(get_u
     """
     _check_consortium_exists(consortium_tag, db)
     return db.consortiums.get_groups(tag = consortium_tag)
+
+
+@router.get("/{consortium_tag}/users")
+def get_consortium_users(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """"
+    Returns the user tags of all users that are members of the consortiums research groups.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    return db.consortiums.get_user_tags(tag = consortium_tag)
 
 
 @router.post("/{consortium_tag}/groups", summary="Adds research groups to a consortium. Requires at least curator rights.")
