@@ -36,6 +36,10 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Use
     Adds a user to the database. Currently requires admin rights.
     """
 
+    # every user must be a member of at least one research group - validate all groups before creating the user
+    for research_group_tag in user_props.research_group_tags:
+        if not db.research_groups.exists(research_group_tag):
+            raise HTTPException(status_code=404, detail=f"Research group with tag {research_group_tag} not found.")
     tag = db.users.get_new_tag() 
     plain_pw = db.users.create_plain_password() 
     hashed_pw = db.users.hash_password(plain_pw)
@@ -44,11 +48,9 @@ def add_user_to_the_database(background_task : BackgroundTasks, user_props : Use
     if not ok:
         raise HTTPException(status_code=500, detail="Could not insert user in the database.")
 
-    # Link user to research group if provided
-    if user_props.research_group:
-        if not db.research_groups.exists(user_props.research_group):
-            raise HTTPException(status_code=404, detail="Research group not found.")
-        db.research_groups.insert_users(tag=user_props.research_group, user_tags=[tag])
+    # Link user to their research groups
+    for research_group_tag in user_props.research_group_tags:
+        db.research_groups.insert_users(tag=research_group_tag, user_tags=[tag])
 
     
     send_email_in_background(background_tasks=background_task,

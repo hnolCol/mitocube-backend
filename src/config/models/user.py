@@ -26,7 +26,7 @@ class BasicUser(BaseModel):
     firstname : str 
     lastname : str 
     institute :  Optional[str] = None 
-    research_group : Optional[str] = None 
+    research_group_tags : List[str] = []
     created_at : float
 
 class BasicUserWithEmail(BasicUser):
@@ -73,7 +73,7 @@ class UserInsertModel(BaseModel):
     firstname : str 
     lastname : str 
     institute : Optional[str] = None  
-    research_group : Optional[str] = None  
+    research_group_tags : List[str] = Field(..., min_length=1)  
     email : EmailStr 
     agreed_to_terms : Optional[bool] = False
     expires_after : float = None
@@ -90,7 +90,7 @@ class UserCreateModel(BaseModel):
     firstname : str 
     lastname : str 
     institute : Optional[str] = None 
-    research_group : Optional[str] = None  
+    research_group_tags : List[str] = Field(..., min_length=1)  
     email : EmailStr 
     role : UserRolesEnum = UserRolesEnum.STANDARD
     allow_login : bool = True 
@@ -129,7 +129,7 @@ class AddUserPropsModel(BaseModel):
             firstname=self.att_user_firstname,
             lastname=self.att_user_lastname,
             role = self.att_user_role,
-            research_group= self.att_user_research_group.text,
+            research_group_tags= [self.att_user_research_group.text],
             institute=self.att_user_institute.text
         ).model_dump(exclude_none=True)
     
@@ -140,7 +140,7 @@ class UserModelForUpdate(BaseModel):
     firstname : str 
     lastname : str 
     institute : str 
-    research_group : str 
+    research_group_tags : List[str] = Field(..., min_length=1)
     role : UserRolesEnum
     updated_on : float = Field(default_factory=get_time_stamp)
 
@@ -168,7 +168,7 @@ class PublicUser(BaseModel):
     firstname : str
     lastname : str 
     institute : Optional[str] = None
-    research_group : Optional[str] = None
+    research_group_tags : List[str] = []
     email : EmailStr
     created_at : float 
 

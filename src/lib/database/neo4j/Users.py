@@ -91,13 +91,14 @@ class Neo4JUser(UserABC):
         """
         query = (
             "MATCH (u:User {tag : $tag}) "
-            "RETURN properties(u) "
+            "OPTIONAL MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup) "
+            "RETURN properties(u) AS props, collect(rg.tag) AS research_group_tags "
         )
         
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag=tag)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, tag=tag)
         
         if len(r) == 0: return None 
-        return UserModel(**r[0])
+        return self._user_with_research_group_tags({**r[0]["props"], "research_group_tags" : r[0]["research_group_tags"]})
         
     def get_tags(self, limit: int = None) -> List[str]:
         
@@ -155,7 +156,7 @@ class Neo4JUser(UserABC):
                 firstname=GENERAL_SETTINGS.lead_contact_first_name,
                 lastname=GENERAL_SETTINGS.lead_contact_last_name,
                 email=GENERAL_SETTINGS.lead_contact,
-                research_group=GENERAL_SETTINGS.lead_contact_group,
+                research_group_tags=[GENERAL_SETTINGS.lead_contact_group],
                 institute=GENERAL_SETTINGS.lead_contact_institute,  
                 role=UserRolesEnum.ADMIN,
                 is_lead_admin=True,
@@ -371,30 +372,32 @@ class Neo4JUser(UserABC):
         """
         query = (
             "MATCH (u:User) "
-            "RETURN properties(u) "
+            "OPTIONAL MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup) "
+            "RETURN properties(u) AS props, collect(rg.tag) AS research_group_tags "
         )
-        r = self._driver.execute_query(query,routing_="r",database_="neo4j",result_transformer_= Result.value)
-        return [UserModel(**ri) for ri in r]
+        r = self._driver.execute_query(query,routing_="r",database_="neo4j",result_transformer_= Result.data)
+        return [self._user_with_research_group_tags({**ri["props"], "research_group_tags" : ri["research_group_tags"]}) for ri in r]
     
     def get_user_by_email(self, email : str) -> UserModel|None:
         ""
         cypher_query = (
             "MATCH (u:User) "
             "WHERE toLower(u.email) = toLower($email) " #case insensitive comparison.
-            "RETURN properties(u) "
+            "OPTIONAL MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup) "
+            "RETURN properties(u) AS props, collect(rg.tag) AS research_group_tags "
         )
         try:
             u = self._driver.execute_query(cypher_query , 
                                         database_="neo4j", 
                                         routing_="r", 
-                                        result_transformer_= Result.value,
+                                        result_transformer_= Result.data,
                                         email = email
                                         )
         except Exception as e:
             print("Query finding resulted in an error " + str(e))
             return None
         if len(u) == 0: return 
-        return UserModel(**u[0])
+        return self._user_with_research_group_tags({**u[0]["props"], "research_group_tags" : u[0]["research_group_tags"]})
 
     def get_user_by_tag(self, tag : str) -> UserModel|None:
         """Returns the user by its tag if a user with 
@@ -435,11 +438,12 @@ class Neo4JUser(UserABC):
         query = (
             "MATCH (u:User) "
             "WHERE u.tag in $tags "
-            "RETURN properties(u) "
+            "OPTIONAL MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup) "
+            "RETURN properties(u) AS props, collect(rg.tag) AS research_group_tags "
         )
         
-        users = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tags=tags)  
-        return [UserModel(**u) for u in users]
+        users = self._driver.execute_query(query,routing_="r",result_transformer_=Result.data, tags=tags)  
+        return [self._user_with_research_group_tags({**u["props"], "research_group_tags" : u["research_group_tags"]}) for u in users]
        
         
     

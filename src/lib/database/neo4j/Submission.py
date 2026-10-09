@@ -2098,7 +2098,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN "
             "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
-            "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(:Consortium)<-[:SHARED_WITH]-(submission) } "
+            "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(:Consortium)<-[share:SHARED_WITH]-(submission) WHERE share.status = 'approved' } "
             "AS has_access "
         )
         r = self._driver.execute_query(query, routing_="r",

@@ -30,7 +30,7 @@ class UserABC(ABC):
                       firstname=u["firstname"], 
                       lastname=u["lastname"], 
                       institute=u["institute"], 
-                      research_group=u["research_group"], 
+                      research_group_tags=[u["research_group"]] if u.get("research_group") else [], 
                       agreed_to_terms=False,
                       created_at=u["created_on"], 
                       email=u["email"], 

@@ -82,3 +82,48 @@ def get_users_in_research_group(research_group_tag : str, user : UserModel = Dep
     user_tags = db.research_groups.get_users(research_group_tag)
     return user_tags
     
+@router.get("/users/{user_tag}", response_model=List[str], summary="Returns the research groups a user is a member of.")
+def get_research_groups_of_user(user_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the tags of all research groups the given user is a member of.
+    Useful to find the research_group_tag when (retrospectively) assigning a
+    research group head (PI), e.g. via POST /{research_group_tag}/heads/{user_tag}.
+    """
+    if not db.users.exists(tag = user_tag):
+        raise HTTPException(status_code=404, detail=f"User with tag {user_tag} not found.")
+    return db.research_groups.find(user_tags = [user_tag], limit = None)
+
+
+@router.get("/{research_group_tag}/heads")
+def get_research_group_heads(research_group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the heads (PIs) of the research group.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    return db.research_groups.get_heads(tag = research_group_tag)
+    
+@router.post("/{research_group_tag}/heads/{user_tag}", summary="Makes a user a head (PI) of the research group. Requires at least curator rights.")
+def set_research_group_head(research_group_tag : str, user_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Makes a user a head (PI) of the research group. Requires at least curator rights.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    if not db.users.exists(tag = user_tag):
+        raise HTTPException(status_code=404, detail=f"User with tag {user_tag} not found.")
+    if user_tag not in db.research_groups.get_users(tag = research_group_tag):
+        raise HTTPException(status_code=400, detail=f"User with tag {user_tag} is not a member of the research group with tag {research_group_tag} and can therefore not be made a head (PI) of it.")
+    db.research_groups.set_head(group_tag = research_group_tag, user_tag = user_tag)
+    return True
+    
+@router.delete("/{research_group_tag}/heads/{user_tag}", summary="Removes a user as head (PI) of the research group. Requires at least curator rights.")
+def remove_research_group_head(research_group_tag : str, user_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Removes a user as head (PI) of the research group. Requires at least curator rights.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    db.research_groups.remove_head(group_tag = research_group_tag, user_tag = user_tag)
+    return True
+    
