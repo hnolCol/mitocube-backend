@@ -5,6 +5,7 @@ from typing import List, Optional
 from config.models.user import UserModel
 from config.models.ptms import PTMSiteInsertModel, PTMSiteResponseModel
 from services.users import is_user_at_least_curator, get_user_from_token
+from services.submission import check_submission_access, check_submission_tags_access
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -35,6 +36,7 @@ def find_ptm_sites_by_query(search_string : Optional[str] = None, limit : int = 
     List[str]
         PTM site tags.
     """
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     submission_tags = submission_tags.split(";") if submission_tags else None
     return db.ptm_sites.find(search_string = search_string, submission_tag = submission_tags[0] if submission_tags else None, limit = limit)
 
@@ -56,6 +58,8 @@ def count_ptm_sites(submission_tag : str = None, user : UserModel = Depends(get_
     int
         The number of PTM sites.
     """
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.ptm_sites.count(submission_tag = submission_tag)
 
 
@@ -184,6 +188,7 @@ def get_ptm_site_abundance_by_tag(ptm_site_tag : str, submission_tags : str = No
         If the PTM site with the given tag does not exist.
     """
     if not db.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.ptm_sites.get_abundance(tag = ptm_site_tag, submission_tags = submission_tags.split(";") if submission_tags else None)
 
 

@@ -3,6 +3,7 @@ from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from typing import Dict, List, Literal
 from services.users import is_user_admin, get_user_from_token
+from services.submission import check_submission_access, check_submission_tags_access
 from services.mail import send_email_in_background
 
 
@@ -29,6 +30,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.get("/q", response_model=List[str])
 def get_protocols(search_string : str = None, submission_tags : str = None,  limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the protocol tags that match the search string."
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.protocols.find(search_string=search_string, submission_tags = APIParamString(param=submission_tags).param, limit=limit)
 
 @router.get("/{protocol_tag}/submissions", response_model=List[str])
@@ -49,11 +51,13 @@ def insert_protocol(protocol : InsertProtocolModel, user : UserModel = Depends(g
 @router.post("/{protocol_tag}/link/{submission_tag}", response_model=bool)
 def link_protocol_to_submission(protocol_tag : str, submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     "Links the given protocol to the specified submission."
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.protocols.link(tag=protocol_tag, submission_tag=submission_tag, user_tag=user.tag)
 
 @router.delete("/{protocol_tag}/link/{submission_tag}", response_model=bool)
 def unlink_protocol_from_submission(protocol_tag : str, submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     "Unlinks the given protocol from the specified submission."
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.protocols.unlink(tag=protocol_tag, submission_tag=submission_tag)
 
 

@@ -10,6 +10,7 @@ from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroups,  Neo4JAnnota
 
 from config.models.user import UserModel
 from services.users import get_user_from_token, is_user_admin
+from services.submission import check_submission_access, check_submission_tags_access
 from services.encryption import create_hierarchical_hash
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
@@ -23,6 +24,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.get("/q", response_model=List[str]|List[Dict])
 def find_annotations(search_string: Optional[str] = None, group_tags: Optional[str] = None, protein_tags: Optional[str] = None, limit : int = None, group_by_group: bool = False, submission_tags: Optional[str] = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Finds annotations matching the search criteria."
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     #TODO add submission tags here  and in find only return if protein is quantified in submission and in that annotation group.
     tags = db.annotations.find(search_string=search_string, 
                                group_tags=APIParamString(param = group_tags).param,  #transforms string with semicolon into list
@@ -188,6 +190,8 @@ def get_proteins_for_annotation( tag: str, submission_tag: Optional[str] = None,
     if not db.annotations.exists(tag):
         raise HTTPException(status_code=404, detail="Annotation not found")
     
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     protein_tags = db.annotations.get_protein_tags(tag, submission_tag)
     
     return protein_tags
@@ -197,8 +201,11 @@ def fisher_annotation_analysis(
     submission_tag: str = Query(..., description="Submission tag to analyze"),
     target_proteins: List[str] = Query(..., description="List of target protein tags"),
     group_tag: str = Query(..., description="Annotation group tag to analyze"),
+    user : UserModel = Depends(get_user_from_token),
     db : DatabaseABC = Depends(get_db),
 ) -> List[Dict]:
+
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
     # Get all proteins in submission
     all_proteins = set(db.submissions.get_proteins_in_submission(submission_tag))

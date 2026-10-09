@@ -23,6 +23,7 @@ from lib.database.abstract.QC import QCABC
 from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesABC
 from lib.database.abstract.Timeline import TimelineABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
+from lib.database.abstract.Consortium import ConsortiumABC
 from lib.database.abstract.Phenotypes import PhenotypeABC
 from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC, ExternalServicesABC
 from lib.database.abstract.SpareParts import SparePartsABC
@@ -98,6 +99,7 @@ class DatabaseABC(ABC):
     instrument_states : InstrumentStatesABC = None
     timeline : TimelineABC = None 
     research_groups : ResearchGroupABC = None
+    consortiums : ConsortiumABC = None
     phenotypes: PhenotypeABC = None
     maintenance_procedures : MaintenanceProcedureABC  = None 
     maintenance_events : MaintenanceEventABC = None
@@ -231,6 +233,10 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the timeline attribute defined.")
         if not isinstance(self.research_groups,ResearchGroupABC):
             raise TypeError("The research_groups class must be an instance of the ResearchGroupABC.")
+        if self.consortiums is None:
+            raise NotImplementedError("A database class must have the consortiums attribute defined.")
+        if not isinstance(self.consortiums,ConsortiumABC):
+            raise TypeError("The consortiums class must be an instance of the ConsortiumABC.")
         
         if self.phenotypes is None:
             raise NotImplementedError("A database class must have the phenotype attribute defined.")

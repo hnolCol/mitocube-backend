@@ -10,6 +10,7 @@ from config.models.conditions_applications import ConditionApplicationAttributeM
 from services.random_generators import get_random_string
 from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from typing import List, Dict, OrderedDict
 import pandas as pd
 
@@ -61,12 +62,14 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.get("/{submission_tag}/ca")
 def get_submission_condition_applications(submission_tag: str, attribute_tags : str = None, group_by_attribute : bool = False, group_by_min_state : bool = False, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]|List[ConditionApplicationAttributeModel]|List[ConditionApplicationStateModel]|List[ConditionApplicationStateAttributeModel]:
     "Return the condition applications for a given submission."
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.get_conditions_applications(submission_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=group_by_attribute, group_by_min_state=group_by_min_state)
 
 
 @router.get("/{submission_tag}/ca/attributes")
 def get_submission_condition_application_attributes(submission_tag: str, include_genotypes : bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Return the condition application attributes for a given submission."
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     ca_tags = db.submissions.get_conditions_applications(submission_tag, group_by_attribute=False)
     attribute_tags = [db.condition_applications.get_attribute(ca_tag) for ca_tag in ca_tags]
     if include_genotypes and db.submissions.has_genotypes(tag = submission_tag):
@@ -94,6 +97,7 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
     List|Dict
         A list of condition application tags for the samples of the submission. If return_unique is False, a list of dictionaries with sample_tag and the associated ca_tags is returned. If return_unique is True, a dictionary with unique ca_tags acrross attribute_tags is returned 
     """
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     sample_tags = db.submissions.get_samples(tag = submission_tag)  #get samples 
     r = []
     genotype_exists = db.submissions.has_genotypes(tag = submission_tag)
@@ -130,8 +134,7 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
 @router.get("/{submission_tag}/samples/ca/attributes")
 def get_submission_sample_condition_application_attributes(submission_tag: str, include_genotypes : bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Return the condition application attributes for samples of a given submission."
-    if not db.submissions.exists(tag = submission_tag):
-        return tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     ca_tags = db.submissions.get_conditions_applications(submission_tag, group_by_attribute=False)
     sample_tags = db.submissions.get_samples(tag = submission_tag)  #ensure samples are loaded
     if len(sample_tags) == 0:
@@ -150,7 +153,7 @@ def get_ca_tree_for_submission(submission_tag: str, user: UserModel = Depends(ge
     """
     Get the condition application tree data for a given submission.
     """
-    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     ca_tags = db.submissions.get_conditions_applications(tag=submission_tag)
 
     result = []
@@ -177,9 +180,8 @@ def get_ca_tree_for_submission(submission_tag: str, user: UserModel = Depends(ge
 def update_submission_condition_applications(
     submission_tag: str,
     selected_traits: List[AttributeTree],
-    user: UserModel = Depends(get_user_from_token)
-, db : DatabaseABC = Depends(get_db)) -> bool:
-    if not db.submissions.exists(tag=submission_tag): raise tag_not_found
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.edit_condition_applications(
         tag=submission_tag,
         attribute_trees=selected_traits

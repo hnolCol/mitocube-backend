@@ -6,6 +6,7 @@ from lib.database.abstract.Database import DatabaseABC
 from fastapi import APIRouter, Depends,  HTTPException
 from config.models.user import UserModel
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 
 import networkx as nx
@@ -474,7 +475,7 @@ def get_annotation_network(submission_tag : str, annotation_group_tag : str = No
     "" 
     
     
-    if not db.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if not db.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
     cache_key = db_cache_runtime.make_cache_key(key_data = ["db.submission.get_network",submission_tag, annotation_group_tag, show_quantified_proteins_only, min_proteins])  
     cached_result =  db_cache_runtime.get(cache_key)

@@ -4,6 +4,7 @@ from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 
 from typing import List, Dict
 
@@ -21,32 +22,28 @@ def get_submission_state_count(state_tag : SubmissionStatesEnums, user : UserMod
 @router.get("/{submission_tag}/protein_groups") 
 def get_protein_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     "Return the number of protein groups for a given submission"
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.protein_groups.count(submission_tag=submission_tag)
 
 
 @router.get("/{submission_tag}/peptides") 
 def get_peptide_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     "Return the number of peptides for a given submission"
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.peptides.count(submission_tag=submission_tag)
 
 
 @router.get("/{submission_tag}/samples")
 def get_sample_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     "Return the number of samples for a given submission"
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.samples.count(submission_tag=submission_tag)
 
 
 @router.get("/{submission_tag}/samples/protein_groups")
 def get_sample_protein_group_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     "Return the number of protein groups per sample for a given submission"
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise HTTPException(status_code=404, detail="Submission not found")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     sample_tags = db.submissions.get_samples(tag = submission_tag)
     return [{"tag" : sample_tag, "count" : db.samples.count_quantified_protein_groups(tag=sample_tag, submission_tag = submission_tag)} for sample_tag in sample_tags]
     

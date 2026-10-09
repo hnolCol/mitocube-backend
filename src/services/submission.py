@@ -1,10 +1,8 @@
 from datetime import datetime
 from collections import OrderedDict
 
-f
-from lib.data.genotype.PandaGenotype import PandaFileGenotype
 
-from config.exceptions.HTTPExceptions import tag_not_found
+from config.exceptions.HTTPExceptions import tag_not_found, submission_tag_not_found, submission_access_forbidden
 
 from config.enums.states import SubmissionStatesEnums
 from config.models.attributes import AttributeModel, AttributeValueModel
@@ -13,11 +11,97 @@ from config.models.submissions.submissions import NewSubmissionModel, DatasetSub
 from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
 from config.models.user import UserModel
 from config.models.prefix import PrefixModel
+from config.models.parameter import APIParamString
 
 from config.enums.units import TimeUnitToSecondsEnum, PrefixEnum
 
 from typing import List, Dict, Literal
 import pandas as pd 
+
+
+def check_submission_access(submission_tag : str, user : UserModel, db = None) -> bool:
+    """
+    Checks if the submission exists and the user has access to it.
+
+    Access is granted if the user is the creator, a collaborator or a member
+    of a research group that has access to the submission. Curators and admins
+    have access to all submissions.
+
+    Parameters
+    ----------
+    submission_tag : str
+        The tag of the submission to check.
+    user : UserModel
+        The user to check the access for.
+    db : DatabaseABC, optional
+        The database to use. If not provided, the global database is used.
+
+    Returns
+    -------
+    bool
+        True if the submission exists and the user has access.
+
+    Raises
+    ------
+    HTTPException
+        submission_tag_not_found (404) if the submission does not exist.
+    HTTPException
+        submission_access_forbidden (403) if the submission exists but the user
+        does not have access to it.
+    """
+    if db is None:
+        from lib.database.Database import Database
+        db = Database.DB()
+
+    if not db.submissions.exists(tag = submission_tag):
+        raise submission_tag_not_found
+
+    if not db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
+        raise submission_access_forbidden
+
+    return True
+
+
+def check_submission_tags_access(submission_tags : str | List[str] | None, user : UserModel, db = None) -> bool:
+    """
+    Checks if the user has access to all given submissions.
+
+    The tags can be given as a semicolon separated string (as used in the API
+    parameters) or as a list. If the parameter is None or empty, the check passes.
+
+    Parameters
+    ----------
+    submission_tags : str | List[str] | None
+        The submission tags to check.
+    user : UserModel
+        The user to check the access for.
+    db : DatabaseABC, optional
+        The database to use. If not provided, the global database is used.
+
+    Returns
+    -------
+    bool
+        True if the user has access to all given submissions.
+
+    Raises
+    ------
+    HTTPException
+        submission_tag_not_found (404) if a submission does not exist.
+    HTTPException
+        submission_access_forbidden (403) if a submission exists but the user
+        does not have access to it.
+    """
+    if submission_tags is None:
+        return True
+
+    tags = APIParamString(param = submission_tags).param
+    if not tags:
+        return True
+
+    for submission_tag in tags:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
+
+    return True
 
 
 def add_timeline_entry_to_metadata(metadata : dict, timelineEntry : TimeLineEntryModel):
@@ -37,13 +121,13 @@ def add_timeline_entry_to_metadata(metadata : dict, timelineEntry : TimeLineEntr
     metadata["timeline"] = TimeLineModel(**time_line)
     return metadata
 
-def get_dataset_from_database(db : MCDatabase, label : str, force_reload : bool = False):
+def get_dataset_from_database(db, label : str, force_reload : bool = False):
     """_summary_
 
     Parameters
     ----------
-    db : MCDatabase
-        _description_
+    db
+        The database to get the dataset from.
     label : str
         _description_
     """
@@ -61,7 +145,7 @@ def map_tags(
              attr_value_tags : List[str], 
              proteome_ids : List[str], 
              attribute_values : pd.DataFrame, 
-             db_features : PandaFeatureDatabase ) -> List[AttributeValueModel]:
+             db_features ) -> List[AttributeValueModel]:
     """_summary_
 
     Parameters

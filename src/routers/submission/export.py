@@ -15,6 +15,7 @@ from config.exceptions.HTTPExceptions import tag_not_found
 
 from services.users import get_user_from_token
 from services.export_submissions import export_submission_to_markdown
+from services.submission import check_submission_access
 
 
 router = APIRouter(
@@ -25,13 +26,7 @@ router = APIRouter(
 
 def _check_access(submission_tag: str, user: UserModel, db: DatabaseABC) -> None:
     """Raises if the submission does not exist or the user has no access."""
-    if not db.submissions.exists(tag=submission_tag):
-        raise tag_not_found
-    if not db.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
-        raise HTTPException(
-            status_code=403,
-            detail=f"User '{user.tag}' does not have access to submission '{submission_tag}'."
-        )
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
 
 
 def _build_markdown(submission_tag: str, db: DatabaseABC, **include_flags) -> str:

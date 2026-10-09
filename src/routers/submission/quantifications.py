@@ -7,6 +7,7 @@ from config.models.user import UserModel
 from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token, is_user_at_least_curator
+from services.submission import check_submission_access
 from typing import Dict, List, Literal, Tuple
 from collections import OrderedDict
 import numpy as np
@@ -65,8 +66,7 @@ def get_submission_quant_exists(submission_tag : str, quantification_type :  Lit
         True if quantification data exists, False otherwise.
     """
 
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
 
     return db.submissions.quantification_exists(tag=submission_tag, type=quantification_type)
 
@@ -97,8 +97,7 @@ def insert_protein_quantifications(
         Number of inserted protein quantifications.
     """
 
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
 
     ##first check if all proteins exist
     N = db.protein_groups.insert_bulk(protein_groups=set([q.tag for q in quantifications.quantifications]))
@@ -116,6 +115,7 @@ def insert_protein_quantifications(
 
 @router.patch("/{submission_tag}/protein_groups/statistics", summary="Calculate and insert the statistics for the protein groups of a given submission. Requires curator rights.")
 def calculate_protein_group_statistics(submission_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     """
     Calculate and insert the statistics for the protein groups of a given submission. Requires curator rights.
 
@@ -130,8 +130,7 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     bool
         True if the statistics were calculated and inserted successfully, False otherwise.
     """
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
     ok = db.submissions.remove_multiple_comparison_metrices(tag = submission_tag)
     if not ok:
@@ -180,8 +179,7 @@ def insert_precursor_quantifications(
     HTTPException
         If the submission with the given tag does not exist, the request body is empty or the batch sizes are invalid.
     """
-    if db.submissions.exists(tag=submission_tag) is False:
-        raise submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if len(quantifications) == 0:
         raise HTTPException(status_code=400, detail="No precursor quantifications provided.")
     if batch_size < 1:
@@ -270,8 +268,7 @@ def calculate_test_quantification_distribution(submission_tag : str,
 
 @router.get("/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
 def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
-    if not db.submissions.exists(tag=submission_tag):
-        raise submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.get_stats_outdated(tag=submission_tag)
 
 
@@ -292,7 +289,7 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
     user : UserModel, optional
         The user that is extracted by the token, by default Depends(get_user_from_token)        
         """   
-    db.submission_exists(tag=submission_tag) or submission_tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if not db.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
     sample_tags = db.submissions.get_samples(tag=submission_tag)

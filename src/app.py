@@ -63,6 +63,7 @@ from routers.performance import standards as performance_standards
 from routers.users import views as user_views
 from routers.timelines import timelines
 from routers.researchgroups import researchgroup
+from routers.consortiums import consortium
 from routers.phenotypes import phenotypes
 from routers.states import states
 from routers.samples import samples
@@ -140,6 +141,7 @@ router_sources = [policy,
                   submission_correlation,
                   feature_correlation,
                   researchgroup,
+                  consortium,
                   phenotypes,
                   maintenance,
                   mfa,

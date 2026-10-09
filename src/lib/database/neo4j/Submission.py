@@ -14,6 +14,7 @@ from lib.database.abstract.Proteomes import ProteomesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from lib.database.abstract.Users import UserABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
+from lib.database.abstract.Consortium import ConsortiumABC
 from lib.database.Neo4JDatabase import Neo4JFactory
 from config.enums.users.roles import UserRolesEnum
 from config.enums.states import SubmissionStatesEnums
@@ -1438,12 +1439,13 @@ class Neo4JSubmissions(SubmissionsABC):
         return len(r) > 0
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
-    def __init__(self, driver : Driver, users : UserABC, research_groups : ResearchGroupABC) -> None:
+    def __init__(self, driver : Driver, users : UserABC, research_groups : ResearchGroupABC, consortiums : ConsortiumABC = None) -> None:
         
         self._driver = driver
         self._factory = Neo4JFactory(driver=driver)
         self._users = users
         self._research_groups = research_groups
+        self._consortiums = consortiums
         
     def _add_limit(self, query : str, limit : int = None):
         ""
@@ -2031,7 +2033,13 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 raise ValueError(f"Research group {rg_tag} does not exist.")
             submission_tags = self._research_groups.get_submission_tags(tags = [rg_tag])
             for submission_tag in submission_tags:
-                tags.add(submission_tag)         
+                tags.add(submission_tag) 
+        ##add submission tags that are shared with a consortium of one of the users research groups
+        if self._consortiums is not None:
+            consortium_tags = self._consortiums.find(group_tags = research_groups_tags)
+            for consortium_tag in consortium_tags:
+                for submission_tag in self._consortiums.get_submission_tags(tag = consortium_tag):
+                    tags.add(submission_tag)       
         ##add submission tags that the user collaborated on and created. /might change the reserach group but remains owner of the submission
         submission_user_tags = self.filter_by_user(user_tags=[current_user_tag], submission_tags=None, limit=None, ordered=True)
         for submission_tag in submission_user_tags:
@@ -2068,6 +2076,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN "
             "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
+            "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(:Consortium)<-[:SHARED_WITH]-(submission) } "
             "AS has_access "
         )
         r = self._driver.execute_query(query, routing_="r",
