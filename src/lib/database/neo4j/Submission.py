@@ -2191,33 +2191,13 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     
     
 
-    def find_v2(self,
-            current_user_tag : str,
-            search_string : str = None,
-            state : List[int] = None,
-            trait_tags : List[str] = None,
-            attribute_tag : List[str]= None,
-            ca_tags: List[str] = None,
-            protein_tags: List[str] = None,
-            ca_search_string : str = None,
-            user_tags : List[str] = None,
-            user_role : Literal["creator", "collaborator", "any"] = "any",
-            genotype_tag : List[str] = None,
-            consortium_tags : List[str] = None,
-            include_sample_ca : bool = False,
-            ordered : bool = True,
-            ca_match_all : bool = True,
-            limit : int = 10) -> List[str]:
-        """Single-query variant of find(). Composes every filter into one Cypher query
-        instead of chaining per-filter round trips. Intended to replace find() once the
-        results are confirmed to be identical.
-        """
-        # ---- user scope: None means unrestricted (curator/admin), [] means no access ----
-        scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
-        if scope_tags is not None and len(scope_tags) == 0: return []
-
-        params = {}
+    def _build_v2_where(self, scope_tags, search_string, state, trait_tags, attribute_tag,
+                        ca_tags, protein_tags, ca_search_string, user_tags, user_role,
+                        genotype_tag, consortium_tags, include_sample_ca, ca_match_all):
+        """Builds the WHERE conditions and query parameters shared by find_v2 and count_v2.
+        scope_tags is the requesting users submission scope (None = unrestricted, e.g. curator)."""
         where = []
+        params = {}
 
         # ---- scope (single query equivalent of _get_users_submission_scope) ----
         if scope_tags is not None:
@@ -2326,6 +2306,96 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 "WHERE c.tag IN $consortium_tags AND sh.status = 'approved' }"
             )
             params["consortium_tags"] = consortium_tags
+
+        return where, params
+
+    def count_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            user_role : Literal["creator", "collaborator", "any"] = "any",
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ca_match_all : bool = True) -> int:
+        """Single-query count variant. Counts the submissions matching all given filters
+        in ONE Cypher query without materializing the tags (unlike the legacy count that
+        runs find() with limit=None and takes len())."""
+        scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+        if scope_tags is not None and len(scope_tags) == 0: return 0
+
+        where, params = self._build_v2_where(
+            scope_tags = scope_tags,
+            search_string = search_string,
+            state = state,
+            trait_tags = trait_tags,
+            attribute_tag = attribute_tag,
+            ca_tags = ca_tags,
+            protein_tags = protein_tags,
+            ca_search_string = ca_search_string,
+            user_tags = user_tags,
+            user_role = user_role,
+            genotype_tag = genotype_tag,
+            consortium_tags = consortium_tags,
+            include_sample_ca = include_sample_ca,
+            ca_match_all = ca_match_all,
+        )
+
+        query = "MATCH (submission:Submission) "
+        if where:
+            query += "WHERE " + " AND ".join(where) + " "
+        query += "RETURN count(DISTINCT submission.tag) AS n "
+
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, **params)
+        return r[0] if len(r) > 0 else 0
+
+    def find_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            user_role : Literal["creator", "collaborator", "any"] = "any",
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ordered : bool = True,
+            ca_match_all : bool = True,
+            limit : int = 10) -> List[str]:
+        """Single-query variant of find(). Composes every filter into one Cypher query
+        instead of chaining per-filter round trips. Intended to replace find() once the
+        results are confirmed to be identical.
+        """
+        # ---- user scope: None means unrestricted (curator/admin), [] means no access ----
+        scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+        if scope_tags is not None and len(scope_tags) == 0: return []
+
+        where, params = self._build_v2_where(
+            scope_tags = scope_tags,
+            search_string = search_string,
+            state = state,
+            trait_tags = trait_tags,
+            attribute_tag = attribute_tag,
+            ca_tags = ca_tags,
+            protein_tags = protein_tags,
+            ca_search_string = ca_search_string,
+            user_tags = user_tags,
+            user_role = user_role,
+            genotype_tag = genotype_tag,
+            consortium_tags = consortium_tags,
+            include_sample_ca = include_sample_ca,
+            ca_match_all = ca_match_all,
+        )
 
         query = "MATCH (submission:Submission) "
         if where:

@@ -105,13 +105,19 @@ def get_submission_by_query_v2(state : str|int = None,
     )
     legacy = db.submission_filter.find(**kwargs)
     v2 = db.submission_filter.find_v2(**kwargs)
+    count_kwargs = {k: v for k, v in kwargs.items() if k not in ("ordered", "limit")}
+    legacy_count = len(db.submission_filter.find(**count_kwargs, ordered = False, limit = None))
+    v2_count = db.submission_filter.count_v2(**count_kwargs)
     return {
         "legacy": legacy,
         "v2": v2,
         "only_in_legacy": sorted(set(legacy) - set(v2)),
         "only_in_v2": sorted(set(v2) - set(legacy)),
         "identical": sorted(legacy) == sorted(v2),
-        "identical_ordered": legacy == v2
+        "identical_ordered": legacy == v2,
+        "legacy_count": legacy_count,
+        "v2_count": v2_count,
+        "counts_identical": legacy_count == v2_count
     }
 
 
@@ -1045,6 +1051,7 @@ def get_submission_query_count(
     user_tags : str = None,
     user_role : Literal["creator", "collaborator", "any"] = "any", 
     protein_tags : str = None,
+    consortium_tags : str = None,
     include_sample_ca : bool = False,
     ca_search_string : str = None,
     user : UserModel = Depends(get_user_from_token)
@@ -1073,6 +1080,7 @@ def get_submission_query_count(
         user_role = user_role,  
         genotype_tag = APIParamString(param=genotype_tag).param,
         protein_tags = APIParamString(param=protein_tags).param,
+        consortium_tags = APIParamString(param=consortium_tags).param,
         include_sample_ca = include_sample_ca,
         ca_search_string = ca_search_string,
         ordered = False, 

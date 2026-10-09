@@ -713,6 +713,25 @@ class SubmissionFilterABC(ABC):
         are confirmed to be identical."""
 
     @abstractmethod
+    def count_v2(self,
+            current_user_tag : str,
+            search_string : str = None,
+            state : List[int] = None,
+            trait_tags : List[str] = None,
+            attribute_tag : List[str]= None,
+            ca_tags: List[str] = None,
+            protein_tags: List[str] = None,
+            ca_search_string : str = None,
+            user_tags : List[str] = None,
+            user_role : Literal["creator", "collaborator", "any"] = "any",
+            genotype_tag : List[str] = None,
+            consortium_tags : List[str] = None,
+            include_sample_ca : bool = False,
+            ca_match_all : bool = True) -> int:
+        """Single-query count variant of the find_v2 filtering. Counts the matching
+        submissions without materializing the tags."""
+
+    @abstractmethod
     def filter_by_consortium(self, consortium_tags : List[str], submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
         """Returns the submission tags that are shared (approved) with the given consortiums.
 
