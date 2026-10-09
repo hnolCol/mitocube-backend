@@ -2,13 +2,16 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings 
-from pydantic import SecretStr
+from pydantic import SecretStr, Field
 
 class UserToken(BaseSettings):
     """BaseSettings for a user token"""
     expires_after_hours : timedelta = timedelta(hours=48)
     expires_after_minutes : timedelta = timedelta(minutes=15)
-    jwt_key : SecretStr 
+    jwt_key : SecretStr = Field(
+        ...,
+        description="JWT signing key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
+    )
     jwt_algorithm : str = "HS256"
 
     class Config:
@@ -23,8 +26,14 @@ class ShareToken(BaseSettings):
     The BaseSettings define the security settings. 
     """
     expires_after_hours : timedelta = timedelta(days = 120) #4 months 
-    jwt_share_key : SecretStr 
-    share_token_pw : SecretStr
+    jwt_share_key : SecretStr = Field(
+        ...,
+        description="JWT share key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
+    )
+    share_token_pw : SecretStr = Field(
+        ...,
+        description="Share token password - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --password"
+    )
     jwt_algorithm : str = "HS256"
 
     class Config:
@@ -45,7 +54,10 @@ class MFASettings(BaseSettings):
     MFA_MONGO_DB_NAME: str = "mfa_db"
     MFA_MAX_ATTEMPTS: int = 5
     MFA_LOCKOUT_MINUTES: int = 15
-    MFA_ENCRYPTION_KEY: SecretStr 
+    MFA_ENCRYPTION_KEY: SecretStr = Field(
+        ...,
+        description="MFA encryption key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --api-key"
+    )
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
     LOGIN_RATE_LIMIT_WINDOW_MINUTES: int = 10
     # Comma-separated list of reverse-proxy IPs whose X-Forwarded-For

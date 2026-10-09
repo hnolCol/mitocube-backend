@@ -9,6 +9,7 @@ from config.models.attributes import AttributeEditModel, AttributeModel, Attribt
 from config.enums.states import SubmissionStatesEnums
 
 from services.users import get_user_from_token, is_user_at_least_curator
+from services.submission import check_submission_access
 
 
 from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel, AttributeInsertModel
@@ -256,8 +257,10 @@ def query_trait(search_string : str, attribute_tag : str = None, limit : int = 5
 
 
 @router.get("/traits/{trait_tag}")
-def get_trait(trait_tag : str, include_input : bool = False, submission_tag : str = None, db : DatabaseABC = Depends(get_db)) -> TraitResponseModel:
+def get_trait(trait_tag : str, include_input : bool = False, submission_tag : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> TraitResponseModel:
     "Return the specific trait"
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if db.attributes.exists(trait=trait_tag):
         if not include_input: return db.attributes.trait(trait_tag = trait_tag)
         if submission_tag is not None:

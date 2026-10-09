@@ -15,6 +15,7 @@ from config.models.user import UserModel
 from config.models.compare import CompareModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 import pandas as pd 
 from scipy.stats import ttest_ind, false_discovery_control
 import numpy as np
@@ -335,7 +336,18 @@ def build_heatmap_matrix(final_ids: pd.Index, leaf_data: Dict[str, Dict]) -> pd.
  
 # --- 7. endpoint -------------------------------------------------------------
 @router.post("/compare")
-def get_compare(comparisons: CompareModel, user: UserModel = Depends(get_user_from_token)):
+def get_compare(comparisons: CompareModel, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+
+    def _collect_submission_tags(node : CompareModel, acc : List[str]):
+        acc.append(node.submission_tag)
+        for child in node.children or []:
+            _collect_submission_tags(child, acc)
+
+    submission_tags : List[str] = []
+    _collect_submission_tags(comparisons, submission_tags)
+    for submission_tag in dict.fromkeys(submission_tags):
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
+
     if len(comparisons.children) == 0:
         raise HTTPException(status_code=400, detail="No comparisons provided")
  

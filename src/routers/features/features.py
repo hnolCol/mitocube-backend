@@ -9,6 +9,7 @@ from config.models.feature import FeatureSequenceResponseModel
 from config.models.annotations.feature import FeatureDataResponseModel, FeatureNeoModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from config.models.parameter import APIParamString
 from config.models.calculations.quantile import QuantileModel 
 
@@ -32,10 +33,7 @@ def find_feature_by_query(search_string : str = None, submission_tag : str = Non
 
     
     if submission_tag is not None:
-        if not db.submissions.exists(tag=submission_tag):
-            raise HTTPException(status_code=404, detail=f"Submission {submission_tag} not found")
-        if not db.submission_filter.has_user_access(user_tag=user.tag, submission_tag=submission_tag):
-            raise HTTPException(status_code=403, detail=f"User {user.tag} does not have access to submission {submission_tag}")
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
     if include_types is not None:
         if any([t not in ["protein_groups","peptides"] for t in include_types]):
@@ -110,11 +108,7 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
     
     if not db.features.exists(tag = feature_tag):
         raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
-    if not db.submissions.exists(tag = submission_tag):
-        raise HTTPException(status_code=404, detail = "Submission tag not found in the database.")
-    
-    if not db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
-        raise HTTPException(status_code=403, detail = "User does not have access to the submission.")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
     sample_tags = db.submissions.get_samples(tag = submission_tag, ignore_excluded=True) # check if submission has samples
     if not sample_tags:

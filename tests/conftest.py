@@ -14,12 +14,17 @@ TEST_ENV = {
     "frontend_build_assets": str(SRC_DIR),
     "use_terms_file": str(SRC_DIR / "app.py"),
     "db_handler": "neo4j",
+    "control_proteome_file": str(SRC_DIR.parent / "resources" / "attributes" / "attributes.json"),
     "db_pw": "test-db-pw",
+    "neo4j_password": "test-neo4j-pw",
+    "mongo_password": "test-mongo-pw",
     "mail_username": "test-mail",
     "mail_password": "test-mail-pw",
     "mail_template_dir": str(SRC_DIR),
     "open_ai_api_key": "test-openai-key",
     "chat_ai_base_url": "https://example.invalid/v1",
+    # Skip secret validation in tests
+    "MITOCUBE_SKIP_SECRET_VALIDATION": "1",
 }
 
 for key, value in TEST_ENV.items():

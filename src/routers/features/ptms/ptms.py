@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List
+from typing import List, Optional
 from config.models.user import UserModel
 from config.models.ptms import PTMSiteInsertModel, PTMSiteResponseModel
 from services.users import is_user_at_least_curator, get_user_from_token
+from services.submission import check_submission_access, check_submission_tags_access
 
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -13,7 +14,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", summary="Finds PTM sites by search query.")
-def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def find_ptm_sites_by_query(search_string : Optional[str] = None, limit : int = 50, submission_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Finds PTM sites by their tag. The tag is derived from the protein tag (or the
     protein group tag for group level identifications), the position and the modification,
@@ -21,8 +22,8 @@ def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_ta
 
     Parameters
     ----------
-    search_string : str
-        The search string to match against the PTM site tags.
+    search_string : str, optional
+        The search string to match against the PTM site tags. If None, the first PTM site tags up to the limit are returned, by default None
     limit : int, optional
         The limit of PTM sites to return, by default 50
     submission_tags : str, optional
@@ -35,6 +36,7 @@ def find_ptm_sites_by_query(search_string : str, limit : int = 50, submission_ta
     List[str]
         PTM site tags.
     """
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     submission_tags = submission_tags.split(";") if submission_tags else None
     return db.ptm_sites.find(search_string = search_string, submission_tag = submission_tags[0] if submission_tags else None, limit = limit)
 
@@ -56,6 +58,8 @@ def count_ptm_sites(submission_tag : str = None, user : UserModel = Depends(get_
     int
         The number of PTM sites.
     """
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.ptm_sites.count(submission_tag = submission_tag)
 
 
@@ -184,6 +188,7 @@ def get_ptm_site_abundance_by_tag(ptm_site_tag : str, submission_tags : str = No
         If the PTM site with the given tag does not exist.
     """
     if not db.ptm_sites.exists(tag = ptm_site_tag): raise HTTPException(status_code=404, detail="PTM site not found.")
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.ptm_sites.get_abundance(tag = ptm_site_tag, submission_tags = submission_tags.split(";") if submission_tags else None)
 
 

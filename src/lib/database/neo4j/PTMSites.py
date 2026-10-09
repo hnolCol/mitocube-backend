@@ -63,10 +63,15 @@ class Neo4JPTMSites(PTMSitesABC):
         return r.records[0]
 
 
-    def find(self, search_string : str, submission_tag : str = None, limit : int = None) -> List[str]:
-        query = "MATCH (ptm:PTMSite) WHERE ptm.tag CONTAINS $search_string "
+    def find(self, search_string : Optional[str] = None, submission_tag : str = None, limit : int = None) -> List[str]:
+        query = "MATCH (ptm:PTMSite) "
+        where_clauses = []
+        if search_string is not None:
+            where_clauses.append("ptm.tag CONTAINS $search_string")
         if submission_tag is not None:
-            query += "AND EXISTS {(ptm)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(:Submission {tag : $submission_tag})} "
+            where_clauses.append("EXISTS {(ptm)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-(:Submission {tag : $submission_tag})}")
+        if where_clauses:
+            query += "WHERE " + " AND ".join(where_clauses) + " "
         query += "RETURN ptm.tag as tag ORDER BY ptm.tag "
         if limit is not None:
             query += "LIMIT $limit "

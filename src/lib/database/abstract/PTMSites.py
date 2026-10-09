@@ -31,9 +31,9 @@ class PTMSitesABC(ABC):
         """
 
     @abstractmethod
-    def find(self, search_string : str, submission_tag : str = None, limit : int = None) -> List[str]:
+    def find(self, search_string : Optional[str] = None, submission_tag : str = None, limit : int = None) -> List[str]:
         """
-        Finds all PTM sites matching the search string, optionally within a submission.
+        Finds all PTM sites matching the search string, optionally within a submission. If the search string is None, the first PTM site tags up to the limit are returned.
         """
 
     @abstractmethod

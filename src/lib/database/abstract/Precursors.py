@@ -31,6 +31,23 @@ class PrecursorsABC(ABC):
         """
 
     @abstractmethod
+    def count_by_protein_group(self, protein_group_tag: str, submission_tag: str = None) -> int:
+        """Counts the number of precursors associated with a given protein group.
+
+        Parameters
+        ----------
+        protein_group_tag : str
+            The tag of the protein group to count precursors for.
+        submission_tag : str, optional
+            If provided, only precursors quantified in the given submission are counted, by default None.
+
+        Returns
+        -------
+        int
+            The number of precursors associated with the protein group.
+        """
+
+    @abstractmethod
     def exists(self, tag: str) -> bool:
         """Checks if a given tag is associated with a precursor (e.g. SEQUENCE.CHARGE).
 
@@ -46,13 +63,13 @@ class PrecursorsABC(ABC):
         """
 
     @abstractmethod
-    def find(self, search_string: str, submission_tag: str = None, limit: int = None, provide_protein_info: bool = False) -> List[str] | List[Tuple[str, List[str]]]:
+    def find(self, search_string: Optional[str] = None, submission_tag: str = None, limit: int = None, provide_protein_info: bool = False) -> List[str] | List[Tuple[str, List[str]]]:
         """Finds all precursors matching the search string.
 
         Parameters
         ----------
-        search_string : str
-            The search string to match against precursor tags (sequence followed by charge state).
+        search_string : str, optional
+            The search string to match against precursor tags (sequence followed by charge state). If None, the first precursor tags up to the limit are returned, by default None.
         submission_tag : str, optional
             If provided, only precursors associated/quantified in the given submission are returned, by default None.
         limit : int, optional

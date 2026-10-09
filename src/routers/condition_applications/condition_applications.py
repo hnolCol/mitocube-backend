@@ -9,6 +9,7 @@ from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationTreeResponseModel, ConditionApplicationTreeModel
 
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 
 from services.condition_application import build_condition_application_tree
 from config.models.parameter import APIParamString
@@ -54,6 +55,8 @@ def query_condition_applications(search_string : str = None,
         
     """
 
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     ca_tags = db.condition_applications.find(search_string = search_string, samples_only = samples_only, protein_tags = protein_tags, submission_tag = submission_tag, attribute_tag = attribute_tag, trait_tag = trait_tag, sort_by_frequency = sort_by_frequency, limit = limit)
 
     return ca_tags

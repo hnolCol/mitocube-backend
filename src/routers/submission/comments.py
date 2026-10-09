@@ -9,6 +9,7 @@ from config.models.submissions.comments import SubmissionCommentModel
 from config.exceptions.HTTPExceptions import tag_not_found
 
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 
 
 
@@ -36,8 +37,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 @router.post('/{submission_tag}/comments')
 def post_comment_to_submission(submission_tag: str, comment: SubmissionCommentModel, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
-    if not db.submissions.exists(submission_tag):
-        raise tag_not_found
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     comment.user_tag = user.tag
     db.submissions.insert_comment(tag=submission_tag, comment=comment)
 
@@ -45,7 +45,7 @@ def post_comment_to_submission(submission_tag: str, comment: SubmissionCommentMo
 @router.get('/{submission_tag}/comments')
 def get_comments_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[SubmissionCommentModel]:
     "" 
-    if not db.submissions.exists(submission_tag) : raise tag_not_found 
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.get_comments(tag = submission_tag)
     
     

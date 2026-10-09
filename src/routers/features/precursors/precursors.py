@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List
+from typing import List, Optional
 from config.models.user import UserModel
 from config.models.precursors import PrecursorInsertModel, PrecursorResponseModel
 from services.users import is_user_at_least_curator, get_user_from_token
+from services.submission import check_submission_access, check_submission_tags_access
 from config.models.parameter import APIParamString
 
 
@@ -15,14 +16,14 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", summary="Finds precursors by search query.")
-def find_precursors_by_query(search_string : str, limit : int = 50, submission_tags : str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def find_precursors_by_query(search_string : Optional[str] = None, limit : int = 50, submission_tags : str = None, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """
     Finds precursors by their tag (sequence followed by charge state, e.g. PEPTIDEK.2).
 
     Parameters
     ----------
-    search_string : str
-        The search string to match against the precursor tags.
+    search_string : str, optional
+        The search string to match against the precursor tags. If None, the first precursor tags up to the limit are returned, by default None
     limit : int, optional
         The limit of precursors to return, by default 50
     submission_tags : str, optional
@@ -36,6 +37,7 @@ def find_precursors_by_query(search_string : str, limit : int = 50, submission_t
         Precursor tags
     """
     submission_tags = APIParamString(param=submission_tags).param
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.precursors.find(search_string=search_string, limit=limit, submission_tag=submission_tags[0] if submission_tags else None)
 
 
@@ -151,4 +153,6 @@ def get_precursors_by_protein_group(protein_group_tag : str, submission_tag : st
     """
     if not db.protein_groups.exists(tag = protein_group_tag):
         raise HTTPException(status_code=404, detail=f"Protein group with tag {protein_group_tag} not found.")
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.precursors.get_by_protein_group(protein_group_tag = protein_group_tag, submission_tag = submission_tag, limit = limit)

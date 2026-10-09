@@ -11,6 +11,7 @@ from config.models.user import UserModel
 from config.models.news.news import  NewsModel, NewsInsertModel
 from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from services.submission import check_submission_tags_access
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel
 
@@ -43,5 +44,6 @@ def bulk_insert_protein_features(search_string : str, limit : int = 50, submissi
     List[str]
        Protein tags
     """
+    check_submission_tags_access(submission_tags = submission_tags, user = user, db = db)
     return db.proteins.find(search_string=search_string, limit=limit, proteome_tags=APIParamString(param=proteome_tags).param, submission_tags=APIParamString(param=submission_tags).param)
 

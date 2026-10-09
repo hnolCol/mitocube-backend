@@ -4,6 +4,7 @@ from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleResponseModel, SampleUpdateModel
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 from lib.database.Database import get_db
 from typing import List, Dict, Optional
 
@@ -17,6 +18,8 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.get("/count", summary="Get the total number of samples in the database.")
 def get_sample_count(protein_group_tag : str = None, submission_tag : str = None, genotype_tag : str = None, trait_tag : str = None, has_protein_quantification : bool = False, has_peptide_quantification : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     "Returns the total number of samples in the database."
+    if submission_tag is not None:
+        check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.samples.count(protein_group_tag=protein_group_tag, submission_tag=submission_tag, trait_tag=trait_tag, has_protein_quantification=has_protein_quantification, has_peptide_quantification=has_peptide_quantification)
 
 
@@ -76,14 +79,12 @@ def set_sample_excluded(sample_tag: str, excluded: bool = True, user: UserModel 
 
 @router.get("/submissions/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
 def get_stats_outdated(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
-    if not db.submissions.exists(tag=submission_tag):
-        raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.get_stats_outdated(tag=submission_tag)
 
 @router.get("/submissions/{submission_tag}/export", summary="Get sample export data (sample_tag, sample_name, replicate, genotype, condition applications) for download.")
 def get_samples_export(submission_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     "Returns one row per sample with resolved genotype/condition-application text for CSV/TSV export."
-    if not db.submissions.exists(tag=submission_tag):
-        raise HTTPException(status_code=404, detail=f"No submission found for tag {submission_tag}")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     df = db.samples.get_samples_export_data(submission_tag=submission_tag, include_sample_name=True)
     return df.to_dict(orient="records")

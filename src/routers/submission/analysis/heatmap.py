@@ -12,6 +12,7 @@ from config.exceptions.HTTPExceptions import no_data_found_http_exception, filte
 from config.models.user import UserModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token
+from services.submission import check_submission_access
 
 from services.statistics.clustering import cluster_to_dataframe, compute_zscores, filter_for_clustering
 
@@ -22,9 +23,9 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 )
 
 @router.get("/{submission_tag}/heatmap")
-def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.001, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token)):
-    #print("Getting heatmap for submission:", submission_tag, "attribute_tag:", attribute_tag, "annotation_tag:", annotation_tag, "fdr:", fdr, "n_clusters:", n_clusters, db : DatabaseABC = Depends(get_db))
-    if not db.submissions.exists(tag = submission_tag): raise submission_tag_not_found 
+def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.001, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+
     if not db.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
     
     condition_applications = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  # already excludes excluded samples

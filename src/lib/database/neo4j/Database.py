@@ -21,6 +21,7 @@ from lib.database.neo4j.QC import Neo4JQC
 from lib.database.neo4j.Instruments import Neo4JInstruments, Neo4JInstrumentStates
 from lib.database.neo4j.Timeline import Neo4JTimeline
 from lib.database.neo4j.ResearchGroup import Neo4JResearchGroup
+from lib.database.neo4j.Consortium import Neo4JConsortium
 from lib.database.neo4j.Phenotypes import Neo4JPhenotypes
 from lib.database.neo4j.Samples import Neo4JSamples
 from lib.database.neo4j.Maintenance import Neo4JMaintenanceProcedure, Neo4JMaintenanceEvent, Neo4JExternalServices
@@ -50,7 +51,6 @@ class MCNeo4JDatabase(DatabaseABC):
         
         self.connection = Neo4JConnection()
         self._driver = self.connection.driver
-        
         self.factory = Neo4JFactory(driver=self.connection.driver)
         self.constructor = Neo4JConstructor(driver=self.connection.driver)
         self.attributes = Neo4JAttributes(driver=self.connection.driver)
@@ -61,7 +61,8 @@ class MCNeo4JDatabase(DatabaseABC):
         
         self.users = Neo4JUser(driver=self.connection.driver)
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
-        self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver, users=self.users, research_groups=self.research_groups)
+        self.consortiums = Neo4JConsortium(driver = self.connection.driver)
+        self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver, users=self.users, research_groups=self.research_groups, consortiums=self.consortiums)
         self.features = Neo4JFeatures(driver=self.connection.driver)
         self.genotypes = Neo4JGenotype(driver=self.connection.driver, condition_applications=self.condition_applications)
         self.proteomes = Neo4JProteomes(driver = self.connection.driver, features=self.features)
@@ -105,6 +106,17 @@ class MCNeo4JDatabase(DatabaseABC):
         #checks if all is correctly defined 
         self.__create_fulltext_search()
         super(MCNeo4JDatabase, self).__init__()
+
+    def health_check(self) -> bool:
+        """Cheap connectivity probe for startup health checks.
+
+        Opens the underlying driver on first call (the Database.DB() proxy is
+        lazy) and runs a trivial query so a broken connection surfaces at
+        startup instead of on the first user request.
+        """
+        self._driver.verify_connectivity()
+        self._driver.execute_query(query_="RETURN 1", routing_="r", database_="neo4j")
+        return True
 
     
         #self.constructor.set_up_units()

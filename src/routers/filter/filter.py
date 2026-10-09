@@ -13,6 +13,7 @@ from config.models.user import UserModel
 from config.models.parameter import APIParamString
 from config.models.filter import FilterModel, FilterProps
 from services.users import get_user_from_token, is_user_admin
+from services.submission import check_submission_tags_access
 
 
 
@@ -28,7 +29,7 @@ def get_available_filters(proteome_tags : str = None,
                           protein_tag : str = None, 
                           submission_tag : str = None,
                           user : UserModel = Depends(get_user_from_token),
-                          
+                          db : DatabaseABC = Depends(get_db),
                           ) -> List[str]:
     """Returns the filter set that are available in the database.
 
@@ -50,6 +51,7 @@ def get_available_filters(proteome_tags : str = None,
         Filters available in the database.
     """
     
+    check_submission_tags_access(submission_tags = submission_tag, user = user, db = db)
     filter_tags = db.filters.find(proteome_tags = APIParamString(param=proteome_tags).param,
                              submission_tags = APIParamString(param=submission_tag).param,
                             protein_tag = protein_tag)
