@@ -246,8 +246,10 @@ class Neo4JResearchGroup(ResearchGroupABC):
         return r[0]
 
     def set_head(self, group_tag : str, user_tag : str):
-        """Makes the user a head (PI) of the research group"""
+        """Makes the user a head (PI) of the research group. The user must be a member of the research group."""
         if not self.exists(group_tag): raise ValueError(f"Research group with tag {group_tag} does not exist.")
+        if user_tag not in self.get_users(group_tag):
+            raise ValueError(f"User with tag {user_tag} is not a member of the research group with tag {group_tag}.")
 
         query = (
             "MATCH (rg:ResearchGroup {tag : $group_tag}) "

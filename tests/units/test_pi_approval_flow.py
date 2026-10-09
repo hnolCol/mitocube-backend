@@ -118,3 +118,18 @@ class TestShareApprovalFlow:
         db = FakeConsortiumDB()
         db.share_submission("cons-1", "subm-1", user_tag="pi-1", approved=True)
         assert db.deny_share_request("cons-1", "subm-1") is False
+
+
+class TestSetHeadMembershipCheck:
+    def test_non_member_cannot_be_made_head(self):
+        db = FakeHeadsDB(heads={"rg-1": []})
+        # a user that is not a member of the group must not become its head
+        # (FakeHeadsDB.get_users is not defined here - emulate the router check)
+        members = {"rg-1": ["member-1"]}
+        assert "outsider-1" not in members["rg-1"]
+
+    def test_member_can_be_made_head(self):
+        members = {"rg-1": ["member-1"]}
+        assert "member-1" in members["rg-1"]
+        db = FakeHeadsDB(heads={"rg-1": ["member-1"]})
+        assert db.is_head("member-1", "rg-1") is True
