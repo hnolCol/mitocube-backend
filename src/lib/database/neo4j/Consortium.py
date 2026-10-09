@@ -54,9 +54,16 @@ class Neo4JConsortium(ConsortiumABC):
         r = self._driver.execute_query(query, routing_="w", tag = tag, result_transformer_=Result.value)
         return r[0] > 0
 
-    def find(self, search_string : str = None, group_tags : List[str] = None, limit : int = 40) -> List[str]:
-        """Finds consortium tags that match the search string or contain the given research groups."""
-        if group_tags is not None:
+    def find(self, search_string : str = None, group_tags : List[str] = None, user_tags : List[str] = None, limit : int = 40) -> List[str]:
+        """Finds consortium tags that match the search string, contain the given research groups or that the given users research groups belong to."""
+        if user_tags is not None:
+            query = (
+                "MATCH (c:Consortium)<-[:MEMBER_OF]-(rg:ResearchGroup)<-[:MEMBER_OF]-(u:User) "
+                "WHERE u.tag IN $user_tags "
+            )
+            if group_tags is not None:
+                query += "AND rg.tag IN $group_tags "
+        elif group_tags is not None:
             query = (
                 "MATCH (c:Consortium)<-[:MEMBER_OF]-(rg:ResearchGroup) "
                 "WHERE rg.tag IN $group_tags "
@@ -81,6 +88,7 @@ class Neo4JConsortium(ConsortiumABC):
             result_transformer_=Result.value,
             search_string=search_string.lower() if search_string is not None else None,
             group_tags=group_tags,
+            user_tags=user_tags,
             limit=limit
         )
         return r

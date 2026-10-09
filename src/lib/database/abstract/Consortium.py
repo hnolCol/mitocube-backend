@@ -25,8 +25,8 @@ class ConsortiumABC(ABC):
         """ """
 
     @abstractmethod
-    def find(self, search_string : str = None, group_tags : List[str] = None, limit : int = 40) -> List[str]:
-        """Finds consortium tags that match the search string or contain the given research groups."""
+    def find(self, search_string : str = None, group_tags : List[str] = None, user_tags : List[str] = None, limit : int = 40) -> List[str]:
+        """Finds consortium tags that match the search string, contain the given research groups or that the given users research groups belong to."""
 
     @abstractmethod
     def get_tags(self, limit : int = 40) -> List[str]:

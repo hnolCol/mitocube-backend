@@ -26,11 +26,13 @@ def _check_consortium_exists(consortium_tag : str, db : DatabaseABC):
 
 
 @router.get("/q", response_model=List[str])
-def find_consortiums(search_string : Optional[str] = None, group_tags : Optional[str] = None, limit : int = 40, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
-    """Finds consortiums matching the search criteria. Consortiums are visible to all logged-in users."""
+def find_consortiums(search_string : Optional[str] = None, group_tags : Optional[str] = None, user_tags : Optional[str] = None, limit : int = 40, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """Finds consortiums matching the search criteria. Consortiums are visible to all logged-in users.
+    Filter by research groups (group_tags) or by the users whose research groups are consortium members (user_tags)."""
     return db.consortiums.find(
         search_string=search_string,
         group_tags=APIParamString(param=group_tags).param,
+        user_tags=APIParamString(param=user_tags).param,
         limit=limit
     )
 
