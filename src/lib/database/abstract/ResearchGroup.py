@@ -50,5 +50,21 @@ class ResearchGroupABC(ABC):
         """Finds research group tags that match the search string, user tags, or submission tags."""
         
     @abstractmethod
+    def get_heads(self, tag : str) -> List[str]:
+        "Returns the user tags of the research group heads (PIs) of the given research group"
+
+    @abstractmethod
+    def is_head(self, user_tag : str, group_tag : str = None) -> bool:
+        "Checks if the user is a head (PI) of the given research group. If no group tag is given, checks if the user is a head of any research group."
+
+    @abstractmethod
+    def set_head(self, group_tag : str, user_tag : str):
+        "Makes the user a head (PI) of the research group"
+
+    @abstractmethod
+    def remove_head(self, group_tag : str, user_tag : str):
+        "Removes the user as head (PI) of the research group"
+
+    @abstractmethod
     def set_subgroup(self, parent_tag : str, child_tag : str):
         "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."

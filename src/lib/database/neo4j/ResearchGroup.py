@@ -218,6 +218,55 @@ class Neo4JResearchGroup(ResearchGroupABC):
         self.insert(research_group)
 
 
+    def get_heads(self, tag : str) -> List[str]:
+        """Returns the user tags of the research group heads (PIs) of the given research group"""
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag})<-[r:HEAD_OF]-(u:User) "
+            "RETURN u.tag ORDER BY u.tag "
+        )
+        r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
+        return r
+
+    def is_head(self, user_tag : str, group_tag : str = None) -> bool:
+        """Checks if the user is a head (PI) of the given research group. If no group tag is given,
+        checks if the user is a head of any research group."""
+        if group_tag is not None:
+            query = (
+                "WITH EXISTS {(u:User {tag : $user_tag})-[:HEAD_OF]->(rg:ResearchGroup {tag : $group_tag})} as is_head "
+                "RETURN is_head "
+            )
+            r = self._driver.execute_query(query, user_tag = user_tag, group_tag = group_tag, result_transformer_=Result.value)
+        else:
+            query = (
+                "WITH EXISTS {(u:User {tag : $user_tag})-[:HEAD_OF]->(:ResearchGroup)} as is_head "
+                "RETURN is_head "
+            )
+            r = self._driver.execute_query(query, user_tag = user_tag, result_transformer_=Result.value)
+        return r[0]
+
+    def set_head(self, group_tag : str, user_tag : str):
+        """Makes the user a head (PI) of the research group"""
+        if not self.exists(group_tag): raise ValueError(f"Research group with tag {group_tag} does not exist.")
+
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $group_tag}) "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MERGE (u)-[r:HEAD_OF]->(rg) "
+            "ON CREATE "
+            "SET r.since = timestamp() "
+        )
+        self._driver.execute_query(query, routing_="w", group_tag = group_tag, user_tag = user_tag)
+
+    def remove_head(self, group_tag : str, user_tag : str):
+        """Removes the user as head (PI) of the research group"""
+        if not self.exists(group_tag): raise ValueError(f"Research group with tag {group_tag} does not exist.")
+
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $group_tag})<-[r:HEAD_OF]-(u:User {tag : $user_tag}) "
+            "DELETE r"
+        )
+        self._driver.execute_query(query, routing_="w", group_tag = group_tag, user_tag = user_tag)
+
     def set_subgroup(self, parent_tag : str, child_tag : str):
         "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."
         if not self.exists(parent_tag): raise ValueError(f"Parent research group with tag {parent_tag} does not exist.")

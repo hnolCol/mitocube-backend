@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 from neo4j import Driver, Result
 
 from lib.database.abstract.Consortium import ConsortiumABC
@@ -162,20 +162,69 @@ class Neo4JConsortium(ConsortiumABC):
         """Returns the submission tags that are shared with the consortium"""
         query = (
             "MATCH (c:Consortium {tag : $tag})<-[r:SHARED_WITH]-(s:Submission) "
+            "WHERE r.status = 'approved' "
             "RETURN s.tag ORDER BY s.created_at DESC "
         )
         r = self._driver.execute_query(query, tag = tag, routing_="r", result_transformer_=Result.value)
         return r
 
-    def share_submission(self, consortium_tag : str, submission_tag : str) -> bool:
-        """Shares a submission with the consortium"""
+    def share_submission(self, consortium_tag : str, submission_tag : str, user_tag : str, approved : bool = False) -> bool:
+        """Shares a submission with the consortium. If approved is False, the share request is
+        created with status pending and requires the approval of a research group head (PI)."""
         if not self.exists(consortium_tag): raise ValueError(f"Consortium with tag {consortium_tag} does not exist.")
 
+        status = "approved" if approved else "pending"
         query = (
             "MATCH (c:Consortium {tag : $consortium_tag}), (s:Submission {tag : $submission_tag}) "
             "MERGE (s)-[r:SHARED_WITH]->(c) "
             "ON CREATE "
-            "SET r.created_at = timestamp() "
+            "SET r.created_at = timestamp(), r.status = $status, r.requested_by = $user_tag "
+            "ON MATCH "
+            "SET r.modified_at = timestamp() "
+            "RETURN count(r) "
+        )
+        r = self._driver.execute_query(query, routing_="w",
+                                       consortium_tag = consortium_tag,
+                                       submission_tag = submission_tag,
+                                       status = status,
+                                       user_tag = user_tag,
+                                       result_transformer_=Result.value)
+        return r[0] > 0
+
+    def get_pending_share_requests_for_head(self, user_tag : str) -> List[Dict]:
+        """Returns the pending share requests that the given research group head (PI) can approve.
+        A head sees the requests of the users that are members of the research groups they lead."""
+        query = (
+            "MATCH (pi:User {tag : $user_tag})-[:HEAD_OF]->(rg:ResearchGroup)<-[:MEMBER_OF]-(owner:User) "
+            "MATCH (owner)-[:CREATED]->(s:Submission)-[r:SHARED_WITH]->(c:Consortium) "
+            "WHERE r.status = 'pending' "
+            "RETURN s.tag AS submission_tag, c.tag AS consortium_tag, r.requested_by AS requested_by, r.created_at AS created_at "
+            "ORDER BY r.created_at DESC "
+        )
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, result_transformer_=Result.data)
+        return list(r) if r else []
+
+    def approve_share_request(self, consortium_tag : str, submission_tag : str, user_tag : str) -> bool:
+        """Approves a pending share request, making the submission accessible to the consortium"""
+        query = (
+            "MATCH (s:Submission {tag : $submission_tag})-[r:SHARED_WITH]->(c:Consortium {tag : $consortium_tag}) "
+            "WHERE r.status = 'pending' "
+            "SET r.status = 'approved', r.approved_by = $user_tag, r.approved_at = timestamp() "
+            "RETURN count(r) "
+        )
+        r = self._driver.execute_query(query, routing_="w",
+                                       consortium_tag = consortium_tag,
+                                       submission_tag = submission_tag,
+                                       user_tag = user_tag,
+                                       result_transformer_=Result.value)
+        return r[0] > 0
+
+    def deny_share_request(self, consortium_tag : str, submission_tag : str) -> bool:
+        """Denies a pending share request, removing the pending relation"""
+        query = (
+            "MATCH (s:Submission {tag : $submission_tag})-[r:SHARED_WITH]->(c:Consortium {tag : $consortium_tag}) "
+            "WHERE r.status = 'pending' "
+            "DELETE r "
             "RETURN count(r) "
         )
         r = self._driver.execute_query(query, routing_="w",

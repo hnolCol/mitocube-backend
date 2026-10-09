@@ -73,7 +73,7 @@ class UserInsertModel(BaseModel):
     firstname : str 
     lastname : str 
     institute : Optional[str] = None  
-    research_group : Optional[str] = None  
+    research_group : str  
     email : EmailStr 
     agreed_to_terms : Optional[bool] = False
     expires_after : float = None
