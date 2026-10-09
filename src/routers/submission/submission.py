@@ -65,6 +65,56 @@ def get_submission_tag(user : UserModel = Depends(get_user_from_token), db : Dat
     return SubmissionIDResponse(tag = tag)   
 
 
+@router.get("/submissions/qv2", summary="Experimental single-query variant of /submissions/q. Returns old vs new result for comparison.")
+def get_submission_by_query_v2(state : str|int = None,
+                            search_string : str = None,
+                            trait_tags : str = None, 
+                            attribute_tag : str = None, 
+                            ca_tags : str = None,
+                            genotype_tag : str = None, 
+                            protein_tags: str = None,
+                            user_tags : str = None,
+                            consortium_tags : str = None,
+                            user_role : Literal["creator", "collaborator", "any"] = "any",  
+                            include_sample_ca : bool = False,
+                            ca_search_string : str = None,
+                            limit : int = 20, 
+                            ordered : bool = True,
+                            user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict:
+    """"
+    Experimental: runs the same filter through the legacy find() and the new
+    single-query find_v2() and returns both results plus the difference, so the
+    outcomes can be compared before find_v2 replaces find().
+    """
+    kwargs = dict(
+        current_user_tag=user.tag,
+        search_string = search_string,
+        state = APIParamInt(param = state).param, 
+        attribute_tag=APIParamString(param=attribute_tag).param,
+        trait_tags=APIParamString(param=trait_tags).param,
+        ca_tags=APIParamString(param=ca_tags).param,
+        user_tags=APIParamString(param=user_tags).param,
+        user_role=user_role,  
+        genotype_tag = APIParamString(param=genotype_tag).param,
+        consortium_tags = APIParamString(param=consortium_tags).param,
+        include_sample_ca = include_sample_ca,
+        ca_search_string = ca_search_string,
+        protein_tags = APIParamString(param=protein_tags).param,
+        ordered = ordered,
+        limit = limit
+    )
+    legacy = db.submission_filter.find(**kwargs)
+    v2 = db.submission_filter.find_v2(**kwargs)
+    return {
+        "legacy": legacy,
+        "v2": v2,
+        "only_in_legacy": sorted(set(legacy) - set(v2)),
+        "only_in_v2": sorted(set(v2) - set(legacy)),
+        "identical": sorted(legacy) == sorted(v2),
+        "identical_ordered": legacy == v2
+    }
+
+
 @router.get("/submissions/q")
 def get_submission_by_query(state : str|int = None,
                             search_string : str = None,
