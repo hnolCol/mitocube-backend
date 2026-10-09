@@ -2,6 +2,7 @@ from typing import List, Dict
 from neo4j import Driver, Result
 
 from lib.database.abstract.Consortium import ConsortiumABC
+from lib.cache.scope_cache import invalidate_all_cached_scopes
 from config.models.consortium import ConsortiumInput, ConsortiumModel
 
 
@@ -144,7 +145,6 @@ class Neo4JConsortium(ConsortiumABC):
             "SET r.created_at = timestamp() "
         )
         self._driver.execute_query(query, routing_="w", tag = tag, group_tags = group_tags)
-        from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
 
     def remove_groups(self, tag : str, group_tags : List[str]):
@@ -159,7 +159,6 @@ class Neo4JConsortium(ConsortiumABC):
             "DELETE r"
         )
         self._driver.execute_query(query, routing_="w", tag = tag, group_tags = group_tags)
-        from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
 
     def get_submission_tags(self, tag : str) -> List[str]:
@@ -193,7 +192,6 @@ class Neo4JConsortium(ConsortiumABC):
                                        status = status,
                                        user_tag = user_tag,
                                        result_transformer_=Result.value)
-        from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
         return r[0] > 0
 
@@ -223,7 +221,6 @@ class Neo4JConsortium(ConsortiumABC):
                                        submission_tag = submission_tag,
                                        user_tag = user_tag,
                                        result_transformer_=Result.value)
-        from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
         return r[0] > 0
 
@@ -239,7 +236,6 @@ class Neo4JConsortium(ConsortiumABC):
                                        consortium_tag = consortium_tag,
                                        submission_tag = submission_tag,
                                        result_transformer_=Result.value)
-        from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
         return r[0] > 0
 
@@ -254,6 +250,5 @@ class Neo4JConsortium(ConsortiumABC):
                                        consortium_tag = consortium_tag,
                                        submission_tag = submission_tag,
                                        result_transformer_=Result.value)
-        from lib.cache.scope_cache import invalidate_all_cached_scopes
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
         return r[0] > 0

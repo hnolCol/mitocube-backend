@@ -29,6 +29,7 @@ from itertools import islice
 
 
 from config.models.calculations.quantile import QuantileModel
+from lib.cache.scope_cache import invalidate_cached_scope, get_cached_scope, cache_scope
 
 
 def chunk_dict(d, size):
@@ -480,7 +481,6 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         
         self._driver.execute_query(query, routing_="w", tag = tag, title = title, user_tag = user_tag, collaborators = collaborators, created_at = created_at)
-        from lib.cache.scope_cache import invalidate_cached_scope
         invalidate_cached_scope(user_tag)
         for collaborator_tag in (collaborators or []):
             invalidate_cached_scope(collaborator_tag)
@@ -1437,7 +1437,6 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN true "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, result_transformer_=Result.value)
-        from lib.cache.scope_cache import invalidate_cached_scope
         invalidate_cached_scope(user_tag)
         if not add_prev_user_to_collaborators:
             # the previous owner may lose access if no other membership grants it
@@ -1459,7 +1458,6 @@ class Neo4JSubmissions(SubmissionsABC):
         if len(collaborator_tags) == 0:
             query += "RETURN true "
             r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
-            from lib.cache.scope_cache import invalidate_cached_scope
             for collaborator_tag in collaborator_tags:
                 invalidate_cached_scope(collaborator_tag)
             return r[0] if len(r) > 0 else False
@@ -1472,7 +1470,6 @@ class Neo4JSubmissions(SubmissionsABC):
             "RETURN true "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, collaborator_tags=collaborator_tags, result_transformer_=Result.value)
-        from lib.cache.scope_cache import invalidate_cached_scope
         for collaborator_tag in collaborator_tags:
             invalidate_cached_scope(collaborator_tag)
         return len(r) > 0
@@ -2061,7 +2058,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         invalidate_cached_scope / invalidate_all_cached_scopes are called on every
         membership-changing write. The None (curator, unrestricted) and [] (guest,
         no access) cases are derived from the role on each request and are not cached."""
-        from lib.cache.scope_cache import get_cached_scope, cache_scope
         cached = get_cached_scope(current_user_tag)
         if cached is not None:
             return cached
