@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException
 
 from lib.database.Database import get_db
@@ -76,6 +76,47 @@ def get_consortiums_by_user(user_tag : str, user : UserModel = Depends(is_user_a
 
 
 
+@router.get("/requests/pending", summary="Returns the pending share requests the current user (as research group head) can approve.")
+def get_my_pending_share_requests(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
+    """"
+    Returns the pending consortium share requests of all users that are members of the
+    research groups the current user leads (as head/PI).
+    """
+    return db.consortiums.get_pending_share_requests_for_head(user_tag = user.tag)
+
+
+@router.post("/requests/{consortium_tag}/{submission_tag}/approve",
+             summary="Approves a pending share request. Requires a head (PI) of the owners research group or a curator.")
+def approve_share_request(consortium_tag : str, submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """"
+    Approves a pending consortium share request. The submission becomes immediately
+    accessible to all members of the consortium.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag):
+        raise HTTPException(status_code=403, detail="Only a research group head (PI) or a curator can approve share requests.")
+    ok = db.consortiums.approve_share_request(consortium_tag = consortium_tag, submission_tag = submission_tag, user_tag = user.tag)
+    if not ok:
+        raise HTTPException(status_code=404, detail="No pending share request found for this submission and consortium.")
+    return True
+
+
+@router.post("/requests/{consortium_tag}/{submission_tag}/deny",
+             summary="Denies a pending share request. Requires a head (PI) of the owners research group or a curator.")
+def deny_share_request(consortium_tag : str, submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """"
+    Denies a pending consortium share request. The pending relation is removed, the
+    submission stays inaccessible to the consortium.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag):
+        raise HTTPException(status_code=403, detail="Only a research group head (PI) or a curator can deny share requests.")
+    ok = db.consortiums.deny_share_request(consortium_tag = consortium_tag, submission_tag = submission_tag)
+    if not ok:
+        raise HTTPException(status_code=404, detail="No pending share request found for this submission and consortium.")
+    return True
+
+
 @router.get("/{consortium_tag}")
 def get_consortium_by_tag(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ConsortiumResponseModel:
     """"
@@ -151,6 +192,11 @@ def share_submission_with_consortium(consortium_tag : str, submission_tag : str,
     """"
     Shares a submission with a consortium, so that all members of the consortiums research
     groups can access it. Only the creator of the submission (or a curator) can share it.
+
+    If the requesting user is a research group head (PI) or at least a curator, the share is
+    effective immediately. Otherwise the share request is created with status pending and
+    must be approved by a head (PI) of one of the owners research groups before the
+    submission becomes accessible to the consortium.
     """
     _check_consortium_exists(consortium_tag, db)
     # the check also verifies that the submission exists; only the owner (creator),
@@ -159,7 +205,9 @@ def share_submission_with_consortium(consortium_tag : str, submission_tag : str,
     creator_tag = db.submissions.get_creator(tag = submission_tag)
     if user.tag != creator_tag and user.role < UserRolesEnum.CURATOR:
         raise HTTPException(status_code=403, detail="Only the owner of the submission can share it with a consortium.")
-    return db.consortiums.share_submission(consortium_tag = consortium_tag, submission_tag = submission_tag)
+    immediate = user.role >= UserRolesEnum.CURATOR or db.research_groups.is_head(user_tag = user.tag)
+    return db.consortiums.share_submission(consortium_tag = consortium_tag, submission_tag = submission_tag,
+                                           user_tag = user.tag, approved = immediate)
 
 
 @router.delete("/{consortium_tag}/submissions/{submission_tag}",

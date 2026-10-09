@@ -57,8 +57,21 @@ class ConsortiumABC(ABC):
         """Returns the submission tags that are shared with the consortium"""
 
     @abstractmethod
-    def share_submission(self, consortium_tag : str, submission_tag : str) -> bool:
-        """Shares a submission with the consortium"""
+    def share_submission(self, consortium_tag : str, submission_tag : str, user_tag : str, approved : bool = False) -> bool:
+        """Shares a submission with the consortium. If approved is False, the share request is
+        created with status pending and requires the approval of a research group head (PI)."""
+
+    @abstractmethod
+    def get_pending_share_requests_for_head(self, user_tag : str) -> List[Dict]:
+        """Returns the pending share requests that the given research group head (PI) can approve"""
+
+    @abstractmethod
+    def approve_share_request(self, consortium_tag : str, submission_tag : str, user_tag : str) -> bool:
+        """Approves a pending share request, making the submission accessible to the consortium"""
+
+    @abstractmethod
+    def deny_share_request(self, consortium_tag : str, submission_tag : str) -> bool:
+        """Denies a pending share request, removing the pending relation"""
 
     @abstractmethod
     def unshare_submission(self, consortium_tag : str, submission_tag : str) -> bool:
