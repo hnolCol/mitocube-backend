@@ -31,7 +31,36 @@ class General(BaseSettings):
 ```
 
 Here you can specify if you would like to restrict the user registration to a certain domain of emails preventing users to use private emails using the ```allowed_email_domains``` parameter. 
-If the you leave this empty, in prinicple everyone can register and have access to the data. Hence, for security reasons, this should not be an empty list. 
+If the you leave this empty, in principle everyone can register and have access to the data. Hence, for security reasons, this should not be an empty list. 
+
+## Secret Management
+
+MitoCube now includes a **complete secret management system** for secure production deployments.
+
+### For Development (No Changes)
+```bash
+# Same as before - just copy .env.example and edit
+cp .env.example .env
+nano .env
+python -m uvicorn src.app:app --reload
+```
+
+### For Production (Secure)
+```bash
+# Generate encryption key (SAVE THIS!)
+python -c "from config.secrets.encryption import EnvFileEncryptor; print(EnvFileEncryptor().get_key())"
+
+# Create .env, encrypt it, deploy
+cp .env.example .env
+nano .env  # Fill in production values
+export ENCRYPTION_KEY="your-key"
+python -c "from config.secrets.encryption import EnvFileEncryptor; EnvFileEncryptor('$ENCRYPTION_KEY').encrypt_file('.env')"
+rm .env
+python deploy.py
+```
+
+**See the [Secret Management Guide](docs/SECRET_MANAGEMENT.md) for complete details.**
+
 ## Database setup
 
 Setting up the database and migrating data is documented in
@@ -40,7 +69,7 @@ Setting up the database and migrating data is documented in
 ## Dependencies
 
 Core dependencies live in `requirements.txt`. The optional AI agent stack
-(langchain/langgraph/openai) is split into `requirements-ai.txt` — install
+(langchain/langgraph/openai) is split into `requirements-ai.txt`  install
 it only if you use the AI features:
 
 ```bash
@@ -113,5 +142,14 @@ semantics:
 The rationale: a transient database outage should not put the whole web
 service down or cause restart loops under a process manager. The trade
 off is that requests touching an unavailable dependency will return
-errors until it recovers — check the logs at startup to see which
+errors until it recovers  check the logs at startup to see which
 dependencies are reachable.
+
+## Production Documentation
+
+For complete production deployment guides, see:
+
+- **[Secret Management Guide](docs/SECRET_MANAGEMENT.md)** - Complete guide for managing secrets securely
+- **[Production Setup Guide](docs/PRODUCTION_SETUP.md)** - Step-by-step production deployment (14 steps)
+- **[Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)** - Complete checklist for deployment verification
+- **[All Documentation](docs/README.md)** - Full documentation overview

@@ -7,6 +7,7 @@ from pydantic import SecretStr
 from pydantic import FilePath
 from pydantic import DirectoryPath
 from pydantic import AnyHttpUrl
+from pydantic import Field
 from typing import Literal, Optional
 
 class DB(BaseSettings):
@@ -17,7 +18,10 @@ class DB(BaseSettings):
     db_uri : Optional[str] = None  # ToDo: create validation conditions if db_handler is postgresql? Good idea. I would use the @field_validator function which is also availabe in  pydantic Settings 
     db_user : Optional[str] = "neo4j"
     db_name : Optional[str] = None
-    db_pw : Optional[SecretStr]
+    db_pw : Optional[SecretStr] = Field(
+        default=None,
+        description="Neo4j database password - REQUIRED for production, no default for security. Generate with: python -m config.secrets.generator --password"
+    )
     db_max_dataset_cached : int = 100
     
 
