@@ -15,8 +15,6 @@ from config.settings.db import get_db_settings
 from config.enums.states import SubmissionStatesEnums
 from config.models.submissions.comments import SubmissionCommentModel
 from config.models.submissions.submissions import DatasetSubmissionModel
-# f, AnnotationDatabase
-# from lib.database.ABCDatabase import MCAttributes
 
 
 # 
@@ -24,8 +22,6 @@ from config.models.submissions.submissions import DatasetSubmissionModel
 from services.paths.utils import get_absolute_path_to_dir
 
 from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publications
-#from migration.load_data import MigrateScripts 
-
 ### import routers
 
 from routers.dataset import correlation as submission_correlation # volcano
@@ -68,7 +64,7 @@ from routers.phenotypes import phenotypes
 from routers.states import states
 from routers.samples import samples
 from routers.maintenance import symptoms
-from routers.maintenance import maintenance 
+from routers.maintenance import maintenance
 from routers.maintenance import maintenancepermissions
 from routers.maintenance import procedures
 from routers.maintenance import spareparts
@@ -87,8 +83,6 @@ from routers.crosslink import crosslink
 from routers.protocols import protocols
 from routers.mfa import mfa
 from routers.policy import policy
-
-# from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
 import sys 
 
@@ -117,8 +111,7 @@ router_sources = [policy,
                   token, 
                   user, 
                   features, 
-                  info, 
-                  #annotations,
+                  info,
                   heatmap, 
                   volcano,
                   compare,
@@ -126,9 +119,7 @@ router_sources = [policy,
                   genotypes, 
                   attribute_permissions,
                   attributes, 
-                  instruments, 
-                  #network, 
-                  #filter,
+                  instruments,
                   annotation_permissions,
                   annotations, 
                   rc, 
@@ -154,8 +145,8 @@ router_sources = [policy,
                   peptides,
                   samples,
                   condition_applications,
-                  metatext, # submission specific metatexts
-                  metatexts, # metatexts in general
+                  metatext,
+                  metatexts,
                   openai,
                   pca,
                   submission_annotations,
@@ -166,8 +157,8 @@ router_sources = [policy,
                   PhenotypeAssociation,
                   crosslink,
                   crosslink_external_resource,
-                   protocols,
-                   submission_export
+                  protocols,
+                  submission_export
 ]
     
 
