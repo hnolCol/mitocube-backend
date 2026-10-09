@@ -2,7 +2,7 @@ from datetime import datetime
 from collections import OrderedDict
 
 
-from config.exceptions.HTTPExceptions import tag_not_found, submission_tag_not_found, user_forbidden
+from config.exceptions.HTTPExceptions import tag_not_found, submission_tag_not_found, submission_access_forbidden
 
 from config.enums.states import SubmissionStatesEnums
 from config.models.attributes import AttributeModel, AttributeValueModel
@@ -46,7 +46,8 @@ def check_submission_access(submission_tag : str, user : UserModel, db = None) -
     HTTPException
         submission_tag_not_found (404) if the submission does not exist.
     HTTPException
-        user_forbidden (401) if the user does not have access to the submission.
+        submission_access_forbidden (403) if the submission exists but the user
+        does not have access to it.
     """
     if db is None:
         from lib.database.Database import Database
@@ -56,7 +57,7 @@ def check_submission_access(submission_tag : str, user : UserModel, db = None) -
         raise submission_tag_not_found
 
     if not db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
-        raise user_forbidden
+        raise submission_access_forbidden
 
     return True
 
@@ -87,7 +88,8 @@ def check_submission_tags_access(submission_tags : str | List[str] | None, user 
     HTTPException
         submission_tag_not_found (404) if a submission does not exist.
     HTTPException
-        user_forbidden (401) if the user does not have access to one of the submissions.
+        submission_access_forbidden (403) if a submission exists but the user
+        does not have access to it.
     """
     if submission_tags is None:
         return True

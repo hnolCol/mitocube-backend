@@ -47,6 +47,11 @@ user_forbidden = HTTPException(
             detail="The user doesnt have the required user role to perform this task.",
             headers={"WWW-Authenticate": "Bearer"},
         )
+submission_access_forbidden = HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Submission exists, but you do not have access to it.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
 user_not_found = HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
