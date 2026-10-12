@@ -63,6 +63,11 @@ def _get_secret_value(secret_name: str) -> str | None:
     return _load_env_file_values().get(secret_name)
 
 
+def _is_dev_mode() -> bool:
+    """In dev mode, presence is still enforced but complexity is not."""
+    return os.environ.get("MITOCUBE_DEV_MODE", "").lower() in ("1", "true", "yes")
+
+
 class SecretValidator:
     """Validate secrets meet security requirements."""
     
@@ -153,6 +158,9 @@ def validate_required_secrets() -> List[str]:
         
         if value is None:
             errors.append(f"Missing required secret: {secret_name}")
+            continue
+        
+        if _is_dev_mode():
             continue
         
         if not validator(value):
