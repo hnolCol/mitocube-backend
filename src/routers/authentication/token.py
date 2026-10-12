@@ -32,6 +32,8 @@ router = APIRouter(
     tags=["Token", "Authentication"]
     )
 
+print(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value(), "IN ROUTE")
+
 fernet = Fernet(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value())
 
 @router.post("/", response_description="Returns a jwt token This token still has to be verified by a one time password.", response_model=TokenResponse)

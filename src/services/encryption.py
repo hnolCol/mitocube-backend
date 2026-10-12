@@ -19,8 +19,9 @@ from services.date import get_current_datetime
 encryption_settings = Encryption()
 user_token_settings = get_user_token_settings()
 SHARE_TOKEN_SETTINGS = get_share_token_settings()
-pwd_context = CryptContext(schemes=[encryption_settings.hash_algorithm], 
-                           deprecated="auto")
+pwd_context = CryptContext(
+        schemes=[encryption_settings.hash_algorithm], 
+        deprecated="auto")
 #scheme to validate token 
 oauth2_scheme_validate = OAuth2PasswordBearer(tokenUrl="api/auth/token/verify", auto_error=False)
 #scheme to create token

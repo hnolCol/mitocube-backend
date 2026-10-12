@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file 
 
 class Settings(BaseSettings):
-    MONGO_USER: str = "ai"
+    MONGO_USER: str = "cache_db"
     MONGO_PASSWORD: Optional[SecretStr] = Field(
         default=None,
         description="MongoDB password - REQUIRED for production AI features, optional for development"
@@ -27,7 +27,7 @@ class Settings(BaseSettings):
         if self.MONGO_PASSWORD is None:
             return None
         return (
-            f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD}"
+            f"mongodb://{self.MONGO_USER}:{self.MONGO_PASSWORD.get_secret_value()}"
             f"@{self.MONGO_HOST}:{self.MONGO_PORT}"
             f"/?authSource={self.MONGO_AUTH_DB}"
         )
@@ -37,4 +37,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_mongo_db_settings() -> Settings:
+    print(Settings().AGENT_MONGO_URI)
     return Settings()

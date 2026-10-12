@@ -72,7 +72,7 @@ class MFASettings(BaseSettings):
     MFA_ENCRYPTION_KEY: SecretStr = Field(
         ...,
         description="MFA encryption key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --api-key"
-    )
+        )
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
     LOGIN_RATE_LIMIT_WINDOW_MINUTES: int = 10
     # Comma-separated list of reverse-proxy IPs whose X-Forwarded-For

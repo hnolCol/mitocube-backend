@@ -5,7 +5,7 @@ Router for exporting submission metadata to markdown format.
 import traceback
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, PlainTextResponse
 
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC

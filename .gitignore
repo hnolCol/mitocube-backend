@@ -198,3 +198,4 @@ resources_/
 functional_classification_output.csv
 label_to_tag.json
 label_to_tag.json
+.env2

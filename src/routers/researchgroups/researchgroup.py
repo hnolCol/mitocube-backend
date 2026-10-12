@@ -60,11 +60,11 @@ def get_research_group_by_tag(research_group_tag : str, user : UserModel = Depen
     return ResearchGroupResponseModel(**research_group.model_dump())
 
 @router.post("/")
-def add_research_group(research_group : ResearchGroupInput, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+def add_research_group(research_group : ResearchGroupInput, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> str:
     tag = create_hierarchical_hash(research_group.model_dump()) #create a unique tag based on the content of the research group. This way, we can avoid duplicates and also easily check if a research group with the same content already exists.
-    return db.research_groups.insert(tag, research_group)
-    
-    
+    db.research_groups.insert(tag, research_group)
+    return tag
+
 @router.post("/{research_group_tag}/users")
 def insert_users_to_research_group(research_group_tag : str, user_tags : List[str], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
     "" 
