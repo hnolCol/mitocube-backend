@@ -66,6 +66,10 @@ class FakeConsortiumDB:
         share = self.shares.pop((consortium_tag, submission_tag), None)
         return share is not None and share["status"] == "pending"
 
+    def unshare_submission(self, consortium_tag, submission_tag):
+        share = self.shares.pop((consortium_tag, submission_tag), None)
+        return share is not None
+
 
 class TestIsHead:
     def test_head_of_group(self):
@@ -133,3 +137,28 @@ class TestSetHeadMembershipCheck:
         assert "member-1" in members["rg-1"]
         db = FakeHeadsDB(heads={"rg-1": ["member-1"]})
         assert db.is_head("member-1", "rg-1") is True
+
+
+class TestPiCanRevokeConsortiumShare:
+    def test_pi_of_owners_group_can_revoke(self):
+        db = FakeConsortiumDB()
+        db.share_submission("cons-1", "subm-1", user_tag="owner-1", approved=True)
+        # emulate the router check: a head of the owners research group may revoke
+        heads = FakeHeadsDB(heads={"rg-1": ["pi-1"]})
+        owners_groups = {"rg-1": ["owner-1"]}
+        pi_is_head_of_owners_group = any(
+            "pi-1" in heads.get_heads(g) and "owner-1" in members
+            for g, members in owners_groups.items()
+        )
+        assert pi_is_head_of_owners_group is True
+        assert db.unshare_submission("cons-1", "subm-1") is True
+        assert ("cons-1", "subm-1") not in db.shares
+
+    def test_non_head_cannot_revoke(self):
+        heads = FakeHeadsDB(heads={"rg-1": ["pi-1"]})
+        owners_groups = {"rg-1": ["owner-1"]}
+        outsider_is_head_of_owners_group = any(
+            "outsider-1" in heads.get_heads(g) and "owner-1" in members
+            for g, members in owners_groups.items()
+        )
+        assert outsider_is_head_of_owners_group is False

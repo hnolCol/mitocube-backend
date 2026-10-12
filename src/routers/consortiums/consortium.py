@@ -211,14 +211,17 @@ def share_submission_with_consortium(consortium_tag : str, submission_tag : str,
 
 
 @router.delete("/{consortium_tag}/submissions/{submission_tag}",
-               summary="Removes a submission from a consortium. Requires the submission owner or a curator.")
+               summary="Removes a submission from a consortium. Requires the submission owner, a head (PI) of the owners research group or a curator.")
 def unshare_submission_with_consortium(consortium_tag : str, submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """"
-    Removes a submission from a consortium. Only the creator of the submission (or a curator) can remove it.
+    Removes a submission from a consortium. Only the creator of the submission, a head (PI) of
+    one of the owners research groups or a curator can remove it.
     """
     _check_consortium_exists(consortium_tag, db)
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     creator_tag = db.submissions.get_creator(tag = submission_tag)
-    if user.tag != creator_tag and user.role < UserRolesEnum.CURATOR:
-        raise HTTPException(status_code=403, detail="Only the owner of the submission can remove it from a consortium.")
+    if (user.tag != creator_tag
+            and user.role < UserRolesEnum.CURATOR
+            and not db.consortiums.is_head_of_submission_owner(user_tag = user.tag, submission_tag = submission_tag)):
+        raise HTTPException(status_code=403, detail="Only the owner of the submission, a research group head (PI) or a curator can remove it from a consortium.")
     return db.consortiums.unshare_submission(consortium_tag = consortium_tag, submission_tag = submission_tag)
