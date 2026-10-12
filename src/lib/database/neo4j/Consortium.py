@@ -224,6 +224,19 @@ class Neo4JConsortium(ConsortiumABC):
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
         return r[0] > 0
 
+    def is_head_of_submission_owner(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if the user is a head (PI) of a research group the owner (creator) of the
+        submission is a member of"""
+        query = (
+            "MATCH (owner:User)-[:CREATED]->(s:Submission {tag : $submission_tag}) "
+            "RETURN EXISTS {(pi:User {tag : $user_tag})-[:HEAD_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(owner)} "
+        )
+        r = self._driver.execute_query(query, routing_="r",
+                                       user_tag = user_tag,
+                                       submission_tag = submission_tag,
+                                       result_transformer_=Result.value)
+        return bool(r[0]) if len(r) > 0 else False
+
     def deny_share_request(self, consortium_tag : str, submission_tag : str) -> bool:
         """Denies a pending share request, removing the pending relation"""
         query = (

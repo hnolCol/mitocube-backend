@@ -76,3 +76,7 @@ class ConsortiumABC(ABC):
     @abstractmethod
     def unshare_submission(self, consortium_tag : str, submission_tag : str) -> bool:
         """Removes a submission from the consortium"""
+
+    @abstractmethod
+    def is_head_of_submission_owner(self, user_tag : str, submission_tag : str) -> bool:
+        """Checks if the user is a head (PI) of a research group the owner (creator) of the submission is a member of"""
