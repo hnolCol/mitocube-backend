@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic_settings import BaseSettings 
+from pydantic_settings import BaseSettings
+from config.settings.env import get_env_file 
 from pydantic import SecretStr, Field, BeforeValidator
 
 def _duration_from_hours(value):
@@ -29,7 +30,7 @@ class UserToken(BaseSettings):
     jwt_algorithm : str = "HS256"
 
     class Config:
-        env_file = ".env"
+        env_file = get_env_file()
         extra = "ignore"
 
 
@@ -51,7 +52,7 @@ class ShareToken(BaseSettings):
     jwt_algorithm : str = "HS256"
 
     class Config:
-        env_file = ".env"
+        env_file = get_env_file()
         extra = "ignore"
 
 
@@ -79,7 +80,7 @@ class MFASettings(BaseSettings):
     TRUSTED_PROXY_IPS: str = "127.0.0.1,::1"
    
     class Config:
-        env_file = ".env"
+        env_file = get_env_file()
         extra = "ignore"
 
 def get_mfa_settings() -> MFASettings:

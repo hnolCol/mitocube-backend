@@ -1,6 +1,7 @@
 from functools import lru_cache
 
-from pydantic_settings import BaseSettings 
+from pydantic_settings import BaseSettings
+from config.settings.env import get_env_file 
 from pydantic import EmailStr, DirectoryPath, HttpUrl, FilePath
 
 from typing import List
@@ -24,7 +25,7 @@ class General(BaseSettings):
     use_terms_file : FilePath
     
     class Config:
-         env_file = ".env"
+         env_file = get_env_file()
          case_sensitive = True
          extra = "ignore"
 

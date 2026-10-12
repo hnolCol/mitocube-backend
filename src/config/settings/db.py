@@ -2,6 +2,7 @@
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings
+from config.settings.env import get_env_file
 from pydantic import IPvAnyAddress
 from pydantic import SecretStr
 from pydantic import FilePath
@@ -26,7 +27,7 @@ class DB(BaseSettings):
     
 
     class Config:
-        env_file = ".env"
+        env_file = get_env_file()
         extra = "ignore"
 
 @lru_cache()

@@ -6,7 +6,8 @@ from functools import lru_cache
 from typing import Optional
 from pydantic import SecretStr, Field
 
-from pydantic_settings import BaseSettings 
+from pydantic_settings import BaseSettings
+from config.settings.env import get_env_file 
 
 class Settings(BaseSettings):
     MONGO_USER: str = "ai"
@@ -31,7 +32,7 @@ class Settings(BaseSettings):
             f"/?authSource={self.MONGO_AUTH_DB}"
         )
     class Config:
-        env_file = ".env"
+        env_file = get_env_file()
         extra = "ignore"
 
 @lru_cache
