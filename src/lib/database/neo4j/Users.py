@@ -74,8 +74,9 @@ class Neo4JUser(UserABC):
             raise ValueError("Password must be at least 6 characters long.")
         return create_password_hash(password)
     
-        
-        
+    def _user_with_research_group_tags(self, props : Dict) -> UserModel:
+        return UserModel(**props)
+    
     def get(self, tag : str) -> UserModel:
         """Returns a user by its tag.
 
