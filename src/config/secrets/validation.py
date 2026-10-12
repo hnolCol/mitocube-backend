@@ -19,10 +19,48 @@ Usage:
 import re
 import os
 import logging
+from pathlib import Path
 from typing import Dict, List, Callable
 from pydantic import SecretStr
 
+from config.settings.env import get_env_file
+
 logger = logging.getLogger(__name__)
+
+
+def _load_env_file_values() -> Dict[str, str]:
+    """Parse KEY=VALUE pairs from the resolved .env file.
+
+    Mirrors pydantic-settings behaviour: real environment variables take
+    priority over the .env file, so the file only supplements os.environ.
+    """
+    values: Dict[str, str] = {}
+    env_path = Path(get_env_file())
+    if not env_path.is_file():
+        return values
+    try:
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, raw = line.partition("=")
+            key = key.strip()
+            raw = raw.strip()
+            if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ("'", '"'):
+                raw = raw[1:-1]
+            if key:
+                values[key] = raw
+    except OSError:
+        logger.warning(f"Could not read env file {env_path}")
+    return values
+
+
+def _get_secret_value(secret_name: str) -> str | None:
+    """Resolve a secret from the environment, then the .env file."""
+    value = os.environ.get(secret_name)
+    if value is not None:
+        return value
+    return _load_env_file_values().get(secret_name)
 
 
 class SecretValidator:
@@ -111,8 +149,7 @@ def validate_required_secrets() -> List[str]:
     errors = []
     
     for secret_name, validator in REQUIRED_SECRETS.items():
-        # Check environment variable
-        value = os.environ.get(secret_name)
+        value = _get_secret_value(secret_name)
         
         if value is None:
             errors.append(f"Missing required secret: {secret_name}")
@@ -134,7 +171,7 @@ def validate_optional_secrets() -> List[str]:
     warnings = []
     
     for secret_name, validator in OPTIONAL_SECRETS.items():
-        value = os.environ.get(secret_name)
+        value = _get_secret_value(secret_name)
         
         if value is not None and not validator(value):
             warnings.append(f"Invalid {secret_name}: does not meet requirements")
@@ -191,6 +228,6 @@ def get_missing_secrets() -> List[str]:
     """
     missing = []
     for secret_name in REQUIRED_SECRETS.keys():
-        if os.environ.get(secret_name) is None:
+        if _get_secret_value(secret_name) is None:
             missing.append(secret_name)
     return missing
