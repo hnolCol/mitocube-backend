@@ -33,6 +33,13 @@ def get_peptide_count_for_submission(submission_tag : str, user : UserModel = De
     return db.peptides.count(submission_tag=submission_tag)
 
 
+@router.get("/{submission_tag}/precursors")
+def get_precursor_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
+    "Return the number of precursors quantified in a given submission"
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    return db.precursors.count(submission_tag=submission_tag)
+
+
 @router.get("/{submission_tag}/samples")
 def get_sample_count_for_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     "Return the number of samples for a given submission"
