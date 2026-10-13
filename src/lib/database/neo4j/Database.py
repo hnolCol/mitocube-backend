@@ -22,6 +22,8 @@ from lib.database.neo4j.Instruments import Neo4JInstruments, Neo4JInstrumentStat
 from lib.database.neo4j.Timeline import Neo4JTimeline
 from lib.database.neo4j.ResearchGroup import Neo4JResearchGroup
 from lib.database.neo4j.Consortium import Neo4JConsortium
+from lib.database.neo4j.Collaborations import Neo4JCollaborations
+from lib.database.neo4j.Messages import Neo4JMessages
 from lib.database.neo4j.Phenotypes import Neo4JPhenotypes
 from lib.database.neo4j.Samples import Neo4JSamples
 from lib.database.neo4j.Maintenance import Neo4JMaintenanceProcedure, Neo4JMaintenanceEvent, Neo4JExternalServices
@@ -62,6 +64,8 @@ class MCNeo4JDatabase(DatabaseABC):
         self.users = Neo4JUser(driver=self.connection.driver)
         self.research_groups = Neo4JResearchGroup(driver = self.connection.driver)
         self.consortiums = Neo4JConsortium(driver = self.connection.driver)
+        self.collaborations = Neo4JCollaborations(driver = self.connection.driver)
+        self.messages = Neo4JMessages(driver = self.connection.driver)
         self.submission_filter = Neo4JSubmissionFilter(driver=self.connection.driver, users=self.users, research_groups=self.research_groups, consortiums=self.consortiums)
         self.features = Neo4JFeatures(driver=self.connection.driver)
         self.genotypes = Neo4JGenotype(driver=self.connection.driver, condition_applications=self.condition_applications)

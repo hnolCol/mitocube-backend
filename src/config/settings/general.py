@@ -23,6 +23,7 @@ class General(BaseSettings):
     frontend_build_assets : DirectoryPath
     
     use_terms_file : FilePath
+    require_pi_approval_for_collaboration_requests : bool = False
     
     class Config:
          env_file = get_env_file()

@@ -60,6 +60,8 @@ from routers.users import views as user_views
 from routers.timelines import timelines
 from routers.researchgroups import researchgroup
 from routers.consortiums import consortium
+from routers.collaborations import collaboration
+from routers.messages import messages
 from routers.phenotypes import phenotypes
 from routers.states import states
 from routers.samples import samples
@@ -136,6 +138,8 @@ router_sources = [policy,
                   feature_correlation,
                   researchgroup,
                   consortium,
+                  collaboration,
+                  messages,
                   phenotypes,
                   maintenance,
                   mfa,
