@@ -62,6 +62,7 @@ def get_my_consortiums(user : UserModel = Depends(get_user_from_token), db : Dat
     Returns the tags of all consortiums that one of the users research groups is a member of.
     A user can be part of multiple consortiums through different research groups.
     """
+    print(user.tag, db.consortiums.find_by_user(user_tag = user.tag, limit = None))
     return db.consortiums.find_by_user(user_tag = user.tag, limit = None)
 
 

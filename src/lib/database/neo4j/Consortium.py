@@ -125,12 +125,13 @@ class Neo4JConsortium(ConsortiumABC):
         """Returns the tags of all consortiums the users research groups are member of"""
         query = (
             "MATCH (u:User {tag : $user_tag})-[:MEMBER_OF]->(rg:ResearchGroup)-[:MEMBER_OF]->(c:Consortium) "
-            "RETURN DISTINCT c.tag ORDER BY c.created_at DESC "
+            "RETURN DISTINCT c.tag, c.created_at ORDER BY c.created_at DESC "
         )
         if limit is not None:
             query += "LIMIT $limit"
-        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, limit = limit, result_transformer_=Result.value)
-        return r
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, limit = limit, result_transformer_=Result.values)
+        print( r)
+        return [tag for tag, _ in r]
 
     def insert_groups(self, tag : str, group_tags : List[str]):
         """Adds research groups to the consortium"""

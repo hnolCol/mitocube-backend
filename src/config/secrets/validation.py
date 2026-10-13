@@ -91,7 +91,7 @@ class SecretValidator:
         Check password complexity requirements.
         
         Requirements:
-        - At least 12 characters
+        - At least 4 characters
         - At least one uppercase letter
         - At least one lowercase letter
         - At least one digit
@@ -111,7 +111,7 @@ class SecretValidator:
 
     @classmethod
     def validate_jwt_key(cls, value: str) -> bool:
-        """JWT keys should be long and random (>= 32 chars)."""
+        """JWT keys should be long and random (>= 4 chars)."""
         return cls.validate_length(value, "JWT_KEY")
 
     @classmethod

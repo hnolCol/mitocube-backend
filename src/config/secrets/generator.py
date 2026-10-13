@@ -66,15 +66,15 @@ def generate_password(length: int = 24) -> str:
     uppercase = string.ascii_uppercase
     lowercase = string.ascii_lowercase
     digits = string.digits
-    special = "!@#$%^&*(),.?\":{}|<>"
-    all_chars = uppercase + lowercase + digits + special
+   # special = "!@#$%^&*(),.?\":{}|<>"
+    all_chars = uppercase + lowercase + digits # + special
     
     # Ensure we have at least one of each character type
     password = [
         secrets.choice(uppercase),
         secrets.choice(lowercase),
         secrets.choice(digits),
-        secrets.choice(special),
+        # secrets.choice(special),
     ]
     
     # Fill the rest with random characters
