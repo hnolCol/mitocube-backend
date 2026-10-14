@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
@@ -6,6 +6,7 @@ from typing import List, Literal
 # 
 import pandas as pd 
 from config.models.user import UserModel
+from services.users import get_user_from_token
 from config.models.news.news import  NewsModel, NewsInsertModel
 from config.models.parameter import APIParamString
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
@@ -20,7 +21,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 
-@router.get("/proteins/{feature_tag}/views ")
+@router.get("/proteins/{feature_tag}/views")
 def get_protein_views(feature_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     """
     Returns the number of views for a given protein feature tag.

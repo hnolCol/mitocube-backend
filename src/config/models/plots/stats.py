@@ -13,3 +13,8 @@ class DistResponseModel(BaseModel):
     
     
      
+
+class GroupedCountResponseModel(BaseModel):
+    group : str
+    year : int
+    value : int
