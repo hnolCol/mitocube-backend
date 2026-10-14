@@ -1550,11 +1550,11 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
-    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tags : List[str] = None) -> pd.DataFrame:
+    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait") -> pd.DataFrame:
         """Counts the submissions or samples and groups them by the given property and the calendar year derived from the submission's created_at. 
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
-        For by = "trait" submissions are grouped by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
+        For by = "trait" submissions are grouped either by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait), group_entity = "trait") or by the condition application tags (group_entity = "condition_application"), optionally restricted to condition applications of the given attribute tag.
 
         Parameters
         ----------
@@ -1568,8 +1568,10 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             Restrict to submissions in one of these states, if None all submissions are considered, by default None
         research_group_tags : List[str], optional
             Restrict to submissions created by members of these research groups, if None all research groups are considered, by default None
-        attribute_tags : List[str], optional
-            Only for by = "trait": restrict the counted condition applications to these attribute tags, if None all attributes are considered, by default None
+        attribute_tag : str, optional
+            Only for by = "trait": restrict the counted condition applications to this attribute tag, if None all attributes are considered, by default None
+        group_entity : Literal["trait","condition_application"], optional
+            Only for by = "trait": group by the trait tags ("trait") or by the condition application tags ("condition_application"), by default "trait"
 
         Returns
         -------
@@ -1577,7 +1579,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             The counts as a data frame with the columns 'group', 'year' and 'value'.
         """
         conditions = []
-        params = dict(years=years, states=states, research_group_tags=research_group_tags, attribute_tags=attribute_tags)
+        params = dict(years=years, states=states, research_group_tags=research_group_tags, attribute_tag=attribute_tag)
         if by in ("research_group", "user"):
             group_name = "rg.text" if by == "research_group" else "u.firstname + ' ' + u.lastname"
             query = (
@@ -1590,13 +1592,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         elif by == "trait":
             if entity == "sample":
                 raise ValueError("Counting samples by trait is not supported.")
-            group_name = "t.tag"
+            if group_entity == "trait":
+                group_name = "t.tag"
+            elif group_entity == "condition_application":
+                group_name = "ca.tag"
+            else:
+                raise ValueError(f"Unsupported group_entity: {group_entity}")
             query = (
                 "MATCH (s:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
                 "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
             )
-            if attribute_tags is not None:
-                conditions.append("a.tag IN $attribute_tags ")
+            if attribute_tag is not None:
+                conditions.append("a.tag = $attribute_tag ")
         else:
             raise ValueError(f"Unsupported grouping: {by}")
         if states is not None:

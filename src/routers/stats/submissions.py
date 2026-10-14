@@ -85,14 +85,16 @@ def get_submission_counts(
     group_by: Literal["research_group", "trait"] = "research_group",
     years: str = None,
     state: str = None,
-    attribute_tags: str = None,
+    attribute_tag: str = None,
+    group_by_entity: Literal["trait", "condition_application"] = "trait",
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
     Returns the number of submissions per research group or trait and year.
-    For group_by = "trait", submissions are grouped by the traits of their condition applications
-    ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)). attribute_tags can
-    restrict the counted condition applications to the given attributes (semicolon-separated).
+    For group_by = "trait", submissions are grouped by the trait tags of their condition applications
+    ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)) or, with
+    group_by_entity = "condition_application", by the condition application tags. attribute_tag restricts
+    the counted condition applications to the given attribute (e.g. att_proteome).
     Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
     """
     df = db.submission_filter.get_counts_by_year(
@@ -100,7 +102,8 @@ def get_submission_counts(
         entity="submission",
         years=parse_semicolon_ints(years),
         states=parse_semicolon_list(state),
-        attribute_tags=parse_semicolon_list(attribute_tags),
+        attribute_tag=attribute_tag,
+        group_entity=group_by_entity,
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 

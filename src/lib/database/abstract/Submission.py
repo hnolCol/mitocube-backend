@@ -638,11 +638,11 @@ class SubmissionFilterABC(ABC):
         
     @abstractmethod
     @abstractmethod
-    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tags : List[str] = None) -> pd.DataFrame:
+    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait") -> pd.DataFrame:
         """Returns the number of submissions or samples grouped by research group, user or trait and the calendar year derived from the submission's created_at.
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
-        For by = "trait" submissions are grouped by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
+        For by = "trait" submissions are grouped either by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait), group_entity = "trait") or by the condition application tags (group_entity = "condition_application"), optionally restricted to condition applications of the given attribute tag.
 
         Parameters
         ----------
@@ -656,8 +656,10 @@ class SubmissionFilterABC(ABC):
             Restrict to submissions in one of these states, if None all submissions are considered, by default None
         research_group_tags : List[str], optional
             Restrict to submissions created by members of these research groups, if None all research groups are considered, by default None
-        attribute_tags : List[str], optional
-            Only for by = "trait": restrict the counted condition applications to these attribute tags, if None all attributes are considered, by default None
+        attribute_tag : str, optional
+            Only for by = "trait": restrict the counted condition applications to this attribute tag, if None all attributes are considered, by default None
+        group_entity : Literal["trait","condition_application"], optional
+            Only for by = "trait": group by the trait tags ("trait") or by the condition application tags ("condition_application"), by default "trait"
 
         Returns
         -------
