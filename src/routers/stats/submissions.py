@@ -81,14 +81,18 @@ def get_submission_durations(
 
 
 @router.get("/counts/submissions")
-def get_submission_counts_by_research_group(
-    group_by: Literal["research_group"] = "research_group",
+def get_submission_counts(
+    group_by: Literal["research_group", "trait"] = "research_group",
     years: str = None,
     state: str = None,
+    attribute_tags: str = None,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
-    Returns the number of submissions per research group and year.
+    Returns the number of submissions per research group or trait and year.
+    For group_by = "trait", submissions are grouped by the traits of their condition applications
+    ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)). attribute_tags can
+    restrict the counted condition applications to the given attributes (semicolon-separated).
     Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
     """
     df = db.submission_filter.get_counts_by_year(
@@ -96,6 +100,7 @@ def get_submission_counts_by_research_group(
         entity="submission",
         years=parse_semicolon_ints(years),
         states=parse_semicolon_list(state),
+        attribute_tags=parse_semicolon_list(attribute_tags),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 

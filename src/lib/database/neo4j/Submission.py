@@ -1550,14 +1550,15 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
-    def get_counts_by_year(self, by : Literal["research_group","user"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None) -> pd.DataFrame:
+    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tags : List[str] = None) -> pd.DataFrame:
         """Counts the submissions or samples and groups them by the given property and the calendar year derived from the submission's created_at. 
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
+        For by = "trait" submissions are grouped by the text of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
 
         Parameters
         ----------
-        by : Literal["research_group","user"], optional
+        by : Literal["research_group","user","trait"], optional
             The property to group by, by default "research_group"
         entity : Literal["submission","sample"], optional
             The entity to count, by default "submission"
@@ -1567,21 +1568,37 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             Restrict to submissions in one of these states, if None all submissions are considered, by default None
         research_group_tags : List[str], optional
             Restrict to submissions created by members of these research groups, if None all research groups are considered, by default None
+        attribute_tags : List[str], optional
+            Only for by = "trait": restrict the counted condition applications to these attribute tags, if None all attributes are considered, by default None
 
         Returns
         -------
         pd.DataFrame
             The counts as a data frame with the columns 'group', 'year' and 'value'.
         """
-        group_name = "rg.text" if by == "research_group" else "u.firstname + ' ' + u.lastname"
-        query = (
-            "MATCH (rg:ResearchGroup)<-[:MEMBER_OF]-(u:User)-[:CREATED]->(s:Submission) "
-        )
-        if entity == "sample":
-            query += "MATCH (s)-[:HAS_SAMPLE]->(sa:Sample) "
         conditions = []
-        if research_group_tags is not None:
-            conditions.append("rg.tag IN $research_group_tags ")
+        params = dict(years=years, states=states, research_group_tags=research_group_tags, attribute_tags=attribute_tags)
+        if by in ("research_group", "user"):
+            group_name = "rg.text" if by == "research_group" else "u.firstname + ' ' + u.lastname"
+            query = (
+                "MATCH (rg:ResearchGroup)<-[:MEMBER_OF]-(u:User)-[:CREATED]->(s:Submission) "
+            )
+            if entity == "sample":
+                query += "MATCH (s)-[:HAS_SAMPLE]->(sa:Sample) "
+            if research_group_tags is not None:
+                conditions.append("rg.tag IN $research_group_tags ")
+        elif by == "trait":
+            if entity == "sample":
+                raise ValueError("Counting samples by trait is not supported.")
+            group_name = "t.text"
+            query = (
+                "MATCH (s:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+                "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            )
+            if attribute_tags is not None:
+                conditions.append("a.tag IN $attribute_tags ")
+        else:
+            raise ValueError(f"Unsupported grouping: {by}")
         if states is not None:
             conditions.append("EXISTS {(s)-[:IN_STATE]->(state:State) WHERE state.tag IN $states} ")
         if years is not None:
@@ -1593,7 +1610,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             f"RETURN {group_name} AS group, date(datetime({{epochmillis: toInteger(s.created_at)}})).year AS year, count({counted}) AS value "
             "ORDER BY year, group"
         )
-        params = dict(years=years, states=states, research_group_tags=research_group_tags)
         return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
     
     
