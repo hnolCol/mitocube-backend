@@ -51,6 +51,35 @@ def get_research_group_submission_count(research_group_tag : str, user : UserMod
         raise research_group_not_found_exception
     return db.research_groups.get_submissions_count(tag = research_group_tag)
 
+@router.patch("/{research_group_tag}", summary="Updates the properties of a research group. Requires at least curator rights.")
+def update_research_group(research_group_tag : str,
+                          text : str,
+                          abbreviation : str,
+                          email : str,
+                          address : str,
+                          institute : str,
+                          profile_text : Optional[str] = None,
+                          url : Optional[str] = None,
+                          user : UserModel = Depends(is_user_at_least_curator),
+                          db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Updates the properties of the research group with the given tag.
+    The fields are passed as query parameters to match the frontend API hook.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    research_group = ResearchGroupInput(
+        text = text,
+        abbreviation = abbreviation,
+        email = email,
+        address = address,
+        institute = institute,
+        profile_text = profile_text,
+        url = url
+    )
+    return db.research_groups.update(tag = research_group_tag, research_group = research_group)
+
+
 @router.get("/{research_group_tag}")
 def get_research_group_by_tag(research_group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ResearchGroupResponseModel:
     "" 
