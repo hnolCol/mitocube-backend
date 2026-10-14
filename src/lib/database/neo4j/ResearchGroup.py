@@ -220,9 +220,18 @@ class Neo4JResearchGroup(ResearchGroupABC):
         
         
         
-    def update(self, research_group : ResearchGroupInput):
-        "" 
-        self.insert(research_group)
+    def update(self, tag : str, research_group : ResearchGroupInput) -> bool:
+        """Updates the properties of the research group with the given tag."""
+        if not self.exists(tag): raise ValueError(f"Research group with tag {tag} does not exist.")
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag}) "
+            "SET rg.modified_at = timestamp(), rg.text = $research_group.text, rg.abbreviation = $research_group.abbreviation, "
+            "rg.address = $research_group.address, rg.email = $research_group.email, rg.institute = $research_group.institute, "
+            "rg.url = $research_group.url, rg.profile_text = $research_group.profile_text "
+            "RETURN rg.tag"
+        )
+        r = self._driver.execute_query(query, routing_="w", tag = tag, research_group = research_group.model_dump(exclude_none=True), result_transformer_=Result.value)
+        return True if len(r) > 0 else False
 
 
     def get_heads(self, tag : str) -> List[str]:

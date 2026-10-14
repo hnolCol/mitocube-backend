@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC 
 from typing import List, Dict 
 
-from config.models.researchgroup import ResearchGroupModel
+from config.models.researchgroup import ResearchGroupModel, ResearchGroupInput
 
 
 class ResearchGroupABC(ABC):
@@ -41,9 +41,9 @@ class ResearchGroupABC(ABC):
         "" 
         
         
-    @abstractmethod 
-    def update(self) -> Dict:
-        "" 
+    @abstractmethod
+    def update(self, tag : str, research_group : ResearchGroupInput) -> bool:
+        """Updates the properties of the research group with the given tag."""
         
     @abstractmethod
     def find(self, search_string: str = None, user_tags: List[str] = None, submission_tags: List[str] = None, limit: int = 20) -> List[str]:
