@@ -46,6 +46,17 @@ class FakeMessagesDB:
             {"sender_tag": sender_tag, "content": message.content, "read_by": [sender_tag]})
         return f"msg-{len(self.messages[conversation_tag])}"
 
+    def add_participants(self, conversation_tag, user_tags):
+        if conversation_tag not in self.conversations:
+            return False
+        if not all(u in self.users for u in user_tags):
+            return False
+        conv = self.conversations[conversation_tag]
+        for u in user_tags:
+            if u not in conv.user_tags:
+                conv.user_tags.append(u)
+        return True
+
     def get_messages(self, conversation_tag, limit=None):
         msgs = self.messages.get(conversation_tag, [])
         return msgs if limit is None else msgs[:limit]
@@ -105,6 +116,38 @@ class TestMessaging:
     def test_message_to_unknown_conversation_returns_none(self):
         db = FakeMessagesDB(users={"a"})
         assert db.insert_message("nope", "a", MessageInput(content="x")) is None
+
+class TestAddParticipants:
+
+    def test_participant_can_invite_more_users(self):
+        db = FakeMessagesDB(users={"a", "b", "c", "d"})
+        tag = db.insert_conversation(created_by="a", conversation=ConversationInput(user_tags=["b"]))
+        assert db.add_participants(tag, ["c", "d"]) is True
+        conv = db.get_conversation(tag)
+        assert set(conv.user_tags) == {"a", "b", "c", "d"}
+
+    def test_invite_duplicate_participant_is_idempotent(self):
+        db = FakeMessagesDB(users={"a", "b"})
+        tag = db.insert_conversation(created_by="a", conversation=ConversationInput(user_tags=["b"]))
+        assert db.add_participants(tag, ["b"]) is True
+        assert set(db.get_conversation(tag).user_tags) == {"a", "b"}
+
+    def test_invite_unknown_user_fails(self):
+        db = FakeMessagesDB(users={"a", "b"})
+        tag = db.insert_conversation(created_by="a", conversation=ConversationInput(user_tags=["b"]))
+        assert db.add_participants(tag, ["ghost"]) is False
+
+    def test_invite_to_unknown_conversation_fails(self):
+        db = FakeMessagesDB(users={"a"})
+        assert db.add_participants("nope", ["a"]) is False
+
+    def test_invited_participant_gains_message_access(self):
+        db = FakeMessagesDB(users={"a", "b", "c"})
+        tag = db.insert_conversation(created_by="a", conversation=ConversationInput(user_tags=["b"]))
+        db.add_participants(tag, ["c"])
+        assert db.is_participant(tag, "c") is True
+        db.insert_message(tag, "a", MessageInput(content="hi all"))
+        assert db.get_unread_count(tag, "c") == 1
 
     def test_unread_and_mark_read(self):
         db = FakeMessagesDB(users={"a", "b"})

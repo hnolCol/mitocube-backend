@@ -132,6 +132,7 @@ Users can have **conversations** containing **messages**. A conversation may be 
 | `GET` | `/api/messages/conversations` | List own conversations (optional `submission_tag` filter) |
 | `GET` | `/api/messages/conversations/{tag}` | Get one conversation |
 | `GET` | `/api/messages/conversations/{tag}/messages` | Get messages (marks conversation read) |
+| `POST` | `/api/messages/conversations/{tag}/participants` | Add participants (group chat / chatroom) |
 | `POST` | `/api/messages/conversations/{tag}/messages` | Post a message |
 | `POST` | `/api/messages/conversations/{tag}/read` | Mark conversation as read |
 | `GET` | `/api/messages/conversations/{tag}/unread` | Unread message count |
@@ -151,6 +152,21 @@ Users can have **conversations** containing **messages**. A conversation may be 
 - If `submission_tag` is set, the creating user must have access to that submission.
 - All participants must exist; the creator is implicitly a participant.
 - Guests cannot create conversations.
+
+### Group chats / chatrooms
+
+Conversations are n-ary from the start: `user_tags` has no upper bound, so a conversation can be a direct chat (2 users), a group chat, or a chatroom. Participants can also **invite more users later**:
+
+```
+POST /api/messages/conversations/{tag}/participants
+["user-xyz", "user-abc"]
+```
+
+Rules:
+- Only existing **participants** can invite others.
+- Invited users must exist; for submission-linked conversations they must also have **access to that submission** (prevents leaking submission-linked discussions to unauthorized users).
+- Re-inviting an existing participant is a no-op (idempotent).
+- The endpoint returns the updated conversation (including the new participant list).
 
 ### Data model (Neo4j)
 

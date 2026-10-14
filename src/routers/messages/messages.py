@@ -71,6 +71,42 @@ def get_conversation(conversation_tag : str,
     return conversation
 
 
+@router.post("/conversations/{conversation_tag}/participants", response_model=ConversationModel,
+            summary="Adds participants to an existing conversation. Requires a participant of the conversation.")
+def add_participants(conversation_tag : str,
+                     user_tags : List[str],
+                     user : UserModel = Depends(get_user_from_token),
+                     db : DatabaseABC = Depends(get_db)) -> ConversationModel:
+    """Adds users as participants to an existing conversation (e.g. to turn a
+    direct chat into a group chat or grow a chatroom). Only participants of the
+    conversation can invite others. If the conversation is linked to a submission,
+    the invited users must have access to that submission so the conversation
+    cannot be used to leak submission-linked discussions to unauthorized users."""
+    if not db.messages.exists(conversation_tag):
+        raise conversation_not_found
+    if not db.messages.is_participant(conversation_tag = conversation_tag, user_tag = user.tag):
+        raise not_a_participant
+    if len(user_tags) == 0:
+        raise HTTPException(status_code=400, detail="At least one user tag must be provided.")
+    if user.tag in user_tags:
+        raise HTTPException(status_code=400, detail="You are already a participant of this conversation.")
+    conversation = db.messages.get_conversation(conversation_tag)
+    if conversation.submission_tag is not None:
+        for invited_tag in user_tags:
+            if not db.users.exists(tag = invited_tag):
+                raise HTTPException(status_code=404, detail=f"User with tag {invited_tag} not found.")
+            if not db.submissions.has_user_access(user_tag = invited_tag, submission_tag = conversation.submission_tag):
+                raise HTTPException(status_code=403,
+                                    detail=f"User {invited_tag} has no access to the submission this conversation is linked to.")
+    ok = db.messages.add_participants(conversation_tag = conversation_tag, user_tags = user_tags)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Participants could not be added, check the user tags.")
+    updated = db.messages.get_conversation(conversation_tag)
+    if updated is None:
+        raise conversation_not_found
+    return updated
+
+
 @router.get("/conversations/{conversation_tag}/messages", response_model=List[MessageModel],
             summary="Returns the messages of a conversation. Requires a participant.")
 def get_messages(conversation_tag : str,

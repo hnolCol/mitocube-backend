@@ -162,6 +162,28 @@ class Neo4JMessages(MessagesABC):
                                        result_transformer_=Result.value)
         return r[0] > 0 if len(r) > 0 else False
 
+    def add_participants(self, conversation_tag : str, user_tags : List[str]) -> bool:
+        """Adds users as participants to an existing conversation. Users that are
+        already participants are ignored (MERGE). Returns False if the conversation
+        does not exist or one of the users does not exist."""
+        if not self.exists(conversation_tag):
+            return False
+        if not self._all_participants_exist(user_tags):
+            return False
+        query = (
+            "MATCH (c:Conversation {tag : $conversation_tag}) "
+            "UNWIND $user_tags AS user_tag "
+            "MATCH (u:User {tag : user_tag}) "
+            "MERGE (u)-[r:PARTICIPATES]->(c) "
+            "ON CREATE SET r.created_at = timestamp() "
+            "RETURN count(r) "
+        )
+        r = self._driver.execute_query(query, routing_="w",
+                                       conversation_tag = conversation_tag,
+                                       user_tags = user_tags,
+                                       result_transformer_=Result.value)
+        return r[0] > 0 if len(r) > 0 else True
+
     def insert_message(self, conversation_tag : str, sender_tag : str, message : MessageInput) -> Optional[str]:
         """Adds a message to a conversation. The message is linked to the sender
         and the conversation and starts with the sender in read_by."""

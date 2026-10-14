@@ -41,6 +41,12 @@ class MessagesABC(ABC):
         """Checks if the user is a participant of the conversation."""
 
     @abstractmethod
+    def add_participants(self, conversation_tag : str, user_tags : List[str]) -> bool:
+        """Adds users as participants to an existing conversation. Users that are
+        already participants are ignored. Returns False if the conversation does
+        not exist or a user does not exist."""
+
+    @abstractmethod
     def insert_message(self, conversation_tag : str, sender_tag : str, message : MessageInput) -> Optional[str]:
         """Adds a message to a conversation. Returns the message tag or None
         if the conversation does not exist."""
