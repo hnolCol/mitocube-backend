@@ -84,11 +84,6 @@ class AttributesABC(ABC):
         bool
             If the deletion was executed successfully 
         """
-        
-        
-    @abstractmethod
-    def delete_value(self, tag : str) -> bool:
-        """Deletes a specific attribute value by its tag (attribute value tag)"""    
     
         
     @abstractmethod 
@@ -155,22 +150,6 @@ class AttributesABC(ABC):
         -------
         Optional[str]
             The abbreviation of the attribute, or None if not found.
-        """
-        
-    @abstractmethod  
-    def get_values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
-        """Returns the attribute values given by a tag. 
-        If a tag is not found in the database, it is simply ignored.
-
-        Parameters
-        ----------
-        tags : List[str]
-            _description_
-
-        Returns
-        -------
-        List[AttributeValueModel|FeatureNeoModel]
-            _description_
         """
         
     @abstractmethod
@@ -431,28 +410,6 @@ class AttributesABC(ABC):
         bool
             _description_
         """
-        
-    @abstractmethod
-    def update_values(self, attribute : AttributeModel, attribute_values : List[AttributeValueModel], join : bool = True) -> bool:
-        """Updates the values of an attribute
-
-        Parameters
-        ----------
-        attribute : AttributeModel
-            The attribute for which the values should be updated. 
-        attribute_values : List[AttributeValueModel]
-            The updated attribute_values. 
-        join : bool 
-            Specify if the attribute values should be joined to the others (True) or replaced (False). 
-            The union of the attribute values is added. 
-            
-        Returns
-        -------
-        bool
-            _description_
-        """
-    
-   
     
     
     @abstractmethod

@@ -6,7 +6,6 @@ from typing import List, Literal, Dict
 # 
 import pandas as pd 
 from config.models.user import UserModel
-# from config.models.attributes import AttributeValueModel
 # from config.enums.states import SubmissionStatesEnums
 from config.models.news.news import  NewsModel, NewsInsertModel
 from config.models.parameter import APIParamString

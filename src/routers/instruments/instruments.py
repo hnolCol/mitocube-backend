@@ -6,7 +6,7 @@ from lib.database.Database import get_db
 
 
 from config.models.user import UserModel
-from config.models.attributes import AttributeValueModel, TraitModel
+from config.models.attributes import TraitModel
 from config.enums.states import SubmissionStatesEnums
 from config.enums.users.roles import UserRolesEnum
 from config.models.permissions import PermissionResponseModel

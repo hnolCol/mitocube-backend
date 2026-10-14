@@ -262,16 +262,9 @@ def get_trait(trait_tag : str, include_input : bool = False, submission_tag : st
     if submission_tag is not None:
         check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if db.attributes.exists(trait=trait_tag):
-        if not include_input: return db.attributes.trait(trait_tag = trait_tag)
-        if submission_tag is not None:
-            r = db.attributes.get_values_by_submission_tag(submission_tag=submission_tag, tags=[trait_tag], include_input=include_input)
-            ##if there is no input, then return just the trait.
-            if len(r) == 0: return db.attributes.get_values(tags=[trait_tag])[0]
-            return db.attributes.get_values_by_submission_tag(submission_tag=submission_tag, tags=[trait_tag], include_input=include_input)[0]
-        else:
-            raise HTTPException(status_code=404,detail="Submission tag must be provided if include_input is true.")
-        
-    raise HTTPException(status_code=404,detail="Tag not associated with a trait/attribute value")
+        return db.attributes.trait(trait_tag = trait_tag)
+    
+    raise HTTPException(status_code=404,detail="Tag not associated with a trait")
 
 @router.get("/traits/{trait_tag}/text")
 def get_trait_text(trait_tag : str, db : DatabaseABC = Depends(get_db)) -> str:
@@ -367,23 +360,6 @@ def get_priority_for_attribute(attribute_tag : str, db : DatabaseABC = Depends(g
         raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
 
     return db.attributes.get_priority(tag = attribute_tag)
-
-    
-@router.delete("/{attribute_tag}/values/{trait_tag}")
-def delete_attribute_value(attribute_tag : str, trait_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
-    "Deletes a trait for an attribute."
-    ok = db.attributes.delete_value(tag = trait_tag)
-    return ok 
-
-@router.patch("/{attribute_tag}/values/{trait_tag}")
-def update_attribute_value(attribute_tag : str, 
-                           trait_tag : str, 
-                           attribute_value_props : dict, 
-                           user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
-    ""
-    "Update a trait for an attribute."
-    ok = db.attributes.update_value(tag = trait_tag, attribute_value_props = attribute_value_props )
-    return ok 
     
     
 @router.post("/{attribute_tag}/traits")

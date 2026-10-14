@@ -8,7 +8,6 @@ from services.mail import send_email_in_background
 
 
 from config.models.user import UserModel
-from config.models.attributes import AttributeValueModel
 from config.enums.users.roles import UserRolesEnum
 from config.models.parameter import APIParamString
 from config.models.calculations.quantile import QuantileModel

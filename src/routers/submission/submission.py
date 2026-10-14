@@ -24,10 +24,10 @@ from config.models.news.news import NewsModel, NewsInsertModel
 
 from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found, user_forbidden
 
-from config.models.submissions.submissions import NewSubmissionModel, SubmissionQueryResponse, DatasetAttributesResponse
+from config.models.submissions.submissions import NewSubmissionModel,  DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionIDResponse, DatasetSubmissionModel, DatasetSubmissionResponseModel, SubmissionCountResponse
+from config.models.submissions.submissions import SubmissionIDResponse, SubmissionCountResponse
 from config.models.submissions.states import StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.timeline import TimelineInputModel
@@ -860,18 +860,6 @@ def get_sample_list_as_tsv(submission_tag : str, user : UserModel = Depends(get_
     samples = db.submissions.get_sample_list(tag=submission_tag)
     samples_string = pd.DataFrame.from_dict(samples).sort_values(by="index")
     return samples_string.to_csv(sep="\t", index = None)
-
-
-@router.get("/submissions", response_model=List[DatasetSubmissionResponseModel])
-def get_submission(labels : str = None, user : UserModel = Depends(get_user_from_token)):
-    """
-    Returns the submissions depending on the user's role. 
-    Curators and admins are able to see all submissions
-    while standard users can only see their own submissions
-    """
-
-
-
 
 
 @router.get("/submissions/{submission_tag}/samples/full")

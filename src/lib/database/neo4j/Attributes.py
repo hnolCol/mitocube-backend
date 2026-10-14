@@ -270,16 +270,6 @@ class Neo4JAttributes(AttributesABC):
             "DETACH DELETE a, t "
         )
         self._driver.execute_query(query = query, routing_="w", tag = tag)
-        
-    def delete_value(self, tag: str) -> bool:
-        
-        query = (
-            "MATCH (av:AttributeValue {tag : $tag}) "
-            "DETACH DELETE av "
-        )
-        
-        self._driver.execute_query(query, routing_="w", tag = tag)
-        return True
                 
     def exists(self, tag: str = None, trait: str = None) -> bool:
         if tag is None and trait is None:
@@ -539,33 +529,6 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query_=query, routing_="r", result_transformer_=Result.value, tag = tag)
         return r[0]
-    
-    def get_values(self, tags : List[str]) -> List[AttributeValueModel|FeatureNeoModel]:
-        """Returns the attribute values by a list of attribute value tags.
-
-        Parameters
-        ----------
-        tags : List[str]
-            _description_
-
-        Returns
-        -------
-        List[AttributeValueModel|FeatureNeoModel]
-            _description_
-        """
-        query = (
-            "MATCH (av:AttributeValue) "
-            "WHERE av.tag in $tags " #WHERE NOT 'Protein' in labels(av) AND 
-            "RETURN properties(av)"
-        )
-        attribute_values = self._driver.execute_query(
-            query_=query,
-            routing_="r",
-            result_transformer_ = Result.value, 
-            tags = tags )
-        
-        return [FeatureNeoModel(**av) if "gene_name" in av else AttributeValueModel(**av)  for av in attribute_values]
-        
     
     def get_values_by_submission_tag(self, submission_tag : str, tags : List[str] = None, include_input : bool = False) -> List[AttributeValueModel]:
         "Returns the props of the attributes and its values."
@@ -1125,64 +1088,6 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query, tags = tags, result_transformer_=Result.data)
         return [AttributeUnitResponseModel(**ri) for ri in r ]
-
-    def update_values(self, attribute: AttributeModel, attribute_values: List[AttributeValueModel], join: bool = True) -> Tuple[AttributeModel,List[AttributeValueModel]]:
-        #return super().update_values(attribute, attribute_values, join)
-    
-        query = (
-                "MATCH (a:Attribute {tag : attribute.tag}) " )
-    
-        if not join:
-            query += (
-                "MATCH (a)-[:HAS_VALUES]->(av:AttributeValue) "
-                "DELETE av "
-                "WITH a ")
-                
-        query += (
-                "UNWIND $attribute_values as attribute_value "
-                "MERGE (av:AttributeValue {tag : attribute_value.tag}) "
-                "SET av += attribute_value "
-                "SET av.s = toLower(av.text)+' '+toLower(av.description)), av.created_at = timestamp() "
-                "RETURN a as attribute, collect(av) as attribute_values"
-                )
-            
-
-        r = self._driver.execute_query(query,
-                                   routing_="w",
-                                   attribute = attribute.model_dump(exclude_none=True),
-                                   attribute_values = [av.model_dump(exclude_none=True) for av in attribute_values],
-                                   result_transformer_=Result.value)
-        return r 
-        
-    
-    def update_value(self, tag, attribute_value_props : dict) -> bool:
-        """Updates a single attribute value. 
-
-        Parameters
-        ----------
-        tag : attribute value (!) tag. 
-            The attribute value tag (not the attribute tag!)
-        attribute_value_props : dict
-            The props you want to update for the given attribute value. 
-
-        Returns
-        -------
-        bool
-            _description_
-        """
-
-        query = (
-            "MATCH (av:AttributeValue) "
-            "WHERE av.tag = $tag "
-            "SET av += $attribute_value_props "
-            "SET av.s = toLower(av.text)+' '+toLower(av.description)), av.modified_at = timestamp() " #update the search string 
-            "RETURN av "
-        )
-
-        r = self._driver.execute_query(query, attribute_value_props = attribute_value_props, tag = tag, result_transformer_= Result.value, routing_="w")
-        
-        return True 
-    
     
     
     def get_parents(self, tag : str) -> List[str]:

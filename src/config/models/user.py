@@ -3,13 +3,11 @@ from pydantic import Field
 from pydantic import EmailStr 
 from pydantic import SecretStr
 from pydantic import field_validator
-from pydantic import field_serializer, model_serializer
-from datetime import datetime
+
 from typing import List, Optional
 import time 
 
 from config.settings.general import get_general_settings
-from config.models.attributes import AttributeValueModel
 from config.enums.users.roles import UserRolesEnum
 from services.random_generators import get_random_string
 from services.enums import get_inversed_enum_as_dict
@@ -99,40 +97,6 @@ class UserCreateModel(BaseModel):
 
 
 
-
-
-class AddUserPropsModel(BaseModel):
-    """BaseModel that handles the 
-    attribute based user input. Upon sterilization (model_dump())
-    a UserModel is created which automatically validates the input. 
-
-    Parameters
-    ----------
-    att_user_firstname 
-    att_user_lastname
-    att_user_institute
-    att_user_research_group
-    att_user_email 
-    att_user_role 
-    """
-    att_user_firstname : str 
-    att_user_lastname : str 
-    att_user_institute : AttributeValueModel
-    att_user_research_group : AttributeValueModel
-    att_user_email : EmailStr
-    att_user_role : UserRolesEnum = UserRolesEnum.STANDARD
-
-    @model_serializer()
-    def serialize_model(self):
-        return UserModel(
-            email=self.att_user_email,
-            firstname=self.att_user_firstname,
-            lastname=self.att_user_lastname,
-            role = self.att_user_role,
-            research_group_tags= [self.att_user_research_group.text],
-            institute=self.att_user_institute.text
-        ).model_dump(exclude_none=True)
-    
 
 class UserModelForUpdate(BaseModel):
     """"""

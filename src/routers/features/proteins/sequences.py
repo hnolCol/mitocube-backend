@@ -6,7 +6,6 @@ import pandas as pd
 from typing import Dict 
 from config.models.user import UserModel
 from config.models.feature import FeatureSequenceResponseModel
-from config.models.annotations.feature import FeatureDataResponseModel, FeatureNeoModel
 from config.enums.states import SubmissionStatesEnums
 from services.users import get_user_from_token
 from config.models.parameter import APIParamString
