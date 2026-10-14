@@ -24,6 +24,8 @@ from lib.database.abstract.Instruments import InstrumentsABC, InstrumentStatesAB
 from lib.database.abstract.Timeline import TimelineABC 
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from lib.database.abstract.Consortium import ConsortiumABC
+from lib.database.abstract.Collaborations import CollaborationsABC
+from lib.database.abstract.Messages import MessagesABC
 from lib.database.abstract.Phenotypes import PhenotypeABC
 from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC, ExternalServicesABC
 from lib.database.abstract.SpareParts import SparePartsABC
@@ -102,6 +104,8 @@ class DatabaseABC(ABC):
     timeline : TimelineABC = None 
     research_groups : ResearchGroupABC = None
     consortiums : ConsortiumABC = None
+    collaborations : CollaborationsABC = None
+    messages : MessagesABC = None
     phenotypes: PhenotypeABC = None
     maintenance_procedures : MaintenanceProcedureABC  = None 
     maintenance_events : MaintenanceEventABC = None
@@ -241,6 +245,14 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the consortiums attribute defined.")
         if not isinstance(self.consortiums,ConsortiumABC):
             raise TypeError("The consortiums class must be an instance of the ConsortiumABC.")
+        if self.collaborations is None:
+            raise NotImplementedError("A database class must have the collaborations attribute defined.")
+        if not isinstance(self.collaborations,CollaborationsABC):
+            raise TypeError("The collaborations class must be an instance of the CollaborationsABC.")
+        if self.messages is None:
+            raise NotImplementedError("A database class must have the messages attribute defined.")
+        if not isinstance(self.messages,MessagesABC):
+            raise TypeError("The messages class must be an instance of the MessagesABC.")
         
         if self.phenotypes is None:
             raise NotImplementedError("A database class must have the phenotype attribute defined.")

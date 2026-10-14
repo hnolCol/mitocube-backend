@@ -109,7 +109,10 @@ constraints = [
     ConstraintModel(constrain_label  = "disease_tag",node_label = NodeLabelModel(label = "Disease"), property_name = "tag"),
     ConstraintModel(constrain_label  = "variant_tag",node_label = NodeLabelModel(label = "Variant"), property_name = "tag"),
     ConstraintModel(constrain_label  = "instrument_state_tag",node_label = NodeLabelModel(label = "InstrumentState"), property_name = "tag"),
-    ConstraintModel(constrain_label  = "xl_tag",node_label = NodeLabelModel(label = "XL"), property_name = "tag")
+    ConstraintModel(constrain_label  = "xl_tag",node_label = NodeLabelModel(label = "XL"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "collaboration_request_tag", node_label = NodeLabelModel(label = "CollaborationRequest"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "conversation_tag", node_label = NodeLabelModel(label = "Conversation"), property_name = "tag"),
+    ConstraintModel(constrain_label  = "message_tag", node_label = NodeLabelModel(label = "Message"), property_name = "tag")
 
 ]
 
