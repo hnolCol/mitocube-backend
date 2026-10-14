@@ -6,7 +6,7 @@ from typing import List, Dict
 from config.exceptions.HTTPExceptions import user_role_too_low, user_not_found
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
-from config.models.user import UserModel, CollaboratorsResponseModel, UsersAdminResponse, UserModelForRegistration, UserLabel, UserModelForUpdate, UseRoleReponseModel, AddUserPropsModel, PublicUser, UserCreateModel, UserInsertModel
+from config.models.user import UserModel,  UsersAdminResponse, UseRoleReponseModel, PublicUser, UserCreateModel, UserInsertModel
 from config.models.parameter import APIParamString
 from services.encryption import verify_password
 from services.users import is_user_admin, get_user_from_token

@@ -7,7 +7,7 @@ from config.exceptions.HTTPExceptions import tag_not_found, submission_tag_not_f
 from config.enums.states import SubmissionStatesEnums
 from config.models.attributes import AttributeModel, AttributeValueModel
 from config.models.annotations.feature import FeatureModel
-from config.models.submissions.submissions import NewSubmissionModel, DatasetSubmissionModel, DatasetSubmissionResponseModel
+from config.models.submissions.submissions import NewSubmissionModel
 from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
 from config.models.user import UserModel
 from config.models.prefix import PrefixModel
@@ -139,46 +139,6 @@ def get_dataset_from_database(db, label : str, force_reload : bool = False):
         raise tag_not_found
     
     return dataset
-
-def map_tags(
-             attribute : AttributeModel, 
-             attr_value_tags : List[str], 
-             proteome_ids : List[str], 
-             attribute_values : pd.DataFrame, 
-             db_features ) -> List[AttributeValueModel]:
-    """_summary_
-
-    Parameters
-    ----------
-    mapped_dataset_attributes : _type_
-        _description_
-    """
-
-    if not attribute.has_features_value and not attribute.has_numeric_input:
-            return [AttributeValueModel(**attribute_values.loc[attr_value_tag,:].to_dict(), tag=attr_value_tag) for attr_value_tag in attr_value_tags]
-    elif attribute.has_features_value:
-            #if it is a feature, then add feature model 
-            feature_keys = [attribute_value_tag.split(":")[1].upper() for attribute_value_tag in attr_value_tags]
-            return [FeatureModel(**f, tag = f"{attribute.tag}:{f['key']}") for f in db_features.get(keys=feature_keys, proteome_ids=proteome_ids).reset_index().to_dict(orient="records")]
-            
-    elif attribute.has_numeric_input:
-            #if a numeric input is there then first check if they are in the attribute_values and if not then extract the value from the tag 
-            #and create an AttributeValueModel 
-            attribute_value_tags_found = [attr_value_tag for attr_value_tag in attr_value_tags if attr_value_tag in attribute_values.index]
-            attr_values_in_attribute_values = [AttributeValueModel( **attribute_values.loc[attr_value_tag,:].to_dict(), 
-                tag=attr_value_tag) for attr_value_tag in attribute_value_tags_found]
-            if len(attr_values_in_attribute_values) != len(attr_value_tags):
-                attr_value_tags_with_numeric_input = [attr_value_tag for attr_value_tag in attr_value_tags if attr_value_tag not in attr_values_in_attribute_values]
-                for attr_value_tag in attr_value_tags_with_numeric_input:
-                    numeric_value = attr_value_tag.split(":")[1]
-                    attr_values_in_attribute_values.append(AttributeValueModel(id=-1, 
-                                                                               tag=f"{attribute.tag}:{numeric_value}",
-                                                                               attribute_id=attribute.id,
-                                                                               text=str(numeric_value),
-                                                                               value=numeric_value, 
-                                                                               description=f"{numeric_value} (user input)"))
-            return attr_values_in_attribute_values    
-    return []   
 
 
 
