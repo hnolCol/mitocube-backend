@@ -1554,7 +1554,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         """Counts the submissions or samples and groups them by the given property and the calendar year derived from the submission's created_at. 
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
-        For by = "trait" submissions are grouped by the text of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
+        For by = "trait" submissions are grouped by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
 
         Parameters
         ----------
@@ -1590,7 +1590,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         elif by == "trait":
             if entity == "sample":
                 raise ValueError("Counting samples by trait is not supported.")
-            group_name = "t.text"
+            group_name = "t.tag"
             query = (
                 "MATCH (s:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
                 "MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "

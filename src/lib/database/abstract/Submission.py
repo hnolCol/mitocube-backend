@@ -642,7 +642,7 @@ class SubmissionFilterABC(ABC):
         """Returns the number of submissions or samples grouped by research group, user or trait and the calendar year derived from the submission's created_at.
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
-        For by = "trait" submissions are grouped by the text of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
+        For by = "trait" submissions are grouped by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)), optionally restricted to condition applications of the given attribute tags.
 
         Parameters
         ----------
