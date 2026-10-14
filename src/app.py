@@ -45,6 +45,7 @@ from routers.genotypes import permissions as genotype_permissions
 from routers.genotypes import genotypes
 from routers.attributes import permissions as attribute_permissions
 from routers.attributes import attributes
+from routers.requests import attributes as attribute_requests
 from routers.instruments import instruments
 #from routers.network import network
 #from routers.filter import filter
@@ -121,7 +122,8 @@ router_sources = [policy,
                   genotype_permissions, 
                   genotypes, 
                   attribute_permissions,
-                  attributes, 
+                  attributes,
+                  attribute_requests,
                   instruments,
                   annotation_permissions,
                   annotations, 
