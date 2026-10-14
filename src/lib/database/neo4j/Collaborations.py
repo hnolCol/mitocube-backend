@@ -365,7 +365,7 @@ class Neo4JCollaborations(CollaborationsABC):
             "WITH s, owner, rgs, head(collect(state)) AS latest_state "
             "WITH s, owner, rgs, latest_state LIMIT $limit "
             "OPTIONAL MATCH (s)<-[:FOR_SUBMISSION]-(cr:CollaborationRequest {status : 'pending'}) "
-            "WITH s, owner, rgs, latest_st, count(cr) > 0 AS has_open_request "
+            "WITH s, owner, rgs, latest_state, count(cr) > 0 AS has_open_request "
             "RETURN s.tag AS tag, s.title AS title, s.created_at AS created_at, "
             "owner.tag AS owner_tag, owner.firstname AS owner_firstname, owner.lastname AS owner_lastname, "
             "owner.institute AS owner_institute, "
