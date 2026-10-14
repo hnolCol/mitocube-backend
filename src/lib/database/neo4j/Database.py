@@ -6,6 +6,7 @@ from lib.database.abstract.Database import DatabaseABC
 
 from lib.database.neo4j.Proteomes import Neo4JProteomes
 from lib.database.neo4j.Attributes import Neo4JAttributes
+from lib.database.neo4j.AttributeRequests import Neo4JAttributeRequests
 from lib.database.neo4j.Dataset import Neo4JDataset
 from lib.database.neo4j.Submission import Neo4JSubmissionFilter, Neo4JSubmissions, Neo4JSubmissionSummary
 from lib.database.neo4j.Meta import Neo4JMetaHandler
@@ -54,6 +55,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.factory = Neo4JFactory(driver=self.connection.driver)
         self.constructor = Neo4JConstructor(driver=self.connection.driver)
         self.attributes = Neo4JAttributes(driver=self.connection.driver)
+        self.attribute_requests = Neo4JAttributeRequests(driver=self.connection.driver, attributes=self.attributes)
         self.proteins = Neo4JProteins(driver = self.connection.driver)
         self.condition_applications = Neo4JConditionApplications(driver=self.connection.driver, attributes=self.attributes, proteins=self.proteins)
         self.meta = Neo4JMetaHandler(driver=self.connection.driver, attributes=self.attributes)

@@ -53,6 +53,7 @@ from lib.database.abstract.external_resource import ExternalResourceABC
 from lib.database.abstract.Protocols import ProtocolsABC
 from lib.database.abstract.Policy import PolicyABC
 from lib.database.abstract.Plates import PlatesABC
+from lib.database.abstract.AttributeRequests import AttributeRequestsABC
 
 
 
@@ -125,6 +126,7 @@ class DatabaseABC(ABC):
     protocols : ProtocolsABC = None
     policy : PolicyABC = None
     plates : PlatesABC = None
+    attribute_requests : AttributeRequestsABC = None
 
     def __init__(self):
         """The abstract database class that defines
@@ -298,6 +300,10 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the plates attribute defined.")
         if not isinstance(self.plates, PlatesABC):
             raise TypeError("The plates class must be an instance of the PlatesABC.")
+        if self.attribute_requests is None:
+            raise NotImplementedError("A database class must have the attribute_requests attribute defined.")
+        if not isinstance(self.attribute_requests, AttributeRequestsABC):
+            raise TypeError("The attribute_requests class must be an instance of the AttributeRequestsABC.")
 
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 
