@@ -1556,6 +1556,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
         For by = "trait" submissions are grouped either by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait), group_entity = "trait") or by the condition application tags (group_entity = "condition_application"), optionally restricted to condition applications of the given attribute tag.
 
+        Each submission is counted at most once per group and year, even if it has several condition applications matching the same trait. A submission with multiple distinct traits therefore contributes one count to each of its traits — the value is the number of submissions having the trait, not the number of trait occurrences.
+
         Parameters
         ----------
         by : Literal["research_group","user","trait"], optional
@@ -1612,7 +1614,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             conditions.append("date(datetime({epochmillis: toInteger(s.created_at)})).year IN $years ")
         if len(conditions) > 0:
             query += "WHERE " + "AND ".join(conditions)
-        counted = "DISTINCT sa" if entity == "sample" else "s"
+        counted = "DISTINCT sa" if entity == "sample" else "DISTINCT s"
         query += (
             f"RETURN {group_name} AS group, date(datetime({{epochmillis: toInteger(s.created_at)}})).year AS year, count({counted}) AS value "
             "ORDER BY year, group"

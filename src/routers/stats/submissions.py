@@ -95,6 +95,8 @@ def get_submission_counts(
     ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait)) or, with
     group_by_entity = "condition_application", by the condition application tags. attribute_tag restricts
     the counted condition applications to the given attribute (e.g. att_proteome).
+    Each submission is counted at most once per trait and year, even if it has several condition applications
+    for the same trait; a submission with multiple distinct traits contributes one count to each of its traits.
     Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
     """
     df = db.submission_filter.get_counts_by_year(

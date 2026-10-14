@@ -644,6 +644,8 @@ class SubmissionFilterABC(ABC):
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
         For by = "trait" submissions are grouped either by the tag of the traits of their condition applications ((Submission)-[:HAS_APPLICATION]->(ConditionApplication)-[:INSTANCE_OF]->(Trait), group_entity = "trait") or by the condition application tags (group_entity = "condition_application"), optionally restricted to condition applications of the given attribute tag.
 
+Each submission is counted at most once per group and year, even if it has several condition applications matching the same trait. A submission with multiple distinct traits therefore contributes one count to each of its traits — the value is the number of submissions having the trait, not the number of trait occurrences.
+
         Parameters
         ----------
         by : Literal["research_group","user","trait"], optional
