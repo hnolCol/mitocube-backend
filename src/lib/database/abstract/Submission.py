@@ -637,6 +637,36 @@ class SubmissionFilterABC(ABC):
         """
         
     @abstractmethod
+    @abstractmethod
+    def get_counts_by_year(self, by : Literal["research_group","user"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None) -> pd.DataFrame:
+        """Returns the number of submissions or samples grouped by research group or user and the calendar year derived from the submission's created_at.
+
+        Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
+
+        Parameters
+        ----------
+        by : Literal["research_group","user"], optional
+            The property to group by, by default "research_group"
+        entity : Literal["submission","sample"], optional
+            The entity to count, by default "submission"
+        years : List[int], optional
+            Restrict to these calendar years, if None all years are considered, by default None
+        states : List[str], optional
+            Restrict to submissions in one of these states, if None all submissions are considered, by default None
+        research_group_tags : List[str], optional
+            Restrict to submissions created by members of these research groups, if None all research groups are considered, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The counts as a data frame with the columns 'group', 'year' and 'value'.
+
+        Raises
+        ------
+        Exception
+            If the database query throws an exception.
+        """
+    
     def get_trending(self, limit : int = 10) -> List[str]:
         """Returns the trending submissions based on the view score.
 

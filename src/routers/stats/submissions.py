@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
+from fastapi import APIRouter, Depends
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from typing import List, Literal
@@ -8,13 +8,23 @@ import pandas as pd
 from config.models.user import UserModel
 # from config.models.attributes import AttributeValueModel
 # from config.enums.states import SubmissionStatesEnums
-from config.models.news.news import  NewsModel, NewsInsertModel
-from config.models.parameter import APIParamString
-from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator
+from services.users import get_user_from_token
 from services.submission import check_submission_access
 from config.enums.states import SubmissionStatesEnums 
-from config.models.plots.stats import DistResponseModel
+from config.models.plots.stats import DistResponseModel, GroupedCountResponseModel
+import pandas as pd
 
+
+def parse_semicolon_list(value : str = None) -> List[str] | None:
+    if value is None or len(value) == 0:
+        return None
+    return [v.strip() for v in value.split(";") if len(v.strip()) > 0]
+
+def parse_semicolon_ints(value : str = None) -> List[int] | None:
+    parsed = parse_semicolon_list(value)
+    if parsed is None:
+        return None
+    return [int(v) for v in parsed]
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/stats/submissions",
@@ -69,3 +79,61 @@ def get_submission_durations(
     
 
 
+
+@router.get("/counts/submissions")
+def get_submission_counts_by_research_group(
+    group_by: Literal["research_group"] = "research_group",
+    years: str = None,
+    state: str = None,
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
+) -> List[GroupedCountResponseModel]:
+    """
+    Returns the number of submissions per research group and year.
+    Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
+    """
+    df = db.submission_filter.get_counts_by_year(
+        by=group_by,
+        entity="submission",
+        years=parse_semicolon_ints(years),
+        states=parse_semicolon_list(state),
+    )
+    return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
+
+@router.get("/counts/samples")
+def get_sample_counts_by_research_group(
+    group_by: Literal["research_group"] = "research_group",
+    years: str = None,
+    state: str = None,
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
+) -> List[GroupedCountResponseModel]:
+    """
+    Returns the number of samples per research group and year.
+    Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
+    """
+    df = db.submission_filter.get_counts_by_year(
+        by=group_by,
+        entity="sample",
+        years=parse_semicolon_ints(years),
+        states=parse_semicolon_list(state),
+    )
+    return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
+
+@router.get("/counts/users")
+def get_submission_counts_by_user(
+    years: str = None,
+    state: str = None,
+    research_group_tags: str = None,
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
+) -> List[GroupedCountResponseModel]:
+    """
+    Returns the number of submissions per user and year, optionally restricted to research groups.
+    Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
+    """
+    df = db.submission_filter.get_counts_by_year(
+        by="user",
+        entity="submission",
+        years=parse_semicolon_ints(years),
+        states=parse_semicolon_list(state),
+        research_group_tags=parse_semicolon_list(research_group_tags),
+    )
+    return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
