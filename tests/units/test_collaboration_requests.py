@@ -83,6 +83,7 @@ class FakeDB:
     def __init__(self, collaborations=None, submissions=None, research_groups=None, consortiums=None):
         self.collaborations = collaborations
         self.submissions = submissions
+        self.submission_filter = submissions
         self.research_groups = research_groups
         self.consortiums = consortiums
 
