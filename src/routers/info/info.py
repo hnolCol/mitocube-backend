@@ -311,8 +311,7 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
         if KEY_FIGURE_SETTINGS.number_submissions:
             key_figures["Submissions"] = len(db.get_submission_tags())
         if KEY_FIGURE_SETTINGS.number_published_datasets:
-            published_datasets = db.submission_filter.find(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE], limit = None)
-            key_figures["Active Submissions"] = len(published_datasets)
+            key_figures["Active Submissions"] = db.submission_filter.count_v2(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE])
         if KEY_FIGURE_SETTINGS.number_proteins:
             key_figures["Quantified Proteins"] = db.protein_groups.count()
         if KEY_FIGURE_SETTINGS.number_quant_values:

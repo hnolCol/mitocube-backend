@@ -2305,84 +2305,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return query
     
     
-    def find(self, 
-            current_user_tag : str,
-            search_string : str = None,
-            state : List[int] = None, 
-            trait_tags : List[str] = None, 
-            attribute_tag : List[str]= None, 
-            ca_tags: List[str] = None,
-            protein_tags: List[str] = None,
-            ca_search_string : str = None,
-            user_tags : List[str] = None, 
-            user_role : Literal["creator", "collaborator", "any"] = "any",  
-            genotype_tag : List[str] = None,
-            consortium_tags : List[str] = None,
-            include_sample_ca : bool = False,   
-            ordered : bool = True,
-            ca_match_all : bool = True,
-            limit : int = 10) -> List[str]:
-        """Returns a list of submission tags that match the given filters."""
-        tags = None
-        
-        try:
-            tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
-            if tags is not None and len(tags) == 0: return [] #if user has no access to any submissions, return empty list. No need to apply other filters.
-        except ValueError as e:
-            print(f"Error: {e}")
-            return []
-        
-        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags, consortium_tags])
-        if search_string is not None:
-            limit_ = limit if all(attr is None for attr in [state, trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered, submission_tags=tags)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if state is not None:
-            limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_state(states=state, submission_tags=tags, limit=limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if genotype_tag is not None:
-            limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tags,protein_tags]) else None
-            tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if attribute_tag is not None or trait_tags is not None or ca_tags is not None:  
-            limit_ = limit if all(attr is None for attr in [trait_tags, user_tags, protein_tags]) else None
-            tags = self.filter_by_condition_applications(
-                attribute_tag=attribute_tag,
-                trait_tags=trait_tags,
-                ca_tags=ca_tags,
-                ca_search_string=ca_search_string,  
-                submission_tags=tags,
-                include_sample_ca=include_sample_ca,
-                limit=limit_,
-                ordered=ordered,
-                match_all=ca_match_all
-            )
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-
-        if user_tags is not None:
-            limit_ = limit if protein_tags is None else None
-            tags = self.filter_by_user(user_tags,submission_tags=tags, role=user_role, limit=limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if protein_tags is not None:
-            limit_ = limit
-            tags = self.filter_by_quantified_protein(protein_tags,submission_tags=tags,limit=limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if consortium_tags is not None:
-            tags = self.filter_by_consortium(consortium_tags, submission_tags=tags, limit=limit, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if not filter_defined: #none defined, then just return all. 
-            if tags is None: #then it must be admin or curator, so return all tags.
-                tags = self.get_all_tags(limit=limit, ordered=ordered)
-            elif isinstance(tags, list) and len(tags) > limit:
-                tags = tags[:limit]
-            return tags 
-        if tags is None: return []
-        
-        return tags 
-    
-    
-
     def _build_v2_where(self, scope_tags, search_string, state, trait_tags, attribute_tag,
                         ca_tags, protein_tags, ca_search_string, user_tags, user_role,
                         genotype_tag, consortium_tags, include_sample_ca, ca_match_all):
@@ -2565,8 +2487,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             ca_match_all : bool = True,
             limit : int = 10) -> List[str]:
         """Single-query variant of find(). Composes every filter into one Cypher query
-        instead of chaining per-filter round trips. Intended to replace find() once the
-        results are confirmed to be identical.
+        instead of chaining per-filter round trips.
         """
         # ---- user scope: None means unrestricted (curator/admin), [] means no access ----
         scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)

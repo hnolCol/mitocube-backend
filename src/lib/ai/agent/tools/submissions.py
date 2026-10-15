@@ -62,7 +62,7 @@ def find_submissions(current_user_tag: str,
     If no search_string is provided and limit = 1, the most recent submission tag will be returned.
     
     """
-    tags = DB.submission_filter.find(current_user_tag= current_user_tag, search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
+    tags = DB.submission_filter.find_v2(current_user_tag= current_user_tag, search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
     return tags
 
 @tool("get_submission_title_and_research_aim", args_schema=SubmissionTagsInput)
@@ -97,16 +97,15 @@ def count_submissions_by_query(
 
     total_count = DB.submissions.count()
 
-    matches = DB.submission_filter.find(
+    query_count = DB.submission_filter.count_v2(
         current_user_tag=current_user_tag,
         search_string=search_string,
         state=state,
-        user_tags=APIParamString(param=user_tags).param,
-        limit=None
+        user_tags=APIParamString(param=user_tags).param
     )
 
     return {
-        "query_count": len(matches),
+        "query_count": query_count,
         "total_count": total_count
     }
 
