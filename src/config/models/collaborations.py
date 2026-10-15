@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
 
 from services.date import get_time_stamp
 
@@ -40,3 +40,5 @@ class SubmissionExploreModel(BaseModel):
     research_group_text : Optional[str] = None
     research_group_institute : Optional[str] = None
     has_open_collaboration_request : bool = False
+    matched_condition_application_tags : Optional[List[str]] = None
+    matched_user_tags : Optional[List[str]] = None

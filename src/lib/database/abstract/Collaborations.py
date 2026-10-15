@@ -51,9 +51,11 @@ class CollaborationsABC(ABC):
         """Returns the pending collaboration requests created by the given user."""
 
     @abstractmethod
-    def explore(self, search_string : str = None, limit : int = 40) -> List[SubmissionExploreModel]:
+    def explore(self, search_string : str = None, ca_tags : Optional[List[str]] = None,
+                user_tags : Optional[List[str]] = None, limit : int = 40) -> List[SubmissionExploreModel]:
         """Returns minimal metadata (title, owner, research group, state) of
-        all submissions that match the search string. This is a discovery
+        all submissions that match the search string and have all the given
+        condition application and user tags (AND semantics). This is a discovery
         endpoint and must never return sensitive submission data."""
 
     @abstractmethod

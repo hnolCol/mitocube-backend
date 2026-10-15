@@ -344,18 +344,34 @@ class Neo4JCollaborations(CollaborationsABC):
         r = self._driver.execute_query(query, user_tag = user_tag, result_transformer_=Result.data)
         return [self._row_to_request_model(row) for row in r]
 
-    def explore(self, search_string : str = None, limit : int = 40) -> List[SubmissionExploreModel]:
-        """Returns minimal metadata of all submissions matching the search string.
+    def explore(self, search_string : str = None, ca_tags : Optional[List[str]] = None,
+                user_tags : Optional[List[str]] = None, limit : int = 40) -> List[SubmissionExploreModel]:
+        """Returns minimal metadata of all submissions matching the search string
+        and having ALL the given condition application and user tags (AND
+        semantics, combined with the title search via AND as well).
         This is a discovery endpoint: it returns only the title, owner, research
-        group and state, never any sensitive submission data."""
+        group, state and which filter tags matched, never any sensitive data."""
+        ca_tags = [t for t in (ca_tags or []) if t]
+        user_tags = [t for t in (user_tags or []) if t]
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
         )
-        params = {"limit" : limit}
+        params = {"limit" : limit, "ca_tags" : ca_tags, "user_tags" : user_tags}
         if search_string is not None:
             query += "AND toLower(s.title) CONTAINS toLower($search_string) "
             params["search_string"] = search_string
+        if ca_tags:
+            query += (
+                "AND ALL(ca_tag IN $ca_tags WHERE EXISTS { "
+                "MATCH (s)-[:HAS_APPLICATION]->(ca:ConditionApplication {tag : ca_tag}) "
+                "OR EXISTS { MATCH (s)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication {tag : ca_tag}) } }) "
+            )
+        if user_tags:
+            query += (
+                "AND ALL(user_tag IN $user_tags WHERE EXISTS { "
+                "MATCH (u:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) }) "
+            )
         query += (
             "OPTIONAL MATCH (owner:User)-[:CREATED]->(s) "
             "OPTIONAL MATCH (owner)-[:MEMBER_OF]->(rg:ResearchGroup) "
@@ -366,13 +382,18 @@ class Neo4JCollaborations(CollaborationsABC):
             "WITH s, owner, rgs, latest_state LIMIT $limit "
             "OPTIONAL MATCH (s)<-[:FOR_SUBMISSION]-(cr:CollaborationRequest {status : 'pending'}) "
             "WITH s, owner, rgs, latest_state, count(cr) > 0 AS has_open_request "
+            "WITH s, owner, rgs, latest_state, has_open_request, "
+            "[ca_tag IN $ca_tags WHERE EXISTS { MATCH (s)-[:HAS_APPLICATION]->(:ConditionApplication {tag : ca_tag}) } "
+            "OR EXISTS { MATCH (s)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(:ConditionApplication {tag : ca_tag}) }] AS matched_ca_tags, "
+            "[user_tag IN $user_tags WHERE EXISTS { MATCH (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) }] AS matched_user_tags "
             "RETURN s.tag AS tag, s.title AS title, s.created_at AS created_at, "
             "owner.tag AS owner_tag, owner.firstname AS owner_firstname, owner.lastname AS owner_lastname, "
             "owner.institute AS owner_institute, "
             "[rg IN rgs WHERE rg IS NOT NULL | rg.tag][0] AS research_group_tag, "
             "[rg IN rgs WHERE rg IS NOT NULL | rg.text][0] AS research_group_text, "
             "[rg IN rgs WHERE rg IS NOT NULL | rg.institute][0] AS research_group_institute, "
-            "latest_state.tag AS state_tag, has_open_request AS has_open_collaboration_request "
+            "latest_state.tag AS state_tag, has_open_request AS has_open_collaboration_request, "
+            "matched_ca_tags, matched_user_tags "
         )
         rows = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, **params)
         results : List[SubmissionExploreModel] = []
@@ -395,5 +416,7 @@ class Neo4JCollaborations(CollaborationsABC):
                 research_group_text = row.get("research_group_text"),
                 research_group_institute = row.get("research_group_institute"),
                 has_open_collaboration_request = bool(row.get("has_open_collaboration_request")),
+                matched_condition_application_tags = row.get("matched_ca_tags") or None,
+                matched_user_tags = row.get("matched_user_tags") or None,
             ))
         return results
