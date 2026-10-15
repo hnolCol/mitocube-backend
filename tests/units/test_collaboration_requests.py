@@ -8,6 +8,8 @@ from config.models.user import UserModel
 from services.encryption import create_password_hash
 import time
 
+from fastapi import HTTPException
+
 
 def make_user(**overrides):
     base = dict(
@@ -179,6 +181,66 @@ class TestExploreModel:
         assert set(dumped.keys()) == {
             "tag", "title", "state", "created_at", "owner_tag", "owner_firstname",
             "owner_lastname", "owner_institute", "research_group_tag",
-            "research_group_text", "research_group_institute", "has_open_collaboration_request"}
+            "research_group_text", "research_group_institute", "has_open_collaboration_request",
+            "matched_condition_application_tags", "matched_user_tags"}
         # no sensitive submission fields (samples, quantifications, metatexts)
         assert "samples" not in dumped and "metatext" not in dumped
+
+
+class TestExploreTagSearchSetting:
+    def _endpoint_kwargs(self, **overrides):
+        kwargs = dict(
+            search_string = None,
+            ca_tags = None,
+            user_tags = None,
+            limit = 40,
+            user = make_user(),
+            db = FakeCollaborationsDB(),
+        )
+        kwargs.update(overrides)
+        return kwargs
+
+    def _wrap(self, collaborations_db):
+        class FakeDatabase:
+            collaborations = collaborations_db
+        return FakeDatabase()
+
+    def _invoke(self, **kwargs):
+        from routers.collaborations.collaboration import explore_submissions
+        return explore_submissions(**self._endpoint_kwargs(**kwargs))
+
+    def test_tag_filters_rejected_when_setting_disabled(self, monkeypatch):
+        monkeypatch.setattr("routers.collaborations.collaboration.get_general_settings",
+                           lambda: type("S", (), {"explore_tag_search_enabled": False})())
+        with pytest.raises(HTTPException) as exc_info:
+            self._invoke(ca_tags=["ca-1"])
+        assert exc_info.value.status_code == 403
+
+    def test_user_tag_filters_rejected_when_setting_disabled(self, monkeypatch):
+        monkeypatch.setattr("routers.collaborations.collaboration.get_general_settings",
+                           lambda: type("S", (), {"explore_tag_search_enabled": False})())
+        with pytest.raises(HTTPException) as exc_info:
+            self._invoke(user_tags=["user-1"])
+        assert exc_info.value.status_code == 403
+
+    def test_title_search_still_allowed_when_setting_disabled(self, monkeypatch):
+        monkeypatch.setattr("routers.collaborations.collaboration.get_general_settings",
+                           lambda: type("S", (), {"explore_tag_search_enabled": False})())
+        db = FakeCollaborationsDB()
+        db.explore = lambda **kw: []
+        assert self._invoke(search_string="mito", db=self._wrap(db)) == []
+
+    def test_tag_filters_passed_to_db_when_setting_enabled(self, monkeypatch):
+        monkeypatch.setattr("routers.collaborations.collaboration.get_general_settings",
+                           lambda: type("S", (), {"explore_tag_search_enabled": True})())
+        db = FakeCollaborationsDB()
+        captured = {}
+        db.explore = lambda **kw: captured.update(kw) or []
+        self._invoke(ca_tags=["ca-1"], user_tags=["user-1"], db=self._wrap(db))
+        assert captured["ca_tags"] == ["ca-1"]
+        assert captured["user_tags"] == ["user-1"]
+
+    def test_no_tag_filters_does_not_call_setting(self):
+        db = FakeCollaborationsDB()
+        db.explore = lambda **kw: []
+        assert self._invoke(db=self._wrap(db)) == []

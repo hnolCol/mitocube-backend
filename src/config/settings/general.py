@@ -24,6 +24,12 @@ class General(BaseSettings):
     
     use_terms_file : FilePath
     require_pi_approval_for_collaboration_requests : bool = False
+
+    explore_tag_search_enabled : bool = False
+
+    """If True, the submissions explore endpoint additionally accepts ca_tags and
+    user_tags filter parameters and the explore search allows searching by
+    condition applications and users. If False, tag parameters are rejected."""
     
     class Config:
          env_file = get_env_file()

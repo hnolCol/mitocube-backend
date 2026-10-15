@@ -1,6 +1,7 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
+from config.settings.general import get_general_settings
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
@@ -43,16 +44,24 @@ def _can_approve(user : UserModel, request : CollaborationRequestModel, db : Dat
 
 
 @router.get("/submissions/explore", response_model=List[SubmissionExploreModel],
-            summary="Discovery endpoint: find submissions by title to request collaboration.")
+            summary="Discovery endpoint: find submissions by title and tags to request collaboration.")
 def explore_submissions(search_string : Optional[str] = None,
+                        ca_tags : Optional[List[str]] = Query(None, description="Condition application tags the submission must have (AND semantics)."),
+                        user_tags : Optional[List[str]] = Query(None, description="User tags that must be creator or collaborator of the submission (AND semantics)."),
                         limit : int = 40,
                         user : UserModel = Depends(get_user_from_token),
                         db : DatabaseABC = Depends(get_db)) -> List[SubmissionExploreModel]:
-    """Finds submissions by title and returns only the minimal metadata required
-    to request collaboration (title, owner, research group, state). This endpoint
-    is intentionally separate from /api/submissions/q: it can return submissions
-    the current user has no access to, but never any sensitive data."""
-    return db.collaborations.explore(search_string = search_string, limit = limit)
+    """Finds submissions by title and optionally by condition application and
+    user tags (all filters are combined with AND semantics) and returns only the
+    minimal metadata required to request collaboration (title, owner, research
+    group, state, matched tags). This endpoint is intentionally separate from
+    /api/submissions/q: it can return submissions the current user has no access
+    to, but never any sensitive data."""
+    has_tag_filters = bool(ca_tags or user_tags)
+    if has_tag_filters and not get_general_settings().explore_tag_search_enabled:
+        raise HTTPException(status_code = 403, detail="Searching submissions by condition applications or users is disabled on this instance.")
+    return db.collaborations.explore(search_string = search_string, ca_tags = ca_tags,
+                                     user_tags = user_tags, limit = limit)
 
 
 @router.post("/requests", response_model=str,
