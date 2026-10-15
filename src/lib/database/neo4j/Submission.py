@@ -2568,19 +2568,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return [ri.data() for ri in r]
         
         
-    def full_dataset_text_search(self, search_string : str) -> List[FulltextSearchResult]:
-        ""  
-        
-        r, _ , _ = self._factory.full_text_search("datasetSearch",search_string)
-        return [ri.data() for ri in r]
-        
-    
-        
-        
-        
-
-
-class Neo4JSubmissionSummary(SubmissionSummaryABC):
     def __init__(self, driver : Driver, meta : MetaABC, attributes : AttributesABC) -> None:
         
         self._driver = driver
