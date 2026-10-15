@@ -45,6 +45,7 @@ from lib.database.neo4j.Crosslink import Neo4jCrosslinks
 from lib.database.neo4j.external_resource import Neo4jExternalResources
 from lib.database.neo4j.Protocols import Neo4JProtocols
 from lib.database.neo4j.Policy import Neo4JPolicy
+from lib.database.neo4j.Impressum import Neo4JImpressum
 from lib.database.neo4j.Plates import Neo4JPlates
 import pandas as pd 
 class MCNeo4JDatabase(DatabaseABC):
@@ -75,6 +76,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes, condition_applications=self.condition_applications)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.policy = Neo4JPolicy(driver=self.connection.driver)
+        self.impressum = Neo4JImpressum(driver=self.connection.driver)
         self.qc = Neo4JQC(driver = self.connection.driver)
         self.protein_groups = Neo4JProteinGroups(driver = self.connection.driver)
         self.submission_summary = Neo4JSubmissionSummary(driver = self.connection.driver, meta=self.meta, attributes=self.attributes)

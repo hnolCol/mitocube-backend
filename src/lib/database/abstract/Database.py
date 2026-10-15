@@ -54,6 +54,7 @@ from lib.database.abstract.Crosslink import CrosslinkABC
 from lib.database.abstract.external_resource import ExternalResourceABC
 from lib.database.abstract.Protocols import ProtocolsABC
 from lib.database.abstract.Policy import PolicyABC
+from lib.database.abstract.Impressum import ImpressumABC
 from lib.database.abstract.Plates import PlatesABC
 from lib.database.abstract.AttributeRequests import AttributeRequestsABC
 
@@ -129,6 +130,7 @@ class DatabaseABC(ABC):
     external_resources : ExternalResourceABC = None
     protocols : ProtocolsABC = None
     policy : PolicyABC = None
+    impressum : ImpressumABC = None
     plates : PlatesABC = None
     attribute_requests : AttributeRequestsABC = None
 
@@ -306,7 +308,11 @@ class DatabaseABC(ABC):
         if self.policy is None:
             raise NotImplementedError("A database class must have the policy attribute defined.")
         if not isinstance(self.policy, PolicyABC):
-            raise TypeError("The policy class must be an instance of the PolicyABC.")   
+            raise TypeError("The policy class must be an instance of the PolicyABC.")
+        if self.impressum is None:
+            raise NotImplementedError("A database class must have the impressum attribute defined.")
+        if not isinstance(self.impressum, ImpressumABC):
+            raise TypeError("The impressum class must be an instance of the ImpressumABC.")   
         
         if self.plates is None:
             raise NotImplementedError("A database class must have the plates attribute defined.")
