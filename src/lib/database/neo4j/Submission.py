@@ -2201,6 +2201,104 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                                     result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
     
+    def find_similar(self, tag : str, current_user_tag : str = None, limit : int = 5, include_sample_ca : bool = False) -> List[Dict]:
+        """Finds the submissions most similar to the given submission.
+
+        Similarity is the Jaccard index over the union of the submission's
+        genotype tags and condition application tags. The shared genotypes,
+        condition applications and traits are returned so the caller can see
+        what actually matched.
+        """
+        if include_sample_ca:
+            target_ca_match = (
+                "CALL { WITH t "
+                "MATCH (t)-[:HAS_APPLICATION]->(tca:ConditionApplication) "
+                "RETURN collect(DISTINCT tca.tag) AS stcas } "
+                "CALL { WITH t "
+                "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(stca2:ConditionApplication) "
+                "RETURN collect(DISTINCT stca2.tag) AS ssca } "
+                "RETURN stcas + [c IN ssca WHERE NOT c IN stcas] AS tags "
+            )
+        else:
+            target_ca_match = (
+                "MATCH (t)-[:HAS_APPLICATION]->(tca:ConditionApplication) "
+                "RETURN collect(DISTINCT tca.tag) AS tags "
+            )
+        ca_import = (
+            "CALL { WITH o, tcas "
+            "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
+            "WHERE oca.tag IN tcas "
+            "RETURN collect(DISTINCT oca.tag) AS scas } "
+        )
+        if include_sample_ca:
+            ca_import = (
+                "CALL { WITH o, tcas "
+                "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
+                "WHERE oca.tag IN tcas "
+                "RETURN collect(DISTINCT oca.tag) AS scas } "
+                "CALL { WITH o, tcas "
+                "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(soca:ConditionApplication) "
+                "WHERE soca.tag IN tcas "
+                "RETURN collect(DISTINCT soca.tag) AS sscas } "
+                "WITH t, tgenos, tcas, o, ogenos, scas + [c IN sscas WHERE NOT c IN scas] AS ocas "
+            )
+        else:
+            ca_import += "WITH t, tgenos, tcas, o, ogenos, scas AS ocas "
+        scope_filter = ""
+        params = {"tag": tag, "limit": limit}
+        if current_user_tag is not None:
+            scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+            if scope_tags is not None and len(scope_tags) == 0:
+                return []
+            if scope_tags is not None:
+                scope_filter = "AND o.tag IN $scope_tags "
+                params["scope_tags"] = scope_tags
+        query = (
+            "MATCH (t:Submission {tag : $tag}) "
+            "CALL { WITH t "
+            "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(tg:Genotype) "
+            "RETURN collect(DISTINCT tg.tag) AS tgenos } "
+            f"CALL {{ WITH t {target_ca_match}}} "
+            "WITH t, tgenos, tags AS tcas "
+            "WHERE size(tgenos) + size(tcas) > 0 "
+            "MATCH (o:Submission) "
+            "WHERE o <> t "
+            f"{scope_filter}"
+            "CALL { WITH o "
+            "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(og:Genotype) "
+            "RETURN collect(DISTINCT og.tag) AS ogenos } "
+            f"WITH t, tgenos, tcas, o, ogenos "
+            f"{ca_import}"
+            "WITH t, tgenos, tcas, o, ogenos, ocas, "
+            "[g IN tgenos WHERE g IN ogenos] AS shared_genos, "
+            "[c IN tcas WHERE c IN ocas] AS shared_cas "
+            "WHERE size(shared_genos) + size(shared_cas) > 0 "
+            "WITH t, tgenos, tcas, o, shared_genos, shared_cas, "
+            "size(ogenos) + size(ocas) AS o_union_size "
+            "CALL { WITH o, shared_cas "
+            "MATCH (o)-[:HAS_APPLICATION]->(sca:ConditionApplication)-[:INSTANCE_OF]->(strait:Trait) "
+            "WHERE sca.tag IN shared_cas "
+            "RETURN collect(DISTINCT strait.tag) AS traits } "
+            "WITH o.tag AS submission_tag, "
+            "toFloat(size(shared_genos) + size(shared_cas)) / "
+            "(size(tgenos) + size(tcas) + o_union_size - size(shared_genos) - size(shared_cas)) AS score, "
+            "shared_genos AS genotypes, shared_cas AS condition_applications, traits "
+            "ORDER BY score DESC, submission_tag ASC "
+            "RETURN submission_tag, score, genotypes, condition_applications, traits "
+            "LIMIT $limit "
+        )
+        r, _, _ = self._driver.execute_query(query, **params)
+        return [
+            {
+                "submission_tag": ri["submission_tag"],
+                "score": ri["score"],
+                "genotypes": ri["genotypes"],
+                "condition_applications": ri["condition_applications"],
+                "traits": ri["traits"],
+            }
+            for ri in r
+        ]
+
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
             query += "ORDER BY submission_tag DESC "

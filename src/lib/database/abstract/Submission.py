@@ -928,6 +928,37 @@ Each submission is counted at most once per group and year, even if it has sever
 
         
     @abstractmethod
+    def find_similar(self, tag : str, current_user_tag : str = None, limit : int = 5, include_sample_ca : bool = False) -> List[Dict]:
+        """Finds the submissions that are most similar to the given submission.
+
+        Similarity is based on the overlap of the genotypes of the submissions'
+        samples and of their condition applications. The score is the Jaccard
+        index of the union of both sets. The shared genotypes, condition
+        applications and traits are returned alongside the score so it is
+        transparent what actually matched.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the submission to find similar submissions for.
+        current_user_tag : str, optional
+            The tag of the requesting user. If provided, only submissions the
+            user has access to are considered as candidates, by default None
+        limit : int, optional
+            The maximum number of similar submissions to return, by default 5
+        include_sample_ca : bool, optional
+            If True, condition applications that are connected to samples of a
+            submission are considered in addition to the ones connected to the
+            submission itself, by default False
+
+        Returns
+        -------
+        List[Dict]
+            A list of dicts with keys 'submission_tag', 'score', 'genotypes',
+            'condition_applications' and 'traits', ordered by descending score.
+        """
+
+    @abstractmethod
     def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, role : Literal["creator", "collaborator", "any"] = "any", limit : int = None, ordered : bool = True) -> List[str]:
         """Filters the submission tags by the user tags. 
         The filtering is performed on the given list of submission tags. 

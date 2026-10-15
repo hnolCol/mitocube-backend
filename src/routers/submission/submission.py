@@ -27,7 +27,7 @@ from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, u
 from config.models.submissions.submissions import NewSubmissionModel,  DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionIDResponse, SubmissionCountResponse
+from config.models.submissions.submissions import SubmissionIDResponse, SubmissionCountResponse, SimilarSubmissionsResponse, SimilarSubmissionModel, SimilarSubmissionMatchedModel
 from config.models.submissions.states import StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.timeline import TimelineInputModel
@@ -120,6 +120,61 @@ def get_submission_by_query_v2(state : str|int = None,
         "counts_identical": legacy_count == v2_count
     }
 
+
+@router.get("/submissions/similar",
+    summary = "Returns the submissions that are most similar to a given submission.",
+    response_model = SimilarSubmissionsResponse)
+def get_similar_submissions(tag : str,
+                            limit : int = 5,
+                            include_sample_ca : bool = False,
+                            user : UserModel = Depends(get_user_from_token),
+                            db : DatabaseABC = Depends(get_db)) -> SimilarSubmissionsResponse:
+    """
+    Returns the submissions that are most similar to the given submission.
+
+    Similarity is based on the overlap of the genotypes of the submissions'
+    samples and of their condition applications. The score is the Jaccard index
+    over the union of both sets. The shared genotypes, condition applications
+    and traits are returned for each similar submission so it is transparent
+    what actually matched.
+
+    Parameters
+    ----------
+    tag : str
+        The tag of the submission to find similar submissions for.
+    limit : int, optional
+        The maximum number of similar submissions to return, by default 5
+    include_sample_ca : bool, optional
+        If True, condition applications of the submissions' samples are
+        considered in addition to the ones of the submissions themselves,
+        by default False
+
+    Returns
+    -------
+    SimilarSubmissionsResponse
+        The list of similar submissions with their scores and matched
+        elements, ordered by descending score.
+    """
+    check_submission_access(submission_tag = tag, user = user, db = db)
+    similar = db.submission_filter.find_similar(tag = tag,
+                                                current_user_tag = user.tag,
+                                                limit = limit,
+                                                include_sample_ca = include_sample_ca)
+    return SimilarSubmissionsResponse(
+        submission_tag = tag,
+        similar = [
+            SimilarSubmissionModel(
+                submission_tag = s["submission_tag"],
+                score = s["score"],
+                matched = SimilarSubmissionMatchedModel(
+                    genotypes = s["genotypes"],
+                    condition_applications = s["condition_applications"],
+                    traits = s["traits"],
+                ),
+            )
+            for s in similar
+        ]
+    )
 
 @router.get("/submissions/q")
 def get_submission_by_query(state : str|int = None,
