@@ -95,7 +95,7 @@ def add_participants(conversation_tag : str,
         for invited_tag in user_tags:
             if not db.users.exists(tag = invited_tag):
                 raise HTTPException(status_code=404, detail=f"User with tag {invited_tag} not found.")
-            if not db.submissions.has_user_access(user_tag = invited_tag, submission_tag = conversation.submission_tag):
+            if not db.submission_filter.has_user_access(user_tag = invited_tag, submission_tag = conversation.submission_tag):
                 raise HTTPException(status_code=403,
                                     detail=f"User {invited_tag} has no access to the submission this conversation is linked to.")
     ok = db.messages.add_participants(conversation_tag = conversation_tag, user_tags = user_tags)

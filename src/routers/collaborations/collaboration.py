@@ -70,7 +70,7 @@ def create_collaboration_request(request : CollaborationRequestInput,
         raise HTTPException(status_code=403, detail="Guests cannot request collaboration.")
     if not db.submissions.exists(tag = request.submission_tag):
         raise HTTPException(status_code=404, detail=f"Submission with tag {request.submission_tag} not found.")
-    if db.submissions.has_user_access(user_tag = user.tag, submission_tag = request.submission_tag):
+    if db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = request.submission_tag):
         raise HTTPException(status_code=400, detail="You already have access to this submission.")
     if request.requested_for_user_tag is not None and request.requested_for_user_tag != user.tag:
         raise HTTPException(status_code=403, detail="A collaboration request can only be created for the requesting user.")
