@@ -674,7 +674,7 @@ Each submission is counted at most once per group and year, even if it has sever
             If the database query throws an exception.
         """
     
-    def get_trending(self, limit : int = 10) -> List[str]:
+    def get_trending(self, tags : List[str] = None, limit : int = 10) -> List[str]:
         """Returns the trending submissions based on the view score.
 
         Parameters

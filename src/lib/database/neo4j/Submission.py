@@ -1638,11 +1638,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         """
         query = (
             "MATCH (submission:Submission)-[:HAS_VIEW_COUNTER]->(vc:ViewCounter) WHERE vc.score IS NOT NULL "
+            f"{'AND submission.tag IN $tags ' if tags is not None else ''}"
             "RETURN submission.tag ORDER BY vc.score DESC "
             "LIMIT $limit"
         )
         
-        r = self._driver.execute_query(query, limit = limit, routing_="r", database_="neo4j", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, tags = tags, limit = limit, routing_="r", database_="neo4j", result_transformer_=Result.value)
         return r
     
     def group_by_state(self, tags : List[str] = None) -> Dict[str|int, List[str]]:

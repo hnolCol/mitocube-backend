@@ -258,7 +258,10 @@ def get_trending_submissions(limit : int, user = Depends(get_user_from_token), d
         A list of submission tags ordered by their view score in descending order.
     """
     
-    return db.submission_filter.get_trending(limit = limit)
+    scope = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+    if scope is not None and len(scope) == 0:
+        return []
+    return db.submission_filter.get_trending(tags = scope, limit = limit)
 
 
 @router.get("/submissions/{submission_tag}/exists")
@@ -595,6 +598,9 @@ def get_submissions_by_user_label(tags : str = None, group : Literal["state","us
 def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Filters submisson by full text searches"
     matches : List[FulltextSearchResult] = db.submission_filter.full_dataset_text_search(query)
+    scope = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+    if scope is not None:
+        matches = [m for m in matches if m["tag"] in scope]
     print(matches)
 
 
@@ -819,7 +825,7 @@ def get_submission_summary_string(submission_tag : str, user : UserModel = Depen
     return "\n".join(summary_strings)
 
 @router.post("/submissions/{submission_tag}/samples")
-def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(is_creator_of_submission_or_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Adds samples to a submission. The sample names are added to the existing samples. Returns true if the samples were added successfully."
     
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
@@ -834,7 +840,8 @@ def add_submission_samples(submission_tag : str, sample_names : List[str], user 
     return True
 
 @router.post("/submissions/{submission_tag}/samples/{sample_name}/proteins")
-def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags: List[str],user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags: List[str],user: UserModel = Depends(is_creator_of_submission_or_curator), db : DatabaseABC = Depends(get_db)):
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
     db.samples.insert_proteins(
         submission_tag=submission_tag,
