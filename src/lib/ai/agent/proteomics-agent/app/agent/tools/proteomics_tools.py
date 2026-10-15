@@ -78,7 +78,7 @@ def find_submissions(user_tag : str, search_string: str = "") -> str:
 
     Returns an empty list (not an error) if nothing matches.
     """
-    results = DB.submission_filter.find(current_user = user_tag, search_string=search_string)
+    results = DB.submission_filter.find_v2(current_user_tag=user_tag, search_string=search_string)
     truncated = results[:25]
     return json.dumps(
         {

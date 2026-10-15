@@ -202,3 +202,23 @@ class DatasetAttributesResponse(BaseModel):
     tag : str
     tags : Dict[str,List[str]]
    #user_input : Dict
+
+
+class SimilarSubmissionMatchedModel(BaseModel):
+    """The shared elements that make two submissions similar."""
+    genotypes: List[str] = Field(default_factory=list)
+    condition_applications: List[str] = Field(default_factory=list)
+    traits: List[str] = Field(default_factory=list)
+
+
+class SimilarSubmissionModel(BaseModel):
+    """A single similar submission with its similarity score and the matched elements."""
+    submission_tag: str
+    score: float
+    matched: SimilarSubmissionMatchedModel
+
+
+class SimilarSubmissionsResponse(BaseModel):
+    """Response for the similar submissions endpoint."""
+    submission_tag: str
+    similar: List[SimilarSubmissionModel]

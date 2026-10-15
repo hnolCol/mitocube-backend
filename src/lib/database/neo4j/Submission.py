@@ -1638,11 +1638,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         """
         query = (
             "MATCH (submission:Submission)-[:HAS_VIEW_COUNTER]->(vc:ViewCounter) WHERE vc.score IS NOT NULL "
+            f"{'AND submission.tag IN $tags ' if tags is not None else ''}"
             "RETURN submission.tag ORDER BY vc.score DESC "
             "LIMIT $limit"
         )
         
-        r = self._driver.execute_query(query, limit = limit, routing_="r", database_="neo4j", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, tags = tags, limit = limit, routing_="r", database_="neo4j", result_transformer_=Result.value)
         return r
     
     def group_by_state(self, tags : List[str] = None) -> Dict[str|int, List[str]]:
@@ -2201,90 +2202,110 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                                     result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
     
+    def find_similar(self, tag : str, current_user_tag : str = None, limit : int = 5, include_sample_ca : bool = False) -> List[Dict]:
+        """Finds the submissions most similar to the given submission.
+
+        Similarity is the Jaccard index over the union of the submission's
+        genotype tags and condition application tags. The shared genotypes,
+        condition applications and traits are returned so the caller can see
+        what actually matched.
+        """
+        if include_sample_ca:
+            target_ca_match = (
+                "CALL { WITH t "
+                "MATCH (t)-[:HAS_APPLICATION]->(tca:ConditionApplication) "
+                "RETURN collect(DISTINCT tca.tag) AS stcas } "
+                "CALL { WITH t "
+                "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(stca2:ConditionApplication) "
+                "RETURN collect(DISTINCT stca2.tag) AS ssca } "
+                "RETURN stcas + [c IN ssca WHERE NOT c IN stcas] AS tags "
+            )
+        else:
+            target_ca_match = (
+                "MATCH (t)-[:HAS_APPLICATION]->(tca:ConditionApplication) "
+                "RETURN collect(DISTINCT tca.tag) AS tags "
+            )
+        ca_import = (
+            "CALL { WITH o, tcas "
+            "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
+            "WHERE oca.tag IN tcas "
+            "RETURN collect(DISTINCT oca.tag) AS scas } "
+        )
+        if include_sample_ca:
+            ca_import = (
+                "CALL { WITH o, tcas "
+                "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
+                "WHERE oca.tag IN tcas "
+                "RETURN collect(DISTINCT oca.tag) AS scas } "
+                "CALL { WITH o, tcas "
+                "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(soca:ConditionApplication) "
+                "WHERE soca.tag IN tcas "
+                "RETURN collect(DISTINCT soca.tag) AS sscas } "
+                "WITH t, tgenos, tcas, o, ogenos, scas + [c IN sscas WHERE NOT c IN scas] AS ocas "
+            )
+        else:
+            ca_import += "WITH t, tgenos, tcas, o, ogenos, scas AS ocas "
+        scope_filter = ""
+        params = {"tag": tag, "limit": limit}
+        if current_user_tag is not None:
+            scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
+            if scope_tags is not None and len(scope_tags) == 0:
+                return []
+            if scope_tags is not None:
+                scope_filter = "AND o.tag IN $scope_tags "
+                params["scope_tags"] = scope_tags
+        query = (
+            "MATCH (t:Submission {tag : $tag}) "
+            "CALL { WITH t "
+            "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(tg:Genotype) "
+            "RETURN collect(DISTINCT tg.tag) AS tgenos } "
+            f"CALL {{ WITH t {target_ca_match}}} "
+            "WITH t, tgenos, tags AS tcas "
+            "WHERE size(tgenos) + size(tcas) > 0 "
+            "MATCH (o:Submission) "
+            "WHERE o <> t "
+            f"{scope_filter}"
+            "CALL { WITH o "
+            "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(og:Genotype) "
+            "RETURN collect(DISTINCT og.tag) AS ogenos } "
+            f"WITH t, tgenos, tcas, o, ogenos "
+            f"{ca_import}"
+            "WITH t, tgenos, tcas, o, ogenos, ocas, "
+            "[g IN tgenos WHERE g IN ogenos] AS shared_genos, "
+            "[c IN tcas WHERE c IN ocas] AS shared_cas "
+            "WHERE size(shared_genos) + size(shared_cas) > 0 "
+            "WITH t, tgenos, tcas, o, shared_genos, shared_cas, "
+            "size(ogenos) + size(ocas) AS o_union_size "
+            "CALL { WITH o, shared_cas "
+            "MATCH (o)-[:HAS_APPLICATION]->(sca:ConditionApplication)-[:INSTANCE_OF]->(strait:Trait) "
+            "WHERE sca.tag IN shared_cas "
+            "RETURN collect(DISTINCT strait.tag) AS traits } "
+            "WITH o.tag AS submission_tag, "
+            "toFloat(size(shared_genos) + size(shared_cas)) / "
+            "(size(tgenos) + size(tcas) + o_union_size - size(shared_genos) - size(shared_cas)) AS score, "
+            "shared_genos AS genotypes, shared_cas AS condition_applications, traits "
+            "ORDER BY score DESC, submission_tag ASC "
+            "RETURN submission_tag, score, genotypes, condition_applications, traits "
+            "LIMIT $limit "
+        )
+        r, _, _ = self._driver.execute_query(query, **params)
+        return [
+            {
+                "submission_tag": ri["submission_tag"],
+                "score": ri["score"],
+                "genotypes": ri["genotypes"],
+                "condition_applications": ri["condition_applications"],
+                "traits": ri["traits"],
+            }
+            for ri in r
+        ]
+
     def _maybe_order(self, query: str, ordered: bool) -> str:
         if ordered:
             query += "ORDER BY submission_tag DESC "
         return query
     
     
-    def find(self, 
-            current_user_tag : str,
-            search_string : str = None,
-            state : List[int] = None, 
-            trait_tags : List[str] = None, 
-            attribute_tag : List[str]= None, 
-            ca_tags: List[str] = None,
-            protein_tags: List[str] = None,
-            ca_search_string : str = None,
-            user_tags : List[str] = None, 
-            user_role : Literal["creator", "collaborator", "any"] = "any",  
-            genotype_tag : List[str] = None,
-            consortium_tags : List[str] = None,
-            include_sample_ca : bool = False,   
-            ordered : bool = True,
-            ca_match_all : bool = True,
-            limit : int = 10) -> List[str]:
-        """Returns a list of submission tags that match the given filters."""
-        tags = None
-        
-        try:
-            tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
-            if tags is not None and len(tags) == 0: return [] #if user has no access to any submissions, return empty list. No need to apply other filters.
-        except ValueError as e:
-            print(f"Error: {e}")
-            return []
-        
-        filter_defined = not all(attr is None for attr in [search_string, state, trait_tags, attribute_tag, user_tags, protein_tags, genotype_tag, ca_search_string, ca_tags, consortium_tags])
-        if search_string is not None:
-            limit_ = limit if all(attr is None for attr in [state, trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_search_string(search_string=search_string, limit=limit, ordered=ordered, submission_tags=tags)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if state is not None:
-            limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tags,protein_tags,genotype_tag]) else None #add limit only if all others are
-            tags = self.filter_by_state(states=state, submission_tags=tags, limit=limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if genotype_tag is not None:
-            limit_ = limit if all(attr is None for attr in [trait_tags,attribute_tag,user_tags,protein_tags]) else None
-            tags = self.filter_by_genotype_tags(genotype_tag,submission_tags = tags, limit = limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if attribute_tag is not None or trait_tags is not None or ca_tags is not None:  
-            limit_ = limit if all(attr is None for attr in [trait_tags, user_tags, protein_tags]) else None
-            tags = self.filter_by_condition_applications(
-                attribute_tag=attribute_tag,
-                trait_tags=trait_tags,
-                ca_tags=ca_tags,
-                ca_search_string=ca_search_string,  
-                submission_tags=tags,
-                include_sample_ca=include_sample_ca,
-                limit=limit_,
-                ordered=ordered,
-                match_all=ca_match_all
-            )
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-
-        if user_tags is not None:
-            limit_ = limit if protein_tags is None else None
-            tags = self.filter_by_user(user_tags,submission_tags=tags, role=user_role, limit=limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if protein_tags is not None:
-            limit_ = limit
-            tags = self.filter_by_quantified_protein(protein_tags,submission_tags=tags,limit=limit_, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if consortium_tags is not None:
-            tags = self.filter_by_consortium(consortium_tags, submission_tags=tags, limit=limit, ordered=ordered)
-            if len(tags) == 0: return [] #if is definedned and returns no results, return empty list. No need to apply other filters.
-        if not filter_defined: #none defined, then just return all. 
-            if tags is None: #then it must be admin or curator, so return all tags.
-                tags = self.get_all_tags(limit=limit, ordered=ordered)
-            elif isinstance(tags, list) and len(tags) > limit:
-                tags = tags[:limit]
-            return tags 
-        if tags is None: return []
-        
-        return tags 
-    
-    
-
     def _build_v2_where(self, scope_tags, search_string, state, trait_tags, attribute_tag,
                         ca_tags, protein_tags, ca_search_string, user_tags, user_role,
                         genotype_tag, consortium_tags, include_sample_ca, ca_match_all):
@@ -2467,8 +2488,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             ca_match_all : bool = True,
             limit : int = 10) -> List[str]:
         """Single-query variant of find(). Composes every filter into one Cypher query
-        instead of chaining per-filter round trips. Intended to replace find() once the
-        results are confirmed to be identical.
+        instead of chaining per-filter round trips.
         """
         # ---- user scope: None means unrestricted (curator/admin), [] means no access ----
         scope_tags = self._get_users_submission_scope(current_user_tag=current_user_tag)
@@ -2548,19 +2568,6 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         return [ri.data() for ri in r]
         
         
-    def full_dataset_text_search(self, search_string : str) -> List[FulltextSearchResult]:
-        ""  
-        
-        r, _ , _ = self._factory.full_text_search("datasetSearch",search_string)
-        return [ri.data() for ri in r]
-        
-    
-        
-        
-        
-
-
-class Neo4JSubmissionSummary(SubmissionSummaryABC):
     def __init__(self, driver : Driver, meta : MetaABC, attributes : AttributesABC) -> None:
         
         self._driver = driver

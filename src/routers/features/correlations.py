@@ -46,7 +46,7 @@ def get_protein_correlations(tag: str,
     if min_data_points > db.samples.count(has_protein_quantification=True):
         raise HTTPException(status_code=400, detail=f"min_data_points cannot be greater than the number of samples with protein quantification ({db.samples.count(has_protein_quantification=True)})")
     
-    submission_tags = db.submission_filter.find(current_user_tag=user.tag, protein_tags=[tag], ca_tags=APIParamString(param=ca_tags).param if ca_tags is not None else None)
+    submission_tags = db.submission_filter.find_v2(current_user_tag=user.tag, protein_tags=[tag], ca_tags=APIParamString(param=ca_tags).param if ca_tags is not None else None)
     if submission_tags is not None and len(submission_tags) == 0:
         return []
 

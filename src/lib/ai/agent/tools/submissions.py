@@ -62,7 +62,7 @@ def find_submissions(current_user_tag: str,
     If no search_string is provided and limit = 1, the most recent submission tag will be returned.
     
     """
-    tags = DB.submission_filter.find(current_user_tag= current_user_tag, search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
+    tags = DB.submission_filter.find_v2(current_user_tag= current_user_tag, search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
     return tags
 
 @tool("get_submission_title_and_research_aim", args_schema=SubmissionTagsInput)
@@ -97,16 +97,15 @@ def count_submissions_by_query(
 
     total_count = DB.submissions.count()
 
-    matches = DB.submission_filter.find(
+    query_count = DB.submission_filter.count_v2(
         current_user_tag=current_user_tag,
         search_string=search_string,
         state=state,
-        user_tags=APIParamString(param=user_tags).param,
-        limit=None
+        user_tags=APIParamString(param=user_tags).param
     )
 
     return {
-        "query_count": len(matches),
+        "query_count": query_count,
         "total_count": total_count
     }
 
@@ -254,7 +253,28 @@ def get_submission_runlist(submission_tag: str) -> Dict:
 
 
 
-SUBMISSION_TOOLS = [find_submissions, 
+@tool("find_similar_submissions")
+def find_similar_submissions(submission_tag: str, current_user_tag: str, limit: int = 5) -> List[Dict]:
+    """Finds the submissions that are most similar to a given submission.
+
+    Similarity is based on the overlap of the genotypes of the submissions' samples
+    and of their condition applications. For each similar submission, the shared
+    genotypes, condition applications and traits are returned so it is transparent
+    what actually matched.
+
+    Returns a list of dicts with keys 'submission_tag', 'score', 'genotypes',
+    'condition_applications' and 'traits', ordered by descending similarity.
+    """
+    if not DB.submissions.exists(tag=submission_tag):
+        return []
+    return DB.submission_filter.find_similar(
+        tag=submission_tag,
+        current_user_tag=current_user_tag,
+        limit=limit,
+    )
+
+SUBMISSION_TOOLS = [find_submissions,
+                    find_similar_submissions,
                     get_submission_title_and_research_aim, 
                     get_submission_creator, 
                     get_submission_user_team, 

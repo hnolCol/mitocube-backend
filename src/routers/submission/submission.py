@@ -19,7 +19,6 @@ from config.settings.email import get_email_settings
 
 from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
-from config.models.searches import FulltextSearchResult
 from config.models.news.news import NewsModel, NewsInsertModel
 
 from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found, user_forbidden
@@ -27,7 +26,7 @@ from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, u
 from config.models.submissions.submissions import NewSubmissionModel,  DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
 from config.models.submissions.metatexts import MetaTextSubmissionResponse
-from config.models.submissions.submissions import SubmissionIDResponse, SubmissionCountResponse
+from config.models.submissions.submissions import SubmissionIDResponse, SubmissionCountResponse, SimilarSubmissionsResponse, SimilarSubmissionModel, SimilarSubmissionMatchedModel
 from config.models.submissions.states import StateChangeModel
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
 from config.models.timeline import TimelineInputModel
@@ -65,61 +64,60 @@ def get_submission_tag(user : UserModel = Depends(get_user_from_token), db : Dat
     return SubmissionIDResponse(tag = tag)   
 
 
-@router.get("/submissions/qv2", summary="Experimental single-query variant of /submissions/q. Returns old vs new result for comparison.")
-def get_submission_by_query_v2(state : str|int = None,
-                            search_string : str = None,
-                            trait_tags : str = None, 
-                            attribute_tag : str = None, 
-                            ca_tags : str = None,
-                            genotype_tag : str = None, 
-                            protein_tags: str = None,
-                            user_tags : str = None,
-                            consortium_tags : str = None,
-                            user_role : Literal["creator", "collaborator", "any"] = "any",  
+@router.get("/submissions/similar",
+    summary = "Returns the submissions that are most similar to a given submission.",
+    response_model = SimilarSubmissionsResponse)
+def get_similar_submissions(tag : str,
+                            limit : int = 5,
                             include_sample_ca : bool = False,
-                            ca_search_string : str = None,
-                            limit : int = 20, 
-                            ordered : bool = True,
-                            user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict:
-    """"
-    Experimental: runs the same filter through the legacy find() and the new
-    single-query find_v2() and returns both results plus the difference, so the
-    outcomes can be compared before find_v2 replaces find().
+                            user : UserModel = Depends(get_user_from_token),
+                            db : DatabaseABC = Depends(get_db)) -> SimilarSubmissionsResponse:
     """
-    kwargs = dict(
-        current_user_tag=user.tag,
-        search_string = search_string,
-        state = APIParamInt(param = state).param, 
-        attribute_tag=APIParamString(param=attribute_tag).param,
-        trait_tags=APIParamString(param=trait_tags).param,
-        ca_tags=APIParamString(param=ca_tags).param,
-        user_tags=APIParamString(param=user_tags).param,
-        user_role=user_role,  
-        genotype_tag = APIParamString(param=genotype_tag).param,
-        consortium_tags = APIParamString(param=consortium_tags).param,
-        include_sample_ca = include_sample_ca,
-        ca_search_string = ca_search_string,
-        protein_tags = APIParamString(param=protein_tags).param,
-        ordered = ordered,
-        limit = limit
-    )
-    legacy = db.submission_filter.find(**kwargs)
-    v2 = db.submission_filter.find_v2(**kwargs)
-    count_kwargs = {k: v for k, v in kwargs.items() if k not in ("ordered", "limit")}
-    legacy_count = len(db.submission_filter.find(**count_kwargs, ordered = False, limit = None))
-    v2_count = db.submission_filter.count_v2(**count_kwargs)
-    return {
-        "legacy": legacy,
-        "v2": v2,
-        "only_in_legacy": sorted(set(legacy) - set(v2)),
-        "only_in_v2": sorted(set(v2) - set(legacy)),
-        "identical": sorted(legacy) == sorted(v2),
-        "identical_ordered": legacy == v2,
-        "legacy_count": legacy_count,
-        "v2_count": v2_count,
-        "counts_identical": legacy_count == v2_count
-    }
+    Returns the submissions that are most similar to the given submission.
 
+    Similarity is based on the overlap of the genotypes of the submissions'
+    samples and of their condition applications. The score is the Jaccard index
+    over the union of both sets. The shared genotypes, condition applications
+    and traits are returned for each similar submission so it is transparent
+    what actually matched.
+
+    Parameters
+    ----------
+    tag : str
+        The tag of the submission to find similar submissions for.
+    limit : int, optional
+        The maximum number of similar submissions to return, by default 5
+    include_sample_ca : bool, optional
+        If True, condition applications of the submissions' samples are
+        considered in addition to the ones of the submissions themselves,
+        by default False
+
+    Returns
+    -------
+    SimilarSubmissionsResponse
+        The list of similar submissions with their scores and matched
+        elements, ordered by descending score.
+    """
+    check_submission_access(submission_tag = tag, user = user, db = db)
+    similar = db.submission_filter.find_similar(tag = tag,
+                                                current_user_tag = user.tag,
+                                                limit = limit,
+                                                include_sample_ca = include_sample_ca)
+    return SimilarSubmissionsResponse(
+        submission_tag = tag,
+        similar = [
+            SimilarSubmissionModel(
+                submission_tag = s["submission_tag"],
+                score = s["score"],
+                matched = SimilarSubmissionMatchedModel(
+                    genotypes = s["genotypes"],
+                    condition_applications = s["condition_applications"],
+                    traits = s["traits"],
+                ),
+            )
+            for s in similar
+        ]
+    )
 
 @router.get("/submissions/q")
 def get_submission_by_query(state : str|int = None,
@@ -187,8 +185,7 @@ def get_submission_by_query(state : str|int = None,
         ordered = False 
         limit = None 
         
-    N = db.submissions.count()
-    tags = db.submission_filter.find(
+    tags = db.submission_filter.find_v2(
             current_user_tag=user.tag,
             search_string = search_string,
             state = APIParamInt(param = state).param, 
@@ -260,7 +257,10 @@ def get_trending_submissions(limit : int, user = Depends(get_user_from_token), d
         A list of submission tags ordered by their view score in descending order.
     """
     
-    return db.submission_filter.get_trending(limit = limit)
+    scope = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
+    if scope is not None and len(scope) == 0:
+        return []
+    return db.submission_filter.get_trending(tags = scope, limit = limit)
 
 
 @router.get("/submissions/{submission_tag}/exists")
@@ -593,12 +593,6 @@ def get_submissions_by_user_label(tags : str = None, group : Literal["state","us
    
 
 
-@router.get("/submission/ftquery")
-def get_submission_by_fulltext(query : Annotated[str | None, Query(min_length=1)] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
-    "Filters submisson by full text searches"
-    matches : List[FulltextSearchResult] = db.submission_filter.full_dataset_text_search(query)
-    print(matches)
-
 
     
 @router.post("/submissions", summary="Add submission to the database")
@@ -821,7 +815,7 @@ def get_submission_summary_string(submission_tag : str, user : UserModel = Depen
     return "\n".join(summary_strings)
 
 @router.post("/submissions/{submission_tag}/samples")
-def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+def add_submission_samples(submission_tag : str, sample_names : List[str], user : UserModel = Depends(is_creator_of_submission_or_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Adds samples to a submission. The sample names are added to the existing samples. Returns true if the samples were added successfully."
     
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
@@ -835,15 +829,6 @@ def add_submission_samples(submission_tag : str, sample_names : List[str], user 
     
     return True
 
-@router.post("/submissions/{submission_tag}/samples/{sample_name}/proteins")
-def add_proteins_to_sample(  submission_tag: str, sample_name: str, protein_tags: List[str],user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
-    
-    db.samples.insert_proteins(
-        submission_tag=submission_tag,
-        sample_name=sample_name,
-        protein_tags=protein_tags
-    )
-    return True
 
 
 @router.get("/submissions/{submission_tag}/samples")
@@ -1057,7 +1042,7 @@ def get_submission_query_count(
     total_count = db.submissions.count()
     
     # Query count (matching filters, no limit)
-    matching_tags = db.submission_filter.find(
+    query_count = db.submission_filter.count_v2(
         current_user_tag=user.tag,
         search_string = search_string,
         state = APIParamInt(param = state).param, 
@@ -1070,12 +1055,8 @@ def get_submission_query_count(
         protein_tags = APIParamString(param=protein_tags).param,
         consortium_tags = APIParamString(param=consortium_tags).param,
         include_sample_ca = include_sample_ca,
-        ca_search_string = ca_search_string,
-        ordered = False, 
-        limit = None  
+        ca_search_string = ca_search_string
     )
-    
-    query_count = len(matching_tags)
     
     return {
         "query_count": query_count,

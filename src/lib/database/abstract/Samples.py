@@ -195,25 +195,6 @@ class SamplesABC(ABC):
         pass
 
     @abstractmethod
-    def insert_proteins(self, submission_tag: str, sample_name: str, protein_tags: List[str]):
-        """Inserts proteins for a given sample in a submission.
-
-        Parameters
-        ----------
-        submission_tag : str
-            The submission tag.
-        sample_name : str
-            The sample name.
-        protein_tags : List[str]
-            The list of protein tags to insert.
-
-        Returns
-        -------
-        bool
-            True if the insertion was successful, False otherwise.
-        """
-
-    @abstractmethod
     def update( self, tag: str, text: str = None, genotype_tag: str = None, condition_applications: List[AttributeTree] = None) -> bool:
         """Update the sample information for a given sample tag.    
         """

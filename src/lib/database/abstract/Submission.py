@@ -674,7 +674,7 @@ Each submission is counted at most once per group and year, even if it has sever
             If the database query throws an exception.
         """
     
-    def get_trending(self, limit : int = 10) -> List[str]:
+    def get_trending(self, tags : List[str] = None, limit : int = 10) -> List[str]:
         """Returns the trending submissions based on the view score.
 
         Parameters
@@ -808,62 +808,6 @@ Each submission is counted at most once per group and year, even if it has sever
         """
     
     @abstractmethod
-    def find(self,
-            current_user_tag : str,
-            search_string : str = None,
-            state : List[int] = None, 
-            trait_tags : List[str] = None, 
-            attribute_tag : List[str]= None, 
-            trait_tag : List[str] = None,
-            ca_tags: List[str] = None,
-            protein_tags: List[str] = None,
-            ca_search_string : str = None,
-            user_tags : List[str] = None, 
-            genotype_tag : List[str] = None,
-            consortium_tags : List[str] = None,
-            include_sample_ca : bool = False,   
-            ordered : bool = True,
-            ca_match_all : bool = True,
-            limit : int = 10) -> List[str]:
-        """Returns the submission tags that match the filtering. 
-        The filtering is performed using the AND operator throughout. 
-
-        Parameters
-        ----------
-        current_user_tag : str
-            The tag of the current user.
-        state : List[int], optional
-            _description_, by default None
-        trait_tags : List[str], optional
-            _description_, by default None
-        attribute_tag : List[str], optional
-            _description_, by default None
-        user_tag : List[str], optional
-            _description_, by default None
-        protein_tags : List[str], optional
-            _description_, by default None
-        genotype_tag : List[str], optional
-            _description_, by default None
-        ordered : bool, optional
-            If True, the results are ordered by the submission creation date in descending order, by default True
-        search_string : str, optional
-            A string to search for in the submission tags. If provided, the filtering is done on the search string, by default None
-        limit : int, optional
-            The maximum number of submissions to be returned that match the filtering, by default 10
-
-        Returns
-        -------
-        List[str]
-            The list of submission tags 
-
-        Raises
-        ------
-        Exception
-            _description_
-        """
-
-
-    @abstractmethod
     def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
         """Sorts the submission tags by the number of views in descending order. 
         The sorting is performed on the given list of submission tags. 
@@ -927,6 +871,37 @@ Each submission is counted at most once per group and year, even if it has sever
         """
 
         
+    @abstractmethod
+    def find_similar(self, tag : str, current_user_tag : str = None, limit : int = 5, include_sample_ca : bool = False) -> List[Dict]:
+        """Finds the submissions that are most similar to the given submission.
+
+        Similarity is based on the overlap of the genotypes of the submissions'
+        samples and of their condition applications. The score is the Jaccard
+        index of the union of both sets. The shared genotypes, condition
+        applications and traits are returned alongside the score so it is
+        transparent what actually matched.
+
+        Parameters
+        ----------
+        tag : str
+            The tag of the submission to find similar submissions for.
+        current_user_tag : str, optional
+            The tag of the requesting user. If provided, only submissions the
+            user has access to are considered as candidates, by default None
+        limit : int, optional
+            The maximum number of similar submissions to return, by default 5
+        include_sample_ca : bool, optional
+            If True, condition applications that are connected to samples of a
+            submission are considered in addition to the ones connected to the
+            submission itself, by default False
+
+        Returns
+        -------
+        List[Dict]
+            A list of dicts with keys 'submission_tag', 'score', 'genotypes',
+            'condition_applications' and 'traits', ordered by descending score.
+        """
+
     @abstractmethod
     def filter_by_user(self, user_tags : List[str], submission_tags : List[str] = None, role : Literal["creator", "collaborator", "any"] = "any", limit : int = None, ordered : bool = True) -> List[str]:
         """Filters the submission tags by the user tags. 
