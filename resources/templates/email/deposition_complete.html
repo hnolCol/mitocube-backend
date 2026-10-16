@@ -1,0 +1,18 @@
+<html><body style="margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif;"></body><div style="width: 90%; background: #efefef; border-radius: 10px; margin: 2rem; padding: 1rem;">
+    <h1>{{app_name}} : Deposition of {{submission_tag}} complete</h1>
+    <p>Dear {{first_name}},</p>
+    <p>the data of your submission</p>
+    <div style="color : #0a68ad; font-size: large; text-align: center;">
+        <h3>{{title}} ({{submission_tag}})</h3>
+    </div>
+    <p>have been deposited to <b>{{database}}</b>.</p>
+    <p>Deposition identifier: <b>{{identifier}}</b></p>
+    {% if url %}
+    <p>Access the deposited data via this <a href={{url}}>link</a>.</p>
+    {% endif %}
+    {% if token %}
+    <p>Login token for the deposited dataset: <b>{{token}}</b></p>
+    {% endif %}
+    <p>Please follow this <a href={{submission_url}}>link</a> to view your submission.</p>
+    <p>The {{app_name}} Support Team</p>
+</div></body></html>
