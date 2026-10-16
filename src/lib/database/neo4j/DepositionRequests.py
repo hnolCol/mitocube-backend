@@ -108,7 +108,7 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
             "ORDER BY r.created_at DESC LIMIT $limit"
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, **params)
-        return [self._to_model(row) for row in r[0]]
+        return [self._to_model(row) for row in r]
 
     def get_pending(self, limit: int = 50) -> List[DepositionRequestModel]:
         return self.get(status="pending", limit=limit)
@@ -119,9 +119,9 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
     def _get_node(self, tag: str) -> dict:
         query = f"MATCH (r:DepositionRequest {{tag: $tag}}) RETURN {self._RETURN}"
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
-        if not r[0]:
+        if not r:
             raise ValueError(f"Deposition request with tag '{tag}' not found.")
-        return r[0][0]
+        return r[0]
 
     def complete(self, tag: str, reviewer_tag: str, identifier: str, url: str = None,
                  token: str = None, comment: str = None) -> DepositionRequestModel:
@@ -148,7 +148,7 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
             comment=comment,
             result_transformer_=Result.data,
         )
-        return self._to_model(r[0][0])
+        return self._to_model(r[0])
 
     def reject(self, tag: str, reviewer_tag: str, comment: str = None) -> DepositionRequestModel:
         row = self._get_node(tag)
@@ -168,4 +168,4 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
             comment=comment,
             result_transformer_=Result.data,
         )
-        return self._to_model(r[0][0])
+        return self._to_model(r[0])
