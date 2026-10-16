@@ -22,7 +22,8 @@ class DepositionRequestsABC(ABC):
     def insert(self, request: DepositionRequestInsertModel, user_tag: str) -> str:
         """Stores a new pending deposition request. Returns the request tag.
         Raises ValueError if the submission does not exist or if a pending
-        deposition request for the same submission and user exists already."""
+        deposition request for the submission exists already, regardless
+        of the requesting user."""
 
     @abstractmethod
     def exists(self, tag: str) -> bool:

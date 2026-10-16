@@ -38,9 +38,9 @@ class FakeDepositionRequestsDB:
         if request.submission_tag not in self.submissions:
             raise ValueError(f"Submission with tag '{request.submission_tag}' does not exist.")
         for r in self.requests.values():
-            if (r.submission_tag == request.submission_tag and r.user_tag == user_tag
+            if (r.submission_tag == request.submission_tag
                     and r.status == "pending"):
-                raise ValueError("A pending deposition request for this submission and user exists already.")
+                raise ValueError("A pending deposition request for this submission exists already.")
         self._counter += 1
         tag = f"dr-{self._counter}"
         self.requests[tag] = DepositionRequestModel(
@@ -126,6 +126,10 @@ def test_insert_and_duplicate_pending():
     assert db.requests[tag].status == "pending"
     with pytest.raises(ValueError, match="exists already"):
         db.insert(request=request, user_tag="user1")
+    with pytest.raises(ValueError, match="exists already"):
+        db.insert(request=request, user_tag="user2")
+    r = db.reject(tag=tag, reviewer_tag="curator1")
+    assert r.status == "rejected"
     other = db.insert(request=request, user_tag="user2")
     assert other != tag
 
@@ -158,11 +162,11 @@ def test_reject():
 
 
 def test_visibility_filters_by_user():
-    db = FakeDepositionRequestsDB(submissions={"sub1": "My dataset"})
+    db = FakeDepositionRequestsDB(submissions={"sub1": "My dataset", "sub2": "Other dataset"})
     tag1 = db.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="user1")
-    tag2 = db.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="user2")
+    tag2 = db.insert(request=DepositionRequestInsertModel(submission_tag="sub2", database="PRIDE"), user_tag="user2")
     assert [r.tag for r in db.get(user_tag="user1")] == [tag1]
-    assert {r.tag for r in db.get_for_submission("sub1")} == {tag1, tag2}
+    assert {r.tag for r in db.get_for_submission("sub1")} == {tag1}
     assert db.get_pending() == [db.requests[tag1], db.requests[tag2]]
 
 

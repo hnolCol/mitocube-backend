@@ -24,8 +24,8 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
     def insert(self, request: DepositionRequestInsertModel, user_tag: str) -> str:
         if not self._submission_exists(request.submission_tag):
             raise ValueError(f"Submission with tag '{request.submission_tag}' does not exist.")
-        if self.get(submission_tag=request.submission_tag, user_tag=user_tag, status="pending", limit=1):
-            raise ValueError("A pending deposition request for this submission and user exists already.")
+        if self.get(submission_tag=request.submission_tag, status="pending", limit=1):
+            raise ValueError("A pending deposition request for this submission exists already.")
         model = DepositionRequestModel(
             submission_tag=request.submission_tag,
             user_tag=user_tag,
