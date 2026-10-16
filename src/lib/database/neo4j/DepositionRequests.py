@@ -24,8 +24,8 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
     def insert(self, request: DepositionRequestInsertModel, user_tag: str) -> str:
         if not self._submission_exists(request.submission_tag):
             raise ValueError(f"Submission with tag '{request.submission_tag}' does not exist.")
-        if self.get(submission_tag=request.submission_tag, user_tag=user_tag, status="pending", limit=1):
-            raise ValueError("A pending deposition request for this submission and user exists already.")
+        if self.get(submission_tag=request.submission_tag, status="pending", limit=1):
+            raise ValueError("A pending deposition request for this submission exists already.")
         model = DepositionRequestModel(
             submission_tag=request.submission_tag,
             user_tag=user_tag,
@@ -149,6 +149,19 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
             result_transformer_=Result.data,
         )
         return self._to_model(r[0])
+
+    def delete(self, tag: str) -> bool:
+        row = self._get_node(tag)
+        if row["status"] != "pending":
+            raise ValueError(f"Deposition request with tag '{tag}' is not pending.")
+        query = (
+            "MATCH (r:DepositionRequest {tag: $tag}) "
+            "DETACH DELETE r "
+            "RETURN count(r) AS n"
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag,
+                                       result_transformer_=Result.data)
+        return r[0]["n"] == 0
 
     def reject(self, tag: str, reviewer_tag: str, comment: str = None) -> DepositionRequestModel:
         row = self._get_node(tag)

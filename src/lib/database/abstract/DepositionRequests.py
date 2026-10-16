@@ -22,7 +22,8 @@ class DepositionRequestsABC(ABC):
     def insert(self, request: DepositionRequestInsertModel, user_tag: str) -> str:
         """Stores a new pending deposition request. Returns the request tag.
         Raises ValueError if the submission does not exist or if a pending
-        deposition request for the same submission and user exists already."""
+        deposition request for the submission exists already, regardless
+        of the requesting user."""
 
     @abstractmethod
     def exists(self, tag: str) -> bool:
@@ -44,6 +45,12 @@ class DepositionRequestsABC(ABC):
     @abstractmethod
     def get_for_submission(self, submission_tag: str, limit: int = 10) -> List[DepositionRequestModel]:
         """Returns the deposition requests of a submission, newest first."""
+
+    @abstractmethod
+    def delete(self, tag: str) -> bool:
+        """Deletes a pending deposition request. Returns True if a request was
+        deleted. Raises ValueError if the request does not exist or is not
+        pending."""
 
     @abstractmethod
     def complete(self, tag: str, reviewer_tag: str, identifier: str, url: str = None,
