@@ -35,7 +35,9 @@ def create_conversation(conversation : ConversationInput,
     if user.role < UserRolesEnum.STANDARD:
         raise HTTPException(status_code=403, detail="Guests cannot create conversations.")
     if user.tag not in conversation.user_tags:
-        raise HTTPException(status_code=400, detail="The creator must be a participant of the conversation.")
+        conversation.user_tags.append(user.tag)
+    if len(set(conversation.user_tags)) < 2:
+        raise HTTPException(status_code=400, detail="Select at least one other participant.")
     if conversation.submission_tag is not None:
         if not db.submissions.exists(tag = conversation.submission_tag):
             raise HTTPException(status_code=404, detail=f"Submission with tag {conversation.submission_tag} not found.")

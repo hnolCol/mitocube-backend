@@ -266,3 +266,12 @@ class Neo4JConsortium(ConsortiumABC):
                                        result_transformer_=Result.value)
         invalidate_all_cached_scopes()  # shares affect the scope of all consortium member group users
         return r[0] > 0
+
+    def get_pending_consortium_tags(self, submission_tag : str) -> List[str]:
+        """Returns the tags of consortiums with a pending share request for the submission"""
+        query = (
+            "MATCH (s:Submission {tag : $submission_tag})-[r:SHARED_WITH]->(c:Consortium) "
+            "WHERE r.status = 'pending' "
+            "RETURN c.tag "
+        )
+        return self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.value)

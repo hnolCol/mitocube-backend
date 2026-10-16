@@ -2514,7 +2514,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         query = "MATCH (submission:Submission) "
         if where:
             query += "WHERE " + " AND ".join(where) + " "
-        query += "RETURN DISTINCT submission.tag AS submission_tag "
+        query += "WITH DISTINCT submission RETURN submission.tag AS submission_tag "
         if ordered:
             query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query, limit)
@@ -2527,7 +2527,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         query = (
             "MATCH (c:Consortium) "
             "WHERE c.tag IN $consortium_tags "
-            "MATCH (c)<[r:SHARED_WITH]-(s:Submission) "
+            "MATCH (c)<-[r:SHARED_WITH]-(s:Submission) "
             "WHERE r.status = 'approved' "
         )
         if submission_tags is not None:
