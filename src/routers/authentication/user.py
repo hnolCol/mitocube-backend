@@ -7,7 +7,7 @@ from config.exceptions.HTTPExceptions import user_role_too_low, user_not_found
 from config.settings.email import get_email_settings
 from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel,  UsersAdminResponse, UseRoleReponseModel, PublicUser, UserCreateModel, UserInsertModel
-from config.models.parameter import APIParamString
+from config.models.parameter import APIParamString, APIParamInt
 from services.encryption import verify_password
 from services.users import is_user_admin, get_user_from_token
 from services.mail import send_email_in_background
@@ -86,15 +86,16 @@ def count_user_db(exclude_inactive : bool = True, user : UserModel = Depends(get
     return db.users.count(exclude_inactive=exclude_inactive)
 
 @router.get("/q")
-def query_user_db(search_string : str = None, roles : List[int] = None, limit : int = 40, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def query_user_db(search_string : str = None, roles : str = None, limit : int = 40, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """Query user in the database and returns the tags 
 
     Parameters
     ----------
     search_string : str, optional
         The search string to query users, by default None
-    roles : List[int], optional
-        The user roles (UserRolesEnum ints) to filter for, by default None
+    roles : str, optional
+        The user roles (UserRolesEnum ints) to filter for as a semicolon
+        separated string, e.g. roles=2;4, by default None
     limit : int, optional
         The maximum number of user tags to return, by default 40
 
@@ -104,6 +105,10 @@ def query_user_db(search_string : str = None, roles : List[int] = None, limit : 
         A list of user tags matching the search criteria.
     """
 
+    try:
+        roles = APIParamInt(param=roles).param
+    except ValueError:
+        raise HTTPException(422, "Invalid user role provided.")
     if roles is not None:
         try:
             roles = [int(UserRolesEnum(role)) for role in roles]
