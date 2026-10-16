@@ -86,13 +86,15 @@ def count_user_db(exclude_inactive : bool = True, user : UserModel = Depends(get
     return db.users.count(exclude_inactive=exclude_inactive)
 
 @router.get("/q")
-def query_user_db(search_string : str = None, limit : int = 40, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+def query_user_db(search_string : str = None, roles : List[int] = None, limit : int = 40, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """Query user in the database and returns the tags 
 
     Parameters
     ----------
     search_string : str, optional
         The search string to query users, by default None
+    roles : List[int], optional
+        The user roles (UserRolesEnum ints) to filter for, by default None
     limit : int, optional
         The maximum number of user tags to return, by default 40
 
@@ -102,7 +104,12 @@ def query_user_db(search_string : str = None, limit : int = 40, user : UserModel
         A list of user tags matching the search criteria.
     """
 
-    return db.users.find(search_string, limit=limit)
+    if roles is not None:
+        try:
+            roles = [int(UserRolesEnum(role)) for role in roles]
+        except ValueError:
+            raise HTTPException(422, "Invalid user role provided.")
+    return db.users.find(search_string, roles=roles, limit=limit)
     
 @router.post("/pw", summary="Allows users to change the password for themselves.")
 def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
@@ -192,6 +199,17 @@ def block_user(user_tag : str, user : UserModel = Depends(is_user_admin), db : D
     #UserDB.block_user_by_label(user_props.label)
     
     
+@router.post("/{user_tag}/role", summary="Change the role of a user. Requires admin rights.")
+def change_user_role(user_tag : str, role : int, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)) -> bool:
+    """Changes the role of a user. Limited to admin users."""
+    if not db.users.exists(tag = user_tag):
+        raise user_not_found
+    try:
+        role = int(UserRolesEnum(role))
+    except ValueError:
+        raise HTTPException(422, "Invalid user role provided.")
+    return db.users.update(tag = user_tag, user_props = {"role": role})
+
 @router.get("/{user_tag}/exists", summary="Checks if a user exists by its tag.")
 def check_if_user_exists(user_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """Checks if a user exists by its tag."""

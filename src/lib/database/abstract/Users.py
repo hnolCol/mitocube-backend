@@ -96,7 +96,7 @@ class UserABC(ABC):
     
     
     @abstractmethod
-    def find(self, search_string : str = None, limit : int = 40) -> List[str]:
+    def find(self, search_string : str = None, roles : List[int] = None, limit : int = 40) -> List[str]:
         """Finds user by 'search_string' string. The result is limited to a number of
         users given by 'limit'.
 
