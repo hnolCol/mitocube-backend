@@ -449,7 +449,7 @@ class Neo4JUser(UserABC):
         
     
     
-    def find(self, search_string : str = None, limit : int = 40) -> List[str]:
+    def find(self, search_string : str = None, roles : List[int] = None, limit : int = 40) -> List[str]:
         """Finds user by 'search_string' string. The result is limited to a number of
         users given by 'limit'.
 
@@ -468,9 +468,13 @@ class Neo4JUser(UserABC):
         """
         
         query = "MATCH (u:User) "
-        
+        conditions = []
         if search_string is not None and len(search_string) > 0:
-            query += "WHERE u.s CONTAINS toLower($search_string) "
+            conditions.append("u.s CONTAINS toLower($search_string)")
+        if roles is not None and len(roles) > 0:
+            conditions.append("u.role IN $roles")
+        if len(conditions) > 0:
+            query += "WHERE " + " AND ".join(conditions) + " "
         query += "RETURN u.tag "
         
         if limit is not None:
@@ -481,6 +485,7 @@ class Neo4JUser(UserABC):
                                         routing_="r",
                                         result_transformer_= Result.value,
                                         search_string= search_string.lower() if search_string is not None else None,
+                                        roles = roles,
                                         limit = limit)
         except Exception as e:
             print("Query finding resulted in an error " + str(e))
