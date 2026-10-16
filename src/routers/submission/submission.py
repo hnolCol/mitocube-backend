@@ -70,6 +70,7 @@ def get_submission_tag(user : UserModel = Depends(get_user_from_token), db : Dat
 def get_similar_submissions(tag : str,
                             limit : int = 5,
                             include_sample_ca : bool = False,
+                            classify_access : bool = False,
                             user : UserModel = Depends(get_user_from_token),
                             db : DatabaseABC = Depends(get_db)) -> SimilarSubmissionsResponse:
     """
@@ -91,23 +92,32 @@ def get_similar_submissions(tag : str,
         If True, condition applications of the submissions' samples are
         considered in addition to the ones of the submissions themselves,
         by default False
+    classify_access : bool, optional
+        If True, the restriction of candidates to the user's scope is
+        dropped and every similar submission is returned with an access
+        classification ('own_group', 'scope' or 'no_access') instead, by
+        default False
 
     Returns
     -------
     SimilarSubmissionsResponse
         The list of similar submissions with their scores and matched
-        elements, ordered by descending score.
+        elements, ordered by descending score. If classify_access is True,
+        each submission also carries an access classification ('own_group',
+        'scope' or 'no_access').
     """
     check_submission_access(submission_tag = tag, user = user, db = db)
     similar = db.submission_filter.find_similar(tag = tag,
                                                 current_user_tag = user.tag,
                                                 limit = limit,
-                                                include_sample_ca = include_sample_ca)
+                                                include_sample_ca = include_sample_ca,
+                                                classify_access = classify_access)
     return SimilarSubmissionsResponse(
         submission_tag = tag,
         similar = [
             SimilarSubmissionModel(
                 submission_tag = s["submission_tag"],
+                access = s.get("access"),
                 score = s["score"],
                 matched = SimilarSubmissionMatchedModel(
                     genotypes = s["genotypes"],
