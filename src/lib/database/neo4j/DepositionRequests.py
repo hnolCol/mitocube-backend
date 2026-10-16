@@ -150,6 +150,19 @@ class Neo4JDepositionRequests(DepositionRequestsABC):
         )
         return self._to_model(r[0])
 
+    def delete(self, tag: str) -> bool:
+        row = self._get_node(tag)
+        if row["status"] != "pending":
+            raise ValueError(f"Deposition request with tag '{tag}' is not pending.")
+        query = (
+            "MATCH (r:DepositionRequest {tag: $tag}) "
+            "DETACH DELETE r "
+            "RETURN count(r) AS n"
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag,
+                                       result_transformer_=Result.data)
+        return r[0]["n"] == 0
+
     def reject(self, tag: str, reviewer_tag: str, comment: str = None) -> DepositionRequestModel:
         row = self._get_node(tag)
         if row["status"] != "pending":

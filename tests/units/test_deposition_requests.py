@@ -88,6 +88,14 @@ class FakeDepositionRequestsDB:
         r.review_comment = comment
         return r
 
+    def delete(self, tag):
+        if tag not in self.requests:
+            raise ValueError(f"Deposition request with tag '{tag}' not found.")
+        if self.requests[tag].status != "pending":
+            raise ValueError(f"Deposition request with tag '{tag}' is not pending.")
+        del self.requests[tag]
+        return True
+
     def reject(self, tag, reviewer_tag, comment=None):
         if tag not in self.requests:
             raise ValueError(f"Deposition request with tag '{tag}' not found.")
@@ -237,6 +245,62 @@ def test_submission_deposition_request_exists_endpoint():
     db_requests.reject(tag=tag, reviewer_tag="curator1")
     result = depositions.submission_deposition_request_exists(submission_tag="sub1", user=user, db=db)
     assert result == {"pending": False}
+
+
+def test_delete_removes_pending_request():
+    db = FakeDepositionRequestsDB(submissions={"sub1": "My dataset"})
+    tag = db.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="user1")
+    assert db.delete(tag=tag)
+    assert tag not in db.requests
+    with pytest.raises(ValueError, match="not found"):
+        db.delete(tag=tag)
+    tag2 = db.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="user1")
+    db.reject(tag=tag2, reviewer_tag="curator1")
+    with pytest.raises(ValueError, match="not pending"):
+        db.delete(tag=tag2)
+
+
+def test_revoke_endpoint_permissions():
+    db_requests = FakeDepositionRequestsDB(submissions={"sub1": "My dataset"})
+    tag = db_requests.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="creator1")
+    class SubmissionsDB:
+        def get_creator(self, tag):
+            return "creator1"
+    class ConsortiumDB:
+        def __init__(self, head_tags):
+            self.head_tags = head_tags
+        def is_head_of_submission_owner(self, user_tag, submission_tag):
+            return user_tag in self.head_tags
+    class FakeFullDatabase:
+        def __init__(self, db_requests, submissions, consortiums):
+            self.deposition_requests = db_requests
+            self.submissions = submissions
+            self.consortiums = consortiums
+        def submission_exists(self, tag):
+            return tag in self.deposition_requests.submissions
+    db = FakeFullDatabase(db_requests, SubmissionsDB(), ConsortiumDB({"head0001"}))
+    requester = make_user(tag="creator1")
+    head = make_user(tag="head0001")
+    other = make_user(tag="other001")
+    curator = make_user(tag="curat001", role=UserRolesEnum.CURATOR)
+
+    result = depositions.revoke_deposition_request(request_tag=tag, user=requester, db=db)
+    assert result == {"tag": tag, "deleted": True}
+    assert tag not in db_requests.requests
+
+    tag2 = db_requests.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="creator1")
+    with pytest.raises(HTTPException) as exc_info:
+        depositions.revoke_deposition_request(request_tag=tag2, user=other, db=db)
+    assert exc_info.value.status_code == 403
+    assert tag2 in db_requests.requests
+
+    depositions.revoke_deposition_request(request_tag=tag2, user=head, db=db)
+    tag3 = db_requests.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="creator1")
+    depositions.revoke_deposition_request(request_tag=tag3, user=curator, db=db)
+
+    with pytest.raises(HTTPException) as exc_info:
+        depositions.revoke_deposition_request(request_tag="missing", user=requester, db=db)
+    assert exc_info.value.status_code == 404
 
 
 def test_models_validate_status():

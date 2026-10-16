@@ -178,3 +178,25 @@ def reject_deposition_request(request_tag: str,
         return db.deposition_requests.reject(tag=request_tag, reviewer_tag=user.tag, comment=review.comment)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.delete("/{request_tag}", summary="Revokes (deletes) a pending deposition request. Only the user who created the request, curators/admins or a research group head (PI) of the creator's research group can revoke it.")
+def revoke_deposition_request(request_tag: str,
+                              user: UserModel = Depends(get_user_from_token),
+                              db: DatabaseABC = Depends(get_db)) -> dict:
+    """Deletes a pending deposition request. Only the requesting user,
+    curators/admins or a research group head (PI) of the creator's research
+    group can revoke a pending request. Deposited or rejected requests
+    cannot be revoked."""
+    requests = db.deposition_requests.get(tags=[request_tag], limit=1)
+    if not requests:
+        raise HTTPException(status_code=404, detail="Deposition request not found.")
+    request = requests[0]
+    if (user.tag != request.user_tag
+            and not _is_creator_or_head(request.submission_tag, user, db)):
+        raise HTTPException(status_code=403, detail="Only the user who created the request, curators/admins or a research group head (PI) of the creator's research group can revoke a deposition request.")
+    try:
+        db.deposition_requests.delete(tag=request_tag)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"tag": request_tag, "deleted": True}

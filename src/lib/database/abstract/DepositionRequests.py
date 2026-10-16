@@ -47,6 +47,12 @@ class DepositionRequestsABC(ABC):
         """Returns the deposition requests of a submission, newest first."""
 
     @abstractmethod
+    def delete(self, tag: str) -> bool:
+        """Deletes a pending deposition request. Returns True if a request was
+        deleted. Raises ValueError if the request does not exist or is not
+        pending."""
+
+    @abstractmethod
     def complete(self, tag: str, reviewer_tag: str, identifier: str, url: str = None,
                  token: str = None, comment: str = None) -> DepositionRequestModel:
         """Marks a pending deposition request as deposited and stores the
