@@ -24,7 +24,7 @@ from services.random_generators import get_random_string
 
 
 class SubmissionLink(BaseModel):
-    """"""
+    """
     id : str 
     url : AnyUrl
     comment : str = None
@@ -47,7 +47,7 @@ class SampleAttribute(BaseModel):
     name : str
 
 class MinimalMetadataModel(BaseModel):
-    
+    ""
     tag : str 
     title : str 
     state : SubmissionStatesEnums
@@ -59,17 +59,17 @@ class MinimalMetadataModel(BaseModel):
     has_datatable : bool 
     
 class MinimalMetadataResponseModel(MinimalMetadataModel):
-    """ 
+    "" 
     
 
 class NewSubmissionModel(BaseModel):
-    """
+    ""
     Model to handle submissions from the ui. 
 
     Parameters
     ----------
 
-    """
+    ""
     tag : str = Field(...,min_length=10, max_length=12)
     user_tag : Optional[str] = None 
     sample_names : List[str]
@@ -83,8 +83,8 @@ class NewSubmissionModel(BaseModel):
     links : List[SubmissionLink] = None
     genotypes : Optional[List[List[str]]] = Field(default_factory=list)
     
-   
-    # datasetAttributes : Dict[str, List[trait_tag]> # <attribute_tag, List[trait_tag]>
+  
+    # datasetAttributes : Dict[str,List[str]] # <attribute_tag, List[trait_tag]>
     # samplesAttributes : Dict[str,Dict[str,List[int]]] # The sample attribute_tag - trait_tag - sample_index 
     # timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
     # includes_data : bool = False 
@@ -103,7 +103,7 @@ class NewSubmissionModel(BaseModel):
     
     # # @field_validator("samplesAttributesInput", mode="after")
     # # def validate_sample_attribute_input(cls, v : Dict[str,List[Dict]]|None, config):
-    # #     """
+    # #     ""
     # #     if v is None: return
         
     # #     n_samples = len(cls.sampleNames)
@@ -115,7 +115,7 @@ class NewSubmissionModel(BaseModel):
  
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
-        """
+        ""
         meta_settings = MetaTexts()
         #check first presents of required metatexts
         
@@ -130,12 +130,12 @@ class NewSubmissionModel(BaseModel):
 
         return v 
 class SampleAttributeFromDB(BaseModel):
-    """
+    ""
     name : str
     values : Dict[str,List[int]]
     
 class DatasetSubmissionModel(BaseModel):
-    """
+    ""
     created_on : float
     modified_on : Optional[float] = None
     state : SubmissionStatesEnums
@@ -191,7 +191,7 @@ class DatasetAttributesResponse(BaseModel):
     ----------
     tag - submission tag 
     tags - The attribute_tag (key) and trait_tags (List[str]) for the assigned traits .
-    """
+    ""
     tag : str
     tags : Dict[str,List[str]]
    #user_input : Dict
