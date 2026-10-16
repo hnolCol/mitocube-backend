@@ -242,6 +242,7 @@ def find_similar_submissions(submission_tag: str, current_user_tag: str, limit: 
         tag=submission_tag,
         current_user_tag=current_user_tag,
         limit=limit,
+        classify_access=True,
     )
 
 SUBMISSION_TOOLS = [find_submissions,

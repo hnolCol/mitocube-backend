@@ -872,7 +872,7 @@ Each submission is counted at most once per group and year, even if it has sever
 
         
     @abstractmethod
-    def find_similar(self, tag : str, current_user_tag : str = None, limit : int = 5, include_sample_ca : bool = False) -> List[Dict]:
+    def find_similar(self, tag : str, current_user_tag : str = None, limit : int = 5, include_sample_ca : bool = False, classify_access : bool = False) -> List[Dict]:
         """Finds the submissions that are most similar to the given submission.
 
         Similarity is based on the overlap of the genotypes of the submissions'
@@ -886,8 +886,14 @@ Each submission is counted at most once per group and year, even if it has sever
         tag : str
             The tag of the submission to find similar submissions for.
         current_user_tag : str, optional
-            The tag of the requesting user. If provided, only submissions the
-            user has access to are considered as candidates, by default None
+            The tag of the requesting user. If provided, candidates are
+            restricted to the submissions the user has access to, unless
+            classify_access is True, by default None
+        classify_access : bool, optional
+            If True (together with current_user_tag), the scope filter is
+            dropped and every candidate is classified by the requesting
+            user's relation to it ('own_group', 'scope' or 'no_access')
+            instead, by default False
         limit : int, optional
             The maximum number of similar submissions to return, by default 5
         include_sample_ca : bool, optional
@@ -899,7 +905,9 @@ Each submission is counted at most once per group and year, even if it has sever
         -------
         List[Dict]
             A list of dicts with keys 'submission_tag', 'score', 'genotypes',
-            'condition_applications' and 'traits', ordered by descending score.
+            'condition_applications' and 'traits', ordered by descending
+            score. If classify_access is True and current_user_tag is
+            provided, each dict also has an 'access' key.
         """
 
     @abstractmethod
