@@ -2295,7 +2295,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN collect(DISTINCT og.tag) AS ogenos } "
             f"WITH t, tgenos, tcas, o, {own_group_carry}ogenos "
             f"{ca_import}"
-            f"WITH t, tgenos, tcas, o, {own_group_carry}"
+            f"WITH t, tgenos, tcas, o, ogenos, ocas, {own_group_carry}"
             "[g IN tgenos WHERE g IN ogenos] AS shared_genos, "
             "[c IN tcas WHERE c IN ocas] AS shared_cas "
             "WHERE size(shared_genos) + size(shared_cas) > 0 "
