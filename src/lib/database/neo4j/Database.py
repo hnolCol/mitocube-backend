@@ -7,6 +7,7 @@ from lib.database.abstract.Database import DatabaseABC
 from lib.database.neo4j.Proteomes import Neo4JProteomes
 from lib.database.neo4j.Attributes import Neo4JAttributes
 from lib.database.neo4j.AttributeRequests import Neo4JAttributeRequests
+from lib.database.neo4j.DepositionRequests import Neo4JDepositionRequests
 from lib.database.neo4j.Dataset import Neo4JDataset
 from lib.database.neo4j.Submission import Neo4JSubmissionFilter, Neo4JSubmissions, Neo4JSubmissionSummary
 from lib.database.neo4j.Meta import Neo4JMetaHandler
@@ -74,6 +75,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.genotypes = Neo4JGenotype(driver=self.connection.driver, condition_applications=self.condition_applications)
         self.proteomes = Neo4JProteomes(driver = self.connection.driver, features=self.features)
         self.submissions = Neo4JSubmissions(driver = self.connection.driver, meta=self.meta, proteomes = self.proteomes, condition_applications=self.condition_applications)
+        self.deposition_requests = Neo4JDepositionRequests(driver=self.connection.driver, submissions=self.submissions)
         self.news = Neo4JNews(driver=self.connection.driver)
         self.policy = Neo4JPolicy(driver=self.connection.driver)
         self.impressum = Neo4JImpressum(driver=self.connection.driver)

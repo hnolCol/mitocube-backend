@@ -37,6 +37,8 @@ class Email(BaseSettings):
     mail_submission_complete_template : str = "submission_complete.html"
     mail_account_generated_template : str = "account_generated.html"
     mail_proteome_added_template : str = "proteome_added.html"
+    mail_deposition_requested_template : str = "deposition_requested.html"
+    mail_deposition_complete_template : str = "deposition_complete.html"
     
     class Config:
         env_file = get_env_file()

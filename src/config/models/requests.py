@@ -61,3 +61,40 @@ class AttributeRequestModel(BaseModel):
 
 class AttributeRequestReviewModel(BaseModel):
     comment: Optional[str] = None
+
+
+class DepositionRequestInsertModel(BaseModel):
+    """A user request that a submission's data should be deposited to an
+    external database (e.g. PRIDE)."""
+    submission_tag: str
+    database: str
+    comment: Optional[str] = None
+
+
+class DepositionRequestModel(BaseModel):
+    tag: str = Field(default_factory=lambda: get_random_string(N=12))
+    submission_tag: str
+    status: Literal["pending", "deposited", "rejected"] = "pending"
+    user_tag: str
+    database: str
+    comment: Optional[str] = None
+    created_at: Optional[float] = None
+    identifier: Optional[str] = None
+    url: Optional[str] = None
+    token: Optional[str] = None
+    reviewer_tag: Optional[str] = None
+    reviewed_at: Optional[float] = None
+    review_comment: Optional[str] = None
+
+
+class DepositionRequestCompleteModel(BaseModel):
+    """The deposition information added by a curator once the data have
+    been deposited to the external database."""
+    identifier: str
+    url: Optional[str] = None
+    token: Optional[str] = None
+    comment: Optional[str] = None
+
+
+class DepositionRequestReviewModel(BaseModel):
+    comment: Optional[str] = None
