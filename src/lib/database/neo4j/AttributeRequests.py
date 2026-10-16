@@ -82,7 +82,7 @@ class Neo4JAttributeRequests(AttributeRequestsABC):
             "ORDER BY r.created_at DESC LIMIT $limit"
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, **params)
-        return [self._to_model(row) for row in r[0]]
+        return [self._to_model(row) for row in r]
 
     def get_pending(self, limit: int = 50) -> List[AttributeRequestModel]:
         return self.get(status="pending", limit=limit)
@@ -94,9 +94,9 @@ class Neo4JAttributeRequests(AttributeRequestsABC):
             "r.comment as comment, r.created_at as created_at, r.attribute as attribute, r.trait as trait"
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
-        if not r[0]:
+        if not r:
             raise ValueError(f"Attribute request with tag '{tag}' not found.")
-        return r[0][0]
+        return r[0]
 
     def accept(self, tag: str, reviewer_tag: str, comment: Optional[str] = None) -> AttributeRequestModel:
         row = self._get_node(tag)
