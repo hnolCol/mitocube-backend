@@ -24,7 +24,7 @@ from services.random_generators import get_random_string
 
 
 class SubmissionLink(BaseModel):
-    """
+    """"""
     id : str 
     url : AnyUrl
     comment : str = None
@@ -63,13 +63,13 @@ class MinimalMetadataResponseModel(MinimalMetadataModel):
     
 
 class NewSubmissionModel(BaseModel):
-    ""
+    """
     Model to handle submissions from the ui. 
 
     Parameters
     ----------
 
-    ""
+    """
     tag : str = Field(...,min_length=10, max_length=12)
     user_tag : Optional[str] = None 
     sample_names : List[str]
@@ -95,7 +95,6 @@ class NewSubmissionModel(BaseModel):
     
     
     
-    
     # @field_validator("datasetAttributeInput", mode="after")
     # def validate_dataset_attribute_input(cls, v : Dict|None, config):
     #     if v is None: return
@@ -103,7 +102,7 @@ class NewSubmissionModel(BaseModel):
     
     # # @field_validator("samplesAttributesInput", mode="after")
     # # def validate_sample_attribute_input(cls, v : Dict[str,List[Dict]]|None, config):
-    # #     ""
+    # #     """"""
     # #     if v is None: return
         
     # #     n_samples = len(cls.sampleNames)
@@ -115,7 +114,7 @@ class NewSubmissionModel(BaseModel):
  
     @field_validator("metatext")
     def validate_meta_text(cls, v : Dict[str,str], config):
-        ""
+        """"""
         meta_settings = MetaTexts()
         #check first presents of required metatexts
         
@@ -130,7 +129,7 @@ class NewSubmissionModel(BaseModel):
 
         return v 
 class SampleAttributeFromDB(BaseModel):
-    ""
+    """"""
     name : str
     values : Dict[str,List[int]]
     
@@ -191,7 +190,7 @@ class DatasetAttributesResponse(BaseModel):
     ----------
     tag - submission tag 
     tags - The attribute_tag (key) and trait_tags (List[str]) for the assigned traits .
-    ""
+    """
     tag : str
     tags : Dict[str,List[str]]
    #user_input : Dict
