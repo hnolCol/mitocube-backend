@@ -12,6 +12,29 @@ from services.random_generators import get_random_string
 # attribute tags of the storage group used for plates
 PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "plate_type": "att_plate_type", "vendor": "att_vendor"}
 
+# attributes + traits the plates need; created on startup if missing (existing ones are never changed)
+STORAGE_GROUP_TAG = "storage"
+STORAGE_ATTRIBUTES = [
+    {"tag": "att_container_format", "text": "Container Format", "traits": [
+        {"value": "1x8",   "text": "1x8",   "description": "8-tube PCR strip"},
+        {"value": "1x12",  "text": "1x12",  "description": "12-tube PCR strip"},
+        {"value": "3x5",   "text": "3x5",   "description": "15 wells (PAL)"},
+        {"value": "6x9",   "text": "6x9",   "description": "54 wells (PAL)"},
+        {"value": "8x12",  "text": "8x12",  "description": "96-well plate"},
+        {"value": "16x24", "text": "16x24", "description": "384-well plate"},
+    ]},
+    {"tag": "att_cold_storage", "text": "Cold Storage", "traits": [
+        {"value": "-20", "text": "-20 °C freezer", "description": "Standard freezer (-20 °C)"},
+        {"value": "-80", "text": "-80 °C freezer", "description": "Ultra-low temperature freezer (-80 °C)"},
+    ]},
+    {"tag": "att_plate_type", "text": "Plate Type", "traits": [
+        {"value": "pcr_skirted", "text": "PCR plate (skirted)", "description": "Fully skirted PCR plate, autosampler/robot compatible"},
+    ]},
+    {"tag": "att_vendor", "text": "Vendor", "traits": [
+        {"value": "thermo_fisher", "text": "Thermo Fisher Scientific", "description": "Thermo Fisher Scientific"},
+    ]},
+]
+
 
 def _trait_text(attribute_tag : str) -> str:
     "Cypher pattern comprehension returning the trait text of the plate's condition application for an attribute."
@@ -51,9 +74,49 @@ class Neo4JPlates(PlatesABC):
         "} AS plate "
     )
 
-    def __init__(self, driver : Driver, condition_applications : ConditionApplicationABC) -> None:
+    def __init__(self, driver : Driver, condition_applications : ConditionApplicationABC):
         self._driver = driver
         self._condition_applications = condition_applications
+        self.ensure_storage_attributes()
+
+    def ensure_storage_attributes(self) -> None:
+        """Creates the storage attribute group, the plate attributes and their default traits
+        if they do not exist yet. Existing attributes and traits are not changed.
+        """
+        attributes = [
+            {
+                "tag": a["tag"],
+                "text": a["text"],
+                "s": f"{a['text'].lower()} {a['tag']}",
+                "traits": [
+                    {**t,
+                     "tag": f"{a['tag']}:{t['value']}",
+                     "s": f"{t['text'].lower()} {t['description'].lower()}"}
+                    for t in a["traits"]
+                ]
+            }
+            for a in STORAGE_ATTRIBUTES
+        ]
+        query = (
+            "MERGE (ag:AttributeGroup {tag: $group_tag}) "
+            "ON CREATE SET ag.created_at = timestamp() "
+            "WITH ag "
+            "UNWIND $attributes AS attr "
+            "MERGE (a:Attribute {tag: attr.tag}) "
+            "ON CREATE SET a.text = attr.text, a.priority = 500, a.allow_input = false, "
+            "              a.s = attr.s, a.created_at = timestamp() "
+            "MERGE (a)-[:PART_OF]->(ag) "
+            "WITH a, attr "
+            "OPTIONAL MATCH (s:State) WHERE toInteger(s.tag) = 0 "
+            "FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | MERGE (a)-[:REQUIRES_STATE]->(s)) "
+            "WITH a, attr "
+            "UNWIND attr.traits AS trait "
+            "MERGE (t:Trait {tag: trait.tag}) "
+            "ON CREATE SET t.text = trait.text, t.description = trait.description, t.value = trait.value, "
+            "              t.priority = 500, t.attribute_tag = attr.tag, t.s = trait.s, t.created_at = timestamp() "
+            "MERGE (a)-[:HAS_TRAIT]->(t) "
+        )
+        self._driver.execute_query(query, group_tag=STORAGE_GROUP_TAG, attributes=attributes, routing_="w")
 
     def exists(self, tag : str) -> bool:
         query = (

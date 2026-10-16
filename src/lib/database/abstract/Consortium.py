@@ -80,3 +80,7 @@ class ConsortiumABC(ABC):
     @abstractmethod
     def is_head_of_submission_owner(self, user_tag : str, submission_tag : str) -> bool:
         """Checks if the user is a head (PI) of a research group the owner (creator) of the submission is a member of"""
+
+    @abstractmethod
+    def get_pending_consortium_tags(self, submission_tag : str) -> List[str]:
+        """Returns the tags of consortiums with a pending share request for the submission"""

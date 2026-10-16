@@ -85,6 +85,13 @@ def get_my_pending_share_requests(user : UserModel = Depends(get_user_from_token
     """
     return db.consortiums.get_pending_share_requests_for_head(user_tag = user.tag)
 
+@router.get("/submissions/{submission_tag}/pending", summary="Returns the consortiums with a pending share request for the submission.")
+def get_pending_consortium_shares(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """"
+    Returns the tags of all consortiums the submission has a pending share request for.
+    """
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    return db.consortiums.get_pending_consortium_tags(submission_tag = submission_tag)
 
 @router.post("/requests/{consortium_tag}/{submission_tag}/approve",
              summary="Approves a pending share request. Requires a head (PI) of the owners research group or a curator.")
