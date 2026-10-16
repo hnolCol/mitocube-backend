@@ -2299,7 +2299,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "[g IN tgenos WHERE g IN ogenos] AS shared_genos, "
             "[c IN tcas WHERE c IN ocas] AS shared_cas "
             "WHERE size(shared_genos) + size(shared_cas) > 0 "
-            f"WITH t, tgenos, tcas, o, {own_group_carry}"
+            f"WITH t, tgenos, tcas, o, shared_genos, shared_cas, {own_group_carry}"
             "size(ogenos) + size(ocas) AS o_union_size "
             "CALL { WITH o, shared_cas "
             "MATCH (o)-[:HAS_APPLICATION]->(sca:ConditionApplication)-[:INSTANCE_OF]->(strait:Trait) "
