@@ -1,7 +1,7 @@
 import time
 
 from datetime import datetime 
-from typing import List, Dict, Optional, Union
+from typing import Literal, List, Dict, Optional, Union
 from pydantic import AnyUrl
 from pydantic import BaseModel 
 from pydantic import Field
@@ -29,7 +29,6 @@ class SubmissionLink(BaseModel):
     url : AnyUrl
     comment : str = None
 
-
     @field_serializer("url", mode="plain")
     def url_to_string(v : AnyUrl):
         return str(v)
@@ -45,8 +44,7 @@ class SampleAttribute(BaseModel):
         The name of the samples attributes
     """
     attribute : AttributeModel
-    name : str 
-
+    name : str
 
 class MinimalMetadataModel(BaseModel):
     ""
@@ -64,14 +62,12 @@ class MinimalMetadataResponseModel(MinimalMetadataModel):
     "" 
     
 
-
 class NewSubmissionModel(BaseModel):
     """
     Model to handle submissions from the ui. 
 
     Parameters
     ----------
-
 
     """
     tag : str = Field(...,min_length=10, max_length=12)
@@ -87,7 +83,7 @@ class NewSubmissionModel(BaseModel):
     links : List[SubmissionLink] = None
     genotypes : Optional[List[List[str]]] = Field(default_factory=list)
     
-   
+  
     # datasetAttributes : Dict[str,List[str]] # <attribute_tag, List[trait_tag]>
     # samplesAttributes : Dict[str,Dict[str,List[int]]] # The sample attribute_tag - trait_tag - sample_index 
     # timeline : TimeLineModel = Field(...,default_factory=TimeLineModel)
@@ -96,7 +92,6 @@ class NewSubmissionModel(BaseModel):
     # data_sample_names : List[str] = None
     # data_index : List[str|None] = None 
     # datasetAttributeInput : Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None # Dict[str,Dict[str,Dict[UnitsEnum,UnitTypeInputModel]]] = None
-    
     
     
     
@@ -162,7 +157,6 @@ class DatasetSubmissionModel(BaseModel):
     class Config:
         use_enum_values = True 
 
-
 class SubmissionUserCountResponse(BaseModel):
     user_label : str
     submission_labels : List[str]
@@ -188,8 +182,6 @@ class SubmissionIDResponse(BaseModel):
     tag: str = Field(default_factory= lambda : get_random_string(N=10))
     created_on : datetime = Field(default_factory= datetime.now)
 
-
-
 class DatasetAttributesResponse(BaseModel):
     """BaseModel for the response of dataset attributes
     for a submission. 
@@ -203,20 +195,18 @@ class DatasetAttributesResponse(BaseModel):
     tags : Dict[str,List[str]]
    #user_input : Dict
 
-
 class SimilarSubmissionMatchedModel(BaseModel):
     """The shared elements that make two submissions similar."""
     genotypes: List[str] = Field(default_factory=list)
     condition_applications: List[str] = Field(default_factory=list)
     traits: List[str] = Field(default_factory=list)
 
-
 class SimilarSubmissionModel(BaseModel):
     """A single similar submission with its similarity score and the matched elements."""
     submission_tag: str
+    access: Optional[Literal["own_group", "scope", "no_access"]] = None
     score: float
     matched: SimilarSubmissionMatchedModel
-
 
 class SimilarSubmissionsResponse(BaseModel):
     """Response for the similar submissions endpoint."""

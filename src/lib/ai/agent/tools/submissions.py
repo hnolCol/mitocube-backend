@@ -1,11 +1,11 @@
 
 from typing import List, Optional, Dict, Tuple
-
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from lib.database.Database import Database 
 from config.models.submissions.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
+
 DB = Database.DB()
 
 # =========================================================
@@ -23,8 +23,7 @@ class SubmissionConditionApplicationInput(BaseModel):
     submission_tag: str = Field(..., description="Exact submission tag to retrieve information for")
     group_by_min_state: bool = Field(False, description="Whether to group by minimum state. This is a property of an attribute. Some attribute can only be entered if a given state of submission is reached. For example: The instrument can only be defined, if the submission is in state 'Measuring'")
     group_by_attribute: bool = Field(True, description="Whether to group by attribute")
-    attribute_tags : Optional[List[str]] = Field(None, description="List of attribute tags to filter by. This gives then only the condition applications that have the given attributes. If empty, all condition applications are returned.")
-    
+    attribute_tags : Optional[List[str]] = Field(None, description="List of attribute tags to filter by. This gives then only the condition applications that have the given attributes. If empty, all condition applications are returned.")    
 
 class FindSubmissionsInput(BaseModel):
     current_user_tag : str = Field(..., description="The user tag of the current user. This is used to filter the submissions that the user has access to.")
@@ -34,14 +33,13 @@ class FindSubmissionsInput(BaseModel):
     limit: int = Field(None, description="Maximum number of submission tags to return. By default None (e.g. no limit). If you want to get all submission tags, set limit to None.")
     ca_tags : List[str] = Field(None, description="Filter submissions by condition application tags (leave empty for all condition applications). You can use the find_condition_applications tool to find condition application tags based on names.")
     protein_tags: List[str] = Field(None, description="Filter submissions by protein tags (leave empty for all proteins). This will return only submission that quantified the given proteins.")
-    
+
 class SubmissionTagInput(BaseModel):
     submission_tag: str = Field(..., description="Exact submission tag to retrieve information for")
-    
+
 class SubmissionTagsInput(BaseModel):
-    submission_tags: List[str] = Field(..., description="Exact submission tags to retrieve information for")
-    
-    
+    submission_tags: List[str] = Field(..., description="Exact submission tags to retrieve information for")    
+
 class SubmissionTitleAndAimOutput(BaseModel):
     submission_tag: str
     title: str
@@ -58,10 +56,8 @@ def find_submissions(current_user_tag: str,
     """Search submissions by free text search on title, tags and research name.
     Returns a list of matching submission tags. The submission are automatically ordered by the creation_date
     - Comments: 
-    
-    If no search_string is provided and limit = 1, the most recent submission tag will be returned.
-    
-    """
+        If no search_string is provided and limit = 1, the most recent submission tag will be returned.
+        """
     tags = DB.submission_filter.find_v2(current_user_tag= current_user_tag, search_string=search_string, state=state, user_tags=user_tags, ca_tags=ca_tags, limit = limit, protein_tags=protein_tags)
     return tags
 
@@ -78,37 +74,31 @@ def get_submission_title_and_research_aim(submission_tags: List[str]) -> List[Su
                 research_aim=submission_aim
             ))
     print("called", "results: ", results    )
-    return results
-    
+    return results    
+
 @tool("count_submissions")
 def count_submissions() -> int:
     """Returns total number of submissions."""
     return DB.submissions.count()
-
 
 @tool("count_submissions_by_query")
 def count_submissions_by_query(
     current_user_tag : str,
     search_string: str = None,
     state: str = None,
-    user_tags: List[str] = None
-) -> Dict[str, int]:
+    user_tags: List[str] = None) -> Dict[str, int]:
     """Returns query_count and total_count for filters."""
-
     total_count = DB.submissions.count()
-
     query_count = DB.submission_filter.count_v2(
         current_user_tag=current_user_tag,
         search_string=search_string,
         state=state,
         user_tags=APIParamString(param=user_tags).param
     )
-
     return {
         "query_count": query_count,
         "total_count": total_count
     }
-
 
 # =========================================================
 # 2. BASIC SUBMISSION INFO
@@ -126,7 +116,6 @@ def get_submission_state(submission_tag: str) -> str:
         return "NOT_FOUND"
     return DB.submissions.get_state(tag=submission_tag)
 
-
 @tool("get_submission_created_at", args_schema=SubmissionTagInput)
 def get_submission_created_at(submission_tag: str) -> float:
     """Get creation timestamp. Use this to determine when a submission was created."""
@@ -142,7 +131,6 @@ def get_submission_creator(submission_tag: str) -> Tuple[str,str]:
     user_tag = DB.submissions.get_creator(tag=submission_tag)
     user = DB.users.get_user_by_tag(tag = user_tag)
     return user_tag, f"{user.firstname} {user.lastname} ({user.email})" if user else "NOT_FOUND"
-
 
 @tool("get_submission_user_team", args_schema=SubmissionTagInput)
 def get_submission_user_team(submission_tag: str) -> List[Tuple[str, str]]:
@@ -163,7 +151,6 @@ def get_submission_attributes(submission_tag: str, attribute_tags : List[str] = 
         return []
     return DB.submissions.get_conditions_applications(tag=submission_tag, group_by_attribute=group_by_attribute, group_by_min_state=group_by_min_state, attribute_tags=attribute_tags)
 
-
 # =========================================================
 # 3. SAMPLES
 # =========================================================
@@ -175,28 +162,22 @@ def get_submission_samples(submission_tag: str) -> List[str]:
         return []
     return DB.submissions.get_samples(tag=submission_tag)
 
-
 @tool("get_submission_samples_full")
 def get_submission_samples_full(submission_tag: str) -> List[Dict]:
     """Returns samples with genotype and basic info."""
     if not DB.submissions.exists(tag=submission_tag):
         return []
-
     result = []
     sample_tags = DB.submissions.get_samples(tag=submission_tag)
-
     for sample_tag in sample_tags:
         sample = DB.samples.get(tag=sample_tag)
         genotype = DB.samples.get_sample_genotype(tag=sample_tag)
-
         result.append({
             "tag": sample_tag,
             "index": sample.get("index") if sample else None,
             "genotype": genotype
         })
-
     return result
-
 
 # =========================================================
 # 4. CONDITION APPLICATIONS
@@ -207,22 +188,18 @@ def get_submission_condition_applications(submission_tag: str) -> List[str]:
     """Returns condition application tags for a submission."""
     if not DB.submissions.exists(tag=submission_tag):
         return []
-
     return DB.submissions.get_conditions_applications(tag=submission_tag)
-
 
 @tool("get_submission_ca_attributes")
 def get_submission_ca_attributes(submission_tag: str) -> List[str]:
     """Returns CA attribute tags for submission."""
     if not DB.submissions.exists(tag=submission_tag):
         return []
-
     ca_tags = DB.submissions.get_conditions_applications(submission_tag, group_by_attribute=False)
     attribute_tags = [
         DB.condition_applications.get_attribute(ca_tag)
         for ca_tag in ca_tags
     ]
-
     return [a for a in attribute_tags if a is not None]
 
 @tool("get_submission_title")
@@ -239,31 +216,25 @@ def get_submission_title(submission_tag: str) -> str:
 @tool("get_submission_runlist")
 def get_submission_runlist(submission_tag: str) -> Dict:
     """Returns runlist for submission."""
-
     if not DB.submissions.exists(tag=submission_tag):
         return {}
-
     runlist = DB.submissions.get_runlist(submission_tag=submission_tag)
     if runlist is None:
         return {}
-
     return runlist.model_dump()
-
-
-
-
 
 @tool("find_similar_submissions")
 def find_similar_submissions(submission_tag: str, current_user_tag: str, limit: int = 5) -> List[Dict]:
     """Finds the submissions that are most similar to a given submission.
-
     Similarity is based on the overlap of the genotypes of the submissions' samples
     and of their condition applications. For each similar submission, the shared
     genotypes, condition applications and traits are returned so it is transparent
     what actually matched.
 
-    Returns a list of dicts with keys 'submission_tag', 'score', 'genotypes',
-    'condition_applications' and 'traits', ordered by descending similarity.
+    Returns a list of dicts with keys 'submission_tag', 'access', 'score',
+    'genotypes', 'condition_applications' and 'traits', ordered by descending
+    similarity. 'access' classifies the relation of the requesting user to the
+    similar submission ('own_group', 'scope' or 'no_access').
     """
     if not DB.submissions.exists(tag=submission_tag):
         return []
