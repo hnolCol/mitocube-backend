@@ -1,0 +1,7 @@
+def find_similar_submissions(submission_tag: str, current_user_tag: str, limit: int = 5):
+    """Finds the submissions that are most similar to a given submission.
+    Returns a list of dicts with keys 'submission_tag', 'access', 'score',
+    'genotypes', 'condition_applications' and 'traits', ordered by descending
+    similarity. 'access' classifies the relation of the requesting user to the
+    similar submission ('own_group', 'scope' or 'no_access').
+    """
