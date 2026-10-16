@@ -7,6 +7,7 @@ from config.models.requests import (
     DepositionRequestModel,
 )
 from config.models.user import UserModel
+from fastapi import HTTPException
 from routers.requests import depositions
 
 
@@ -182,6 +183,60 @@ def test_get_curator_emails():
     db = FakeDatabase(db_requests=FakeDepositionRequestsDB(), users=UsersDB())
     emails = depositions._get_curator_emails(db)
     assert set(emails) == {"curator@age.mpg.de", "admin@age.mpg.de"}
+
+
+def test_create_deposition_request_requires_creator_or_head():
+    db_requests = FakeDepositionRequestsDB(submissions={"sub1": "My dataset"})
+    class SubmissionsDB:
+        def get_creator(self, tag):
+            return "creator1"
+    class ConsortiumDB:
+        def __init__(self, head_tags):
+            self.head_tags = head_tags
+        def is_head_of_submission_owner(self, user_tag, submission_tag):
+            return user_tag in self.head_tags
+    class FakeFullDatabase:
+        def __init__(self, db_requests, submissions, consortiums):
+            self.deposition_requests = db_requests
+            self.submissions = submissions
+            self.consortiums = consortiums
+        def submission_exists(self, tag):
+            return tag in self.deposition_requests.submissions
+    creator = make_user(tag="creator1")
+    head = make_user(tag="head0001")
+    other = make_user(tag="other001")
+    db = FakeFullDatabase(db_requests, SubmissionsDB(), ConsortiumDB({"head0001"}))
+    request = DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE")
+    assert depositions._is_creator_or_head("sub1", creator, db)
+    assert depositions._is_creator_or_head("sub1", head, db)
+    assert not depositions._is_creator_or_head("sub1", other, db)
+    with pytest.raises(HTTPException) as exc_info:
+        depositions.create_deposition_request(request=request, background_task=None, user=other, db=db)
+    assert exc_info.value.status_code == 403
+
+def test_submission_deposition_request_exists_endpoint():
+    db_requests = FakeDepositionRequestsDB(submissions={"sub1": "My dataset"})
+    tag = db_requests.insert(request=DepositionRequestInsertModel(submission_tag="sub1", database="PRIDE"), user_tag="user1")
+    class SubmissionFilterDB:
+        def has_user_access(self, user_tag, submission_tag):
+            return True
+    class SubmissionsDB:
+        def exists(self, tag):
+            return True
+    class FakeFullDatabase:
+        def __init__(self, db_requests):
+            self.deposition_requests = db_requests
+            self.submissions = SubmissionsDB()
+            self.submission_filter = SubmissionFilterDB()
+        def submission_exists(self, tag):
+            return tag in self.deposition_requests.submissions
+    db = FakeFullDatabase(db_requests)
+    user = make_user(tag="user0001")
+    result = depositions.submission_deposition_request_exists(submission_tag="sub1", user=user, db=db)
+    assert result == {"pending": True}
+    db_requests.reject(tag=tag, reviewer_tag="curator1")
+    result = depositions.submission_deposition_request_exists(submission_tag="sub1", user=user, db=db)
+    assert result == {"pending": False}
 
 
 def test_models_validate_status():
