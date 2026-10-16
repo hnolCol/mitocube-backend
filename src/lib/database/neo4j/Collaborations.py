@@ -356,36 +356,28 @@ class Neo4JCollaborations(CollaborationsABC):
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
+            "WITH s, "
+            "[ca_tag IN $ca_tags WHERE size((s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag})) > 0] AS matched_ca_tags, "
+            "[user_tag IN $user_tags WHERE size((:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s)) > 0] AS matched_user_tags "
         )
         params = {"limit" : limit, "ca_tags" : ca_tags, "user_tags" : user_tags}
         if search_string is not None:
-            query += "AND toLower(s.title) CONTAINS toLower($search_string) "
+            query += "WHERE toLower(s.title) CONTAINS toLower($search_string) "
             params["search_string"] = search_string
         if ca_tags:
-            query += (
-                "AND ALL(ca_tag IN $ca_tags WHERE EXISTS { "
-                "MATCH (s)-[:HAS_APPLICATION]->(ca:ConditionApplication {tag : ca_tag}) "
-                "OR EXISTS { MATCH (s)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication {tag : ca_tag}) } }) "
-            )
+            query += "AND size(matched_ca_tags) = size($ca_tags) "
         if user_tags:
-            query += (
-                "AND ALL(user_tag IN $user_tags WHERE EXISTS { "
-                "MATCH (u:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) }) "
-            )
+            query += "AND size(matched_user_tags) = size($user_tags) "
         query += (
             "OPTIONAL MATCH (owner:User)-[:CREATED]->(s) "
             "OPTIONAL MATCH (owner)-[:MEMBER_OF]->(rg:ResearchGroup) "
-            "WITH s, owner, collect(DISTINCT rg) AS rgs "
+            "WITH s, owner, collect(DISTINCT rg) AS rgs, matched_ca_tags, matched_user_tags "
             "OPTIONAL MATCH (s)-[st:IN_STATE]->(state:State) "
-            "WITH s, owner, rgs, state ORDER BY st.created_at DESC "
-            "WITH s, owner, rgs, head(collect(state)) AS latest_state "
-            "WITH s, owner, rgs, latest_state LIMIT $limit "
+            "WITH s, owner, rgs, matched_ca_tags, matched_user_tags, state ORDER BY st.created_at DESC "
+            "WITH s, owner, rgs, matched_ca_tags, matched_user_tags, head(collect(state)) AS latest_state "
+            "WITH s, owner, rgs, matched_ca_tags, matched_user_tags, latest_state LIMIT $limit "
             "OPTIONAL MATCH (s)<-[:FOR_SUBMISSION]-(cr:CollaborationRequest {status : 'pending'}) "
-            "WITH s, owner, rgs, latest_state, count(cr) > 0 AS has_open_request "
-            "WITH s, owner, rgs, latest_state, has_open_request, "
-            "[ca_tag IN $ca_tags WHERE EXISTS { MATCH (s)-[:HAS_APPLICATION]->(:ConditionApplication {tag : ca_tag}) } "
-            "OR EXISTS { MATCH (s)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(:ConditionApplication {tag : ca_tag}) }] AS matched_ca_tags, "
-            "[user_tag IN $user_tags WHERE EXISTS { MATCH (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) }] AS matched_user_tags "
+            "WITH s, owner, rgs, matched_ca_tags, matched_user_tags, latest_state, count(cr) > 0 AS has_open_request "
             "RETURN s.tag AS tag, s.title AS title, s.created_at AS created_at, "
             "owner.tag AS owner_tag, owner.firstname AS owner_firstname, owner.lastname AS owner_lastname, "
             "owner.institute AS owner_institute, "
