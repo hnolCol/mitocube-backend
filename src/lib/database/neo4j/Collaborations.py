@@ -357,8 +357,8 @@ class Neo4JCollaborations(CollaborationsABC):
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
             "WITH s, "
-            "[ca_tag IN $ca_tags WHERE size((s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag})) > 0] AS matched_ca_tags, "
-            "[user_tag IN $user_tags WHERE size((:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s)) > 0] AS matched_user_tags "
+            "[ca_tag IN $ca_tags WHERE COUNT { (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag}) } > 0] AS matched_ca_tags, "
+            "[user_tag IN $user_tags WHERE COUNT { (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) } > 0] AS matched_user_tags "
         )
         params = {"limit" : limit, "ca_tags" : ca_tags, "user_tags" : user_tags}
         if search_string is not None:
