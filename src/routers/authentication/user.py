@@ -216,6 +216,8 @@ def change_user_role(user_tag : str, role : int, user : UserModel = Depends(is_u
         role = int(UserRolesEnum(role))
     except ValueError:
         raise HTTPException(422, "Invalid user role provided.")
+    if role > int(user.role):
+        raise user_role_too_low
     return db.users.update(tag = user_tag, user_props = {"role": role})
 
 @router.get("/{user_tag}/exists", summary="Checks if a user exists by its tag.")
