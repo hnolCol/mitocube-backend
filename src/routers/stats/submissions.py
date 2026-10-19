@@ -52,6 +52,10 @@ def get_submission_durations(
     group_by_year: bool = False,
     years: str = None,
     state: str = None,
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
+    genotype_tag: str = None,
     user: UserModel = Depends(get_user_from_token)
 , db : DatabaseABC = Depends(get_db)) -> float | DistResponseModel | List[YearQuantileResponseModel]:
     """
@@ -74,6 +78,7 @@ def get_submission_durations(
             user_tags=parse_semicolon_list(user_tags),
             ca_tags=parse_semicolon_list(ca_tags),
             include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tag),
         )
         for col in ["min", "q25", "median", "q75", "max"]:
             df[col] = df[col] / (1000 * 60 * 60 * 24)
@@ -83,6 +88,7 @@ def get_submission_durations(
         user_tags=parse_semicolon_list(user_tags),
         ca_tags=parse_semicolon_list(ca_tags),
         include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tag),
     )
     df = pd.DataFrame(columns=["submission_tag", "duration"]).from_dict(durations)
     df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
@@ -109,6 +115,7 @@ def get_samples_per_submission(
     user_tags: str = None,
     ca_tags: str = None,
     include_sample_ca: bool = False,
+    genotype_tag: str = None,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[YearQuantileResponseModel]:
     """
@@ -123,6 +130,7 @@ def get_samples_per_submission(
         user_tags=parse_semicolon_list(user_tags),
         ca_tags=parse_semicolon_list(ca_tags),
         include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tag),
     )
     return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -140,6 +148,7 @@ def get_submission_counts(
     user_tags: str = None,
     ca_tags: str = None,
     include_sample_ca: bool = False,
+    genotype_tag: str = None,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
@@ -162,6 +171,7 @@ def get_submission_counts(
         user_tags=parse_semicolon_list(user_tags),
         ca_tags=parse_semicolon_list(ca_tags),
         include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tag),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -173,6 +183,7 @@ def get_sample_counts_by_research_group(
     user_tags: str = None,
     ca_tags: str = None,
     include_sample_ca: bool = False,
+    genotype_tag: str = None,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
@@ -187,6 +198,7 @@ def get_sample_counts_by_research_group(
         user_tags=parse_semicolon_list(user_tags),
         ca_tags=parse_semicolon_list(ca_tags),
         include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tag),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -198,6 +210,7 @@ def get_submission_counts_by_user(
     user_tags: str = None,
     ca_tags: str = None,
     include_sample_ca: bool = False,
+    genotype_tag: str = None,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
@@ -213,5 +226,6 @@ def get_submission_counts_by_user(
         user_tags=parse_semicolon_list(user_tags),
         ca_tags=parse_semicolon_list(ca_tags),
         include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tag),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]

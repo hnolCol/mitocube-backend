@@ -33,7 +33,7 @@ class ProteinGroupQuantificationCountModel(BaseModel):
     created_at : float
     
 @router.get("/quantifications/protein_groups/count", summary="Get the number of protein group quantifications for a given submission.")
-def get_protein_group_quantification_count(user_tags : str = None, ca_tags : str = None, include_sample_ca : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ProteinGroupQuantificationCountModel]:
+def get_protein_group_quantification_count(user_tags : str = None, ca_tags : str = None, include_sample_ca : bool = False, genotype_tag : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ProteinGroupQuantificationCountModel]:
     """
     Get the number of protein group quantifications for a given submission.
 
@@ -51,6 +51,7 @@ def get_protein_group_quantification_count(user_tags : str = None, ca_tags : str
         user_tags=parse_semicolon_list(user_tags),
         ca_tags=parse_semicolon_list(ca_tags),
         include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tag),
     ).to_dict(orient="records")]
     
     
