@@ -160,3 +160,20 @@ def test_report_to_excel_returns_readable_workbook():
     assert "Instrument performance" in sheets
     assert sheets["Community"].iloc[0]["new_users"] == 5
     assert sheets["Instrument performance"].iloc[0]["qc_runs"] == 2
+
+
+def test_report_to_markdown_renders_all_sections():
+    from routers.reports.year_report import _report_to_markdown
+
+    report = build_year_report(YEAR, FakeDB())
+    md = _report_to_markdown(report)
+    assert f"# MitoCube Year Report {YEAR}" in md
+    assert "## Community" in md
+    assert "- New users: 5" in md
+    assert "## Submissions" in md
+    assert "| rg-1 | 3 |" in md
+    assert "## Data volume" in md
+    assert "## Instrument performance" in md
+    assert "| inst-1 | 2 | 4500.0 | 30500.0 | 2 | 900 |" in md
+    assert "## Highlights" in md
+    assert "- subm-1" in md
