@@ -245,12 +245,13 @@ def get_feature_variance(feature_tag : str, submission_tags : str = None, user :
         _description_
     """
     submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
-        
-    if submission_tags is not None:
+    if submission_scope_tags is None:
+        pass  # curator/admin: unrestricted access, no scope filtering
+    elif submission_tags is not None:
         submission_tags = [submission_tag for submission_tag in APIParamString(param=submission_tags).param if submission_tag in submission_scope_tags]
     else:
         submission_tags = submission_scope_tags
-    if len(submission_tags) == 0:
+    if submission_tags is not None and len(submission_tags) == 0:
         raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
     submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
     f_stats = db.features.get_f_value(tags=[feature_tag], submission_tags=APIParamString(submission_tags).param)

@@ -52,7 +52,9 @@ def get_protein_group_stats(protein_group_tag : str, attribute_tags : str = None
 
         
     user_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag = user.tag)
-    if submission_tags is not None:
+    if user_scope_tags is None:
+        pass  # curator/admin: unrestricted access, no scope filtering
+    elif submission_tags is not None:
         submission_tags = [tag for tag in submission_tags if tag in user_scope_tags]
     else:
         submission_tags = user_scope_tags
