@@ -1078,7 +1078,9 @@ class Neo4JSubmissions(SubmissionsABC):
     
     def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """Returns per-year protein group statistics: the sum of quantified protein groups of all
-        submissions created in that year and the number of those submissions.
+        submissions created in that year and the number of those submissions. Only submissions
+        that have protein group quantifications are included, so protein_groups / submissions
+        is the average number of quantified protein groups per quantified submission.
         All filters are optional; None or empty lists mean no filtering.
 
         Returns
@@ -1097,7 +1099,7 @@ class Neo4JSubmissions(SubmissionsABC):
         if len(conditions) > 0:
             query += "WHERE " + " AND ".join(conditions) + " "
         query += (
-            "OPTIONAL MATCH (s)-[:HAS_SAMPLE]->(sa:Sample)-[:QUANTIFIED]->(p:ProteinGroup) "
+            "MATCH (s)-[:HAS_SAMPLE]->(sa:Sample)-[:QUANTIFIED]->(p:ProteinGroup) "
             "WITH s, count(DISTINCT p) AS pg "
             "RETURN date(datetime({epochmillis: toInteger(s.created_at)})).year AS year, sum(pg) AS protein_groups, count(s) AS submissions "
             "ORDER BY year"
