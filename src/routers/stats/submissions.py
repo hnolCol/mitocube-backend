@@ -12,6 +12,8 @@ from services.users import get_user_from_token
 from services.submission import check_submission_access
 from config.enums.states import SubmissionStatesEnums 
 from config.models.plots.stats import DistResponseModel, GroupedCountResponseModel, YearQuantileResponseModel
+from lib.cache.cache import db_cache_runtime
+from datetime import timedelta
 import pandas as pd
 
 
@@ -25,6 +27,16 @@ def parse_semicolon_ints(value : str = None) -> List[int] | None:
     if parsed is None:
         return None
     return [int(v) for v in parsed]
+
+SUBMISSION_STATS_CACHE_NAMESPACE = "submission_stats"
+SUBMISSION_STATS_CACHE_TIME = timedelta(minutes=10)
+
+def get_submission_stats_cached(key_data : dict, compute_fn):
+    """Caches a submission statistics result under the submission_stats namespace.
+    The key must include every filter parameter of the endpoint, since results are
+    identical for all authenticated users but differ per filter combination."""
+    cache_key = db_cache_runtime.make_cache_key(key_data=key_data, namespace=SUBMISSION_STATS_CACHE_NAMESPACE)
+    return db_cache_runtime.get_or_compute(cache_key=cache_key, compute_fn=compute_fn, cache_time=SUBMISSION_STATS_CACHE_TIME)
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/stats/submissions",
@@ -68,45 +80,63 @@ def get_submission_durations(
     The optional state parameter restricts the submissions to one of the given states (semicolon-delimited),
     the optional years parameter restricts the year buckets (semicolon-delimited years).
     """
-    if group_by_year:
-        df = db.submission_filter.get_quantiles_by_year(
-            metric="duration",
-            state_01=state_01,
-            state_02=state_02,
-            years=parse_semicolon_ints(years),
-            states=parse_semicolon_list(state),
+    def compute():
+        if group_by_year:
+            df = db.submission_filter.get_quantiles_by_year(
+                metric="duration",
+                state_01=state_01,
+                state_02=state_02,
+                years=parse_semicolon_ints(years),
+                states=parse_semicolon_list(state),
+                user_tags=parse_semicolon_list(user_tags),
+                ca_tags=parse_semicolon_list(ca_tags),
+                include_sample_ca=include_sample_ca,
+                genotype_tags=parse_semicolon_list(genotype_tags),
+            )
+            for col in ["min", "q25", "median", "q75", "max"]:
+                df[col] = df[col] / (1000 * 60 * 60 * 24)
+            return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
+        durations = db.submissions.get_durations_between_states(
+            state_01=state_01, state_02=state_02,
             user_tags=parse_semicolon_list(user_tags),
             ca_tags=parse_semicolon_list(ca_tags),
             include_sample_ca=include_sample_ca,
             genotype_tags=parse_semicolon_list(genotype_tags),
         )
-        for col in ["min", "q25", "median", "q75", "max"]:
-            df[col] = df[col] / (1000 * 60 * 60 * 24)
-        return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
-    durations = db.submissions.get_durations_between_states(
-        state_01=state_01, state_02=state_02,
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+        df = pd.DataFrame(columns=["submission_tag", "duration"]).from_dict(durations)
+        df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
+        if aggregate == "dist":
+            desc = df["duration"].describe(percentiles=[0.25, 0.5, 0.75])
+            return DistResponseModel(
+                min=desc["min"],
+                q1=desc["25%"],
+                median=desc["50%"],
+                q3=desc["75%"],
+                max=desc["max"],
+                mean=desc["mean"],
+                std=desc["std"],
+                count=desc["count"]
+            )
+        else:
+            agg_metric = df["duration"].agg(func=aggregate, skipna=True)
+            return agg_metric
+
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "durations",
+            "state_01": int(state_01),
+            "state_02": int(state_02),
+            "aggregate": aggregate,
+            "group_by_year": group_by_year,
+            "years": years,
+            "state": state,
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=compute,
     )
-    df = pd.DataFrame(columns=["submission_tag", "duration"]).from_dict(durations)
-    df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
-    if aggregate == "dist":
-        desc = df["duration"].describe(percentiles=[0.25, 0.5, 0.75])
-        return DistResponseModel(
-            min=desc["min"],
-            q1=desc["25%"],
-            median=desc["50%"],
-            q3=desc["75%"],
-            max=desc["max"],
-            mean=desc["mean"],
-            std=desc["std"],
-            count=desc["count"]
-        )
-    else:
-        agg_metric = df["duration"].agg(func=aggregate, skipna=True)
-        return agg_metric
 
 @router.get("/samples_per_submission")
 def get_samples_per_submission(
@@ -123,16 +153,26 @@ def get_samples_per_submission(
     The year bucket is derived from the submission's created_at, not from the samples.
     Rows are flat: [{ year, min, q25, median, q75, max, N }].
     """
-    df = db.submission_filter.get_quantiles_by_year(
-        metric="samples_per_submission",
-        years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "samples_per_submission",
+            "years": years,
+            "state": state,
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=lambda: [YearQuantileResponseModel(**row) for row in db.submission_filter.get_quantiles_by_year(
+            metric="samples_per_submission",
+            years=parse_semicolon_ints(years),
+            states=parse_semicolon_list(state),
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tags),
+        ).to_dict(orient="records")],
     )
-    return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
 
     
 
@@ -161,19 +201,32 @@ def get_submission_counts(
     for the same trait; a submission with multiple distinct traits contributes one count to each of its traits.
     Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
     """
-    df = db.submission_filter.get_counts_by_year(
-        by=group_by,
-        entity="submission",
-        years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
-        attribute_tag=attribute_tag,
-        group_entity=group_by_entity,
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "counts/submissions",
+            "group_by": group_by,
+            "group_by_entity": group_by_entity,
+            "years": years,
+            "state": state,
+            "attribute_tag": attribute_tag,
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=lambda: [GroupedCountResponseModel(**row) for row in db.submission_filter.get_counts_by_year(
+            by=group_by,
+            entity="submission",
+            years=parse_semicolon_ints(years),
+            states=parse_semicolon_list(state),
+            attribute_tag=attribute_tag,
+            group_entity=group_by_entity,
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tags),
+        ).to_dict(orient="records")],
     )
-    return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
 @router.get("/counts/samples")
 def get_sample_counts_by_research_group(
@@ -190,17 +243,28 @@ def get_sample_counts_by_research_group(
     Returns the number of samples per research group and year.
     Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
     """
-    df = db.submission_filter.get_counts_by_year(
-        by=group_by,
-        entity="sample",
-        years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "counts/samples",
+            "group_by": group_by,
+            "years": years,
+            "state": state,
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=lambda: [GroupedCountResponseModel(**row) for row in db.submission_filter.get_counts_by_year(
+            by=group_by,
+            entity="sample",
+            years=parse_semicolon_ints(years),
+            states=parse_semicolon_list(state),
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tags),
+        ).to_dict(orient="records")],
     )
-    return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
 @router.get("/counts/users")
 def get_submission_counts_by_user(
@@ -217,18 +281,29 @@ def get_submission_counts_by_user(
     Returns the number of submissions per user and year, optionally restricted to research groups.
     Rows are flat: [{ group, year, value }]. Missing (group, year) combinations are absent.
     """
-    df = db.submission_filter.get_counts_by_year(
-        by="user",
-        entity="submission",
-        years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
-        research_group_tags=parse_semicolon_list(research_group_tags),
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "counts/users",
+            "years": years,
+            "state": state,
+            "research_group_tags": research_group_tags,
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=lambda: [GroupedCountResponseModel(**row) for row in db.submission_filter.get_counts_by_year(
+            by="user",
+            entity="submission",
+            years=parse_semicolon_ints(years),
+            states=parse_semicolon_list(state),
+            research_group_tags=parse_semicolon_list(research_group_tags),
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tags),
+        ).to_dict(orient="records")],
     )
-    return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
 
 @router.get("/counts/states")
@@ -244,13 +319,21 @@ def get_submission_counts_by_state(
     There is no state parameter since the state is the grouping variable.
     Rows are flat: [{ "state_tag": 2, "value": 31 }, ...]. Missing states are absent.
     """
-    df = db.submission_filter.get_counts_by_state(
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "counts/states",
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=lambda: [{"state_tag": int(row["state_tag"]), "value": int(row["value"])} for row in db.submission_filter.get_counts_by_state(
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tags),
+        ).to_dict(orient="records")],
     )
-    return [{"state_tag": int(row["state_tag"]), "value": int(row["value"])} for row in df.to_dict(orient="records")]
 
 @router.get("/counts/protein-groups")
 def get_protein_group_counts_by_year(
@@ -268,12 +351,22 @@ def get_protein_group_counts_by_year(
     (lets the frontend compute the average without an aggregate parameter).
     Rows are flat: [{ "year": 2024, "protein_groups": 158342, "submissions": 23 }, ...].
     """
-    df = db.submissions.get_protein_group_counts_by_year(
-        years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
-        user_tags=parse_semicolon_list(user_tags),
-        ca_tags=parse_semicolon_list(ca_tags),
-        include_sample_ca=include_sample_ca,
-        genotype_tags=parse_semicolon_list(genotype_tags),
+    return get_submission_stats_cached(
+        key_data={
+            "endpoint": "counts/protein-groups",
+            "years": years,
+            "state": state,
+            "user_tags": user_tags,
+            "ca_tags": ca_tags,
+            "include_sample_ca": include_sample_ca,
+            "genotype_tags": genotype_tags,
+        },
+        compute_fn=lambda: [{"year": int(row["year"]), "protein_groups": int(row["protein_groups"]), "submissions": int(row["submissions"])} for row in db.submissions.get_protein_group_counts_by_year(
+            years=parse_semicolon_ints(years),
+            states=parse_semicolon_list(state),
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
+            genotype_tags=parse_semicolon_list(genotype_tags),
+        ).to_dict(orient="records")],
     )
-    return [{"year": int(row["year"]), "protein_groups": int(row["protein_groups"]), "submissions": int(row["submissions"])} for row in df.to_dict(orient="records")]

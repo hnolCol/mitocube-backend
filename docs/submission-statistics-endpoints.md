@@ -16,6 +16,13 @@ The following parameters are shared by the statistics endpoints listed below:
 
 The filters are combined with AND semantics. `include_sample_ca` without `ca_tags` has no effect. All listed genotypes must be present (AND within `genotype_tags`).
 
+## Caching
+
+All statistics endpoints are cached for 10 minutes under the `submission_stats` cache namespace (Mongo-backed TTL cache).
+The cache key includes every filter parameter of the respective endpoint, and results are identical for all authenticated
+users, so one entry per filter combination serves everyone. Consequence: freshly created submissions or state changes can
+take up to 10 minutes to be reflected in the statistics.
+
 ## Endpoints
 
 ### `GET /api/stats/submissions/counts/submissions`
