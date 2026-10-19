@@ -39,6 +39,30 @@ def chunk_dict(d, size):
         if not chunk:
             break
         yield chunk
+def _build_stats_filter(submission_var : str, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None):
+    """Builds WHERE conditions and parameters for the user/condition-application/genotype filters of the statistics endpoints.
+    All filters are optional; None or empty lists mean no filtering. The user filter matches creators and collaborators
+    (same semantics as the submission query endpoints), the condition-application filter matches submission-level
+    condition applications and, with include_sample_ca = True, sample-level ones as well. The ca_tags filter matches
+    submissions containing any of the given condition applications. The genotype filter requires all given genotypes
+    to be present in the submission's samples."""
+    where = []
+    params = {}
+    if user_tags is not None and len(user_tags) > 0:
+        where.append(f"EXISTS {{ MATCH (u:User)-[:CREATED|COLLABORATES]->({submission_var}) WHERE u.tag IN $user_tags }}")
+        params["user_tags"] = user_tags
+    if ca_tags is not None and len(ca_tags) > 0:
+        ca_match = [f"EXISTS {{ MATCH ({submission_var})-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags }}"]
+        if include_sample_ca:
+            ca_match.append(f"EXISTS {{ MATCH ({submission_var})-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication) WHERE ca.tag IN $ca_tags }}")
+        where.append("(" + " OR ".join(ca_match) + ")")
+        params["ca_tags"] = ca_tags
+    if genotype_tags is not None and len(genotype_tags) > 0:
+        where.append(f"ALL(g IN $genotype_tags WHERE EXISTS {{ MATCH ({submission_var})-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(gen:Genotype {{tag : g}}) }})")
+        params["genotype_tags"] = genotype_tags
+    return where, params
+
+
 class Neo4JSubmissions(SubmissionsABC):
 
     def __init__(self, driver : Driver, meta : MetaABC, proteomes : ProteomesABC, condition_applications : ConditionApplicationABC) -> None:
@@ -442,16 +466,21 @@ class Neo4JSubmissions(SubmissionsABC):
         return tag
 
 
-    def get_durations_between_states(self, state_01 : SubmissionStatesEnums, state_02 : SubmissionStatesEnums) -> List[Dict]:
+    def get_durations_between_states(self, state_01 : SubmissionStatesEnums, state_02 : SubmissionStatesEnums, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> List[Dict]:
         """Returns the duration between states for all submissions that have been in both states."""
+        filter_conditions, filter_params = _build_stats_filter("submission", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        where_clause = ""
+        if len(filter_conditions) > 0:
+            where_clause = "WHERE " + " AND ".join(filter_conditions) + " "
         query = (
             "MATCH (s2:State {tag : $state_02})<-[r2:IN_STATE]-(submission:Submission)-[r1:IN_STATE]->(s1:State {tag : $state_01}) "
+            + where_clause +
             "WITH submission, (r2.created_at - r1.created_at) AS duration, r2, r1 "
             "ORDER BY submission.tag, duration DESC "
             "WITH submission, collect(duration) AS durations "
             "RETURN {submission_tag: submission.tag, duration: durations[0]} "
         )
-        r = self._driver.execute_query(query, routing_="r", state_01 = state_01, state_02 = state_02, result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r", state_01 = state_01, state_02 = state_02, result_transformer_=Result.value, **filter_params)
         return r
 
     def has_genotypes(self, tag : str) -> bool:
@@ -1047,7 +1076,35 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
     
-    def get_protein_group_quantification_count(self) -> pd.DataFrame:
+    def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Returns per-year protein group statistics: the sum of quantified protein groups of all
+        submissions created in that year and the number of those submissions.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per year with the columns 'year', 'protein_groups' and 'submissions'.
+        """
+        conditions, params = _build_stats_filter("s", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        if states is not None:
+            conditions.append("EXISTS {(s)-[:IN_STATE]->(state:State) WHERE state.tag IN $states} ")
+            params["states"] = states
+        if years is not None:
+            conditions.append("date(datetime({epochmillis: toInteger(s.created_at)})).year IN $years ")
+            params["years"] = years
+        query = "MATCH (s:Submission) "
+        if len(conditions) > 0:
+            query += "WHERE " + " AND ".join(conditions) + " "
+        query += (
+            "OPTIONAL MATCH (s)-[:HAS_SAMPLE]->(sa:Sample)-[:QUANTIFIED]->(p:ProteinGroup) "
+            "WITH s, count(DISTINCT p) AS pg "
+            "RETURN date(datetime({epochmillis: toInteger(s.created_at)})).year AS year, sum(pg) AS protein_groups, count(s) AS submissions "
+            "ORDER BY year"
+        )
+        return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
+
+    def get_protein_group_quantification_count(self, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """Returns the number of protein group quantifications for each submission. 
         Neo4J implementation.  
 
@@ -1063,12 +1120,16 @@ class Neo4JSubmissions(SubmissionsABC):
             ```
             A dictionary with submission tags as keys and the number of protein group quantifications as values.
         """
+        filter_conditions, filter_params = _build_stats_filter("submission", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        where_clause = ""
+        if len(filter_conditions) > 0:
+            where_clause = "WHERE " + " AND ".join(filter_conditions) + " "
         query = (
             "MATCH (u:User)-[:CREATED]->(submission:Submission)-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:ProteinGroup) "
+            + where_clause +
             "RETURN submission.tag as submission_tag, count(DISTINCT p) as count, u.tag as user_tag, submission.created_at as created_at "
         )
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df)
-
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, **filter_params)
         return r
     
     def calculate_multiple_comparison_metrices(self, tag : str, batch_size : int = 300) -> bool:
@@ -1550,7 +1611,31 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
-    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[SubmissionStatesEnums] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait") -> pd.DataFrame:
+    def get_counts_by_state(self, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Counts the submissions grouped by their current (latest) state.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per state with the columns 'state_tag' and 'value'.
+        """
+        conditions, params = _build_stats_filter("s", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        query = (
+            "MATCH (s:Submission)-[r:IN_STATE]->(st:State) "
+            "WHERE r.created_at IS NOT NULL "
+        )
+        if len(conditions) > 0:
+            query += "AND " + " AND ".join(conditions) + " "
+        query += (
+            "WITH s, r, st ORDER BY r.created_at DESC "
+            "WITH s, collect(st.tag)[0] AS state_tag "
+            "RETURN state_tag, count(s) AS value "
+            "ORDER BY state_tag"
+        )
+        return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
+
+    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[SubmissionStatesEnums] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait", user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """Counts the submissions or samples and groups them by the given property and the calendar year derived from the submission's created_at. 
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
@@ -1582,6 +1667,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         """
         conditions = []
         params = dict(years=years, states=states, research_group_tags=research_group_tags, attribute_tag=attribute_tag)
+        filter_conditions, filter_params = _build_stats_filter("s", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        conditions.extend(filter_conditions)
+        params.update(filter_params)
         if by in ("research_group", "user"):
             group_name = "rg.text" if by == "research_group" else "u.firstname + ' ' + u.lastname"
             query = (
@@ -1621,7 +1709,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         )
         return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
 
-    def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[SubmissionStatesEnums] = None) -> pd.DataFrame:
+    def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[SubmissionStatesEnums] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """
         Returns one quantile summary row per calendar year (derived from the submission's created_at)
         for the given metric. For metric = "duration" the value is the duration in milliseconds
@@ -1649,6 +1737,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         else:
             raise ValueError(f"Unsupported metric: {metric}")
         conditions = []
+        filter_conditions, filter_params = _build_stats_filter("s", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        conditions.extend(filter_conditions)
         if states is not None:
             conditions.append("EXISTS {(s)-[:IN_STATE]->(state:State) WHERE state.tag IN $states} ")
         if years is not None:
@@ -1663,6 +1753,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "ORDER BY year"
         )
         params = dict(state_01=state_01, state_02=state_02, years=years, states=states)
+        params.update(filter_params)
         return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
     
     
