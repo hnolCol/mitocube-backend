@@ -251,3 +251,29 @@ def get_submission_counts_by_state(
         genotype_tags=parse_semicolon_list(genotype_tags),
     )
     return [{"state_tag": int(row["state_tag"]), "value": int(row["value"])} for row in df.to_dict(orient="records")]
+
+@router.get("/counts/protein-groups")
+def get_protein_group_counts_by_year(
+    years: str = None,
+    state: str = None,
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
+    genotype_tags: str = None,
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
+) -> List[Dict[str, int]]:
+    """
+    Returns per-year protein group statistics: protein_groups is the sum of quantified protein
+    groups of all submissions created in that year, submissions is the number of those submissions
+    (lets the frontend compute the average without an aggregate parameter).
+    Rows are flat: [{ "year": 2024, "protein_groups": 158342, "submissions": 23 }, ...].
+    """
+    df = db.submissions.get_protein_group_counts_by_year(
+        years=parse_semicolon_ints(years),
+        states=parse_semicolon_list(state),
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tags),
+    )
+    return [{"year": int(row["year"]), "protein_groups": int(row["protein_groups"]), "submissions": int(row["submissions"])} for row in df.to_dict(orient="records")]

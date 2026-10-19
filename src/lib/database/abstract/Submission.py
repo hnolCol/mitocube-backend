@@ -676,6 +676,19 @@ Each submission is counted at most once per group and year, even if it has sever
         pass
 
     @abstractmethod
+    def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Returns per-year protein group statistics: the sum of quantified protein groups of all
+        submissions created in that year and the number of those submissions.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per year with the columns 'year', 'protein_groups' and 'submissions'.
+        """
+        pass
+
+    @abstractmethod
     def get_counts_by_state(self, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """Counts the submissions grouped by their current (latest) state.
         All filters are optional; None or empty lists mean no filtering.

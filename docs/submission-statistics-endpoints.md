@@ -45,6 +45,14 @@ Returns flat rows: `[{ "state_tag": 2, "value": 31 }, ...]`. States with no subm
 Supports the general filter parameters (`user_tags`, `ca_tags`, `include_sample_ca`, `genotype_tags`).
 There is no `state` parameter since the state is the grouping variable.
 
+### `GET /api/stats/submissions/counts/protein-groups`
+
+Per-year quantified protein group statistics: one row per year,
+`[{ "year": 2024, "protein_groups": 158342, "submissions": 23 }, ...]`.
+`protein_groups` is the sum of quantified protein groups of all submissions created in that year,
+`submissions` is the number of those submissions (the frontend computes the average from these).
+Supports `years`, `state` plus the general filter parameters (`user_tags`, `ca_tags`, `include_sample_ca`, `genotype_tags`).
+
 ### `GET /api/submissions/quantifications/protein_groups/count`
 
 Number of quantified protein groups per submission. Supports the general filter parameters (`user_tags`, `ca_tags`, `include_sample_ca`); results are restricted to the matching submissions.

@@ -1076,6 +1076,34 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
     
+    def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Returns per-year protein group statistics: the sum of quantified protein groups of all
+        submissions created in that year and the number of those submissions.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per year with the columns 'year', 'protein_groups' and 'submissions'.
+        """
+        conditions, params = _build_stats_filter("s", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        if states is not None:
+            conditions.append("EXISTS {(s)-[:IN_STATE]->(state:State) WHERE state.tag IN $states} ")
+            params["states"] = states
+        if years is not None:
+            conditions.append("date(datetime({epochmillis: toInteger(s.created_at)})).year IN $years ")
+            params["years"] = years
+        query = "MATCH (s:Submission) "
+        if len(conditions) > 0:
+            query += "WHERE " + " AND ".join(conditions) + " "
+        query += (
+            "OPTIONAL MATCH (s)-[:HAS_SAMPLE]->(sa:Sample)-[:QUANTIFIED]->(p:ProteinGroup) "
+            "WITH s, count(DISTINCT p) AS pg "
+            "RETURN date(datetime({epochmillis: toInteger(s.created_at)})).year AS year, sum(pg) AS protein_groups, count(s) AS submissions "
+            "ORDER BY year"
+        )
+        return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
+
     def get_protein_group_quantification_count(self, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """Returns the number of protein group quantifications for each submission. 
         Neo4J implementation.  
