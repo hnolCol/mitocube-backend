@@ -473,7 +473,21 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def quantification_exists(self, tag : str, type : Literal["proteins","precursors","any"]) -> bool:
         """Checks if samples have quantification data for a given submission."""
-        pass 
+        pass
+
+    @abstractmethod
+    def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Returns per-year protein group statistics: the sum of quantified protein groups of all
+        submissions created in that year and the number of those submissions.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per year with the columns 'year', 'protein_groups' and 'submissions'.
+        """
+        pass
+ 
 
     @abstractmethod
     def get_proteins_in_submission(self, tag: str) -> List[str]:
@@ -671,19 +685,6 @@ Each submission is counted at most once per group and year, even if it has sever
         ------
         Exception
             If the database query throws an exception.
-        """
-        pass
-
-    @abstractmethod
-    def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
-        """Returns per-year protein group statistics: the sum of quantified protein groups of all
-        submissions created in that year and the number of those submissions.
-        All filters are optional; None or empty lists mean no filtering.
-
-        Returns
-        -------
-        pd.DataFrame
-            One row per year with the columns 'year', 'protein_groups' and 'submissions'.
         """
         pass
 
