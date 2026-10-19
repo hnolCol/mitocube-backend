@@ -26,6 +26,21 @@ def parse_semicolon_ints(value : str = None) -> List[int] | None:
         return None
     return [int(v) for v in parsed]
 
+def parse_semicolon_states(value : str = None) -> List[SubmissionStatesEnums] | None:
+    parsed = parse_semicolon_list(value)
+    if parsed is None:
+        return None
+    states = []
+    for v in parsed:
+        try:
+            states.append(SubmissionStatesEnums(int(v)))
+        except ValueError:
+            try:
+                states.append(SubmissionStatesEnums[v.upper()])
+            except KeyError:
+                raise ValueError(f"Unknown submission state: {v}")
+    return states
+
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/stats/submissions",
     tags=["Submissions","Statistics"]
@@ -70,7 +85,7 @@ def get_submission_durations(
             state_01=state_01,
             state_02=state_02,
             years=parse_semicolon_ints(years),
-            states=parse_semicolon_list(state),
+            states=parse_semicolon_states(state),
         )
         for col in ["min", "q25", "median", "q75", "max"]:
             df[col] = df[col] / (1000 * 60 * 60 * 24)
@@ -108,7 +123,7 @@ def get_samples_per_submission(
     df = db.submission_filter.get_quantiles_by_year(
         metric="samples_per_submission",
         years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
+        states=parse_semicolon_states(state),
     )
     return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -139,7 +154,7 @@ def get_submission_counts(
         by=group_by,
         entity="submission",
         years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
+        states=parse_semicolon_states(state),
         attribute_tag=attribute_tag,
         group_entity=group_by_entity,
     )
@@ -160,7 +175,7 @@ def get_sample_counts_by_research_group(
         by=group_by,
         entity="sample",
         years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
+        states=parse_semicolon_states(state),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -179,7 +194,7 @@ def get_submission_counts_by_user(
         by="user",
         entity="submission",
         years=parse_semicolon_ints(years),
-        states=parse_semicolon_list(state),
+        states=parse_semicolon_states(state),
         research_group_tags=parse_semicolon_list(research_group_tags),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
