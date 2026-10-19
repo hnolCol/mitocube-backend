@@ -184,9 +184,12 @@ def delete_user(user_tag : str, user : UserModel = Depends(is_user_admin)):
     
 
 @router.get("/roles/{user_tag}", summary="Returns the roles of a user by its tag.", response_model=int)
-def get_user_role(user_tag : str, user : UserModel = Depends(get_user_from_token)) -> int:
+def get_user_role(user_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> int:
     """Returns the role of a user by its tag."""
-    return user.role 
+    user_from_db = db.users.get_user_by_tag(user_tag)
+    if user_from_db is None:
+        raise user_not_found
+    return user_from_db.role 
 
 
 @router.get("/{user_tag}/submissions/count", summary="Returns the number of submissions of a user by its tag.")
@@ -213,6 +216,8 @@ def change_user_role(user_tag : str, role : int, user : UserModel = Depends(is_u
         role = int(UserRolesEnum(role))
     except ValueError:
         raise HTTPException(422, "Invalid user role provided.")
+    if role > int(user.role):
+        raise user_role_too_low
     return db.users.update(tag = user_tag, user_props = {"role": role})
 
 @router.get("/{user_tag}/exists", summary="Checks if a user exists by its tag.")
