@@ -3,7 +3,6 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file
-from pydantic import AnyHttpUrl
 
 class OpenAI(BaseSettings):
     """Base Settings"""

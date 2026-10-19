@@ -115,7 +115,6 @@ def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_u
 def get_instrument_by_tag(instrument_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Return the number of samples the instrument measured."
     return db.samples.count(instrument_tag = instrument_tag)
-    return 12 #db.samples.count(instrument_tag = instrument_tag)
 
 @router.get("/{instrument_tag}/quantification/summary")
 def get_instrument_quantification_summary(

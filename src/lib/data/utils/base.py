@@ -1,4 +1,4 @@
-from numba import jit, prange 
+from numba import jit
 import numpy as np 
 from typing import List 
 

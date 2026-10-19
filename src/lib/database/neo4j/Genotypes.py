@@ -8,7 +8,6 @@ from config.models.conditions_applications import ConditionApplicationTreeModel
 from lib.database.abstract.Genotypes import GenotypeABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
 from services.encryption import create_hierarchical_hash
-import uuid
 
 class Neo4JGenotype(GenotypeABC):
     """

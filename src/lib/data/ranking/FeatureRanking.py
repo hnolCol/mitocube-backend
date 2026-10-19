@@ -278,10 +278,5 @@ class FeatureRanking(object):
         print(total_results)
         print("No valid data to compute metrics. Returning empty DataFrame.")
         return pd.DataFrame()
-            
-        #df.loc[:,"FDR"] = df.groupby("attribute_tag")["p_value"].transform(lambda p: stats.false_discovery_control(p, method="fdr_bh")[1])
-        #df.loc[:"rank"] = df.groupby("attribute_tag")["score"].rank(ascending=False, method="min")
-        return df
-
         
     

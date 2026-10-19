@@ -2,7 +2,7 @@ import time
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Body, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 import pyotp
 
 from config.models.user import UserModel

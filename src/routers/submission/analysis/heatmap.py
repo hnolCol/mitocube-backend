@@ -6,9 +6,8 @@ from collections import OrderedDict
 
 
 from lib.data.statistic.ANOVA import OneWayANOVA
-from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 
-from config.exceptions.HTTPExceptions import no_data_found_http_exception, filter_tag_does_not_exist_exception
+from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from config.models.user import UserModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token

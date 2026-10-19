@@ -3,11 +3,9 @@ from functools import lru_cache
 
 from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file
-from pydantic import IPvAnyAddress
 from pydantic import SecretStr
 from pydantic import FilePath
 from pydantic import DirectoryPath
-from pydantic import AnyHttpUrl
 from pydantic import Field
 from typing import Literal, Optional
 

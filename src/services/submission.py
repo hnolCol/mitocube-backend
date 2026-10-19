@@ -10,7 +10,6 @@ from config.models.annotations.feature import FeatureModel
 from config.models.submissions.submissions import NewSubmissionModel
 from config.models.submissions.timeline import TimeLineModel, TimeLineEntryModel
 from config.models.user import UserModel
-from config.models.prefix import PrefixModel
 from config.models.parameter import APIParamString
 
 from config.enums.units import TimeUnitToSecondsEnum, PrefixEnum

@@ -11,7 +11,6 @@ from config.models.submissions.states import SubmissionStatesEnums
 from config.settings.metatexts import MetaTexts
 from services.enums import get_inversed_enum_as_dict, get_enum_as_dict
 from config.models.submissions.timeline import TimeLineEntryModel, TimeLineModel
-from  collections import Counter
 org = {
     "Saccharomyces cerevisiae (Baker's Yeast)" : "UP000002311", 
     "Homo sapiens (Human)" : "UP000005640", 

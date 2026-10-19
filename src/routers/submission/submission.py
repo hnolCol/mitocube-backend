@@ -4,7 +4,6 @@ from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from typing import List, Annotated, Literal, Dict, Optional
 from collections import OrderedDict
-from neo4j.exceptions import ConstraintError
 import pandas as pd 
 
 
@@ -21,7 +20,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.models.parameter import APIParamString, APIParamInt
 from config.models.news.news import NewsModel, NewsInsertModel
 
-from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found, user_forbidden
+from config.exceptions.HTTPExceptions import tag_not_found, user_role_too_low, user_not_found
 
 from config.models.submissions.submissions import NewSubmissionModel,  DatasetAttributesResponse
 from config.models.user import UserModel, PublicUser
@@ -667,34 +666,8 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                         template_name=EMAIL_SETTINGS.mail_submission_complete_template)    
 
     return True
-    
-    # #save_json(metadata.model_dump(),"MODEL.json")
-    # try:
-    #     db.insert_meta(meta_data=metadata)
-    # except ConstraintError:
-    #     #should not happen, since it is controlled before, delete?
-    #     raise HTTPException(status_code=409, detail="Submission tag exists already. Use the update function to update a submission.")
-    # except Exception as e:
-    #     print(e)
-    #     raise HTTPException(status_code=500, detail="An unknown error occured.")
-    # check_collaborators = are_public_users_allowed(user_tags=metadata.collaborators)
-    
-    if not submission.includes_data:
-        db.news.insert(NewsModel(user_tag=user.tag,
-                             title="New Submission!",
-                             content = f"New sample submission: {metadata.title} by {user.firstname}.", 
-                             submission_tags=[metadata.tag])) 
-    else:
-         db.news.insert(NewsModel(user_tag=user.tag,
-                             title="New dataset!",
-                             content = f"New dataset online: {metadata.title} by {user.firstname}.", 
-                             submission_tags=[metadata.tag])) 
-    
-    
-    return 
-    
-    
-@router.get("/submissions/{submission_tag}/datasetattributes",summary="Returns the dataset attributes of a submission.")
+
+@router.get("/submissions/{submission_tag}/datasetattributes", summary="Returns the dataset attributes of a submission.")
 def get_submission_attributes(submission_tag : str,
                               user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> DatasetAttributesResponse:
     

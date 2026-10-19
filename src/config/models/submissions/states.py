@@ -3,7 +3,7 @@ from time import time
 from pydantic import BaseModel, Field 
 
 from config.enums.states import SubmissionStatesEnums, SubmissionStateColors
-from services.enums import get_enum_as_dict, get_inversed_enum_as_dict, get_enum_values_as_list_of_strings
+from services.enums import get_enum_as_dict, get_inversed_enum_as_dict
 
 
 class StateResponse(BaseModel):

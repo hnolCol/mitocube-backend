@@ -11,10 +11,8 @@ from services.read_text import tsv_string_to_dataframe
 from services.regex import get_cursor_from_header_link
 from pydantic import BaseModel
 import pandas as pd 
-import zipfile 
 import gzip
-import zlib
-from io import StringIO, BytesIO
+from io import StringIO
 #https://rest.uniprot.org/uniprotkb/search?compressed=true&fields=accession%2Creviewed%2Cid%2Cprotein_name%2Cgene_names%2Corganism_name%2Clength%2Cgo_p%2Cgo_c%2Cgo_f&format=tsv&query=%28%28proteome%3AUP000005640%29%29&size=500
 
 def download_proteome_annotations(annotationUrl : str,
