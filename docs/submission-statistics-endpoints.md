@@ -58,6 +58,9 @@ Per-year quantified protein group statistics: one row per year,
 `[{ "year": 2024, "protein_groups": 158342, "submissions": 23 }, ...]`.
 `protein_groups` is the sum of quantified protein groups of all submissions created in that year,
 `submissions` is the number of those submissions (the frontend computes the average from these).
+Only submissions that have protein group quantifications are included, so
+`protein_groups / submissions` is the average number of quantified protein groups per quantified
+submission — normalize with the returned `submissions` value, not the total submission count.
 Supports `years`, `state` plus the general filter parameters (`user_tags`, `ca_tags`, `include_sample_ca`, `genotype_tags`).
 
 ### `GET /api/submissions/quantifications/protein_groups/count`

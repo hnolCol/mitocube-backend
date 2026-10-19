@@ -364,6 +364,8 @@ def get_protein_group_counts_by_year(
     Returns per-year protein group statistics: protein_groups is the sum of quantified protein
     groups of all submissions created in that year, submissions is the number of those submissions
     (lets the frontend compute the average without an aggregate parameter).
+    Only submissions that have protein group quantifications are included, so
+    protein_groups / submissions is the average per quantified submission.
     Rows are flat: [{ "year": 2024, "protein_groups": 158342, "submissions": 23 }, ...].
     """
     return get_submission_stats_cached(
