@@ -106,26 +106,3 @@ def get_dataset_volcano(submission_tag : str,
             "attribute_tag": attribute_tag, 
             "impute" : impute,
             "annotation_tag" : annotation_tag}
-    
-    # within_attribute_tag = APIParamString(param=within_attribute_tag).param 
-    # within_attribute_value_tag = APIParamString(param=within_attribute_value_tag).param 
-    
-    comparison_suffix = f"{attribute_value_tag_left} vs. {attribute_value_tag_right} ({within_attribute_value_tag}) ({filter_tag})"
-    datatable = db.datasets.get_datatable(tag = dataset_tag, filter_tag = filter_tag)
-    stats = Ttest(datatable, sample_map).get_stats(sample_attribute_tag=sample_attribute_tag, 
-                                     attribute_value_left=attribute_value_tag_left, 
-                                     attribute_value_right=attribute_value_tag_right, 
-                                     suffix = comparison_suffix, 
-                                     impute = impute,
-                                     within_attribute_tag=within_attribute_tag,
-                                     within_attribute_value_tag=within_attribute_value_tag)
-
-    
-    #features = db.features.get_protein_by_tags(tags = datatable.index.to_list(), as_data_frame=True)
-    #join features to the stat results
-    stats_and_feature_data = stats.join(features,how="left").reset_index()
-    print(stats_and_feature_data)
-    print(stats_and_feature_data.to_dict(orient="records")[0])
-    return {"stats" : stats_and_feature_data.to_dict(orient="records"), "suffix" : comparison_suffix}
-    
-

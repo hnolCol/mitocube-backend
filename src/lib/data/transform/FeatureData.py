@@ -7,7 +7,6 @@ from services.transforms import value_mapper_from_dict
 
 
 from lib.data.transform.ABCTransform import DatasetTransform
-from lib.data.annotate.samples.SampleAttributes import SampleAttributeAnnotation
 
 
 class FeatureData(DatasetTransform):

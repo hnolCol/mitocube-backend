@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
 
-from config.models.phenotype import PhenotypeGenotypeInput, PhenotypeModel, PhenotypeInputModel
+from config.models.phenotype import PhenotypeModel, PhenotypeInputModel
 
 from typing import List, Dict, Optional, Tuple
 

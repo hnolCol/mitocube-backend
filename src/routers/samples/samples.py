@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel
-from config.models.samples import SampleResponseModel, SampleUpdateModel
+from config.models.samples import SampleUpdateModel
 from services.users import get_user_from_token
 from services.submission import check_submission_access
 from lib.database.Database import get_db

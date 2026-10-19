@@ -652,21 +652,6 @@ class Neo4JSamples(SamplesABC):
                         N = desc["count"]
             )]}
         return q 
-        if boolIdx is not None:
-            log2FCAnnotation = log2FC[boolIdx]
-            descAnnotation = log2FCAnnotation.describe()
-            q["distributions"].append(QuantileModel(
-                tag = f"{suffix} - annotated with {annotation_tag}",
-                min = descAnnotation["min"],
-                max = descAnnotation["max"],
-                m = descAnnotation["50%"],
-                q25 = descAnnotation["25%"],
-                q75 = descAnnotation["75%"],
-                N = descAnnotation["count"]
-            ))
-        
-        return q
-        
         
     
 

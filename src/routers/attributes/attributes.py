@@ -5,7 +5,7 @@ from typing import List, Optional, Literal
 import pandas as pd 
 from typing import Dict 
 from config.models.user import UserModel
-from config.models.attributes import AttributeEditModel, AttributeModel, AttribteValueInsertModel, InsertTraitModel, UpdateTraitModel
+from config.models.attributes import AttributeEditModel, AttributeModel, InsertTraitModel, UpdateTraitModel
 from config.enums.states import SubmissionStatesEnums
 
 from services.users import get_user_from_token, is_user_at_least_curator
@@ -292,9 +292,6 @@ def get_all_traits_count_for_attribute_tag(attribute_tag : str, user : UserModel
         raise HTTPException(status_code=404,detail="Tag not associated with an attribute")
 
     return db.attributes.count_traits(tag = attribute_tag)
-
-    return db.attributes.get_trait_tags(tag = attribute_tag)
-
 
 @router.get("/{attribute_tag}/children")
 def get_attribute_children(attribute_tag : str, db : DatabaseABC = Depends(get_db)) -> List[str]:

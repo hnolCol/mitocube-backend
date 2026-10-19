@@ -8,7 +8,6 @@ from sklearn.preprocessing import scale
 
 
 from lib.data.transform.ABCTransform import DatasetTransform
-from lib.data.annotate.samples.SampleAttributes import SampleAttributeAnnotation
 
 
 class PCATransform(DatasetTransform):

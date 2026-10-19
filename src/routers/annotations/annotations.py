@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict
 from scipy.stats import fisher_exact
 
 from lib.database.Database import get_db

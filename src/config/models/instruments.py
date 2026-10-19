@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, field_serializer, computed_field
+from pydantic import BaseModel, field_validator, field_serializer
 from typing import Optional
 import time 
 class InstrumentStateModel(BaseModel):

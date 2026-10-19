@@ -2,7 +2,7 @@
 from typing import List
 from fastapi import APIRouter, Depends
 from config.models.user import UserModel, PublicUser
-from config.models.timeline import SubmissionTimelineResponseModel, TimelineModel, TimelineInputModel
+from config.models.timeline import TimelineModel, TimelineInputModel
 from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import check_submission_access
 from lib.database.Database import get_db

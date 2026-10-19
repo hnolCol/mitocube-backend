@@ -11,7 +11,7 @@ from config.settings.token import get_user_token_settings, get_mfa_settings
 from services.users import get_user_from_token, check_mfa_setup_token, check_pending_mfa_token
 from services.encryption import verify_password
 from config.exceptions.HTTPExceptions import (
-    mfa_already_enabled, mfa_not_setup, mfa_code_invalid, mfa_not_enabled, user_blocked, user_not_found
+    mfa_not_setup, mfa_code_invalid, mfa_not_enabled, user_blocked, user_not_found
 )
 from cryptography.fernet import Fernet
 

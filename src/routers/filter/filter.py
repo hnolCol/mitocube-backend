@@ -6,7 +6,6 @@ from typing import List
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 
-from lib.data.clustering.HierarchicalClustering import HierarchicalClustering
 
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from config.models.user import UserModel
