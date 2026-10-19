@@ -293,6 +293,20 @@ class Neo4JUser(UserABC):
 
     def delete_user(self, tag: str) -> bool:
         return super().delete_user(tag)
+
+    def count_by_year(self, year : int) -> int:
+        """Counts the users created in the given calendar year."""
+        from datetime import datetime, timezone
+        year_start_ms = int(datetime(year, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+        year_end_ms = int(datetime(year + 1, 1, 1, tzinfo=timezone.utc).timestamp() * 1000)
+        query = (
+            "MATCH (u:User) "
+            "WHERE u.created_at >= $year_start AND u.created_at < $year_end "
+            "RETURN count(u) "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value,
+                                       year_start=year_start_ms, year_end=year_end_ms)
+        return r[0] if r else 0
     
     
     def is_user_active(self, tag: str) -> bool:

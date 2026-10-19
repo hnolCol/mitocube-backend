@@ -81,6 +81,21 @@ class UserABC(ABC):
         ""
     
     @abstractmethod
+    def count_by_year(self, year : int) -> int:
+        """The number of users created in the given calendar year.
+
+        Parameters
+        ----------
+        year : int
+            The calendar year.
+
+        Returns
+        -------
+        int
+            The number of users created in that year.
+        """
+
+    @abstractmethod
     def count(self) -> int:
         """The number of users in the database.
         Blocked users are not counted. 

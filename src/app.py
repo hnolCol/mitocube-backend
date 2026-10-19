@@ -78,6 +78,7 @@ from routers.metatexts import metatexts
 from routers.condition_applications import condition_applications
 from routers.ai import openai
 from routers.stats import submissions as submission_stats
+from routers.reports import year_report
 from routers.diseases import diseases
 from routers.variants import Variants
 from routers.diseases import ClinVar
@@ -109,6 +110,7 @@ router_sources = [policy,
                   feature_ptms,
                   submissions_permissions, 
                   submission_stats, 
+                  year_report, 
                   quantifications,
                   researchaim,
                   ranking,
