@@ -1583,6 +1583,30 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
+    def get_counts_by_state(self, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Counts the submissions grouped by their current (latest) state.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per state with the columns 'state_tag' and 'value'.
+        """
+        conditions, params = _build_stats_filter("s", user_tags, ca_tags, include_sample_ca, genotype_tags)
+        query = (
+            "MATCH (s:Submission)-[r:IN_STATE]->(st:State) "
+            "WHERE r.created_at IS NOT NULL "
+        )
+        if len(conditions) > 0:
+            query += "AND " + " AND ".join(conditions) + " "
+        query += (
+            "WITH s, r, st ORDER BY r.created_at DESC "
+            "WITH s, collect(st.tag)[0] AS state_tag "
+            "RETURN state_tag, count(s) AS value "
+            "ORDER BY state_tag"
+        )
+        return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
+
     def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait", user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """Counts the submissions or samples and groups them by the given property and the calendar year derived from the submission's created_at. 
 

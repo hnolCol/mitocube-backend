@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List, Literal
+from typing import Dict, List, Literal
 
 # 
 import pandas as pd 
@@ -229,3 +229,25 @@ def get_submission_counts_by_user(
         genotype_tags=parse_semicolon_list(genotype_tags),
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
+
+
+@router.get("/counts/states")
+def get_submission_counts_by_state(
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
+    genotype_tags: str = None,
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
+) -> List[Dict[str, int]]:
+    """
+    Returns the number of submissions currently in each state, optionally restricted by the general filters.
+    There is no state parameter since the state is the grouping variable.
+    Rows are flat: [{ "state_tag": 2, "value": 31 }, ...]. Missing states are absent.
+    """
+    df = db.submission_filter.get_counts_by_state(
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
+        genotype_tags=parse_semicolon_list(genotype_tags),
+    )
+    return [{"state_tag": int(row["state_tag"]), "value": int(row["value"])} for row in df.to_dict(orient="records")]

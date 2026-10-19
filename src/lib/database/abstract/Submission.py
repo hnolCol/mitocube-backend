@@ -676,6 +676,18 @@ Each submission is counted at most once per group and year, even if it has sever
         pass
 
     @abstractmethod
+    def get_counts_by_state(self, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
+        """Counts the submissions grouped by their current (latest) state.
+        All filters are optional; None or empty lists mean no filtering.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per state with the columns 'state_tag' and 'value'.
+        """
+        pass
+
+    @abstractmethod
     def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:
         """
         Returns per-year quantile summaries of a submission metric, bucketed by the calendar year

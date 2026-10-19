@@ -38,6 +38,13 @@ Duration statistics between two states (aggregated or per-year quantiles via `gr
 
 Per-year quantile summaries of the number of samples per submission. Supports `years` plus the general filter parameters (`state`, `user_tags`, `ca_tags`, `include_sample_ca`, `genotype_tags`).
 
+### `GET /api/stats/submissions/counts/states`
+
+Number of submissions currently in each state, grouped by the submission's current (latest) state.
+Returns flat rows: `[{ "state_tag": 2, "value": 31 }, ...]`. States with no submissions are absent.
+Supports the general filter parameters (`user_tags`, `ca_tags`, `include_sample_ca`, `genotype_tags`).
+There is no `state` parameter since the state is the grouping variable.
+
 ### `GET /api/submissions/quantifications/protein_groups/count`
 
 Number of quantified protein groups per submission. Supports the general filter parameters (`user_tags`, `ca_tags`, `include_sample_ca`); results are restricted to the matching submissions.
