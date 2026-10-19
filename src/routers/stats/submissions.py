@@ -37,6 +37,21 @@ def get_submission_stats_cached(key_data : dict, compute_fn):
     identical for all authenticated users but differ per filter combination."""
     cache_key = db_cache_runtime.make_cache_key(key_data=key_data, namespace=SUBMISSION_STATS_CACHE_NAMESPACE)
     return db_cache_runtime.get_or_compute(cache_key=cache_key, compute_fn=compute_fn, cache_time=SUBMISSION_STATS_CACHE_TIME)
+  
+def parse_semicolon_states(value : str = None) -> List[SubmissionStatesEnums] | None:
+    parsed = parse_semicolon_list(value)
+    if parsed is None:
+        return None
+    states = []
+    for v in parsed:
+        try:
+            states.append(SubmissionStatesEnums(int(v)))
+        except ValueError:
+            try:
+                states.append(SubmissionStatesEnums[v.upper()])
+            except KeyError:
+                raise ValueError(f"Unknown submission state: {v}")
+    return states
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/stats/submissions",
@@ -87,7 +102,7 @@ def get_submission_durations(
                 state_01=state_01,
                 state_02=state_02,
                 years=parse_semicolon_ints(years),
-                states=parse_semicolon_list(state),
+                states=parse_semicolon_states(state),
                 user_tags=parse_semicolon_list(user_tags),
                 ca_tags=parse_semicolon_list(ca_tags),
                 include_sample_ca=include_sample_ca,
@@ -166,7 +181,7 @@ def get_samples_per_submission(
         compute_fn=lambda: [YearQuantileResponseModel(**row) for row in db.submission_filter.get_quantiles_by_year(
             metric="samples_per_submission",
             years=parse_semicolon_ints(years),
-            states=parse_semicolon_list(state),
+            states=parse_semicolon_states(state),
             user_tags=parse_semicolon_list(user_tags),
             ca_tags=parse_semicolon_list(ca_tags),
             include_sample_ca=include_sample_ca,
@@ -218,7 +233,7 @@ def get_submission_counts(
             by=group_by,
             entity="submission",
             years=parse_semicolon_ints(years),
-            states=parse_semicolon_list(state),
+            states=parse_semicolon_states(state),
             attribute_tag=attribute_tag,
             group_entity=group_by_entity,
             user_tags=parse_semicolon_list(user_tags),
@@ -258,7 +273,7 @@ def get_sample_counts_by_research_group(
             by=group_by,
             entity="sample",
             years=parse_semicolon_ints(years),
-            states=parse_semicolon_list(state),
+            states=parse_semicolon_states(state),
             user_tags=parse_semicolon_list(user_tags),
             ca_tags=parse_semicolon_list(ca_tags),
             include_sample_ca=include_sample_ca,
@@ -363,7 +378,7 @@ def get_protein_group_counts_by_year(
         },
         compute_fn=lambda: [{"year": int(row["year"]), "protein_groups": int(row["protein_groups"]), "submissions": int(row["submissions"])} for row in db.submissions.get_protein_group_counts_by_year(
             years=parse_semicolon_ints(years),
-            states=parse_semicolon_list(state),
+            states=parse_semicolon_states(state),
             user_tags=parse_semicolon_list(user_tags),
             ca_tags=parse_semicolon_list(ca_tags),
             include_sample_ca=include_sample_ca,
