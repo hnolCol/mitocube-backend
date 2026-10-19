@@ -1620,6 +1620,50 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "ORDER BY year, group"
         )
         return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
+
+    def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[str] = None) -> pd.DataFrame:
+        """
+        Returns one quantile summary row per calendar year (derived from the submission's created_at)
+        for the given metric. For metric = "duration" the value is the duration in milliseconds
+        between the two given states (same computation as get_durations_between_states), for
+        metric = "samples_per_submission" it is the number of samples of the submission.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per year with the columns 'year', 'min', 'q25', 'median', 'q75', 'max' and 'N'.
+        """
+        if metric == "duration":
+            query = (
+                "MATCH (s2:State {tag : $state_02})<-[r2:IN_STATE]-(s:Submission)-[r1:IN_STATE]->(s1:State {tag : $state_01}) "
+                "WITH s, r1, r2, (r2.created_at - r1.created_at) AS value "
+                "ORDER BY s.tag, value DESC "
+                "WITH s, collect(value)[0] AS value "
+            )
+        elif metric == "samples_per_submission":
+            query = (
+                "MATCH (s:Submission) "
+                "OPTIONAL MATCH (s)-[:HAS_SAMPLE]->(sa:Sample) "
+                "WITH s, count(sa) AS value "
+            )
+        else:
+            raise ValueError(f"Unsupported metric: {metric}")
+        conditions = []
+        if states is not None:
+            conditions.append("EXISTS {(s)-[:IN_STATE]->(state:State) WHERE state.tag IN $states} ")
+        if years is not None:
+            conditions.append("date(datetime({epochmillis: toInteger(s.created_at)})).year IN $years ")
+        if len(conditions) > 0:
+            query += "WHERE " + "AND ".join(conditions)
+        query += (
+            "WITH date(datetime({epochmillis: toInteger(s.created_at)})).year AS year, value "
+            "RETURN year, min(value) AS min, percentileCont(value, 0.25) AS q25, "
+            "percentileCont(value, 0.5) AS median, percentileCont(value, 0.75) AS q75, "
+            "max(value) AS max, count(value) AS N "
+            "ORDER BY year"
+        )
+        params = dict(state_01=state_01, state_02=state_02, years=years, states=states)
+        return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
     
     
     

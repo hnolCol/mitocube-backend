@@ -11,7 +11,7 @@ from config.models.user import UserModel
 from services.users import get_user_from_token
 from services.submission import check_submission_access
 from config.enums.states import SubmissionStatesEnums 
-from config.models.plots.stats import DistResponseModel, GroupedCountResponseModel
+from config.models.plots.stats import DistResponseModel, GroupedCountResponseModel, YearQuantileResponseModel
 import pandas as pd
 
 
@@ -49,14 +49,32 @@ def get_submission_durations(
     state_01: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
     state_02: SubmissionStatesEnums = SubmissionStatesEnums.DONE,
     aggregate: Literal["mean", "sum", "std", "median", "min", "max", "dist"] = "mean",
+    group_by_year: bool = False,
+    years: str = None,
+    state: str = None,
     user: UserModel = Depends(get_user_from_token)
-, db : DatabaseABC = Depends(get_db)) -> float | DistResponseModel:
+, db : DatabaseABC = Depends(get_db)) -> float | DistResponseModel | List[YearQuantileResponseModel]:
     """
     Returns the duration statistics for submissions. The durations are calculated as the difference between the timestamps of two states.
     The unit is in milliseconds.
     If aggregate is 'dist', returns a DistResponseModel with min, q1, median, q3, max. 
     The results are transformed to days. 
+    If group_by_year is true, returns flat rows of quantile summaries in days, one per year bucket
+    derived from the submission's created_at: [{ year, min, q25, median, q75, max, N }].
+    The optional state parameter restricts the submissions to one of the given states (semicolon-delimited),
+    the optional years parameter restricts the year buckets (semicolon-delimited years).
     """
+    if group_by_year:
+        df = db.submission_filter.get_quantiles_by_year(
+            metric="duration",
+            state_01=state_01,
+            state_02=state_02,
+            years=parse_semicolon_ints(years),
+            states=parse_semicolon_list(state),
+        )
+        for col in ["min", "q25", "median", "q75", "max"]:
+            df[col] = df[col] / (1000 * 60 * 60 * 24)
+        return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
     durations = db.submissions.get_durations_between_states(state_01=state_01, state_02=state_02)
     df = pd.DataFrame(columns=["submission_tag", "duration"]).from_dict(durations)
     df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
@@ -75,7 +93,25 @@ def get_submission_durations(
     else:
         agg_metric = df["duration"].agg(func=aggregate, skipna=True)
         return agg_metric
-    
+
+@router.get("/samples_per_submission")
+def get_samples_per_submission(
+    years: str = None,
+    state: str = None,
+    user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
+) -> List[YearQuantileResponseModel]:
+    """
+    Returns per-year quantile summaries of the number of samples per submission.
+    The year bucket is derived from the submission's created_at, not from the samples.
+    Rows are flat: [{ year, min, q25, median, q75, max, N }].
+    """
+    df = db.submission_filter.get_quantiles_by_year(
+        metric="samples_per_submission",
+        years=parse_semicolon_ints(years),
+        states=parse_semicolon_list(state),
+    )
+    return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
+
     
 
 
