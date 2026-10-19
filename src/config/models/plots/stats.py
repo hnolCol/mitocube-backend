@@ -1,6 +1,5 @@
 from pydantic import BaseModel
 
-
 class DistResponseModel(BaseModel):
     min : float
     q1 : float
@@ -12,9 +11,17 @@ class DistResponseModel(BaseModel):
     count : int
     
     
-     
-
+    
 class GroupedCountResponseModel(BaseModel):
     group : str
     year : int
     value : int
+
+class YearQuantileResponseModel(BaseModel):
+    year : int
+    min : float
+    q25 : float
+    median : float
+    q75 : float
+    max : float
+    N : int

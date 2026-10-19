@@ -673,7 +673,38 @@ Each submission is counted at most once per group and year, even if it has sever
         Exception
             If the database query throws an exception.
         """
-    
+        pass
+
+    @abstractmethod
+    def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[str] = None) -> pd.DataFrame:
+        """
+        Returns per-year quantile summaries of a submission metric, bucketed by the calendar year
+        derived from the submission's created_at.
+
+        For metric = "duration" the value is the duration in milliseconds between the two given
+        states (same computation as get_durations_between_states), for
+        metric = "samples_per_submission" it is the number of samples belonging to the submission.
+
+        Parameters
+        ----------
+        metric : Literal["duration", "samples_per_submission"], optional
+            The metric to summarize, by default "duration"
+        state_01 : SubmissionStatesEnums, optional
+            Only for metric = "duration": the first state, by default SUBMITTED
+        state_02 : SubmissionStatesEnums, optional
+            Only for metric = "duration": the second state, by default DONE
+        years : List[int], optional
+            Restrict to these calendar years, if None all years are considered, by default None
+        states : List[str], optional
+            Restrict to submissions in one of these states, if None all submissions are considered, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            One row per year with the columns 'year', 'min', 'q25', 'median', 'q75', 'max' and 'N'.
+        """
+        pass
+
     def get_trending(self, tags : List[str] = None, limit : int = 10) -> List[str]:
         """Returns the trending submissions based on the view score.
 
