@@ -9,6 +9,7 @@ from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import check_submission_access
 from typing import Dict, List, Literal, Tuple
+from routers.stats.submissions import parse_semicolon_list
 from collections import OrderedDict
 import numpy as np
 from config.models.calculations.quantile import QuantileModel
@@ -32,7 +33,7 @@ class ProteinGroupQuantificationCountModel(BaseModel):
     created_at : float
     
 @router.get("/quantifications/protein_groups/count", summary="Get the number of protein group quantifications for a given submission.")
-def get_protein_group_quantification_count(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ProteinGroupQuantificationCountModel]:
+def get_protein_group_quantification_count(user_tags : str = None, ca_tags : str = None, include_sample_ca : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ProteinGroupQuantificationCountModel]:
     """
     Get the number of protein group quantifications for a given submission.
 
@@ -46,7 +47,11 @@ def get_protein_group_quantification_count(user : UserModel = Depends(get_user_f
         A list of ProteinGroupQuantificationCountModel objects, each containing the submission tag, the number of protein group quantifications, and the user tag of the creator of the submission.
     """
 
-    return [ProteinGroupQuantificationCountModel(**record) for record in db.submissions.get_protein_group_quantification_count().to_dict(orient="records")]
+    return [ProteinGroupQuantificationCountModel(**record) for record in db.submissions.get_protein_group_quantification_count(
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
+    ).to_dict(orient="records")]
     
     
 @router.get("/{submission_tag}/quantifications/exists", summary="Checks if quantification data for this submission exists.")

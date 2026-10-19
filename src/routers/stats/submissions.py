@@ -16,7 +16,7 @@ import pandas as pd
 
 
 def parse_semicolon_list(value : str = None) -> List[str] | None:
-    if value is None or len(value) == 0:
+    if value is None or len(value) == 0 or value == "null" or value == "None":
         return None
     return [v.strip() for v in value.split(";") if len(v.strip()) > 0]
 
@@ -71,11 +71,19 @@ def get_submission_durations(
             state_02=state_02,
             years=parse_semicolon_ints(years),
             states=parse_semicolon_list(state),
+            user_tags=parse_semicolon_list(user_tags),
+            ca_tags=parse_semicolon_list(ca_tags),
+            include_sample_ca=include_sample_ca,
         )
         for col in ["min", "q25", "median", "q75", "max"]:
             df[col] = df[col] / (1000 * 60 * 60 * 24)
         return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
-    durations = db.submissions.get_durations_between_states(state_01=state_01, state_02=state_02)
+    durations = db.submissions.get_durations_between_states(
+        state_01=state_01, state_02=state_02,
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
+    )
     df = pd.DataFrame(columns=["submission_tag", "duration"]).from_dict(durations)
     df.loc[:,"duration"] = df["duration"] / (1000 * 60 * 60 * 24) #transform to days
     if aggregate == "dist":
@@ -98,6 +106,9 @@ def get_submission_durations(
 def get_samples_per_submission(
     years: str = None,
     state: str = None,
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[YearQuantileResponseModel]:
     """
@@ -109,6 +120,9 @@ def get_samples_per_submission(
         metric="samples_per_submission",
         years=parse_semicolon_ints(years),
         states=parse_semicolon_list(state),
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
     )
     return [YearQuantileResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -123,6 +137,9 @@ def get_submission_counts(
     state: str = None,
     attribute_tag: str = None,
     group_by_entity: Literal["trait", "condition_application"] = "trait",
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
@@ -142,6 +159,9 @@ def get_submission_counts(
         states=parse_semicolon_list(state),
         attribute_tag=attribute_tag,
         group_entity=group_by_entity,
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -150,6 +170,9 @@ def get_sample_counts_by_research_group(
     group_by: Literal["research_group"] = "research_group",
     years: str = None,
     state: str = None,
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
@@ -161,6 +184,9 @@ def get_sample_counts_by_research_group(
         entity="sample",
         years=parse_semicolon_ints(years),
         states=parse_semicolon_list(state),
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
 
@@ -169,6 +195,9 @@ def get_submission_counts_by_user(
     years: str = None,
     state: str = None,
     research_group_tags: str = None,
+    user_tags: str = None,
+    ca_tags: str = None,
+    include_sample_ca: bool = False,
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)
 ) -> List[GroupedCountResponseModel]:
     """
@@ -181,5 +210,8 @@ def get_submission_counts_by_user(
         years=parse_semicolon_ints(years),
         states=parse_semicolon_list(state),
         research_group_tags=parse_semicolon_list(research_group_tags),
+        user_tags=parse_semicolon_list(user_tags),
+        ca_tags=parse_semicolon_list(ca_tags),
+        include_sample_ca=include_sample_ca,
     )
     return [GroupedCountResponseModel(**row) for row in df.to_dict(orient="records")]
