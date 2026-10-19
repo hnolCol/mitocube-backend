@@ -1550,7 +1550,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         
         submission_counts = self._driver.execute_query(query, tags = tags, routing_="r",database_="neo4j",result_transformer_=Result.to_df)
         return submission_counts.set_index("tag")
-    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[str] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait") -> pd.DataFrame:
+    def get_counts_by_year(self, by : Literal["research_group","user","trait"] = "research_group", entity : Literal["submission","sample"] = "submission", years : List[int] = None, states : List[SubmissionStatesEnums] = None, research_group_tags : List[str] = None, attribute_tag : str = None, group_entity : Literal["trait","condition_application"] = "trait") -> pd.DataFrame:
         """Counts the submissions or samples and groups them by the given property and the calendar year derived from the submission's created_at. 
 
         Submissions are attributed to their creator only, hence for by = "research_group" each submission is counted exactly once for the creator's research group.
@@ -1566,7 +1566,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             The entity to count, by default "submission"
         years : List[int], optional
             Restrict to these calendar years, if None all years are considered, by default None
-        states : List[str], optional
+        states : List[SubmissionStatesEnums], optional
             Restrict to submissions in one of these states, if None all submissions are considered, by default None
         research_group_tags : List[str], optional
             Restrict to submissions created by members of these research groups, if None all research groups are considered, by default None
@@ -1621,7 +1621,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         )
         return self._driver.execute_query(query, routing_="r", database_="neo4j", result_transformer_=Result.to_df, **params)
 
-    def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[str] = None) -> pd.DataFrame:
+    def get_quantiles_by_year(self, metric : Literal["duration", "samples_per_submission"] = "duration", state_01 : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, state_02 : SubmissionStatesEnums = SubmissionStatesEnums.DONE, years : List[int] = None, states : List[SubmissionStatesEnums] = None) -> pd.DataFrame:
         """
         Returns one quantile summary row per calendar year (derived from the submission's created_at)
         for the given metric. For metric = "duration" the value is the duration in milliseconds
