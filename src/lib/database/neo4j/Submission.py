@@ -1411,7 +1411,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
-            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
         )
         r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
@@ -1431,7 +1431,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
-            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
             "ORDER BY rl.created_at DESC "
         )
