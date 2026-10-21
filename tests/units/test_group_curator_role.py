@@ -175,3 +175,54 @@ class TestGroupCuratorUserCreation:
         assert sig.parameters["user"].default.dependency is is_user_at_least_group_curator
         with pytest.raises(HTTPException):
             is_user_at_least_group_curator(self._make_user(UserRolesEnum.STANDARD))
+
+
+class TestScopedStateChangeGate:
+    """The submission state-change routes accept global curators and group
+    curators whose scope contains the submission, nobody else."""
+
+    @staticmethod
+    def _call(user, db):
+        from services.users import is_curator_or_scoped_group_curator
+        return is_curator_or_scoped_group_curator("subm-1", user, db)
+
+    def _make_user(self, role):
+        import time
+        from pydantic import SecretStr
+        from config.models.user import UserModel
+
+        return UserModel(
+            tag="groupcur", firstname="G", lastname="C",
+            email="g.c@age.mpg.de", created_at=time.time(),
+            password=SecretStr("x"), role=role, allow_login=True,
+        )
+
+    def _make_db(self, accessible):
+        class FF:
+            def has_user_access(self, user_tag, submission_tag):
+                return submission_tag in accessible
+        class DB:
+            def __init__(self):
+                self.submission_filter = FF()
+        return DB()
+
+    def test_global_curator_passes_regardless_of_scope(self):
+        assert self._call(self._make_user(UserRolesEnum.CURATOR), self._make_db([])) is not None
+
+    def test_group_curator_in_scope_passes(self):
+        assert self._call(self._make_user(UserRolesEnum.GROUP_CURATOR), self._make_db(["subm-1"])) is not None
+
+    def test_group_curator_out_of_scope_rejected(self):
+        with pytest.raises(HTTPException):
+            self._call(self._make_user(UserRolesEnum.GROUP_CURATOR), self._make_db([]))
+
+    def test_standard_user_rejected(self):
+        with pytest.raises(HTTPException):
+            self._call(self._make_user(UserRolesEnum.STANDARD), self._make_db(["subm-1"]))
+
+    def test_state_change_routes_use_scoped_gate(self):
+        import inspect
+        from routers.submission import submission as submission_router
+        for fn in (submission_router.update_submission_state, submission_router.update_submission):
+            dep = inspect.signature(fn).parameters["user"].default
+            assert dep.dependency.__name__ == "is_curator_or_scoped_group_curator"
