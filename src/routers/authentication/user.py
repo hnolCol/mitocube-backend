@@ -9,7 +9,7 @@ from config.enums.users.roles import UserRolesEnum
 from config.models.user import UserModel,  UsersAdminResponse, UseRoleReponseModel, PublicUser, UserCreateModel, UserInsertModel
 from config.models.parameter import APIParamString, APIParamInt
 from services.encryption import verify_password
-from services.users import is_user_admin, get_user_from_token
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_group_curator
 from services.mail import send_email_in_background
 from services.enums import get_enum_as_dict
 
@@ -31,10 +31,20 @@ def get_user_tags(limit : int = None, user : UserModel = Depends(get_user_from_t
 
 
 @router.post("", summary="Add a new user to the database.")
-def add_user_to_the_database(background_task : BackgroundTasks, user_props : UserCreateModel, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)):
+def add_user_to_the_database(background_task : BackgroundTasks, user_props : UserCreateModel, user : UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)):
     """
-    Adds a user to the database. Currently requires admin rights.
+    Adds a user to the database. Requires at least group curator rights.
+
+    Group curators can only create users for research groups they are a
+    member of and cannot assign a role above their own.
     """
+    if user.role < UserRolesEnum.ADMIN:
+        own_group_tags = set(db.research_groups.find(user_tags=[user.tag], limit=None))
+        for research_group_tag in user_props.research_group_tags:
+            if research_group_tag not in own_group_tags:
+                raise HTTPException(status_code=403, detail="Group curators can only create users for their own research groups.")
+        if user_props.role > user.role:
+            raise user_role_too_low
 
     # every user must be a member of at least one research group - validate all groups before creating the user
     for research_group_tag in user_props.research_group_tags:

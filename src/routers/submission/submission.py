@@ -33,7 +33,7 @@ from config.models.submissions.runs import RunListRequestPropsModel, RunListResp
 
 
 
-from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin, is_creator_of_submission_or_curator
+from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin, is_creator_of_submission_or_curator, is_curator_or_scoped_group_curator
 from services.submission import check_submission_access
 
 
@@ -682,7 +682,7 @@ def get_submission_attributes(submission_tag : str,
 def update_submission_state(background_task : BackgroundTasks, 
                           submission_tag : str, 
                           state_tag : SubmissionStatesEnums, 
-                          user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+                          user : UserModel = Depends(is_curator_or_scoped_group_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Updates the state of a submission. The user must be at least curator to update the state.
     Returns the updated version of the complete submission.
@@ -746,7 +746,7 @@ def update_submission(background_task : BackgroundTasks,
                       state_change : StateChangeModel,  
                       dataset_attributes : Dict[str,List[str]], # attribute_tag, List[trait_tag] 
                       dataset_attribute_input : Optional[Dict[str,Dict[str,Dict]]] = None,
-                      user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+                      user : UserModel = Depends(is_curator_or_scoped_group_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Update datas etattribute along with the state if user is at least curator.
     Returns the updated version of the complete submission.

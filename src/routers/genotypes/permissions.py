@@ -20,6 +20,6 @@ def get_permissions( user: UserModel = Depends(get_user_from_token)) -> Permissi
     return PermissionResponseModel(user_tag = user.tag, 
                                    role = user.role, 
                                    insert = user.role >= UserRolesEnum.STANDARD, 
-                                   delete = user.role >= UserRolesEnum.CURATOR,
-                                   edit = user.role >= UserRolesEnum.CURATOR)   
+                                   delete = user.role >= UserRolesEnum.GROUP_CURATOR,
+                                   edit = user.role >= UserRolesEnum.GROUP_CURATOR)   
 
