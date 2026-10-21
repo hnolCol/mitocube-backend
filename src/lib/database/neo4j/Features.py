@@ -279,12 +279,12 @@ class Neo4JFeatures(FeaturesABC):
         return df.set_index("tag")
     
     def is_quantified(self, tags : List[str]) -> pd.DataFrame:
-        ""
+        """Checks which of the given proteins are quantified and how often."""
         query = (
             "MATCH (p:Protein) "
             "WHERE p.tag in $tags "
             "MATCH (p)<-[r:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]->(submission:Submission) "
-            "WITH count(submission) as N, p, count(rsample) as nsample "
+            "WITH p, count(DISTINCT submission) as N, count(DISTINCT s) as nsample "
             "RETURN p.tag as tag,  N > 0 as quantified, N as quant_dataset, nsample as quant_samples "
         )
             
