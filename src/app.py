@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import ORJSONResponse
 
 
 from fastapi.staticfiles import StaticFiles
@@ -199,8 +198,7 @@ app = FastAPI(
     version=GENERAL_SETTINGS.version,
     description=GENERAL_SETTINGS.description,
     lifespan=lifespan,
-    redoc_url="/api/doc",
-    default_response_class=ORJSONResponse)
+    redoc_url="/api/doc")
 
 app.add_middleware(
     CORSMiddleware,

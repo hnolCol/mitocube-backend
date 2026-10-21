@@ -1411,7 +1411,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
-            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
         )
         r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
@@ -1431,7 +1431,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
-            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
             "ORDER BY rl.created_at DESC "
         )
@@ -2352,10 +2352,10 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         """
         if include_sample_ca:
             target_ca_match = (
-                "CALL { WITH t "
+                "CALL (t) { "
                 "MATCH (t)-[:HAS_APPLICATION]->(tca:ConditionApplication) "
                 "RETURN collect(DISTINCT tca.tag) AS stcas } "
-                "CALL { WITH t "
+                "CALL (t) { "
                 "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(stca2:ConditionApplication) "
                 "RETURN collect(DISTINCT stca2.tag) AS ssca } "
                 "RETURN stcas + [c IN ssca WHERE NOT c IN stcas] AS tags "
@@ -2382,7 +2382,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 params["user_tag"] = current_user_tag
                 params["scope_tags"] = scope_tags
                 own_group_match = (
-                    "CALL { WITH o "
+                    "CALL (o) { "
                     "MATCH (ou:User)-[:CREATED]->(o) "
                     "MATCH (ou)-[:MEMBER_OF]->(rg:ResearchGroup)<-[:MEMBER_OF]-(mu:User {tag : $user_tag}) "
                     "RETURN count(DISTINCT rg) > 0 AS own_group } "
@@ -2396,18 +2396,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                     "ELSE 'no_access' END"
                 )
         ca_import = (
-            "CALL { WITH o, tcas "
+            "CALL (o, tcas) { "
             "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
             "WHERE oca.tag IN tcas "
             "RETURN collect(DISTINCT oca.tag) AS scas } "
         )
         if include_sample_ca:
             ca_import = (
-                "CALL { WITH o, tcas "
+                "CALL (o, tcas) { "
                 "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
                 "WHERE oca.tag IN tcas "
                 "RETURN collect(DISTINCT oca.tag) AS scas } "
-                "CALL { WITH o, tcas "
+                "CALL (o, tcas) { "
                 "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(soca:ConditionApplication) "
                 "WHERE soca.tag IN tcas "
                 "RETURN collect(DISTINCT soca.tag) AS sscas } "
@@ -2418,16 +2418,16 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             ca_import += f"WITH t, tgenos, tcas, o, {own_group_carry}ogenos, scas AS ocas "
         query = (
             "MATCH (t:Submission {tag : $tag}) "
-            "CALL { WITH t "
+            "CALL (t) { "
             "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(tg:Genotype) "
             "RETURN collect(DISTINCT tg.tag) AS tgenos } "
-            f"CALL {{ WITH t {target_ca_match}}} "
+            f"CALL (t) {{ {target_ca_match}}} "
             "WITH t, tgenos, tags AS tcas "
             "WHERE size(tgenos) + size(tcas) > 0 "
             "MATCH (o:Submission) "
             "WHERE o <> t "
             f"{scope_filter}{own_group_match}"
-            "CALL { WITH o "
+            "CALL (o) { "
             "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(og:Genotype) "
             "RETURN collect(DISTINCT og.tag) AS ogenos } "
             f"WITH t, tgenos, tcas, o, {own_group_carry}ogenos "
@@ -2438,7 +2438,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "WHERE size(shared_genos) + size(shared_cas) > 0 "
             f"WITH t, tgenos, tcas, o, shared_genos, shared_cas, {own_group_carry}"
             "size(ogenos) + size(ocas) AS o_union_size "
-            "CALL { WITH o, shared_cas "
+            "CALL (o, shared_cas) { "
             "MATCH (o)-[:HAS_APPLICATION]->(sca:ConditionApplication)-[:INSTANCE_OF]->(strait:Trait) "
             "WHERE sca.tag IN shared_cas "
             "RETURN collect(DISTINCT strait.tag) AS traits } "

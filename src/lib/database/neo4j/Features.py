@@ -455,8 +455,7 @@ class Neo4JFeatures(FeaturesABC):
    # // Now use these filtered submissions in both parts of the UNION
         query = (
             base_submission_query +
-            "CALL { " #call is required to make filteredSubmission available for UNION
-            "WITH filteredSubmissions "
+            "CALL (filteredSubmissions) { "
             "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
             "WHERE p.tag IN $tags AND submission.tag IN filteredSubmissions "
             "MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[hav:HAS_ATTRIBUTE_VALUE]-(submission) "
@@ -465,8 +464,6 @@ class Neo4JFeatures(FeaturesABC):
             "av.tag AS attribute_value_tag "
 
             "UNION "
-            #get the genotypes in the second union statement. 
-            "WITH filteredSubmissions "
             "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
             "WHERE p.tag IN $tags AND submission.tag IN filteredSubmissions "
             "MATCH (sample)-[rhg:HAS_GENOTYPE]->(g:Genotype) "
