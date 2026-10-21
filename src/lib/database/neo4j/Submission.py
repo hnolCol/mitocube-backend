@@ -2279,6 +2279,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             return None  # Curators have access to all submissions
         if user.role == UserRolesEnum.GUEST:
             return []  # Guests have no access to submissions
+        # Group curators are scoped like standard users: only their research
+        # groups' submissions plus consortium-shared and own submissions.
         research_groups_tags = self._research_groups.find(user_tags=[current_user_tag])
         for rg_tag in research_groups_tags:
             if not self._research_groups.exists(rg_tag):
