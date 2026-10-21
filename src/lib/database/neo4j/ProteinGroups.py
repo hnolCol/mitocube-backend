@@ -230,14 +230,15 @@ class Neo4JProteinGroups(ProteinGroupsABC):
     def get_exclusively_quantified(self, submission_tag : str, annotation_tags : List[str] = None, limit : int = None) -> List[ExclusivelyQuantifiedModel]:
         
         
-        query = "MATCH (pg:ProteinGroup)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute)  " 
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_STATS]->(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "MATCH (stats)-[:FOR_PROTEIN_GROUP]->(pg:ProteinGroup) "
+            "WHERE stats.exclusively = true "
+        )
         
         if annotation_tags is not None and len(annotation_tags) > 0:
-            query += "WHERE EXISTS {(pg)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(annotation:Annotation) WHERE annotation.tag IN $annotation_tags}  AND "
-        else:
-            query += "WHERE "    
+            query += "AND EXISTS {(pg)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(annotation:Annotation) WHERE annotation.tag IN $annotation_tags}  "
         query += (
-            "EXISTS {(stats)-[:HAS_STATS]-(submission:Submission {tag : $submission_tag})} AND stats.exclusively = true "
             "RETURN pg.tag as tag, a.tag as attribute_tag, stats.tag as stats_tag, stats.mean as mean, stats.exclusively_ca_tags as exclusively_ca_tags, stats.quantified_in_samples as quantified_in_samples ORDER BY mean DESC "
         )
         if limit is not None:

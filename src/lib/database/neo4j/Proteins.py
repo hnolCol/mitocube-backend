@@ -87,23 +87,19 @@ class Neo4JProteins(ProteinsABC):
         where_conditions = []
         score_conditions = []
 
-        query = "MATCH (p:Protein) "
-
         # -------------------------
         # FILTER CONDITIONS
         # -------------------------
 
         if submission_tags:
-            where_conditions.append(
-                """
-                EXISTS {
-                    (p)<-[:HAS_PROTEINS]-(pg:ProteinGroup)
-                        <-[:QUANTIFIED]-(:Sample)
-                        <-[:HAS_SAMPLE]-(submission:Submission)
-                    WHERE submission.tag IN $submission_tags
-                }
-                """
+            query = (
+                "MATCH (submission:Submission)-[:HAS_SAMPLE]->(:Sample)"
+                "-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
+                "WHERE submission.tag IN $submission_tags "
+                "WITH DISTINCT p "
             )
+        else:
+            query = "MATCH (p:Protein) "
 
         if annotation_tags:
             where_conditions.append(
