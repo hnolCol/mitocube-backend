@@ -94,29 +94,14 @@ class Neo4JProteinGroups(ProteinGroupsABC):
    
     def find(self, search_string : str = None, submission_tag : str = None, sort_by_stat_attribute : str = None,  annotation_tags : List[str] = None, limit : int = 20) -> List[str]:
         ""
-        query = "MATCH (pg:ProteinGroup) "
-        
         where_clauses = []
         if annotation_tags is not None and len(annotation_tags) > 0:
             where_clauses.append("""EXISTS {
                     MATCH (pg)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(a:Annotation)
                     WHERE a.tag IN $annotation_tags
                         }""")
-                        
-            
-            
-        # Filter by submission first
-        if submission_tag is not None:
-                where_clauses.append("""
-                                EXISTS {
-                                MATCH (pg)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-
-                                (:Submission {tag: $submission_tag})}
-                                """)
-        
-        # Only expand proteins if search is needed
+
         if search_string is not None and search_string.strip() != "":
-
-
             where_clauses.append("""
                     (
                         toLower(pg.tag) CONTAINS $search_string
@@ -126,23 +111,30 @@ class Neo4JProteinGroups(ProteinGroupsABC):
                         }
                     )
                     """)
-        
-        if len(where_clauses) > 0:
-            query += "WHERE " + " AND ".join(where_clauses) + " "
 
-            
         if sort_by_stat_attribute is not None and submission_tag is not None:
-            query += "MATCH (pg)<-[:FOR_PROTEIN_GROUP]-(stats:Statistics) "
-            if submission_tag is not None:
-                query += "WHERE EXISTS {(stats)<-[:HAS_STATS]-(submission:Submission {tag : $submission_tag})} "
-            query += (
+            query = (
+                "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_STATS]->(stats:Statistics) "
                 "MATCH (stats)-[:OF_ATTRIBUTE]->(a:Attribute) "
                 "WHERE a.tag = $sort_by_stat_attribute "
+                "MATCH (stats)-[:FOR_PROTEIN_GROUP]->(pg:ProteinGroup) "
+            )
+            if len(where_clauses) > 0:
+                query += "WHERE " + " AND ".join(where_clauses) + " "
+            query += (
                 "RETURN pg.tag AS tag, stats.score AS score "
                 "ORDER BY score DESC "
-             )
+            )
         else:
-            query += "RETURN DISTINCT pg.tag AS tag " 
+            query = "MATCH (pg:ProteinGroup) "
+            if submission_tag is not None:
+                where_clauses.append("""EXISTS {
+                                MATCH (pg)<-[:QUANTIFIED]-(:Sample)<-[:HAS_SAMPLE]-
+                                (:Submission {tag: $submission_tag})}
+                                """)
+            if len(where_clauses) > 0:
+                query += "WHERE " + " AND ".join(where_clauses) + " "
+            query += "RETURN DISTINCT pg.tag AS tag "
 
         if limit is not None:
             query += "LIMIT $limit"
