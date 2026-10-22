@@ -2149,6 +2149,23 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         )
 
 
+    @staticmethod
+    def _ca_text_match_clause(token_params: Dict[str, str]) -> str:
+        """Cypher text-match clause over the trait/attribute labels of a condition
+        application and its whole hierarchy of condition values. Intended for use
+        inside an EXISTS { ... } block whose nodes are bound to (ca:ConditionApplication),
+        (t:Trait) and (a:Attribute); the same node variables are reused for the value
+        level, so the tokens match anywhere down the HAS_VALUE chain."""
+        token_clauses = " AND ".join(
+            f"(toLower(t.s) CONTAINS ${name} OR toLower(a.s) CONTAINS ${name})"
+            for name in token_params
+        )
+        return (
+            f"({token_clauses}) "
+            f"OR EXISTS {{ MATCH (ca)-[:HAS_VALUE*1..]->(cv:ConditionValue)-[:INSTANCE_OF]->(t) "
+            f"MATCH (cv)-[:OF_ATTRIBUTE]->(a) WHERE {token_clauses} }}"
+        )
+
     def _filter_by_ca_search_string(
         self,
         ca_search_string: str,
@@ -2157,10 +2174,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         limit: int,
         ordered: bool,
     ) -> List[str]:
-        """Filter by free-text search across trait and attribute labels.
+        """Filter by free-text search across trait and attribute labels of a
+        submission's condition applications and their nested condition values.
 
         The search string is split on whitespace into tokens; a submission matches
-        only if every token is contained in a trait or attribute label (order-independent, AND semantics).
+        only if every token is contained in a trait or attribute label somewhere in
+        the condition application hierarchy (order-independent, AND semantics).
         """
 
         tokens = self._tokenize_search_string(ca_search_string)
@@ -2173,11 +2192,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         if submission_tags is not None:
             where_clauses.append("submission.tag IN $submission_tags")
 
-        token_clauses = " AND ".join(
-            f"(toLower(t.s) CONTAINS ${name} OR toLower(a.s) CONTAINS ${name})"
-            for name in token_params
-        )
-        text_match = f"({token_clauses})"
+        text_match = self._ca_text_match_clause(token_params)
 
         if include_sample_ca:
             where_clauses.append(
@@ -2514,7 +2529,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             where.append("submission.tag IN $scope_tags")
             params["scope_tags"] = scope_tags
 
-        # ---- search string: every whitespace-separated token must be contained in title or tag (AND semantics) ----
+        # ---- search string: every whitespace-separated token must be contained in title or tag (AND semantics),
+        # or somewhere in the condition application hierarchy (trait/attribute labels of the CA or any nested condition value) ----
         if search_string is not None:
             tokens = self._tokenize_search_string(search_string)
             if len(tokens) == 0:
@@ -2524,7 +2540,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 f"(toLower(submission.title) CONTAINS ${name} OR toLower(submission.tag) CONTAINS ${name})"
                 for name in token_params
             )
-            where.append(f"({token_clauses})")
+            ca_text_match = self._ca_text_match_clause(token_params)
+            ca_exists = (
+                "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait), "
+                "(ca)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE " + ca_text_match + " }"
+            )
+            where.append(f"(({token_clauses}) OR {ca_exists})")
             params.update(token_params)
 
         # ---- state: latest IN_STATE relationship must point to one of the states ----
@@ -2567,11 +2588,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             if len(ca_tokens) == 0:
                 ca_tokens = [""]
             ca_token_params = {f"ca_token_{index}": token for index, token in enumerate(ca_tokens)}
-            token_clauses = " AND ".join(
-                f"(toLower(t.s) CONTAINS ${name} OR toLower(a.s) CONTAINS ${name})"
-                for name in ca_token_params
-            )
-            text_match = f"({token_clauses})"
+            text_match = self._ca_text_match_clause(ca_token_params)
             submission_ca = (
                 "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait), "
                 "(ca)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE " + text_match + " }"
