@@ -48,6 +48,22 @@ def recording_scope_cache(monkeypatch):
     RecordingScopeCache.reset()
     monkeypatch.setattr(scope_cache_module, "invalidate_cached_scope", _invalidate_cached)
     monkeypatch.setattr(scope_cache_module, "invalidate_all_cached_scopes", _invalidate_all)
+
+    # The Neo4j DB classes import the cache functions at module import time
+    # (from lib.cache.scope_cache import ...), so the bound names must also be
+    # patched whenever those modules are already in sys.modules - otherwise the
+    # contract test silently asserts against the real cache runtime and only
+    # passes when it happens to run before any other test imports the modules.
+    import lib.database.neo4j.Submission as submission_module
+    import lib.database.neo4j.ResearchGroup as research_group_module
+    import lib.database.neo4j.Consortium as consortium_module
+    import lib.database.neo4j.Collaborations as collaborations_module
+
+    monkeypatch.setattr(submission_module, "invalidate_cached_scope", _invalidate_cached)
+    monkeypatch.setattr(research_group_module, "invalidate_cached_scope", _invalidate_cached)
+    monkeypatch.setattr(consortium_module, "invalidate_all_cached_scopes", _invalidate_all)
+    monkeypatch.setattr(collaborations_module, "invalidate_cached_scope", _invalidate_cached)
+
     yield RecordingScopeCache
     RecordingScopeCache.reset()
 
