@@ -1,0 +1,23 @@
+<html><body style="margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif;"><div style="width: 90%; background: #efefef; border-radius: 10px; margin: 2rem; padding: 1rem;">
+    <h1>{{app_name}} : New {{kind}} request</h1>
+    <p>Dear Curator,</p>
+    <p>the user <b>{{user}}</b> requested a new {{kind}}</p>
+    <div style="color : #0a68ad; font-size: large; text-align: center;">
+        <h3>{{text}}</h3>
+        {% if attribute_tag %}
+        <p style="color: #555; font-size: medium;">for the attribute <b>{{attribute_tag}}</b></p>
+        {% endif %}
+    </div>
+    {% if description %}
+    <p><b>Description:</b></p>
+    <p style="white-space: pre-wrap;">{{description}}</p>
+    {% endif %}
+    {% if traits %}
+    <p><b>Suggested traits:</b> {{traits}}</p>
+    {% endif %}
+    {% if comment %}
+    <p>User comment: {{comment}}</p>
+    {% endif %}
+    <p>Please follow this <a href={{review_url}}>link</a> to review the request. You can edit it before approving or deny it with a comment.</p>
+    <p>The {{app_name}} Support Team</p>
+</div></body></html>

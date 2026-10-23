@@ -14,13 +14,16 @@ class MessageModel(BaseModel):
 
 
 class ConversationModel(BaseModel):
-    """A conversation between two or more users, optionally linked to a submission."""
+    """A conversation between two or more users, optionally linked to a submission.
+    System notifications (e.g. from MitoCube Support) are read-only conversations
+    with a single participant."""
     tag : str = Field(..., description="Unique tag of the conversation.")
     created_at : float = Field(..., default_factory=get_time_stamp)
     created_by : str
     user_tags : List[str] = []
     submission_tag : Optional[str] = None
     title : Optional[str] = None
+    read_only : bool = False
 
 
 class MessageInput(BaseModel):

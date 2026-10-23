@@ -7,7 +7,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file 
 
-from typing import List
+from typing import List, Optional
 
 class Email(BaseSettings):
     """
@@ -39,7 +39,14 @@ class Email(BaseSettings):
     mail_proteome_added_template : str = "proteome_added.html"
     mail_deposition_requested_template : str = "deposition_requested.html"
     mail_deposition_complete_template : str = "deposition_complete.html"
-    
+    mail_attribute_requested_template : str = "attribute_requested.html"
+    mail_attribute_request_reviewed_template : str = "attribute_request_reviewed.html"
+
+    # in-app notifications (same pattern as the emails, sent as read-only messages;
+    # the .txt templates live in mail_template_dir next to the email templates)
+    message_sender_tag : str = "mitocube-support"
+    message_attribute_request_reviewed_template : str = "attribute_request_reviewed.txt"
+
     class Config:
         env_file = get_env_file()
         extra = "ignore"

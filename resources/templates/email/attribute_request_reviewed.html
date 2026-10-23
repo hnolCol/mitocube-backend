@@ -1,0 +1,26 @@
+<html><body style="margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif;"><div style="width: 90%; background: #efefef; border-radius: 10px; margin: 2rem; padding: 1rem;">
+    <h1>{{app_name}} : Your {{kind}} request was {% if approved %}approved{% else %}denied{% endif %}</h1>
+    <p>Dear {{first_name}},</p>
+    <p>your request for the new {{kind}}</p>
+    <div style="color : #0a68ad; font-size: large; text-align: center;">
+        <h3>{{text}}</h3>
+        {% if attribute_tag %}
+        <p style="color: #555; font-size: medium;">for the attribute <b>{{attribute_tag}}</b></p>
+        {% endif %}
+    </div>
+    {% if approved %}
+    <p>has been <b style="color: #1c7c3c;">approved</b> by <b>{{reviewer}}</b> and is now available in {{app_name}}.</p>
+    {% if edited %}
+    <p>The curator adjusted some details (e.g. text, groups, priority or traits) before approval.</p>
+    {% endif %}
+    {% else %}
+    <p>has been <b style="color: #a82a2a;">denied</b> by <b>{{reviewer}}</b>.</p>
+    {% endif %}
+    {% if review_comment %}
+    <p>Comment from {{reviewer}}: {{review_comment}}</p>
+    {% endif %}
+    {% if approved %}
+    <p>Please follow this <a href={{view_url}}>link</a> to view it.</p>
+    {% endif %}
+    <p>The {{app_name}} Support Team</p>
+</div></body></html>

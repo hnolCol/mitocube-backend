@@ -27,6 +27,18 @@ class Neo4JMessages(MessagesABC):
         r = self._driver.execute_query(query, user_tags = user_tags, result_transformer_=Result.value)
         return len(r) > 0 and r[0] == len(set(user_tags))
 
+    def _link_submission(self, conversation_tag : str, submission_tag : Optional[str]) -> None:
+        if submission_tag is None:
+            return
+        link_query = (
+            "MATCH (c:Conversation {tag : $conversation_tag}) "
+            "MATCH (s:Submission {tag : $submission_tag}) "
+            "MERGE (c)-[:ABOUT_SUBMISSION]->(s) "
+        )
+        self._driver.execute_query(link_query, routing_="w",
+                                   conversation_tag = conversation_tag,
+                                   submission_tag = submission_tag)
+
     def insert_conversation(self, created_by : str, conversation : ConversationInput) -> Optional[str]:
         """Creates a conversation with the given participants, optionally linked
         to a submission. All participants must exist. The creator is implicitly a
@@ -40,7 +52,7 @@ class Neo4JMessages(MessagesABC):
         conversation_tag = get_random_string(N = 12)
         query = (
             "CREATE (c:Conversation {tag : $conversation_tag, created_at : timestamp(), "
-            "created_by : $created_by, title : $title, submission_tag : $submission_tag}) "
+            "created_by : $created_by, title : $title, submission_tag : $submission_tag, read_only : false}) "
             "WITH c "
             "UNWIND $participants AS participant_tag "
             "MATCH (u:User {tag : participant_tag}) "
@@ -59,15 +71,7 @@ class Neo4JMessages(MessagesABC):
         if len(r) == 0:
             return None
 
-        if conversation.submission_tag is not None:
-            link_query = (
-                "MATCH (c:Conversation {tag : $conversation_tag}) "
-                "MATCH (s:Submission {tag : $submission_tag}) "
-                "MERGE (c)-[:ABOUT_SUBMISSION]->(s) "
-            )
-            self._driver.execute_query(link_query, routing_="w",
-                                       conversation_tag = conversation_tag,
-                                       submission_tag = conversation.submission_tag)
+        self._link_submission(conversation_tag, conversation.submission_tag)
 
         if conversation.initial_message:
             message_input = MessageInput(content = conversation.initial_message)
@@ -75,10 +79,54 @@ class Neo4JMessages(MessagesABC):
                                 message = message_input)
         return conversation_tag
 
+    def insert_system_message(self, user_tags : List[str], title : str, content : str,
+                              sender_tag : str, submission_tag : Optional[str] = None) -> Optional[str]:
+        """Creates a read-only conversation for the given users with a single
+        system message. The sender is a plain tag (no User node, no SENT link)
+        and is not a participant. The message starts unread for all recipients."""
+        recipients = list(dict.fromkeys(t for t in user_tags if t))
+        if len(recipients) == 0 or not self._all_participants_exist(recipients):
+            return None
+
+        conversation_tag = get_random_string(N = 12)
+        message_tag = get_random_string(N = 12)
+        query = (
+            "CREATE (c:Conversation {tag : $conversation_tag, created_at : timestamp(), "
+            "created_by : $sender_tag, title : $title, submission_tag : $submission_tag, read_only : true}) "
+            "CREATE (m:Message {tag : $message_tag, created_at : timestamp(), "
+            "content : $content, sender_tag : $sender_tag, read_by : []}) "
+            "MERGE (m)-[:IN_CONVERSATION]->(c) "
+            "WITH c "
+            "UNWIND $recipients AS recipient_tag "
+            "MATCH (u:User {tag : recipient_tag}) "
+            "MERGE (u)-[r:PARTICIPATES]->(c) "
+            "ON CREATE SET r.created_at = timestamp() "
+            "WITH DISTINCT c "
+            "RETURN c.tag "
+        )
+        r = self._driver.execute_query(query, routing_="w",
+                                       conversation_tag = conversation_tag,
+                                       message_tag = message_tag,
+                                       sender_tag = sender_tag,
+                                       title = title,
+                                       content = content,
+                                       submission_tag = submission_tag,
+                                       recipients = recipients,
+                                       result_transformer_=Result.value)
+        if len(r) == 0:
+            return None
+        self._link_submission(conversation_tag, submission_tag)
+        return conversation_tag
+
     def exists(self, conversation_tag : str) -> bool:
         query = "RETURN EXISTS { (c:Conversation {tag : $conversation_tag})} "
         r = self._driver.execute_query(query, conversation_tag = conversation_tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+
+    def is_read_only(self, conversation_tag : str) -> bool:
+        query = "MATCH (c:Conversation {tag : $conversation_tag}) RETURN coalesce(c.read_only, false) "
+        r = self._driver.execute_query(query, conversation_tag = conversation_tag, result_transformer_=Result.value)
+        return bool(r[0]) if len(r) > 0 else False
 
     def get_conversation(self, conversation_tag : str) -> Optional[ConversationModel]:
         query = (
@@ -86,7 +134,8 @@ class Neo4JMessages(MessagesABC):
             "OPTIONAL MATCH (u:User)-[:PARTICIPATES]->(c) "
             "OPTIONAL MATCH (c)-[:ABOUT_SUBMISSION]->(s:Submission) "
             "RETURN c.tag AS tag, c.created_at AS created_at, c.created_by AS created_by, "
-            "c.title AS title, s.tag AS submission_tag, collect(u.tag) AS user_tags "
+            "c.title AS title, s.tag AS submission_tag, collect(u.tag) AS user_tags, "
+            "coalesce(c.read_only, false) AS read_only "
         )
         r = self._driver.execute_query(query, conversation_tag = conversation_tag, result_transformer_=Result.data)
         if len(r) == 0: return None
@@ -95,7 +144,8 @@ class Neo4JMessages(MessagesABC):
                                  created_by = row["created_by"],
                                  user_tags = [t for t in row["user_tags"] if t is not None],
                                  submission_tag = row.get("submission_tag"),
-                                 title = row.get("title"))
+                                 title = row.get("title"),
+                                 read_only = bool(row.get("read_only")))
 
     def get_conversations_for_user(self, user_tag : str, submission_tag : str = None) -> List[ConversationResponseModel]:
         """Returns all conversations of the given user, optionally filtered by
@@ -118,9 +168,11 @@ class Neo4JMessages(MessagesABC):
             "WITH c, participants, s, head(collect(m)) AS last_message, count(m) AS n_messages "
             "RETURN c.tag AS tag, c.created_at AS created_at, c.created_by AS created_by, c.title AS title, "
             "s.tag AS submission_tag, participants AS user_tags, "
+            "coalesce(c.read_only, false) AS read_only, "
             "last_message.created_at AS last_message_at, n_messages AS n_messages, "
             "last_message.content AS last_message, "
             "EXISTS { MATCH (c)<-[:IN_CONVERSATION]-(m2:Message) WHERE NOT $user_tag IN m2.read_by AND m2.sender_tag <> $user_tag } AS unread "
+            "ORDER BY coalesce(last_message_at, created_at) DESC "
         )
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, **params)
         results = []
@@ -132,6 +184,7 @@ class Neo4JMessages(MessagesABC):
                 user_tags = [t for t in row["user_tags"] if t is not None],
                 submission_tag = row.get("submission_tag"),
                 title = row.get("title"),
+                read_only = bool(row.get("read_only")),
                 last_message_at = row.get("last_message_at"),
                 n_messages = row.get("n_messages", 0),
                 unread = bool(row.get("unread", False)),
@@ -144,14 +197,16 @@ class Neo4JMessages(MessagesABC):
             "MATCH (c:Conversation)-[:ABOUT_SUBMISSION]->(s:Submission {tag : $submission_tag}) "
             "OPTIONAL MATCH (u:User)-[:PARTICIPATES]->(c) "
             "RETURN c.tag AS tag, c.created_at AS created_at, c.created_by AS created_by, "
-            "c.title AS title, s.tag AS submission_tag, collect(u.tag) AS user_tags "
+            "c.title AS title, s.tag AS submission_tag, collect(u.tag) AS user_tags, "
+            "coalesce(c.read_only, false) AS read_only "
         )
         r = self._driver.execute_query(query, submission_tag = submission_tag, result_transformer_=Result.data)
         return [ConversationModel(tag = row["tag"], created_at = row["created_at"],
                                   created_by = row["created_by"],
                                   user_tags = [t for t in row["user_tags"] if t is not None],
                                   submission_tag = row.get("submission_tag"),
-                                  title = row.get("title")) for row in r]
+                                  title = row.get("title"),
+                                  read_only = bool(row.get("read_only"))) for row in r]
 
     def is_participant(self, conversation_tag : str, user_tag : str) -> bool:
         query = (
