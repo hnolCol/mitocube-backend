@@ -75,7 +75,7 @@ def compute_trend_subset(pivot: pd.DataFrame, increase: bool = True, strict: boo
            (diffs <= 0).all(axis=1)
     return pivot.index[mask]
  
-def _annotation_analysis(annotation_tag: str, submission_tag : str, db : DatabaseABC = Depends(get_db)) -> Dict:
+def _annotation_analysis(annotation_tag: str, submission_tag : str, db : DatabaseABC) -> Dict:
     
 
     protein_tags = db.annotations.get_protein_tags(tag = annotation_tag, submission_tag = submission_tag)
@@ -107,13 +107,14 @@ def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[
  
 # --- 3. pairwise: return both filtered ids and the full per-protein log2FC --------
 def _pairwise_analysis(submission_tag: str,
+                        db : DatabaseABC,
                         ca_tag_left: str,
                         ca_tag_right: str,
                         criteria: Literal["significant", "not_significant", "significant_increase", "significant_decrease"],
                         within_attribute_tags: str,
                         within_ca_tags: str,
                         annotation_tag: str = None,
-                        protein_group_tags: List[str] = None, db : DatabaseABC = Depends(get_db)) -> Dict:
+                        protein_group_tags: List[str] = None) -> Dict:
     sample_tags_left, sample_tags_right, sample_tags, suffix, ca_left_text, ca_right_text, attribute_tag = db.samples.handle_comparison(
         submission_tag=submission_tag,
         ca_tag_left=ca_tag_left,
@@ -130,7 +131,8 @@ def _pairwise_analysis(submission_tag: str,
         sample_tags_right=sample_tags_right,
         suffix="",
         equal_variance=True,
-        fdr=0.05
+        fdr=0.05,
+        db=db
     )
  
     if criteria == "significant":
@@ -155,11 +157,11 @@ def _pairwise_analysis(submission_tag: str,
 # node in the tree, not just the leaves.
 def _process_comparison_children(
     comparisons: CompareModel,
+    db : DatabaseABC,
     protein_group_tags: List[str] = None,
     operator: Literal["and", "or", "not"] = "and",
     protein_tag_results: Dict = None,
     leaf_data: Dict = None,
-    db : DatabaseABC = Depends(get_db),
 ):
     if protein_tag_results is None:
         protein_tag_results = {"operator": operator, "children": [], "id": comparisons.id}
@@ -197,7 +199,8 @@ def _process_comparison_children(
             
             annotation_results = _annotation_analysis(
                 annotation_tag=child_comp.props["annotation_tag"],
-                submission_tag=child_comp.submission_tag
+                submission_tag=child_comp.submission_tag,
+                db=db
             )
             protein_tag_results["children"].append({
                 "id": leaf_id,
@@ -208,6 +211,7 @@ def _process_comparison_children(
  
         elif child_comp.type == "pairwise":
             pairwise_result = _pairwise_analysis(
+                db=db,
                 submission_tag=child_comp.submission_tag,
                 ca_tag_left=child_comp.props["ca_tag_left"],
                 ca_tag_right=child_comp.props["ca_tag_right"],
@@ -233,6 +237,7 @@ def _process_comparison_children(
                 operator=child_comp.type,
                 protein_tag_results=nested_node,
                 leaf_data=leaf_data,
+                db=db
             )
  
     return protein_tag_results, leaf_data
@@ -351,7 +356,7 @@ def get_compare(comparisons: CompareModel, user: UserModel = Depends(get_user_fr
         raise HTTPException(status_code=400, detail="No comparisons provided")
  
     operator_root = comparisons.type
-    result, leaf_data = _process_comparison_children(comparisons, operator=operator_root)
+    result, leaf_data = _process_comparison_children(comparisons, operator=operator_root, db=db)
  
     final_ids, count_tree = merge_comparison_results(result, leaf_data=leaf_data)
     step_counts = flatten_count_tree(count_tree)

@@ -21,7 +21,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     )
 
 
-def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float, db : DatabaseABC = Depends(get_db)):
+def handle_pairwise(submission_tag: str, annotation_tag: str, sample_tags: list, sample_tags_left: list, sample_tags_right: list, suffix: str, equal_variance: bool, fdr: float, db : DatabaseABC):
     dt = db.get_datatable(tag = submission_tag, annotation_tag= annotation_tag, sample_tags=sample_tags, use_sample_tags=True)
     if dt.empty:
         raise HTTPException(status_code=404, detail="No data found for the given submission and annotation tag. Ensure that the annotation tag is correct and that there is data available. Double check the ca_tags please.") 
@@ -97,7 +97,7 @@ def get_dataset_volcano(submission_tag : str,
     # check if sample tags not empty 
 
 
-    stats = handle_pairwise(submission_tag=submission_tag, annotation_tag=annotation_tag, sample_tags=sample_tags, sample_tags_left=sample_tags_left, sample_tags_right=sample_tags_right, suffix=suffix, equal_variance=equal_variance, fdr=fdr)
+    stats = handle_pairwise(submission_tag=submission_tag, annotation_tag=annotation_tag, sample_tags=sample_tags, sample_tags_left=sample_tags_left, sample_tags_right=sample_tags_right, suffix=suffix, equal_variance=equal_variance, fdr=fdr, db = db)
     
     return {"stats" : stats.to_dict(orient="records"), 
             "suffix" : suffix, 

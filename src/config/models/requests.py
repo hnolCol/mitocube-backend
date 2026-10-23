@@ -125,7 +125,7 @@ class DepositionRequestInsertModel(BaseModel):
     """A user request that a submission's data should be deposited to an
     external database (e.g. PRIDE)."""
     submission_tag: str
-    database: str
+    database: Optional[str] = "PRIDE - PRoteomics IDEntifications Database"
     comment: Optional[str] = None
 
 
@@ -134,7 +134,7 @@ class DepositionRequestModel(BaseModel):
     submission_tag: str
     status: Literal["pending", "deposited", "rejected"] = "pending"
     user_tag: str
-    database: str
+    database: Optional[str] = "PRIDE - PRoteomics IDEntifications Database"
     comment: Optional[str] = None
     created_at: Optional[float] = None
     identifier: Optional[str] = None

@@ -306,7 +306,7 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
     user : UserModel, optional
         the user that is inferred from the token, by default Depends(get_user_from_token)
     """
-    def _get_keyfigures(user : UserModel, db : DatabaseABC = Depends(get_db)):
+    def _get_keyfigures(user : UserModel, db : DatabaseABC):
         key_figures = OrderedDict()
         if KEY_FIGURE_SETTINGS.number_submissions:
             key_figures["Submissions"] = len(db.get_submission_tags())
@@ -325,7 +325,7 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
 
     cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_keyfigures", user.tag])    
     keyfigureData = db_cache_runtime.get_or_compute(cache_key = cache_key,
-                                        compute_fn = lambda : _get_keyfigures(user),
+                                        compute_fn = lambda : _get_keyfigures(user, db),
                                         cache_time = timedelta(hours = 24))
     return keyfigureData
 

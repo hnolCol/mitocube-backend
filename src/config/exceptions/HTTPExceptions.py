@@ -31,19 +31,19 @@ submission_tag_not_found = HTTPException(
         )
 
 user_role_too_low = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="The required user role is not matched.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 user_blocked = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="User blocked and not allowed for login.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
 user_forbidden = HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="The user doesnt have the required user role to perform this task.",
             headers={"WWW-Authenticate": "Bearer"},
         )
