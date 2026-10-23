@@ -1,6 +1,6 @@
 """Integration tests for the attribute request workflow:
 a user proposes an attribute/trait, curators see the pending request,
-accept creates the attribute/trait, reject does not."""
+approve creates the attribute/trait, deny does not."""
 import sys
 import time
 from pathlib import Path
@@ -57,14 +57,16 @@ class FakeAttributeRequestsDB:
         self.requests[model.tag] = model
         return model.tag
 
-    def get(self, tags=None, status=None, limit=50):
+    def get(self, tags=None, status=None, kind=None, user_tag=None, limit=50):
         return [r for r in self.requests.values()
-                if status is None or r.status == status][:limit]
+                if (tags is None or r.tag in tags)
+                and (status is None or r.status == status)
+                and (kind is None or r.kind == kind)][:limit]
 
-    def get_pending(self, limit=50):
-        return self.get(status="pending", limit=limit)
+    def get_pending(self, kind=None, limit=50):
+        return self.get(status="pending", kind=kind, limit=limit)
 
-    def accept(self, tag, reviewer_tag, comment=None):
+    def accept(self, tag, reviewer_tag, comment=None, edits=None):
         r = self.requests[tag]
         if r.status != "pending":
             raise ValueError(f"Attribute request with tag '{tag}' is not pending.")
@@ -95,10 +97,19 @@ class FakeAttributeRequestsDB:
         return r
 
 
+class FakeUsersDB:
+    def get_users(self):
+        return []
+
+    def get_user_by_tag(self, tag):
+        return None
+
+
 class FakeDB:
     def __init__(self):
         self.attributes = FakeAttributesDB()
         self.attribute_requests = FakeAttributeRequestsDB(self.attributes)
+        self.users = FakeUsersDB()
 
 
 def make_user(tag="abcdefgh", role=UserRolesEnum.STANDARD):
@@ -141,9 +152,9 @@ def client(app):
 class TestAttributeRequestsRoute:
     def test_standard_user_can_propose_attribute(self, client):
         c, db = client
-        resp = c.post("/api/requests/attributes", json={
-            "kind": "attribute",
-            "attribute": {"text": "New Organ", "traits": [{"text": "Heart", "description": ""}]},
+        resp = c.post("/api/attribute_requests", json={
+            "text": "New Organ",
+            "traits": [{"text": "Heart", "description": ""}],
         })
         assert resp.status_code == 200
         tag = resp.json()["tag"]
@@ -151,28 +162,26 @@ class TestAttributeRequestsRoute:
 
     def test_pending_visible_to_curator(self, client):
         c, db = client
-        c.post("/api/requests/attributes", json={
-            "kind": "attribute", "attribute": {"text": "Other Attribute"}})
-        resp = c.get("/api/requests/attributes/pending")
+        c.post("/api/attribute_requests", json={"text": "Other Attribute"})
+        resp = c.get("/api/attribute_requests/pending")
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
     def test_non_curator_cannot_list_or_review(self, client):
         c, db = client
         c.app.dependency_overrides[is_user_at_least_curator] = _role_too_low
-        resp = c.get("/api/requests/attributes")
+        resp = c.get("/api/attribute_requests/pending")
         assert resp.status_code == 401
         c.app.dependency_overrides[is_user_at_least_curator] = lambda: make_user(role=UserRolesEnum.CURATOR)
 
     def test_accept_creates_attribute_and_traits(self, client):
         c, db = client
-        resp = c.post("/api/requests/attributes", json={
-            "kind": "attribute",
-            "attribute": {"text": "New Compound",
-                          "traits": [{"text": "Drug X", "description": "a drug"}]},
+        resp = c.post("/api/attribute_requests", json={
+            "text": "New Compound",
+            "traits": [{"text": "Drug X", "description": "a drug"}],
         })
         tag = resp.json()["tag"]
-        resp = c.post(f"/api/requests/attributes/{tag}/accept", json={})
+        resp = c.post(f"/api/attribute_requests/{tag}/approve", json={})
         assert resp.status_code == 200
         assert resp.json()["status"] == "accepted"
         assert db.attributes.exists(tag="att_new_compound")
@@ -180,39 +189,35 @@ class TestAttributeRequestsRoute:
 
     def test_accept_twice_conflicts(self, client):
         c, db = client
-        resp = c.post("/api/requests/attributes", json={
-            "kind": "attribute", "attribute": {"text": "Once Only"}})
+        resp = c.post("/api/attribute_requests", json={"text": "Once Only"})
         tag = resp.json()["tag"]
-        assert c.post(f"/api/requests/attributes/{tag}/accept", json={}).status_code == 200
-        assert c.post(f"/api/requests/attributes/{tag}/accept", json={}).status_code == 409
+        assert c.post(f"/api/attribute_requests/{tag}/approve", json={}).status_code == 200
+        assert c.post(f"/api/attribute_requests/{tag}/approve", json={}).status_code == 409
 
     def test_reject_does_not_create(self, client):
         c, db = client
-        resp = c.post("/api/requests/attributes", json={
-            "kind": "attribute", "attribute": {"text": "Rejected Attribute"}})
+        resp = c.post("/api/attribute_requests", json={"text": "Rejected Attribute"})
         tag = resp.json()["tag"]
-        resp = c.post(f"/api/requests/attributes/{tag}/reject", json={"comment": "not needed"})
+        resp = c.post(f"/api/attribute_requests/{tag}/deny", json={"comment": "not needed"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "rejected"
         assert not db.attributes.exists(tag="att_rejected_attribute")
 
     def test_trait_request_requires_existing_attribute(self, client):
         c, db = client
-        resp = c.post("/api/requests/attributes", json={
-            "kind": "trait", "trait": {"attribute_tag": "att_missing", "text": "Nope"}})
+        resp = c.post("/api/trait_requests", json={"attribute_tag": "att_missing", "text": "Nope"})
         assert resp.status_code == 404
 
     def test_trait_request_accept(self, client):
         c, db = client
         db.attributes.attributes["att_organ"] = {"text": "Organ"}
-        resp = c.post("/api/requests/attributes", json={
-            "kind": "trait", "trait": {"attribute_tag": "att_organ", "text": "Kidney"}})
+        resp = c.post("/api/trait_requests", json={"attribute_tag": "att_organ", "text": "Kidney"})
         tag = resp.json()["tag"]
-        resp = c.post(f"/api/requests/attributes/{tag}/accept", json={})
+        resp = c.post(f"/api/trait_requests/{tag}/approve", json={})
         assert resp.status_code == 200
         assert db.attributes.exists(tag="att_organ", trait="att_organ:kidney")
 
     def test_insert_model_validation(self, client):
         c, db = client
-        resp = c.post("/api/requests/attributes", json={"kind": "attribute"})
+        resp = c.post("/api/attribute_requests", json={"comment": "no text"})
         assert resp.status_code == 422

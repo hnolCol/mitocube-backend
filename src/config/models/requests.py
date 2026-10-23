@@ -11,6 +11,10 @@ class AttributeProposalModel(BaseModel):
     group_tags: List[str] = []
     priority: int = 500
     traits: List[MinimalTraitModel] = []
+    allow_input: bool = False
+    parents: List[str] = []
+    children: List[str] = []
+    required_trait_tags: List[str] = []
 
 
 class TraitProposalModel(BaseModel):
@@ -19,6 +23,37 @@ class TraitProposalModel(BaseModel):
     text: str
     description: Optional[str] = ""
     priority: int = 500
+
+
+class AttributeRequestCreateModel(AttributeProposalModel):
+    """Body for POST /api/attribute_requests."""
+    comment: Optional[str] = None
+
+
+class TraitRequestCreateModel(TraitProposalModel):
+    """Body for POST /api/trait_requests."""
+    comment: Optional[str] = None
+
+class AttributeProposalEditModel(BaseModel):
+    """Curator edits applied to an attribute proposal before approval.
+    Only the fields that are sent are changed."""
+    text: Optional[str] = None
+    abbr: Optional[str] = None
+    group_tags: Optional[List[str]] = None
+    priority: Optional[int] = None
+    allow_input: Optional[bool] = None
+    parents: Optional[List[str]] = None
+    children: Optional[List[str]] = None
+    required_trait_tags: Optional[List[str]] = None
+
+
+class TraitProposalEditModel(BaseModel):
+    """Curator edits applied to a trait proposal before approval.
+    Only the fields that are sent are changed. The target attribute
+    cannot be changed."""
+    text: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[int] = None
 
 
 class AttributeRequestInsertModel(BaseModel):
@@ -63,6 +98,29 @@ class AttributeRequestReviewModel(BaseModel):
     comment: Optional[str] = None
 
 
+class AttributeRequestApproveModel(BaseModel):
+    """Body for POST /api/attribute_requests/{tag}/approve."""
+    comment: Optional[str] = None
+    attribute: Optional[AttributeProposalEditModel] = None
+
+
+class TraitRequestApproveModel(BaseModel):
+    """Body for POST /api/trait_requests/{tag}/approve."""
+    comment: Optional[str] = None
+    trait: Optional[TraitProposalEditModel] = None
+
+class TraitBulkItemModel(BaseModel):
+    text: str
+    description: Optional[str] = ""
+
+
+class TraitRequestBulkCreateModel(BaseModel):
+    """Body for POST /api/trait_requests/bulk: several traits for one attribute."""
+    attribute_tag: str
+    traits: List[TraitBulkItemModel]
+    comment: Optional[str] = None
+
+    
 class DepositionRequestInsertModel(BaseModel):
     """A user request that a submission's data should be deposited to an
     external database (e.g. PRIDE)."""

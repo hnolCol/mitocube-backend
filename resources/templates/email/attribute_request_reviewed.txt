@@ -1,0 +1,9 @@
+Dear {{first_name}},
+
+your request for the new {{kind}} "{{text}}"{% if attribute_tag %} for the attribute {{attribute_tag}}{% endif %} has been {% if approved %}approved{% else %}denied{% endif %} by {{reviewer}}.
+{% if approved %}
+It is now available in {{app_name}}.{% if edited %} Some details (e.g. text, groups, priority or traits) were adjusted before approval.{% endif %}
+{% endif %}{% if review_comment %}
+Comment from {{reviewer}}: {{review_comment}}
+{% endif %}
+The {{app_name}} Support Team

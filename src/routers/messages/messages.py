@@ -21,7 +21,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 conversation_not_found = HTTPException(status_code=404, detail="Conversation not found.")
 not_a_participant = HTTPException(status_code=403, detail="You are not a participant of this conversation.")
-
+conversation_read_only = HTTPException(status_code=403, detail="This is a notification from MitoCube Support and cannot be replied to.")
 
 @router.post("/conversations", response_model=str,
              summary="Creates a conversation, optionally linked to a submission.")
@@ -88,6 +88,8 @@ def add_participants(conversation_tag : str,
         raise conversation_not_found
     if not db.messages.is_participant(conversation_tag = conversation_tag, user_tag = user.tag):
         raise not_a_participant
+    if db.messages.is_read_only(conversation_tag):
+        raise conversation_read_only
     if len(user_tags) == 0:
         raise HTTPException(status_code=400, detail="At least one user tag must be provided.")
     if user.tag in user_tags:
@@ -134,6 +136,8 @@ def post_message(conversation_tag : str,
         raise conversation_not_found
     if not db.messages.is_participant(conversation_tag = conversation_tag, user_tag = user.tag):
         raise not_a_participant
+    if db.messages.is_read_only(conversation_tag):
+        raise conversation_read_only
     message_tag = db.messages.insert_message(conversation_tag = conversation_tag, sender_tag = user.tag, message = message)
     if message_tag is None:
         raise conversation_not_found

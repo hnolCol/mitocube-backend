@@ -63,3 +63,20 @@ class MessagesABC(ABC):
     def get_unread_count(self, conversation_tag : str, user_tag : str) -> int:
         """Returns the number of messages of the conversation that the user has
         not read yet (messages sent by other users)."""
+
+    @abstractmethod
+    def insert_system_message(self, user_tags : List[str], title : str, content : str,
+                              sender_tag : str, submission_tag : Optional[str] = None) -> Optional[str]:
+        """Creates a read-only conversation for the given users with a single
+        system message (e.g. from MitoCube Support). The sender is not a user
+        and is not a participant; recipients cannot reply.
+
+        Returns
+        -------
+        Optional[str]
+            The conversation tag, or None if a recipient does not exist.
+        """
+
+    @abstractmethod
+    def is_read_only(self, conversation_tag : str) -> bool:
+        """Returns True if the conversation is a read-only system notification."""
