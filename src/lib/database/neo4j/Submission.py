@@ -1,4 +1,5 @@
 import math
+import re
 from typing import Literal, List , Dict, Optional
 from neo4j import Driver, Result 
 import pandas as pd 
@@ -1411,7 +1412,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
-            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
         )
         r = self._driver.execute_query(query, tag=submission_tag, rl_tag=rl_tag, result_transformer_=Result.data)
@@ -1431,7 +1432,7 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
             "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
-            "   collect(r{.*, plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
+            "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
             "ORDER BY rl.created_at DESC "
         )
@@ -2027,19 +2028,37 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         r = self._driver.execute_query(query, states = states, submission_tags = submission_tags, limit = limit, result_transformer_=Result.value)
         return r
     
+    @staticmethod
+    def _tokenize_search_string(search_string: str) -> List[str]:
+        """Split a free-text search string into lowercase tokens."""
+        return [token.lower() for token in re.split(r"\s+", search_string.strip()) if token]
+
     def filter_by_search_string(self, search_string : str, submission_tags : List[str] = None, limit : int = None, ordered : bool = True) -> List[str]:
-        """Filter submissions by search string in title or tag."""
+        """Filter submissions by search string in title or tag.
+
+        The search string is split on whitespace into tokens; a submission matches
+        only if every token is contained in its title or tag (order-independent, AND semantics).
+        """
+        tokens = self._tokenize_search_string(search_string)
+        if len(tokens) == 0:
+            return []
+
+        token_params = {f"token_{index}": token for index, token in enumerate(tokens)}
+        token_clauses = " AND ".join(
+            f"(toLower(submission.title) CONTAINS ${name} OR toLower(submission.tag) CONTAINS ${name})"
+            for name in token_params
+        )
         query = (
             "MATCH (submission:Submission) "
             f"{'WHERE submission.tag in $submission_tags AND (' if submission_tags is not None else 'WHERE ('}"
-            "toLower(submission.title) CONTAINS $search_string OR toLower(submission.tag) CONTAINS $search_string )"
+            f"{token_clauses} )"
             "RETURN submission.tag "
         )
         if ordered:
             query += "ORDER BY submission.created_at DESC "
         query = self._add_limit(query,limit)
         
-        tags = self._driver.execute_query(query, routing_="r", result_transformer_= Result.value, search_string = search_string.lower(), limit = limit)
+        tags = self._driver.execute_query(query, routing_="r", result_transformer_= Result.value, limit = limit, **token_params)
  
         return tags 
     
@@ -2130,6 +2149,23 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         )
 
 
+    @staticmethod
+    def _ca_text_match_clause(token_params: Dict[str, str]) -> str:
+        """Cypher text-match clause over the trait/attribute labels of a condition
+        application and its whole hierarchy of condition values. Intended for use
+        inside an EXISTS { ... } block whose nodes are bound to (ca:ConditionApplication),
+        (t:Trait) and (a:Attribute); the same node variables are reused for the value
+        level, so the tokens match anywhere down the HAS_VALUE chain."""
+        token_clauses = " AND ".join(
+            f"(toLower(t.s) CONTAINS ${name} OR toLower(a.s) CONTAINS ${name})"
+            for name in token_params
+        )
+        return (
+            f"({token_clauses}) "
+            f"OR EXISTS {{ MATCH (ca)-[:HAS_VALUE*1..]->(cv:ConditionValue)-[:INSTANCE_OF]->(t) "
+            f"MATCH (cv)-[:OF_ATTRIBUTE]->(a) WHERE {token_clauses} }}"
+        )
+
     def _filter_by_ca_search_string(
         self,
         ca_search_string: str,
@@ -2138,16 +2174,25 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         limit: int,
         ordered: bool,
     ) -> List[str]:
-        """Filter by free-text search across trait and attribute labels."""
+        """Filter by free-text search across trait and attribute labels of a
+        submission's condition applications and their nested condition values.
+
+        The search string is split on whitespace into tokens; a submission matches
+        only if every token is contained in a trait or attribute label somewhere in
+        the condition application hierarchy (order-independent, AND semantics).
+        """
+
+        tokens = self._tokenize_search_string(ca_search_string)
+        if len(tokens) == 0:
+            return []
+
+        token_params = {f"ca_token_{index}": token for index, token in enumerate(tokens)}
 
         where_clauses = []
         if submission_tags is not None:
             where_clauses.append("submission.tag IN $submission_tags")
 
-        text_match = (
-            "toLower(t.s) CONTAINS toLower($ca_search_string) "
-            "OR toLower(a.s) CONTAINS toLower($ca_search_string)"
-        )
+        text_match = self._ca_text_match_clause(token_params)
 
         if include_sample_ca:
             where_clauses.append(
@@ -2180,10 +2225,10 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
 
         return self._driver.execute_query(
             query,
-            ca_search_string=ca_search_string,
             submission_tags=submission_tags,
             limit=limit,
             result_transformer_=Result.value,
+            **token_params
         )
 
 
@@ -2279,6 +2324,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             return None  # Curators have access to all submissions
         if user.role == UserRolesEnum.GUEST:
             return []  # Guests have no access to submissions
+        # Group curators are scoped like standard users: only their research
+        # groups' submissions plus consortium-shared and own submissions.
         research_groups_tags = self._research_groups.find(user_tags=[current_user_tag])
         for rg_tag in research_groups_tags:
             if not self._research_groups.exists(rg_tag):
@@ -2352,10 +2399,10 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         """
         if include_sample_ca:
             target_ca_match = (
-                "CALL { WITH t "
+                "CALL (t) { "
                 "MATCH (t)-[:HAS_APPLICATION]->(tca:ConditionApplication) "
                 "RETURN collect(DISTINCT tca.tag) AS stcas } "
-                "CALL { WITH t "
+                "CALL (t) { "
                 "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(stca2:ConditionApplication) "
                 "RETURN collect(DISTINCT stca2.tag) AS ssca } "
                 "RETURN stcas + [c IN ssca WHERE NOT c IN stcas] AS tags "
@@ -2382,7 +2429,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 params["user_tag"] = current_user_tag
                 params["scope_tags"] = scope_tags
                 own_group_match = (
-                    "CALL { WITH o "
+                    "CALL (o) { "
                     "MATCH (ou:User)-[:CREATED]->(o) "
                     "MATCH (ou)-[:MEMBER_OF]->(rg:ResearchGroup)<-[:MEMBER_OF]-(mu:User {tag : $user_tag}) "
                     "RETURN count(DISTINCT rg) > 0 AS own_group } "
@@ -2396,18 +2443,18 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                     "ELSE 'no_access' END"
                 )
         ca_import = (
-            "CALL { WITH o, tcas "
+            "CALL (o, tcas) { "
             "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
             "WHERE oca.tag IN tcas "
             "RETURN collect(DISTINCT oca.tag) AS scas } "
         )
         if include_sample_ca:
             ca_import = (
-                "CALL { WITH o, tcas "
+                "CALL (o, tcas) { "
                 "MATCH (o)-[:HAS_APPLICATION]->(oca:ConditionApplication) "
                 "WHERE oca.tag IN tcas "
                 "RETURN collect(DISTINCT oca.tag) AS scas } "
-                "CALL { WITH o, tcas "
+                "CALL (o, tcas) { "
                 "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_APPLICATION]->(soca:ConditionApplication) "
                 "WHERE soca.tag IN tcas "
                 "RETURN collect(DISTINCT soca.tag) AS sscas } "
@@ -2418,16 +2465,16 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             ca_import += f"WITH t, tgenos, tcas, o, {own_group_carry}ogenos, scas AS ocas "
         query = (
             "MATCH (t:Submission {tag : $tag}) "
-            "CALL { WITH t "
+            "CALL (t) { "
             "MATCH (t)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(tg:Genotype) "
             "RETURN collect(DISTINCT tg.tag) AS tgenos } "
-            f"CALL {{ WITH t {target_ca_match}}} "
+            f"CALL (t) {{ {target_ca_match}}} "
             "WITH t, tgenos, tags AS tcas "
             "WHERE size(tgenos) + size(tcas) > 0 "
             "MATCH (o:Submission) "
             "WHERE o <> t "
             f"{scope_filter}{own_group_match}"
-            "CALL { WITH o "
+            "CALL (o) { "
             "MATCH (o)-[:HAS_SAMPLE]->(:Sample)-[:HAS_GENOTYPE]->(og:Genotype) "
             "RETURN collect(DISTINCT og.tag) AS ogenos } "
             f"WITH t, tgenos, tcas, o, {own_group_carry}ogenos "
@@ -2438,7 +2485,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "WHERE size(shared_genos) + size(shared_cas) > 0 "
             f"WITH t, tgenos, tcas, o, shared_genos, shared_cas, {own_group_carry}"
             "size(ogenos) + size(ocas) AS o_union_size "
-            "CALL { WITH o, shared_cas "
+            "CALL (o, shared_cas) { "
             "MATCH (o)-[:HAS_APPLICATION]->(sca:ConditionApplication)-[:INSTANCE_OF]->(strait:Trait) "
             "WHERE sca.tag IN shared_cas "
             "RETURN collect(DISTINCT strait.tag) AS traits } "
@@ -2482,10 +2529,24 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             where.append("submission.tag IN $scope_tags")
             params["scope_tags"] = scope_tags
 
-        # ---- search string: title or tag contains ----
+        # ---- search string: every whitespace-separated token must be contained in title or tag (AND semantics),
+        # or somewhere in the condition application hierarchy (trait/attribute labels of the CA or any nested condition value) ----
         if search_string is not None:
-            where.append("(toLower(submission.title) CONTAINS $search_string OR toLower(submission.tag) CONTAINS $search_string)")
-            params["search_string"] = search_string.lower()
+            tokens = self._tokenize_search_string(search_string)
+            if len(tokens) == 0:
+                tokens = [""]
+            token_params = {f"search_token_{index}": token for index, token in enumerate(tokens)}
+            token_clauses = " AND ".join(
+                f"(toLower(submission.title) CONTAINS ${name} OR toLower(submission.tag) CONTAINS ${name})"
+                for name in token_params
+            )
+            ca_text_match = self._ca_text_match_clause(token_params)
+            ca_exists = (
+                "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait), "
+                "(ca)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE " + ca_text_match + " }"
+            )
+            where.append(f"(({token_clauses}) OR {ca_exists})")
+            params.update(token_params)
 
         # ---- state: latest IN_STATE relationship must point to one of the states ----
         if state is not None:
@@ -2523,7 +2584,11 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                     )
             params["ca_tags"] = ca_tags
         elif ca_search_string is not None:
-            text_match = "(toLower(t.s) CONTAINS toLower($ca_search_string) OR toLower(a.s) CONTAINS toLower($ca_search_string))"
+            ca_tokens = self._tokenize_search_string(ca_search_string)
+            if len(ca_tokens) == 0:
+                ca_tokens = [""]
+            ca_token_params = {f"ca_token_{index}": token for index, token in enumerate(ca_tokens)}
+            text_match = self._ca_text_match_clause(ca_token_params)
             submission_ca = (
                 "EXISTS { MATCH (submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait), "
                 "(ca)-[:OF_ATTRIBUTE]->(a:Attribute) WHERE " + text_match + " }"
@@ -2536,7 +2601,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                 where.append(f"({submission_ca} OR {sample_ca})")
             else:
                 where.append(submission_ca)
-            params["ca_search_string"] = ca_search_string
+            params.update(ca_token_params)
         elif attribute_tag is not None or trait_tags is not None:
             def _attr_exists(subject : str) -> str:
                 block = (

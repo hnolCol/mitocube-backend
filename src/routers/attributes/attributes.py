@@ -8,7 +8,7 @@ from config.models.user import UserModel
 from config.models.attributes import AttributeEditModel, AttributeModel, InsertTraitModel, UpdateTraitModel
 from config.enums.states import SubmissionStatesEnums
 
-from services.users import get_user_from_token, is_user_at_least_curator
+from services.users import get_user_from_token, is_user_at_least_group_curator
 from services.submission import check_submission_access
 
 
@@ -25,7 +25,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.post("")
-def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Inserts a new attribute into the database. Returns True if successful, False otherwise."
     attribute_tag = "att_" + attribute.text.replace(" ","_").lower().encode('utf-8', 'ignore').decode('utf-8')
     if db.attributes.exists(tag = attribute_tag):
@@ -63,7 +63,7 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
 
 
 @router.patch("/{attribute_tag}") 
-def update_attribute(attribute_tag : str, attribute : AttributeEditModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+def update_attribute(attribute_tag : str, attribute : AttributeEditModel, user : UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Updates existing attribute in the database. Returns True if successful, False otherwise."
     if not db.attributes.exists(tag = attribute_tag):
         raise HTTPException(status_code=404, detail = "Attribute not found.")
@@ -203,7 +203,7 @@ def get_dataset_attributes(user : UserModel = Depends(get_user_from_token), min_
 
 
 @router.get("/export", summary="Exports all attributes and traits for seeding a new MitoCube instance.")
-def export_attributes(user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> dict:
+def export_attributes(user: UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)) -> dict:
     "Exports all attributes and traits in the format used by the DB seed script."
     return db.attributes.export_attributes_and_traits()
 
@@ -380,7 +380,7 @@ def add_trait_to_attribute( attribute_tag: str, trait: InsertTraitModel, user: U
     return {"tag": trait.tag}
 
 @router.patch("/{attribute_tag}/traits/{trait_tag}")
-def update_trait (attribute_tag: str, trait_tag: str, updates: UpdateTraitModel, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
+def update_trait (attribute_tag: str, trait_tag: str, updates: UpdateTraitModel, user: UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)):
     "Updates a trait's text, description, and/or priority."
     if not db.attributes.exists(tag=attribute_tag, trait=trait_tag):
         raise HTTPException(
@@ -393,7 +393,7 @@ def update_trait (attribute_tag: str, trait_tag: str, updates: UpdateTraitModel,
 
 
 @router.delete("/{attribute_tag}/traits/{trait_tag}")
-def delete_trait( attribute_tag: str, trait_tag: str, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
+def delete_trait( attribute_tag: str, trait_tag: str, user: UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)):
     "Deletes a trait if it is not connected to any ConditionApplication."
     try:
         db.attributes.delete_trait(trait_tag=trait_tag)

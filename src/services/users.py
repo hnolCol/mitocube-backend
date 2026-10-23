@@ -151,6 +151,13 @@ def get_user_from_token(token = Depends(check_token_verified), db : DatabaseABC 
     return user 
 
 
+def is_user_at_least_group_curator(user : UserModel = Depends(get_user_from_token)) -> UserModel:
+    """Checks if the user is at least group curator.
+    raises an exception if the userrole is not at least group curator."""
+    if (user.role >= UserRolesEnum.GROUP_CURATOR):
+        return user
+    raise user_role_too_low
+
 def is_user_at_least_curator(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     """Checks if the user is at least curator.
     raises an exception if the userrole is not at least curator."""
@@ -158,6 +165,15 @@ def is_user_at_least_curator(user : UserModel = Depends(get_user_from_token)) ->
         return user
     raise user_role_too_low
 
+
+def is_curator_or_scoped_group_curator(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> UserModel:
+    """Checks if the user is a global curator or a group curator whose scope
+    contains the submission. raises an exception otherwise."""
+    if user.role >= UserRolesEnum.CURATOR:
+        return user
+    if user.role == UserRolesEnum.GROUP_CURATOR and db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
+        return user
+    raise user_role_too_low
 
 def is_user_admin(user : UserModel = Depends(get_user_from_token)) -> UserModel:
     """Checks if the user is at least admin.
@@ -177,5 +193,7 @@ def is_creator_of_submission_or_curator(submission_tag : str, user : UserModel =
         return user 
     else:
         if user.role >= UserRolesEnum.CURATOR:
+            return user
+        if user.role == UserRolesEnum.GROUP_CURATOR and db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
             return user
     raise user_role_too_low

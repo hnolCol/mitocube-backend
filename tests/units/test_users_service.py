@@ -92,10 +92,19 @@ class FakeSubmissionDB:
         return self.creators.get(tag)
 
 
+class FakeSubmissionFilterDB:
+    def __init__(self, accessible_tags=None):
+        self.accessible_tags = set(accessible_tags or [])
+
+    def has_user_access(self, user_tag, submission_tag):
+        return submission_tag in self.accessible_tags
+
+
 class FakeDB:
-    def __init__(self, users=None, submissions=None):
+    def __init__(self, users=None, submissions=None, accessible_tags=None):
         self.users = users or FakeUserDB()
         self.submissions = submissions or FakeSubmissionDB()
+        self.submission_filter = FakeSubmissionFilterDB(accessible_tags=accessible_tags)
 
 
 def make_user(**overrides):
@@ -151,7 +160,8 @@ class TestUserModelValidation:
 
     def test_role_hierarchy(self):
         assert UserRolesEnum.GUEST < UserRolesEnum.STANDARD
-        assert UserRolesEnum.STANDARD < UserRolesEnum.CURATOR
+        assert UserRolesEnum.STANDARD < UserRolesEnum.GROUP_CURATOR
+        assert UserRolesEnum.GROUP_CURATOR < UserRolesEnum.CURATOR
         assert UserRolesEnum.CURATOR < UserRolesEnum.ADMIN
 
 
@@ -312,6 +322,18 @@ class TestGetUserFromLogin:
 
 
 class TestRoleGates:
+    def test_group_curator_rejected_from_curator_gate(self):
+        with pytest.raises(HTTPException):
+            is_user_at_least_curator(make_user(role=UserRolesEnum.GROUP_CURATOR))
+
+    def test_group_curator_passes_group_curator_gate(self):
+        u = make_user(role=UserRolesEnum.GROUP_CURATOR)
+        assert users_service.is_user_at_least_group_curator(u) is u
+
+    def test_standard_user_rejected_from_group_curator_gate(self):
+        with pytest.raises(HTTPException):
+            users_service.is_user_at_least_group_curator(make_user(role=UserRolesEnum.STANDARD))
+
     def test_standard_user_rejected_from_curator_gate(self):
         with pytest.raises(HTTPException):
             is_user_at_least_curator(make_user(role=UserRolesEnum.STANDARD))
@@ -349,6 +371,17 @@ class TestIsCreatorOfSubmissionOrCurator:
         user = make_user(role=UserRolesEnum.CURATOR)
         db = FakeDB(submissions=FakeSubmissionDB(creators={"subm-1": "otherusr"}))
         assert is_creator_of_submission_or_curator("subm-1", user, db) is user
+
+    def test_group_curator_in_scope_passes(self, token_settings):
+        user = make_user(role=UserRolesEnum.GROUP_CURATOR)
+        db = FakeDB(submissions=FakeSubmissionDB(creators={"subm-1": "otherusr"}), accessible_tags=["subm-1"])
+        assert is_creator_of_submission_or_curator("subm-1", user, db) is user
+
+    def test_group_curator_out_of_scope_rejected(self, token_settings):
+        user = make_user(role=UserRolesEnum.GROUP_CURATOR)
+        db = FakeDB(submissions=FakeSubmissionDB(creators={"subm-1": "otherusr"}), accessible_tags=[])
+        with pytest.raises(HTTPException):
+            is_creator_of_submission_or_curator("subm-1", user, db)
 
     def test_unknown_submission_raises(self, token_settings):
         user = make_user()

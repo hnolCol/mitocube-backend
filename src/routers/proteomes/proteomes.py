@@ -43,8 +43,8 @@ def get_proteome_permissions(user : UserModel = Depends(get_user_from_token)) ->
     return PermissionResponseModel(
         user_tag = user.tag, 
         role = user.role,
-        create=user.role >= UserRolesEnum.CURATOR,
-        update=user.role >= UserRolesEnum.CURATOR
+        create=user.role >= UserRolesEnum.GROUP_CURATOR,
+        update=user.role >= UserRolesEnum.GROUP_CURATOR
     )
 
 @router.get("/{proteome_tag}")

@@ -279,12 +279,12 @@ class Neo4JFeatures(FeaturesABC):
         return df.set_index("tag")
     
     def is_quantified(self, tags : List[str]) -> pd.DataFrame:
-        ""
+        """Checks which of the given proteins are quantified and how often."""
         query = (
             "MATCH (p:Protein) "
             "WHERE p.tag in $tags "
             "MATCH (p)<-[r:QUANTIFIED]-(s:Sample)<-[:HAS_SAMPLE]->(submission:Submission) "
-            "WITH count(submission) as N, p, count(rsample) as nsample "
+            "WITH p, count(DISTINCT submission) as N, count(DISTINCT s) as nsample "
             "RETURN p.tag as tag,  N > 0 as quantified, N as quant_dataset, nsample as quant_samples "
         )
             
@@ -455,8 +455,7 @@ class Neo4JFeatures(FeaturesABC):
    # // Now use these filtered submissions in both parts of the UNION
         query = (
             base_submission_query +
-            "CALL { " #call is required to make filteredSubmission available for UNION
-            "WITH filteredSubmissions "
+            "CALL (filteredSubmissions) { "
             "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
             "WHERE p.tag IN $tags AND submission.tag IN filteredSubmissions "
             "MATCH (sample)-[:HAS_SAMPLE_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[hav:HAS_ATTRIBUTE_VALUE]-(submission) "
@@ -465,8 +464,6 @@ class Neo4JFeatures(FeaturesABC):
             "av.tag AS attribute_value_tag "
 
             "UNION "
-            #get the genotypes in the second union statement. 
-            "WITH filteredSubmissions "
             "MATCH (p:Protein)<-[r:QUANTIFIED]-(sample:Sample)<-[:HAS_SAMPLE]-(submission:Submission) "
             "WHERE p.tag IN $tags AND submission.tag IN filteredSubmissions "
             "MATCH (sample)-[rhg:HAS_GENOTYPE]->(g:Genotype) "
