@@ -3,7 +3,7 @@ from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel
 from config.models.samples import SampleUpdateModel, SampleCommentModel
-from services.users import get_user_from_token
+from services.users import get_user_from_token, is_creator_of_submission_or_curator
 from services.submission import check_submission_access
 from lib.database.Database import get_db
 from typing import List, Dict, Optional
@@ -77,21 +77,29 @@ def check_sample_access(sample_tag : str, user : UserModel, db : DatabaseABC) ->
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
 
 
+def check_sample_edit_access(sample_tag : str, user : UserModel, db : DatabaseABC) -> None:
+    "Checks that the user may change analysis-relevant sample state (lost/excluded): only the submission creator, a group curator with access to the submission, a curator or an admin."
+    submission_tag = db.samples.get_submission_tag(tag = sample_tag)
+    if submission_tag is None:
+        raise HTTPException(status_code=404, detail=f"No submission found for sample tag {sample_tag}")
+    is_creator_of_submission_or_curator(submission_tag = submission_tag, user = user, db = db)
+
+
 @router.patch("/{sample_tag}/exclude", summary="Exclude or include a sample from statistical analysis.")
 def set_sample_excluded(sample_tag: str, excluded: bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
-    "Sets Sample.excluded. Excluded samples are ignored when computing quantification statistics/distributions."
+    "Sets Sample.excluded. Excluded samples are ignored when computing quantification statistics/distributions. Only the submission creator, group curators with access, curators and admins may change this."
     if not db.samples.exists(tag=sample_tag):
         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
-    check_sample_access(sample_tag = sample_tag, user = user, db = db)
+    check_sample_edit_access(sample_tag = sample_tag, user = user, db = db)
     return db.samples.set_excluded(tag=sample_tag, excluded=excluded)
 
 
 @router.patch("/{sample_tag}/lost", summary="Mark a sample as lost or found.")
 def set_sample_lost(sample_tag: str, lost: bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
-    "Sets Sample.lost. Lost samples (e.g. lost, corrupted or otherwise unusable) are ignored when computing quantification statistics/distributions and can be filtered out when listing samples of a submission."
+    "Sets Sample.lost. Lost samples (e.g. lost, corrupted or otherwise unusable) are ignored when computing quantification statistics/distributions and can be filtered out when listing samples of a submission. Only the submission creator, group curators with access, curators and admins may change this."
     if not db.samples.exists(tag=sample_tag):
         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
-    check_sample_access(sample_tag = sample_tag, user = user, db = db)
+    check_sample_edit_access(sample_tag = sample_tag, user = user, db = db)
     return db.samples.set_lost(tag=sample_tag, lost=lost)
 
 
