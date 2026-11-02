@@ -298,7 +298,7 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if not db.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
-    sample_tags = db.submissions.get_samples(tag=submission_tag)
+    sample_tags = db.submissions.get_samples(tag=submission_tag, ignore_excluded=True, ignore_lost=True)  # excluded and lost samples have no valid quantification distribution
     ca = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, return_sample_index = False)  # Preload condition applications for efficiency
     #unique_ca_tags = 
         

@@ -668,6 +668,8 @@ class Neo4JSamples(SamplesABC):
     def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> QuantileModel:
         """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
         qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})
+        if self.is_lost(tag = tag) or self.is_excluded(tag = tag):
+            raise ValueError("No quantifications found for this submission and quantification type.")
         dataset_distribution_exists = self.has_quantification_distribution(qd_tag=qd_tag)
         if dataset_distribution_exists:
             
