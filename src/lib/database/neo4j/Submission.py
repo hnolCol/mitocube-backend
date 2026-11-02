@@ -137,13 +137,15 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0]
     
     
-    def get_samples(self, tag : str, ignore_excluded : bool = False) -> List[str]:
+    def get_samples(self, tag : str, ignore_excluded : bool = False, ignore_lost : bool = False) -> List[str]:
         "" 
         query = (
             "MATCH (submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
             "WHERE submission.tag = $tag ")
         if ignore_excluded:
             query += "AND coalesce(sample.excluded, false) = false "
+        if ignore_lost:
+            query += "AND coalesce(sample.lost, false) = false "
             
         query +="RETURN sample.tag ORDER BY sample.sample_index"
         
@@ -343,7 +345,7 @@ class Neo4JSubmissions(SubmissionsABC):
             if len(r) > 0:
                 return QuantileModel(tag=submission_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
             
-        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample) WHERE coalesce(sample.excluded, false) = false "
+        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample) WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
 
         if quantification_type == "protein_groups":
             query += "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
@@ -689,7 +691,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = """MATCH (submission:Submission {tag: $tag})
                 -[:HAS_SAMPLE]->(sample:Sample)
                 -[q:QUANTIFIED]->(pg:ProteinGroup)
-                WHERE coalesce(sample.excluded, false) = false
+                WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false
 
                 WITH pg, avg(q.value) AS mean, stDev(q.value) AS stdev
                 WHERE stdev > 0
@@ -715,7 +717,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = """
             MATCH (submission:Submission {tag: $tag})
             MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup)
-            WHERE coalesce(sample.excluded, false) = false
+            WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false
 
             WITH submission, pg, avg(q.value) AS mean_log2
 
@@ -1140,7 +1142,7 @@ class Neo4JSubmissions(SubmissionsABC):
         
         query = (
             "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample) "
-            "WHERE coalesce(s.excluded, false) = false "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
             "MATCH (s)-[q:QUANTIFIED]->(p:ProteinGroup) "
             "MATCH (s)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "WITH p, q, a, collect(ca.tag) as ca_tags, s "
@@ -1152,7 +1154,7 @@ class Neo4JSubmissions(SubmissionsABC):
               
             query = (
                 "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample) "
-                "WHERE coalesce(s.excluded, false) = false "
+                "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
                 "MATCH (s)-[q:QUANTIFIED]->(p:ProteinGroup) "
                 "MATCH (s)-[:HAS_GENOTYPE]->(g:Genotype) "
                 "WITH p, q, collect(g.tag) as ca_tags, s "

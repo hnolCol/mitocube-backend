@@ -10,7 +10,7 @@ from config.models.conditions_applications import ConditionApplicationAttributeM
 from lib.database.abstract.Genotypes import  GenotypeABC
 from lib.database.abstract.Annotations import AnnotationsABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
-from config.models.samples import SampleModel, SampleUpdateModel
+from config.models.samples import SampleModel, SampleUpdateModel, SampleCommentModel
 import pandas as pd
 
 import re
@@ -158,7 +158,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (s:Sample {tag : $tag}) "
-            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at, excluded : coalesce(s.excluded, false)}  "
+            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at, excluded : coalesce(s.excluded, false), lost : coalesce(s.lost, false)}  "
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
@@ -385,7 +385,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
-            "WHERE coalesce(s.excluded, false) = false "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
             "RETURN s.sample_index as sample_index, s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
@@ -434,7 +434,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
-            "WHERE coalesce(s.excluded, false) = false "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
             "RETURN s.sample_index as sample_index, s.tag as sample_tag, 'att_genotype' as attribute_tag, collect(g.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
@@ -668,18 +668,23 @@ class Neo4JSamples(SamplesABC):
     def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> QuantileModel:
         """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
         qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})
-        dataset_distribution_exists = self.has_quantification_distribution(qd_tag=qd_tag)
-        if dataset_distribution_exists:
+        
+        query = (
+            "MATCH (sample:Sample {tag : $tag}) "
+            "OPTIONAL MATCH (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : $qd_tag}) "
+            "RETURN coalesce(sample.excluded, false) AS excluded, coalesce(sample.lost, false) AS lost, "
+            "qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, qd_tag = qd_tag, result_transformer_=Result.data)
+        if len(r) == 0:
+            raise ValueError("No quantifications found for this submission and quantification type.")
+        row = r[0]
+        if row["excluded"] or row["lost"]:
+            raise ValueError("No quantifications found for this submission and quantification type.")
+        if row["min"] is not None:
+            return QuantileModel(tag=qd_tag, min=row["min"], q25=row["q25"], m=row["m"], q75=row["q75"], max=row["max"], N=row["N"])
             
-            query = (
-                "MATCH (qd:QuantificationDistribution {tag : $qd_tag})<-[:HAS_QUANTIFICATION_DISTRIBUTION]-(sample:Sample {tag : $tag}) "
-                "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
-            )
-            r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, tag = tag, result_transformer_=Result.data)
-            if len(r) > 0:
-                return QuantileModel(tag=qd_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
-            
-        query = "MATCH (sample:Sample {tag : $tag}) WHERE coalesce(sample.excluded, false) = false "
+        query = "MATCH (sample:Sample {tag : $tag}) WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
 
         if quantification_type == "protein_groups":
             query += "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
@@ -700,6 +705,88 @@ class Neo4JSamples(SamplesABC):
         self.insert_quantification_distribution(tag=tag, qd_tag=qd_tag,  quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
         
         return qm 
+
+
+    def get_quantification_distributions(self, tags : List[str], quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> Dict[str, QuantileModel]:
+        """Returns the quantification distributions for many samples in a batched fashion.
+        Excluded and lost samples are skipped. Cached distributions are fetched in a single query;
+        missing ones are computed from a single query and inserted in a single batch write.
+        Returns a dict mapping sample tag to QuantileModel. Samples without quantifications are omitted."""
+        if len(tags) == 0:
+            return {}
+
+        rows = [
+            {"tag" : tag, "qd_tag" : create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})}
+            for tag in tags
+        ]
+
+        cache_query = (
+            "UNWIND $rows AS row "
+            "MATCH (sample:Sample {tag : row.tag}) "
+            "OPTIONAL MATCH (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : row.qd_tag}) "
+            "RETURN row.tag AS tag, row.qd_tag AS qd_tag, coalesce(sample.excluded, false) AS excluded, coalesce(sample.lost, false) AS lost, "
+            "qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
+        )
+        cached = self._driver.execute_query(cache_query, routing_="r", rows = rows, result_transformer_=Result.data)
+
+        distributions : Dict[str, QuantileModel] = {}
+        missing : List[Dict] = []
+        for row in cached:
+            if row["excluded"] or row["lost"]:
+                continue
+            if row["min"] is not None:
+                distributions[row["tag"]] = QuantileModel(tag = row["qd_tag"], min = row["min"], q25 = row["q25"], m = row["m"], q75 = row["q75"], max = row["max"], N = row["N"])
+            else:
+                missing.append(row)
+
+        if len(missing) == 0:
+            return distributions
+
+        missing_tags = [row["tag"] for row in missing]
+        values_query = (
+            "UNWIND $tags AS tag "
+            "MATCH (sample:Sample {tag : tag})-[q:QUANTIFIED]->(f "
+        )
+        if quantification_type == "protein_groups":
+            values_query += ":ProteinGroup "
+            if annotation_tag is not None:
+                values_query += "WHERE EXISTS {(f)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
+        elif quantification_type == "precursors":
+            values_query += ":Precursor "
+        else:
+            raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
+        values_query += "RETURN tag, q.value AS value "
+
+        vr = self._driver.execute_query(values_query, routing_="r", tags = missing_tags, annotation_tag = annotation_tag, result_transformer_=Result.data)
+
+        values_by_tag : Dict[str, List[float]] = {}
+        for row in vr:
+            values_by_tag.setdefault(row["tag"], []).append(row["value"])
+
+        insert_rows : List[Dict] = []
+        for row in missing:
+            values = values_by_tag.get(row["tag"])
+            if not values:
+                continue
+            values = remove_outliers_iqr(pd.Series(values), k = 1.5)
+            qm = QuantileModel(tag = row["tag"], min = np.min(values), q25 = np.percentile(values, 25), m = np.median(values), q75 = np.percentile(values, 75), max = np.max(values), N = len(values))
+            distributions[row["tag"]] = qm
+            insert_rows.append({"sample_tag" : row["tag"], "qd_tag" : row["qd_tag"], "distribution" : qm})
+
+        if len(insert_rows) > 0:
+            insert_query = (
+                "UNWIND $rows AS row "
+                "MATCH (sample:Sample {tag : row.sample_tag}) "
+                "MERGE (qd:QuantificationDistribution {tag : row.qd_tag}) "
+                "SET qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), "
+                "qd.min = row.distribution.min, qd.q25 = row.distribution.q25, qd.m = row.distribution.m, "
+                "qd.q75 = row.distribution.q75, qd.max = row.distribution.max, qd.N = row.distribution.N, qd.outlier_removed = $outlier_removed "
+                "WITH sample, qd "
+                "MERGE (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd) "
+            )
+            self._driver.execute_query(insert_query, routing_="w", rows = insert_rows, quantification_type = quantification_type, annotation_tag = annotation_tag, outlier_removed = remove_outlier)
+
+        return distributions
 
 
     def insert_quantification_distribution(self, tag : str, qd_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None, remove_outlier : bool = True) -> bool:
@@ -888,6 +975,70 @@ class Neo4JSamples(SamplesABC):
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+
+    def get_submission_tag(self, tag: str) -> str|None:
+        "Returns the tag of the submission the sample belongs to."
+        query = (
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "RETURN submission.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+
+    def set_lost(self, tag: str, lost: bool) -> bool:
+        "Marks a sample as lost (e.g. lost, corrupted or otherwise unusable). Lost samples are ignored in statistical analysis. Marks the parent submission's cached statistics as outdated."
+        query = (
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "SET s.lost = $lost "
+            "SET submission.stats_outdated = true "
+            "RETURN s.lost "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, lost=lost, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+    
+    def is_lost(self, tag: str) -> bool:
+        "Checks whether a sample is marked as lost."
+        query = (
+            "MATCH (s:Sample {tag : $tag}) "
+            "RETURN coalesce(s.lost, false) "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+
+    def insert_comment(self, tag: str, comment: SampleCommentModel) -> bool:
+        "Inserts a comment for a sample. The comment is stored as a separate Comment node linked via HAS_COMMENT so it is not loaded with the sample node."
+        query = (
+            "MATCH (sample:Sample {tag: $tag}) "
+            "MATCH (user:User {tag: $user_tag}) "
+            "CREATE (comment:Comment {tag: $comment_tag, content: $content, created_at: timestamp()}) "
+            "MERGE (sample)-[:HAS_COMMENT]->(comment) "
+            "MERGE (user)-[:CREATED]->(comment) "
+        )
+        r = self._driver.execute_query(
+            query, routing_="w",
+            tag=tag, user_tag=comment.user_tag, comment_tag=comment.tag, content=comment.content,
+            result_transformer_=Result.value
+        )
+        
+        if comment.response_to:
+            reply_query = (
+                "MATCH (child:Comment {tag: $child_tag}) "
+                "MATCH (parent:Comment {tag: $parent_tag}) "
+                "MERGE (child)-[:RESPONSE_TO]->(parent) "
+            )
+            self._driver.execute_query(reply_query, routing_="w", child_tag=comment.tag, parent_tag=comment.response_to)
+        return True
+    
+    def get_comments(self, tag: str) -> List[SampleCommentModel]:
+        "Returns the available comments for a given sample tag."
+        query = (
+            "MATCH (sample:Sample {tag: $tag})-[:HAS_COMMENT]->(comment:Comment)<-[:CREATED]-(u:User) "
+            "OPTIONAL MATCH (comment)-[:RESPONSE_TO]->(parent:Comment) "
+            "RETURN {user_tag: u.tag, created_at: comment.created_at, content: comment.content, tag: comment.tag, response_to: parent.tag} "
+            "ORDER BY comment.created_at ASC"
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return [SampleCommentModel(**c) for c in r]
 
 
     def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True,

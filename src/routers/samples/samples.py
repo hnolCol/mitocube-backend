@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
 from config.models.conditions_applications import ConditionApplicationAttributeModel
-from config.models.samples import SampleUpdateModel
+from config.models.samples import SampleUpdateModel, SampleCommentModel
 from services.users import get_user_from_token
 from services.submission import check_submission_access
 from lib.database.Database import get_db
@@ -69,12 +69,49 @@ def update_sample(sample_tag: str, data: SampleUpdateModel, user: UserModel = De
     return True
 
 
+def check_sample_access(sample_tag : str, user : UserModel, db : DatabaseABC) -> None:
+    "Checks that the user has access to the submission the sample belongs to."
+    submission_tag = db.samples.get_submission_tag(tag = sample_tag)
+    if submission_tag is None:
+        raise HTTPException(status_code=404, detail=f"No submission found for sample tag {sample_tag}")
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+
+
 @router.patch("/{sample_tag}/exclude", summary="Exclude or include a sample from statistical analysis.")
 def set_sample_excluded(sample_tag: str, excluded: bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     "Sets Sample.excluded. Excluded samples are ignored when computing quantification statistics/distributions."
     if not db.samples.exists(tag=sample_tag):
         raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+    check_sample_access(sample_tag = sample_tag, user = user, db = db)
     return db.samples.set_excluded(tag=sample_tag, excluded=excluded)
+
+
+@router.patch("/{sample_tag}/lost", summary="Mark a sample as lost or found.")
+def set_sample_lost(sample_tag: str, lost: bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    "Sets Sample.lost. Lost samples (e.g. lost, corrupted or otherwise unusable) are ignored when computing quantification statistics/distributions and can be filtered out when listing samples of a submission."
+    if not db.samples.exists(tag=sample_tag):
+        raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+    check_sample_access(sample_tag = sample_tag, user = user, db = db)
+    return db.samples.set_lost(tag=sample_tag, lost=lost)
+
+
+@router.post("/{sample_tag}/comments", summary="Add a comment to a sample.")
+def insert_sample_comment(sample_tag: str, comment : SampleCommentModel, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    "Adds a comment to the sample. Comments are stored as separate Comment nodes (linked via HAS_COMMENT) and are not loaded with the sample itself."
+    if not db.samples.exists(tag=sample_tag):
+        raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+    check_sample_access(sample_tag = sample_tag, user = user, db = db)
+    comment.user_tag = user.tag
+    return db.samples.insert_comment(tag=sample_tag, comment=comment)
+
+
+@router.get("/{sample_tag}/comments", summary="Get all comments of a sample.")
+def get_sample_comments(sample_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[SampleCommentModel]:
+    "Returns the comments of the sample ordered by creation date."
+    if not db.samples.exists(tag=sample_tag):
+        raise HTTPException(status_code=404, detail=f"No sample found for tag {sample_tag}")
+    check_sample_access(sample_tag = sample_tag, user = user, db = db)
+    return db.samples.get_comments(tag=sample_tag)
 
 
 @router.get("/submissions/{submission_tag}/stats/outdated", summary="Checks if the cached statistics for this submission are outdated (e.g. after excluding/including samples).")
