@@ -171,7 +171,7 @@ class TestAttributeRequestsRoute:
         c, db = client
         c.app.dependency_overrides[is_user_at_least_curator] = _role_too_low
         resp = c.get("/api/attribute_requests/pending")
-        assert resp.status_code == 401
+        assert resp.status_code == 403
         c.app.dependency_overrides[is_user_at_least_curator] = lambda: make_user(role=UserRolesEnum.CURATOR)
 
     def test_accept_creates_attribute_and_traits(self, client):
