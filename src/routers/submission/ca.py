@@ -99,18 +99,39 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
     """
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     sample_tags = db.submissions.get_samples(tag = submission_tag)  #get samples 
-    r = []
     genotype_exists = db.submissions.has_genotypes(tag = submission_tag)
+    requested_attribute_tags = APIParamString(param=attribute_tags).param
+    r = []
+    if return_unique:
+        ca_df = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, join=None, pivot=False, sort_ca_tags=True, return_sample_index=False)
+        if genotype_exists:
+            genotypes = db.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, join=None, pivot=False, sort_ca_tags=True, return_sample_index=False)
+    else:
+        ca_df = None
+        genotypes = None
     for sample_tag in sample_tags:
         
         ri = {"tag" : sample_tag}
-        ca_tags = db.samples.get_condition_applications(tag=sample_tag, attribute_tags=APIParamString(param=attribute_tags).param, group_by_attribute=True)  #preload condition applications for samples
-        
-        if genotype_exists:
-            genotype_tags = db.samples.get_sample_genotype(tag = sample_tag)
-            ri["att_genotype"] = genotype_tags
-        for ca_tag in ca_tags:
-            ri[ca_tag.attribute_tag] = ca_tag.condition_application_tags
+        if return_unique and ca_df is not None and sample_tag in ca_df.index:
+            rows = ca_df.loc[sample_tag]
+            if isinstance(rows, pd.DataFrame):
+                for _, row in rows.iterrows():
+                    if requested_attribute_tags is None or row["attribute_tag"] in requested_attribute_tags:
+                        ri[row["attribute_tag"]] = row["condition_tags"]
+            else:
+                if requested_attribute_tags is None or rows["attribute_tag"] in requested_attribute_tags:
+                    ri[rows["attribute_tag"]] = rows["condition_tags"]
+            if genotype_exists and genotypes is not None and sample_tag in genotypes.index:
+                genotype_rows = genotypes.loc[sample_tag]
+                genotype_tags = genotype_rows["condition_tags"] if hasattr(genotype_rows, "keys") else [genotype_rows]
+                ri["att_genotype"] = genotype_tags
+        else:
+            ca_tags = db.samples.get_condition_applications(tag=sample_tag, attribute_tags=requested_attribute_tags, group_by_attribute=True)
+            if genotype_exists:
+                genotype_tags = db.samples.get_sample_genotype(tag = sample_tag)
+                ri["att_genotype"] = genotype_tags
+            for ca_tag in ca_tags:
+                ri[ca_tag.attribute_tag] = ca_tag.condition_application_tags
         r.append(ri)
         
     df = pd.DataFrame.from_dict(r)
@@ -135,17 +156,16 @@ def get_submission_sample_condition_applications(submission_tag: str, attribute_
 def get_submission_sample_condition_application_attributes(submission_tag: str, include_genotypes : bool = True, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Return the condition application attributes for samples of a given submission."
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
-    ca_tags = db.submissions.get_conditions_applications(submission_tag, group_by_attribute=False)
     sample_tags = db.submissions.get_samples(tag = submission_tag)  #ensure samples are loaded
     if len(sample_tags) == 0:
         raise HTTPException(status_code=404, detail="No samples found for this submission.")
+    ca_df = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, join=None, pivot=False, sort_ca_tags=True, return_sample_index=False)
     attribute_tags = []
-    for sample_tag in sample_tags:
-        ca_tags = db.samples.get_condition_applications(tag=sample_tag, group_by_attribute=False)
-        attribute_tags.extend([db.condition_applications.get_attribute(ca_tag) for ca_tag in ca_tags])
+    if not ca_df.empty:
+        attribute_tags = ca_df["attribute_tag"].dropna().unique().tolist()
     if include_genotypes and db.submissions.has_genotypes(tag = submission_tag):
         attribute_tags = ["att_genotype"] + attribute_tags
-    return pd.Series(attribute_tags).dropna().unique().tolist()
+    return attribute_tags
 
 
 @router.get("/{submission_tag}/ca/data")

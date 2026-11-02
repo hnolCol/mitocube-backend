@@ -60,6 +60,9 @@ class SamplesABC(ABC):
             The number of quantified protein groups for the given sample.
         """
     @abstractmethod
+    def count_quantified_protein_groups_for_samples(self, submission_tag : str, tags : List[str] = None) -> Dict[str, int]:
+        """Counts the quantified protein groups for many samples of a submission in a single query. Excluded and lost samples are omitted from the result."""
+    @abstractmethod
     def calculate_test_quantification_distribution(self, submission_tag : str, testParam : Dict, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
         """Calculates the quantification distribution for a given submission and quantification type based on a statistical test. This is used to calculate the distribution for the test results in the volcano plot."""
         
@@ -68,6 +71,10 @@ class SamplesABC(ABC):
     def get(self, tag : str) -> SampleModel:
         """Returns the sample information for a given sample tag."""
         
+        
+    @abstractmethod
+    def get_quantified_data_for_features(self, tags : List[str], feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> Dict[str, float]:
+        """Get the quantified data for one feature across many samples in a single query. Excluded and lost samples are skipped."""
         
     @abstractmethod
     def get_sample_condition_application_map_for_submission(self, submission_tag : str) -> pd.DataFrame:
@@ -235,6 +242,10 @@ class SamplesABC(ABC):
         int
             The replicate number for the given sample.
         """        
+
+    @abstractmethod
+    def get_replicates(self, tags: List[str]) -> Dict[str, int]:
+        """Returns the replicate numbers for many samples in a single query. Samples without a replicate are omitted."""
 
     @abstractmethod
     def set_replicate(self, tag: str, replicate: int) -> bool:

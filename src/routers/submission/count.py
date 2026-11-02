@@ -52,5 +52,6 @@ def get_sample_protein_group_count_for_submission(submission_tag : str, user : U
     "Return the number of protein groups per sample for a given submission"
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     sample_tags = db.submissions.get_samples(tag = submission_tag)
-    return [{"tag" : sample_tag, "count" : db.samples.count_quantified_protein_groups(tag=sample_tag, submission_tag = submission_tag)} for sample_tag in sample_tags]
+    counts = db.samples.count_quantified_protein_groups_for_samples(submission_tag = submission_tag, tags = sample_tags)
+    return [{"tag" : sample_tag, "count" : counts.get(sample_tag, 0)} for sample_tag in sample_tags]
     
