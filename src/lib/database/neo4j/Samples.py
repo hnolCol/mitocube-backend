@@ -668,18 +668,21 @@ class Neo4JSamples(SamplesABC):
     def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> QuantileModel:
         """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
         qd_tag = create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})
-        if self.is_lost(tag = tag) or self.is_excluded(tag = tag):
+        
+        query = (
+            "MATCH (sample:Sample {tag : $tag}) "
+            "OPTIONAL MATCH (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : $qd_tag}) "
+            "RETURN coalesce(sample.excluded, false) AS excluded, coalesce(sample.lost, false) AS lost, "
+            "qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, qd_tag = qd_tag, result_transformer_=Result.data)
+        if len(r) == 0:
             raise ValueError("No quantifications found for this submission and quantification type.")
-        dataset_distribution_exists = self.has_quantification_distribution(qd_tag=qd_tag)
-        if dataset_distribution_exists:
-            
-            query = (
-                "MATCH (qd:QuantificationDistribution {tag : $qd_tag})<-[:HAS_QUANTIFICATION_DISTRIBUTION]-(sample:Sample {tag : $tag}) "
-                "RETURN qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
-            )
-            r = self._driver.execute_query(query, routing_="r", qd_tag = qd_tag, tag = tag, result_transformer_=Result.data)
-            if len(r) > 0:
-                return QuantileModel(tag=qd_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
+        row = r[0]
+        if row["excluded"] or row["lost"]:
+            raise ValueError("No quantifications found for this submission and quantification type.")
+        if row["min"] is not None:
+            return QuantileModel(tag=qd_tag, min=row["min"], q25=row["q25"], m=row["m"], q75=row["q75"], max=row["max"], N=row["N"])
             
         query = "MATCH (sample:Sample {tag : $tag}) WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
 
@@ -702,6 +705,88 @@ class Neo4JSamples(SamplesABC):
         self.insert_quantification_distribution(tag=tag, qd_tag=qd_tag,  quantification_type=quantification_type, distribution=qm, annotation_tag=annotation_tag)
         
         return qm 
+
+
+    def get_quantification_distributions(self, tags : List[str], quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None, remove_outlier : bool = True) -> Dict[str, QuantileModel]:
+        """Returns the quantification distributions for many samples in a batched fashion.
+        Excluded and lost samples are skipped. Cached distributions are fetched in a single query;
+        missing ones are computed from a single query and inserted in a single batch write.
+        Returns a dict mapping sample tag to QuantileModel. Samples without quantifications are omitted."""
+        if len(tags) == 0:
+            return {}
+
+        rows = [
+            {"tag" : tag, "qd_tag" : create_hierarchical_hash(data = {"sample_tag" : tag, "quantification_type" : quantification_type, "annotation_tag" : annotation_tag, "remove_outlier" : remove_outlier})}
+            for tag in tags
+        ]
+
+        cache_query = (
+            "UNWIND $rows AS row "
+            "MATCH (sample:Sample {tag : row.tag}) "
+            "OPTIONAL MATCH (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : row.qd_tag}) "
+            "RETURN row.tag AS tag, row.qd_tag AS qd_tag, coalesce(sample.excluded, false) AS excluded, coalesce(sample.lost, false) AS lost, "
+            "qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
+        )
+        cached = self._driver.execute_query(cache_query, routing_="r", rows = rows, result_transformer_=Result.data)
+
+        distributions : Dict[str, QuantileModel] = {}
+        missing : List[Dict] = []
+        for row in cached:
+            if row["excluded"] or row["lost"]:
+                continue
+            if row["min"] is not None:
+                distributions[row["tag"]] = QuantileModel(tag = row["qd_tag"], min = row["min"], q25 = row["q25"], m = row["m"], q75 = row["q75"], max = row["max"], N = row["N"])
+            else:
+                missing.append(row)
+
+        if len(missing) == 0:
+            return distributions
+
+        missing_tags = [row["tag"] for row in missing]
+        values_query = (
+            "UNWIND $tags AS tag "
+            "MATCH (sample:Sample {tag : tag})-[q:QUANTIFIED]->(f "
+        )
+        if quantification_type == "protein_groups":
+            values_query += ":ProteinGroup "
+            if annotation_tag is not None:
+                values_query += "WHERE EXISTS {(f)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
+        elif quantification_type == "precursors":
+            values_query += ":Precursor "
+        else:
+            raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
+        values_query += "RETURN tag, q.value AS value "
+
+        vr = self._driver.execute_query(values_query, routing_="r", tags = missing_tags, annotation_tag = annotation_tag, result_transformer_=Result.data)
+
+        values_by_tag : Dict[str, List[float]] = {}
+        for row in vr:
+            values_by_tag.setdefault(row["tag"], []).append(row["value"])
+
+        insert_rows : List[Dict] = []
+        for row in missing:
+            values = values_by_tag.get(row["tag"])
+            if not values:
+                continue
+            values = remove_outliers_iqr(pd.Series(values), k = 1.5)
+            qm = QuantileModel(tag = row["tag"], min = np.min(values), q25 = np.percentile(values, 25), m = np.median(values), q75 = np.percentile(values, 75), max = np.max(values), N = len(values))
+            distributions[row["tag"]] = qm
+            insert_rows.append({"sample_tag" : row["tag"], "qd_tag" : row["qd_tag"], "distribution" : qm})
+
+        if len(insert_rows) > 0:
+            insert_query = (
+                "UNWIND $rows AS row "
+                "MATCH (sample:Sample {tag : row.sample_tag}) "
+                "MERGE (qd:QuantificationDistribution {tag : row.qd_tag}) "
+                "SET qd.quantification_type = $quantification_type, qd.annotation_tag = $annotation_tag, qd.created_at = timestamp(), "
+                "qd.min = row.distribution.min, qd.q25 = row.distribution.q25, qd.m = row.distribution.m, "
+                "qd.q75 = row.distribution.q75, qd.max = row.distribution.max, qd.N = row.distribution.N, qd.outlier_removed = $outlier_removed "
+                "WITH sample, qd "
+                "MERGE (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd) "
+            )
+            self._driver.execute_query(insert_query, routing_="w", rows = insert_rows, quantification_type = quantification_type, annotation_tag = annotation_tag, outlier_removed = remove_outlier)
+
+        return distributions
 
 
     def insert_quantification_distribution(self, tag : str, qd_tag : str, quantification_type : Literal["protein_groups","precursors"], distribution : QuantileModel, annotation_tag : str = None, remove_outlier : bool = True) -> bool:

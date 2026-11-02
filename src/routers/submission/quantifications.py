@@ -329,8 +329,11 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
 
     # 5. (optional) map colors back onto the dataframe
     ca['color'] = ca['combo'].map(color_mapper)
+    distributions = db.samples.get_quantification_distributions(tags=sample_tags, quantification_type=quantification_type, annotation_tag=annotation_tag)
     qs = []
     for sample_tag in sample_tags:
-        q = db.samples.get_quantification_distribution(tag=sample_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        q = distributions.get(sample_tag)
+        if q is None:
+            continue
         qs.append((sample_tag, q, ca.loc[ca.index == sample_tag, 'color'].values[0] if sample_tag in ca.index else '#000000'))  # Default to black if not found
     return qs

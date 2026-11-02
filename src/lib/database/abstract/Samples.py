@@ -291,6 +291,11 @@ class SamplesABC(ABC):
     def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
         """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
 
+    @abstractmethod
+    def get_quantification_distributions(self, tags : List[str], quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> Dict[str, QuantileModel]:
+        """Returns the quantification distributions for many samples in a batched fashion (single query for cached values, single query for missing values, single batch insert).
+        Excluded and lost samples are skipped. Returns a dict mapping sample tag to QuantileModel."""
+
         
 
     @abstractmethod

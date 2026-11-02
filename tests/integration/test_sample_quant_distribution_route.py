@@ -21,6 +21,7 @@ from lib.database.Database import get_db
 
 class FakeSamplesDB:
     def __init__(self):
+        self.batch_calls = 0
         self.distributions = {
             "sub-1|s1": QuantileModel(tag="sub-1|s1", min=1.0, q25=2.0, m=3.0, q75=4.0, max=5.0, N=10),
             "sub-1|s2": QuantileModel(tag="sub-1|s2", min=1.0, q25=2.0, m=3.0, q75=4.0, max=5.0, N=10),
@@ -36,6 +37,10 @@ class FakeSamplesDB:
 
     def get_quantification_distribution(self, tag, quantification_type, annotation_tag=None):
         return self.distributions[tag]
+
+    def get_quantification_distributions(self, tags, quantification_type, annotation_tag=None, remove_outlier=True):
+        self.batch_calls += 1
+        return {tag: self.distributions[tag] for tag in tags if tag in self.distributions}
 
 
 class FakeSubmissionsDB:
@@ -110,3 +115,9 @@ def test_sample_quantification_distribution_skips_excluded_and_lost(client, db):
     returned_tags = [entry[0] for entry in body]
     assert returned_tags == ["sub-1|s1", "sub-1|s2"]
     assert db.submissions.get_samples_calls[-1] == ("sub-1", True, True)
+
+
+def test_sample_quantification_distribution_uses_batch_method(client, db):
+    resp = client.get("/api/submissions/sub-1/samples/quantifications/distribution?quantification_type=protein_groups")
+    assert resp.status_code == 200
+    assert db.samples.batch_calls == 1
