@@ -10,7 +10,7 @@ from config.models.conditions_applications import ConditionApplicationAttributeM
 from lib.database.abstract.Genotypes import  GenotypeABC
 from lib.database.abstract.Annotations import AnnotationsABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
-from config.models.samples import SampleModel, SampleUpdateModel
+from config.models.samples import SampleModel, SampleUpdateModel, SampleCommentModel
 import pandas as pd
 
 import re
@@ -158,7 +158,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (s:Sample {tag : $tag}) "
-            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at, excluded : coalesce(s.excluded, false)}  "
+            "RETURN {tag : s.tag, text : s.name, index : s.sample_index, created_at : s.created_at, excluded : coalesce(s.excluded, false), lost : coalesce(s.lost, false)}  "
         )
         
         r = self._driver.execute_query(query,routing_="r",result_transformer_=Result.value, tag = tag)
@@ -385,7 +385,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
-            "WHERE coalesce(s.excluded, false) = false "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
             "RETURN s.sample_index as sample_index, s.tag as sample_tag, a.tag as attribute_tag, collect(ca.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
@@ -434,7 +434,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:HAS_GENOTYPE]->(g:Genotype) "
-            "WHERE coalesce(s.excluded, false) = false "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
             "RETURN s.sample_index as sample_index, s.tag as sample_tag, 'att_genotype' as attribute_tag, collect(g.tag) as condition_tags "
             "ORDER BY s.sample_index ASC "
         )
@@ -679,7 +679,7 @@ class Neo4JSamples(SamplesABC):
             if len(r) > 0:
                 return QuantileModel(tag=qd_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
             
-        query = "MATCH (sample:Sample {tag : $tag}) WHERE coalesce(sample.excluded, false) = false "
+        query = "MATCH (sample:Sample {tag : $tag}) WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
 
         if quantification_type == "protein_groups":
             query += "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
@@ -888,6 +888,70 @@ class Neo4JSamples(SamplesABC):
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
+
+    def get_submission_tag(self, tag: str) -> str|None:
+        "Returns the tag of the submission the sample belongs to."
+        query = (
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "RETURN submission.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+
+    def set_lost(self, tag: str, lost: bool) -> bool:
+        "Marks a sample as lost (e.g. lost, corrupted or otherwise unusable). Lost samples are ignored in statistical analysis. Marks the parent submission's cached statistics as outdated."
+        query = (
+            "MATCH (submission:Submission)-[:HAS_SAMPLE]->(s:Sample {tag : $tag}) "
+            "SET s.lost = $lost "
+            "SET submission.stats_outdated = true "
+            "RETURN s.lost "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, lost=lost, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+    
+    def is_lost(self, tag: str) -> bool:
+        "Checks whether a sample is marked as lost."
+        query = (
+            "MATCH (s:Sample {tag : $tag}) "
+            "RETURN coalesce(s.lost, false) "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else False
+
+    def insert_comment(self, tag: str, comment: SampleCommentModel) -> bool:
+        "Inserts a comment for a sample. The comment is stored as a separate Comment node linked via HAS_COMMENT so it is not loaded with the sample node."
+        query = (
+            "MATCH (sample:Sample {tag: $tag}) "
+            "MATCH (user:User {tag: $user_tag}) "
+            "CREATE (comment:Comment {tag: $comment_tag, content: $content, created_at: timestamp()}) "
+            "MERGE (sample)-[:HAS_COMMENT]->(comment) "
+            "MERGE (user)-[:CREATED]->(comment) "
+        )
+        r = self._driver.execute_query(
+            query, routing_="w",
+            tag=tag, user_tag=comment.user_tag, comment_tag=comment.tag, content=comment.content,
+            result_transformer_=Result.value
+        )
+        
+        if comment.response_to:
+            reply_query = (
+                "MATCH (child:Comment {tag: $child_tag}) "
+                "MATCH (parent:Comment {tag: $parent_tag}) "
+                "MERGE (child)-[:RESPONSE_TO]->(parent) "
+            )
+            self._driver.execute_query(reply_query, routing_="w", child_tag=comment.tag, parent_tag=comment.response_to)
+        return True
+    
+    def get_comments(self, tag: str) -> List[SampleCommentModel]:
+        "Returns the available comments for a given sample tag."
+        query = (
+            "MATCH (sample:Sample {tag: $tag})-[:HAS_COMMENT]->(comment:Comment)<-[:CREATED]-(u:User) "
+            "OPTIONAL MATCH (comment)-[:RESPONSE_TO]->(parent:Comment) "
+            "RETURN {user_tag: u.tag, created_at: comment.created_at, content: comment.content, tag: comment.tag, response_to: parent.tag} "
+            "ORDER BY comment.created_at ASC"
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return [SampleCommentModel(**c) for c in r]
 
 
     def get_samples_export_data(self, submission_tag: str, join: str = ";", sort_ca_tags: bool = True,

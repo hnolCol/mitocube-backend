@@ -815,11 +815,10 @@ def add_submission_samples(submission_tag : str, sample_names : List[str], user 
 
 
 @router.get("/submissions/{submission_tag}/samples")
-def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
-    "Returns the samples tags associated with the submission"
+def get_submission_samples(submission_tag : str, ignore_excluded : bool = False, ignore_lost : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    "Returns the samples tags associated with the submission. If ignore_excluded is True, excluded samples are omitted. If ignore_lost is True, lost samples are omitted."
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
-    sample_tags = db.submissions.get_samples(tag=submission_tag)
-    sample = db.samples.get(tag=sample_tags[0])
+    sample_tags = db.submissions.get_samples(tag=submission_tag, ignore_excluded=ignore_excluded, ignore_lost=ignore_lost)
     return sample_tags
 
 @router.get("/submissions/{submission_tag}/samplelist")
@@ -854,6 +853,7 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
             "tag": sample_tag,
             "index": sample.get("index") if sample else None,
             "excluded": sample.get("excluded", False) if sample else False,
+            "lost": sample.get("lost", False) if sample else False,
             "genotype": genotype,
             "attributes": attributes,
             "replicate": db.samples.get_replicate(tag=sample_tag),

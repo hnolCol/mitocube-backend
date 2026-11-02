@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from typing import List, Dict, Literal
 import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
-from config.models.samples import SampleModel
+from config.models.samples import SampleModel, SampleCommentModel
 from config.models.attributes import AttributeTree
 from config.models.calculations.quantile import QuantileModel
 
@@ -262,6 +262,26 @@ class SamplesABC(ABC):
     @abstractmethod
     def set_excluded(self, tag: str, excluded: bool) -> bool:
         "Sets whether a sample is excluded from statistical analysis / quantification aggregation."
+    
+    @abstractmethod
+    def get_submission_tag(self, tag: str) -> str|None:
+        "Returns the tag of the submission the sample belongs to, or None if the sample does not exist."
+
+    @abstractmethod
+    def is_lost(self, tag: str) -> bool:
+        "Checks whether a sample is marked as lost (e.g. lost, corrupted or otherwise unusable)."
+
+    @abstractmethod
+    def set_lost(self, tag: str, lost: bool) -> bool:
+        "Marks a sample as lost. Lost samples are ignored in statistical analysis / quantification aggregation."
+
+    @abstractmethod
+    def insert_comment(self, tag: str, comment: SampleCommentModel) -> bool:
+        "Inserts a comment for a sample. The comment is stored as a separate Comment node linked via HAS_COMMENT so it is not loaded with the sample node."
+
+    @abstractmethod
+    def get_comments(self, tag: str) -> List[SampleCommentModel]:
+        "Returns the available comments for a given sample tag."
     
     @abstractmethod
     def has_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:

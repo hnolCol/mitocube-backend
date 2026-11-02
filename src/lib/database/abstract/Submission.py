@@ -214,8 +214,8 @@ class SubmissionsABC(ABC):
         "Returns the comments associated with a submission."
         
     @abstractmethod
-    def get_samples(self, tag : str, ignore_excluded : bool = False)-> List[str]:
-        "Returns the samples of a submission"
+    def get_samples(self, tag : str, ignore_excluded : bool = False, ignore_lost : bool = False)-> List[str]:
+        "Returns the samples of a submission. If ignore_excluded is True, excluded samples are omitted. If ignore_lost is True, lost samples are omitted."
     
     @abstractmethod
     def get_states(self) -> List[int]:
