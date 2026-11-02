@@ -140,6 +140,20 @@ class Neo4JSamples(SamplesABC):
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data, submission_tag=submission_tag)
         return r[0]["count"] if len(r) > 0 and "count" in r[0] else 0
 
+    def count_quantified_protein_groups_for_samples(self, submission_tag : str, tags : List[str] = None) -> Dict[str, int]:
+        """Counts the quantified protein groups for many samples of a submission in a single query.
+        Returns a dict mapping sample tag to count. If tags is None, all samples of the submission are counted.
+        Excluded and lost samples are omitted from the result."""
+        query = (
+            "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup) "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
+        )
+        if tags is not None:
+            query += "AND s.tag IN $tags "
+        query += "RETURN s.tag AS tag, count(DISTINCT pg) AS count "
+        r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, tags = tags, result_transformer_=Result.data)
+        return {row["tag"] : row["count"] for row in r}
+
 
     def exists(self, tag : str) -> bool:
         "Check if a sample is associated with the given tag."
@@ -192,6 +206,29 @@ class Neo4JSamples(SamplesABC):
         return r[0] if len(r) > 0 else None
     
         
+
+    def get_quantified_data_for_features(self, tags : List[str], feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> Dict[str, float]:
+        """Get the quantified data for one feature across many samples in a single query.
+        Returns a dict mapping sample tag to value. Samples without a quantification for the feature are omitted.
+        Excluded and lost samples are skipped."""
+        metrics_mapping = {
+            "raw" : "value",
+            "z_score_sample" : "z_score_sample",
+            "z_score_protein_group" : "z_score_protein_group",
+            "log2_fc_vs_mean" : "log2_fc_vs_mean"
+        }
+        if metrics not in metrics_mapping:
+            raise ValueError(f"Invalid metrics value. Allowed values are: {list(metrics_mapping.keys())}")
+        if len(tags) == 0:
+            return {}
+        query = (
+            "UNWIND $tags AS tag "
+            "MATCH (s:Sample {tag : tag})-[r:QUANTIFIED]->(f:ProteinGroup|Peptide {tag : $feature_tag}) "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
+            f"RETURN tag, r.{metrics_mapping[metrics]} as value "
+        )
+        r = self._driver.execute_query(query, routing_="r", tags = tags, feature_tag = feature_tag, result_transformer_=Result.data)
+        return {row["tag"] : row["value"] for row in r}
 
     def insert(self, submission_tag : str, sample_name : str, sample_index : int, replicate: int = None, return_tag_if_exists : bool = False, connect_if_exists : bool = False) -> str:
         "Insert a new sample to a given submission" 
@@ -887,6 +924,19 @@ class Neo4JSamples(SamplesABC):
         )
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
         return r[0] if len(r) > 0 else None
+
+    def get_replicates(self, tags : List[str]) -> Dict[str, int]:
+        """Returns the replicate numbers for many samples in a single query. Samples without a replicate are omitted."""
+        if len(tags) == 0:
+            return {}
+        query = (
+            "UNWIND $tags AS tag "
+            "MATCH (s:Sample {tag : tag}) "
+            "WHERE s.replicate IS NOT NULL "
+            "RETURN tag, s.replicate AS replicate "
+        )
+        r = self._driver.execute_query(query, tags = tags, routing_="r", result_transformer_=Result.data)
+        return {row["tag"] : row["replicate"] for row in r}
 
     def set_replicate(self, tag: str, replicate: int) -> bool:
         query = (
