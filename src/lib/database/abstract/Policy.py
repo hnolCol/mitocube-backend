@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from config.models.Policy import PolicyModel, PolicyInsertModel, PolicyUpdateModel, PolicyStatusModel
+from config.models.Policy import PolicyModel, PolicyInsertModel, PolicyUpdateModel, PolicyStatusModel, PolicyVersionModel
 
 
 class PolicyABC(ABC):
@@ -9,7 +9,10 @@ class PolicyABC(ABC):
     def list(self) -> List[PolicyModel]: 
         ""
     @abstractmethod
-    def get(self, tag : str) -> Optional[PolicyModel]:
+    def get(self, tag : str) -> Optional[PolicyModel]: 
+        ""
+    @abstractmethod
+    def history(self, tag : str) -> List[PolicyVersionModel]: 
         ""
     @abstractmethod
     def create(self, policy : PolicyInsertModel, user_tag : str) -> PolicyModel: 

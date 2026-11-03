@@ -5,7 +5,8 @@ from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 
 from config.models.user import UserModel
-from config.models.Policy import PolicyModel, PolicyInsertModel, PolicyUpdateModel, PolicyStatusModel
+from config.models.Policy import (PolicyModel, PolicyInsertModel, PolicyUpdateModel,
+                                  PolicyStatusModel, PolicyVersionModel)
 from services.users import get_user_from_token, is_user_admin
 
 
@@ -17,17 +18,17 @@ router = APIRouter(
 
 @router.get("")
 def get_policies(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[PolicyModel]:
-    "Returns all policies."
+    "Returns the policies (terms of use, data protection) that exist."
     return db.policy.list()
 
 
 @router.get("/status")   # has to stay above "/{tag}", otherwise "status" is read as a tag
 def get_policy_status(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[PolicyStatusModel]:
-    "Returns for every policy whether the current user has to agree to it."
+    "Returns for every existing policy whether the current user has to agree to it."
     return db.policy.get_status(user_tag=user.tag)
 
 
-@router.post("", summary="Create a policy. Requires admin rights.")
+@router.post("", summary="Create the terms of use or the data protection policy. Requires admin rights.")
 def create_policy(policy : PolicyInsertModel, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)) -> PolicyModel:
     try:
         return db.policy.create(policy=policy, user_tag=user.tag)
@@ -42,6 +43,10 @@ def get_policy(tag : str, user : UserModel = Depends(get_user_from_token), db : 
         raise HTTPException(status_code=404, detail="Policy not found.")
     return policy
 
+
+@router.get("/{tag}/history", summary="Older versions of a policy. Requires admin rights.")
+def get_policy_history(tag : str, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)) -> List[PolicyVersionModel]:
+    return db.policy.history(tag)
 
 @router.put("/{tag}", summary="Update a policy. Requires admin rights.")
 def update_policy(tag : str, policy : PolicyUpdateModel, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)) -> PolicyModel:
