@@ -18,6 +18,9 @@ class ResearchGroupABC(ABC):
     def get(self, tag : str) -> ResearchGroupModel:
         ""
     @abstractmethod
+    def count(self) -> int:
+        "Returns the number of research groups in the database"
+    @abstractmethod
     def get_users_count(self, tag : str) -> int:
         " "
     @abstractmethod

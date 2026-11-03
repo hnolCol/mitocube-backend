@@ -45,6 +45,15 @@ class Neo4JConsortium(ConsortiumABC):
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag = tag)
         return ConsortiumModel(**r[0]) if len(r) > 0 else None
 
+    def count(self) -> int:
+        """Returns the number of consortiums"""
+        query = (
+            "MATCH (c:Consortium) "
+            "RETURN count(c) "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else 0
+
     def delete(self, tag : str) -> bool:
         """Deletes a consortium together with its membership and sharing relations."""
         query = (

@@ -17,6 +17,8 @@ class KeyFigures(BaseSettings):
     number_quant_values : bool = True
     number_genotypes : bool = True
     number_users : bool = True
+    number_research_groups : bool = True
+    number_consortiums : bool = True
     turnover_time : bool = True
     
 @lru_cache()

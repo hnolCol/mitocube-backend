@@ -109,8 +109,18 @@ class Neo4JResearchGroup(ResearchGroupABC):
         r = self._driver.execute_query(query, routing_="r",result_transformer_=Result.value, tag = tag)
 
         return ResearchGroupModel(**r[0]) if len(r) > 0 else None
-
-
+    
+    def count(self) -> int:
+        "Returns the number of research groups in the database"
+        query = (
+            "MATCH (rg:ResearchGroup) "
+            "RETURN count(rg) "
+        )
+        
+        r = self._driver.execute_query(query, routing_= "r", result_transformer_=Result.value)
+        if len(r) == 0:  return 0
+        return r[0]
+    
     def get_submissions_count(self, tag : str) -> int:
         "Returns the number of submissions associated with the research group"
         query = (

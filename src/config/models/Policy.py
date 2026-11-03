@@ -1,11 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from typing import Optional
-
-POLICY_TAG = "mitocube_policy"
+from services.encryption import create_hierarchical_hash
 
 
 class PolicyModel(BaseModel):
-    tag : str = POLICY_TAG
+    tag : str
     title : Optional[str] = None
     text : str = ""
     required : bool = False
@@ -15,15 +14,29 @@ class PolicyModel(BaseModel):
     updated_by : Optional[str] = None
 
 
+class PolicyInsertModel(BaseModel):
+    title : str
+    text : str
+    required : bool = False
+    tag : str = ""
+
+    @model_validator(mode="after")
+    def generate_tag(self):
+        self.tag = create_hierarchical_hash([self.title])[:20]
+        return self
+
+
 class PolicyUpdateModel(BaseModel):
     title : Optional[str] = None
     text : str
     required : bool = False
-    bump_version : bool = False     # True → all users must agree again
+    bump_version : bool = False     # True -> all users must agree again
 
 
 class PolicyStatusModel(BaseModel):
+    tag : str
+    title : Optional[str] = None
     required : bool       # is agreement currently required
-    agreed : bool         # has this user agreed
-    must_agree : bool     # required and not agreed → user is blocked
+    agreed : bool         # has this user agreed to the current version
+    must_agree : bool     # required and not agreed -> user is blocked
     version : int

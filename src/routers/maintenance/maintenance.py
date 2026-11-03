@@ -21,7 +21,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 def insert_maintenance(maintenance_event: MaintenanceEventInsertModel, user: UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)):
     maintenance_event = MaintenanceEventInsertModel(**maintenance_event.model_dump(exclude=["user_tag"]), user_tag=user.tag)
     db.maintenance_events.insert(maintenance_event=maintenance_event)
-    
+    return {"tag": maintenance_event.tag}
     
     
     

@@ -160,9 +160,11 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
         if tag is not None:
             query += "WHERE me.tag = $tag "
             
-        query += "MATCH (t)-[r:IN_STATE]->(is:InstrumentState) WHERE r.maintenance_event_tag = me.tag "
+        query += ("OPTIONAL MATCH (t)-[r:IN_STATE]->(is:InstrumentState) WHERE r.maintenance_event_tag = me.tag "
+                  "WITH me, u, t, is, r ORDER BY r.created_at ASC "
+                  "WITH me, u, t, head(collect(is.tag)) AS instrument_state_tag ")
         query += ("OPTIONAL MATCH (me)-[:PERFORMED]->(m:MaintenanceProcedure) "
-                  "WITH  collect(m.tag) as maintenance_tags, me, u, t, is.tag as instrument_state_tag ")
+                  "WITH  collect(m.tag) as maintenance_tags, me, u, t, instrument_state_tag ")
         
         query += ("OPTIONAL MATCH (me)-[:HAS_SYMPTOM]->(s:Symptom) "
                   "WITH collect(s.tag) as symptom_tags, me, u, t, maintenance_tags, instrument_state_tag ")
@@ -231,8 +233,8 @@ class Neo4JMaintenanceEvent(MaintenanceEventABC):
             "CREATE (me)-[:IN_STATE {created_at : timestamp(), maintenance_event_tag : $maintenance_event.tag, user_tag : u.tag}]->(ms) "
             "MERGE (u)-[:CREATED]->(me) "
             "MERGE (t)-[:HAS_EVENT]->(me) "
-            "MERGE (t)-[r:IN_STATE]->(is) "
-            "SET r.created_at = timestamp(), r.maintenance_event_tag = $maintenance_event.tag "
+            "CREATE (t)-[r:IN_STATE]->(is) "
+            "SET r.created_at = timestamp(), r.maintenance_event_tag = $maintenance_event.tag, r.tag = randomUUID() "
             "WITH me "
             "UNWIND $maintenance_event.symptom_tags as symptom_tag "
             "MATCH (s:Symptom {tag : symptom_tag}) "

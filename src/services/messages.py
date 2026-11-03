@@ -7,7 +7,7 @@ from lib.database.abstract.Database import DatabaseABC
 
 email_settings = get_email_settings()
 
-templates = [email_settings.message_attribute_request_reviewed_template]
+templates = [email_settings.message_attribute_request_reviewed_template, email_settings.message_collaboration_request_reviewed_template]
 
 TEMPLATE_ENV = Environment(loader=FileSystemLoader(email_settings.mail_template_dir), autoescape=False)
 
