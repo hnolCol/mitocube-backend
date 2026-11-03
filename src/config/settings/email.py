@@ -41,6 +41,7 @@ class Email(BaseSettings):
     mail_deposition_complete_template : str = "deposition_complete.html"
     mail_attribute_requested_template : str = "attribute_requested.html"
     mail_attribute_request_reviewed_template : str = "attribute_request_reviewed.html"
+    message_collaboration_request_reviewed_template : str = "collaboration_request_reviewed.txt"
 
     # in-app notifications (same pattern as the emails, sent as read-only messages;
     # the .txt templates live in mail_template_dir next to the email templates)

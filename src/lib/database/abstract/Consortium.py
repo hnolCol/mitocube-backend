@@ -19,7 +19,9 @@ class ConsortiumABC(ABC):
     @abstractmethod
     def get(self, tag : str) -> ConsortiumModel:
         """ """
-
+    @abstractmethod
+    def count(self) -> int:
+        "Returns the number of consortiums"
     @abstractmethod
     def delete(self, tag : str) -> bool:
         """ """

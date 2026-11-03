@@ -320,10 +320,14 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
             key_figures["Genotypes"] = db.genotypes.count()
         if KEY_FIGURE_SETTINGS.number_users:
             key_figures["Users"] = db.users.count()
+        if KEY_FIGURE_SETTINGS.number_research_groups:
+            key_figures["Research Groups"] = db.research_groups.count()
+        if KEY_FIGURE_SETTINGS.number_consortiums:
+            key_figures["Consortiums"] = db.consortiums.count()
         keyfigureData = [{"label" : k, "metric" : v} for k,v in key_figures.items()]
         return keyfigureData
 
-    cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_keyfigures", user.tag])    
+    cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_keyfigures.v2", user.tag])    
     keyfigureData = db_cache_runtime.get_or_compute(cache_key = cache_key,
                                         compute_fn = lambda : _get_keyfigures(user, db),
                                         cache_time = timedelta(hours = 24))

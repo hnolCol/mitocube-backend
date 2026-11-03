@@ -1,0 +1,7 @@
+Dear {{first_name}},
+
+your collaboration request for the submission "{{title}}" ({{submission_tag}}){% if group %} for the research group {{group}}{% endif %} has been {% if approved %}approved{% else %}denied{% endif %} by {{reviewer}}.
+{% if approved %}
+{% if group %}All members of {{group}} now have{% else %}You now have{% endif %} access to the submission.
+{% endif %}
+The {{app_name}} Support Team

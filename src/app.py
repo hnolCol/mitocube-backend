@@ -87,6 +87,7 @@ from routers.crosslink import crosslink
 from routers.protocols import protocols
 from routers.mfa import mfa
 from routers.policy import policy
+from routers.policy import permissions as policy_permissions
 from routers.impressum import impressum
 from routers.plates import plates
 
@@ -97,7 +98,8 @@ import sys
 
 
 #the order of these matters for the functioning of the routes
-router_sources = [policy,
+router_sources = [policy_permissions,
+                  policy,
                  impressum,
                   protein_groups,
                   protein_favorite,

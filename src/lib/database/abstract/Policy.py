@@ -1,17 +1,31 @@
 from abc import ABC, abstractmethod
-from config.models.Policy import PolicyModel, PolicyUpdateModel, PolicyStatusModel
+from typing import List, Optional
+from config.models.Policy import PolicyModel, PolicyInsertModel, PolicyUpdateModel, PolicyStatusModel, PolicyVersionModel
 
 
 class PolicyABC(ABC):
 
     @abstractmethod
-    def get(self) -> PolicyModel | None: ...
-
+    def list(self) -> List[PolicyModel]: 
+        ""
     @abstractmethod
-    def update(self, policy : PolicyUpdateModel, user_tag : str) -> PolicyModel: ...
-
+    def get(self, tag : str) -> Optional[PolicyModel]: 
+        ""
     @abstractmethod
-    def agree(self, user_tag : str) -> bool: ...
-
+    def history(self, tag : str) -> List[PolicyVersionModel]: 
+        ""
     @abstractmethod
-    def get_status(self, user_tag : str) -> PolicyStatusModel: ...
+    def create(self, policy : PolicyInsertModel, user_tag : str) -> PolicyModel: 
+        ""
+    @abstractmethod
+    def update(self, tag : str, policy : PolicyUpdateModel, user_tag : str) -> Optional[PolicyModel]: 
+        ""
+    @abstractmethod
+    def delete(self, tag : str) -> bool: 
+        ""
+    @abstractmethod
+    def agree(self, tag : str, user_tag : str) -> bool: 
+        ""
+    @abstractmethod
+    def get_status(self, user_tag : str) -> List[PolicyStatusModel]: 
+        ""
