@@ -148,39 +148,6 @@ def find_best_k(X, k_range):
     best_k = max(scores, key=scores.get)
     return best_k, scores
 
-@njit(cache=True)
-def pairwise_euclidean(X):
-    """
-    Compute full n x n Euclidean distance matrix, NaN-aware.
-    Distance between rows i, j is computed only over dimensions where
-    both rows have non-NaN values, then scaled back up to full dimensionality
-    (average squared diff * n_features) so distances stay comparable across
-    pairs with different amounts of missingness.
-    If two rows share zero overlapping non-NaN dimensions, distance is inf
-    (they should never be merged based on no shared evidence).
-    """
-    n = X.shape[0]
-    n_features = X.shape[1]
-    D = np.zeros((n, n))
-    for i in range(n):
-        for j in range(i + 1, n):
-            s = 0.0
-            count = 0
-            for k in range(n_features):
-                a = X[i, k]
-                b = X[j, k]
-                if not np.isnan(a) and not np.isnan(b):
-                    diff = a - b
-                    s += diff * diff
-                    count += 1
-            if count == 0:
-                d = np.inf
-            else:
-                # mean squared diff over overlapping dims, rescaled to full dim count
-                d = np.sqrt((s / count) * n_features)
-            D[i, j] = d
-            D[j, i] = d
-    return D
 
 @njit(cache=True)
 def complete_linkage_history(D):
@@ -278,13 +245,14 @@ def cluster_to_dataframe(X, n_clusters, index=None, columns=None):
 def compute_zscores(df: pd.DataFrame) -> pd.DataFrame:
     """Row-wise (per-feature) z-scores, NaN-safe."""
     arr = df.values.astype(np.float64)
-    mean = np.nanmean(arr, axis=1, keepdims=True)
-    std = np.nanstd(arr, axis=1, keepdims=True)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        mean = np.nanmean(arr, axis=1, keepdims=True)
+        std = np.nanstd(arr, axis=1, keepdims=True)
+    std = np.where(std == 0.0, np.nan, std)
     with np.errstate(invalid="ignore", divide="ignore"):
         z = (arr - mean) / std
+    z[~np.isfinite(z)] = np.nan
     return pd.DataFrame(z, index=df.index, columns=df.columns)
-
-
 
 
 if __name__ == "__main__":
