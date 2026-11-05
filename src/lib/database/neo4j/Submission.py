@@ -51,26 +51,33 @@ def build_combined_attribute_rows(df : pd.DataFrame) -> pd.DataFrame:
         ('<attribute_tag_a>__<attribute_tag_b>') and ca_tags is the union of both attributes' tags.
     """
     attribute_tags = sorted(df["attribute_tag"].dropna().unique())
-    rows = []
+    if len(attribute_tags) < 2:
+        return pd.DataFrame(columns=["protein_group_tag", "value", "attribute_tag", "ca_tags", "sample_tag"])
+
+    pivot = df.pivot(index=["protein_group_tag", "sample_tag"], columns="attribute_tag", values="ca_tags")
+    values = df.groupby(["protein_group_tag", "sample_tag"])["value"].first().reindex(pivot.index)
+
+    frames = []
     for attribute_tag_a, attribute_tag_b in combinations(attribute_tags, 2):
-        df_pair = df[df["attribute_tag"].isin([attribute_tag_a, attribute_tag_b])]
-        pivot = df_pair.pivot(index=["protein_group_tag", "sample_tag"], columns="attribute_tag", values="ca_tags")
         if attribute_tag_a not in pivot.columns or attribute_tag_b not in pivot.columns:
             continue
-        pivot = pivot.dropna(subset=[attribute_tag_a, attribute_tag_b])
-        if pivot.empty:
+        pair = pivot[[attribute_tag_a, attribute_tag_b]].dropna()
+        if pair.empty:
             continue
-        values = df_pair.groupby(["protein_group_tag", "sample_tag"])["value"].first()
-        for (protein_group_tag, sample_tag), row in pivot.iterrows():
-            ca_tags = sorted(set(str(row[attribute_tag_a]).split(",")) | set(str(row[attribute_tag_b]).split(",")))
-            rows.append({
-                "protein_group_tag" : protein_group_tag,
-                "value" : values.loc[(protein_group_tag, sample_tag)],
-                "attribute_tag" : f"{attribute_tag_a}__{attribute_tag_b}",
-                "ca_tags" : ",".join(ca_tags),
-                "sample_tag" : sample_tag
-            })
-    return pd.DataFrame(rows, columns=["protein_group_tag", "value", "attribute_tag", "ca_tags", "sample_tag"])
+        ca_tags = [
+            ",".join(sorted(set(str(ca_a).split(",")) | set(str(ca_b).split(","))))
+            for ca_a, ca_b in zip(pair[attribute_tag_a].to_numpy(), pair[attribute_tag_b].to_numpy())
+        ]
+        frames.append(pd.DataFrame({
+            "protein_group_tag" : pair.index.get_level_values("protein_group_tag"),
+            "value" : values.loc[pair.index].to_numpy(),
+            "attribute_tag" : f"{attribute_tag_a}__{attribute_tag_b}",
+            "ca_tags" : ca_tags,
+            "sample_tag" : pair.index.get_level_values("sample_tag")
+        }))
+    if len(frames) == 0:
+        return pd.DataFrame(columns=["protein_group_tag", "value", "attribute_tag", "ca_tags", "sample_tag"])
+    return pd.concat(frames, ignore_index=True)
 
 
 def chunk_dict(d, size):
