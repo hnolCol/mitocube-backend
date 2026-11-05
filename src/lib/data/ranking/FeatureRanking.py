@@ -127,7 +127,6 @@ Recommended Interpretation Strategy
 import numpy as np 
 import pandas as pd 
 from scipy import stats
-from itertools import combinations
 
 
 class FeatureRanking(object):
@@ -149,121 +148,120 @@ class FeatureRanking(object):
         pd.DataFrame
             DataFrame containing the computed metrics for each feature
         """
+        ca_annotation_counts = df.dropna(subset=["ca_tags"]).groupby(["attribute_tag", "ca_tags"])["sample_tag"].nunique()
         df_no_nan = df.dropna(subset=["value", "ca_tags"])
         
         total_results = []
         for attribute_tag, df in df_no_nan.groupby("attribute_tag"):
-        
-            results = []
-            df_pivot_mean = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="mean")
-            df_pivot_count = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="count")
-            df_grouped_values = df.groupby(["protein_group_tag","ca_tags"])["value"].apply(list)
-            
 
-            for protein_group_tag, pdf in df.groupby("protein_group_tag"):
-                exclusively = False
-                exclusively_ca_tags = []
-                f_stat, p_value = np.nan, np.nan
-                # Drop missing
-                pdf = pdf.dropna(subset=["value", "ca_tags"])
+            # A condition application group is only valid if it is annotated on at least two samples.
+            # This avoids per-sample attributes (e.g. MouseID) where every sample forms its own group.
+            attribute_ca_counts = ca_annotation_counts.xs(attribute_tag, level="attribute_tag")
+            valid_ca_tags = attribute_ca_counts[attribute_ca_counts >= 2].index
+            n_attribute_groups = len(valid_ca_tags)
+            df = df[df["ca_tags"].isin(valid_ca_tags)]
+            if df.empty:
+                continue
 
-                groups = pdf.groupby("ca_tags")["value"].apply(list)
+            n_samples = df["sample_tag"].nunique()
 
-                # ---------------------------
-                # Basic stats
-                # ---------------------------
-                group_means = {g: df_pivot_mean.loc[protein_group_tag, g] for g in groups.keys()}
-                group_sizes = {g: df_pivot_count.loc[protein_group_tag, g] for g in groups.keys()}
-                
-                all_values = pdf["value"].values
-                grand_mean = np.mean(all_values)
+            # ---------------------------
+            # Group aggregates as protein group x condition application matrices
+            # ---------------------------
+            grouped = df.groupby(["protein_group_tag", "ca_tags"])["value"]
+            group_counts = grouped.size().unstack("ca_tags")
+            group_means = grouped.mean().unstack("ca_tags")
 
-                # ---------------------------
-                # ANOVA
-                # ---------------------------
-                sizes = group_sizes.values() 
-                bools_group_size_not_null = [s > 0 for s in sizes]
-                bools_group_size_at_least_2 = [s >= 2 for s in sizes]
-                group_sizes_not_null_sum = sum(bools_group_size_not_null)
-                exclusively = group_sizes_not_null_sum == 1 and sum(sizes) > 1 #if only one group has non-null size and that size is > 4, we consider the protein exclusively present in that group. In this case, ANOVA is not applicable, but we can still compute effect sizes.
-                if exclusively:
-                    exclusively_ca_tags = [g for g, s in group_sizes.items() if s > 0]
-                
-                if not exclusively and group_sizes_not_null_sum > 1 and sum(bools_group_size_at_least_2) >= 2: #ANOVA requires at least 2 groups with non-null size
-                    try:
-                        f_stat, p_value = stats.f_oneway(*df_grouped_values.loc[protein_group_tag].values)
-                    except Exception:
-                        pass 
-        
-                # group means and counts as arrays
-                means = np.array([group_means[g] for g in groups.keys()])
-                counts = np.array([group_sizes[g] for g in groups.keys()])
+            counts = group_counts.fillna(0).to_numpy()
+            means = group_means.to_numpy()
+            total_counts = counts.sum(axis=1)
+            n_groups = (counts > 0).sum(axis=1)
+            valid = counts > 0
+            grand_means = np.where(valid, np.nan_to_num(means) * counts, 0.0).sum(axis=1) / total_counts
 
-                # ss_between
-                ss_between = np.sum(counts * (means - grand_mean)**2)
-                # ---------------------------
-                # Sum of squares
-                # ---------------------------
-                # ss_between = sum(
-                #     group_sizes[g] * (group_means[g] - grand_mean) ** 2
-                #     for g in groups.keys()
-                # )
+            # ---------------------------
+            # Sum of squares
+            # ---------------------------
+            ss_between = np.where(valid, counts * np.nan_to_num(means - grand_means[:, None])**2, 0.0).sum(axis=1)
+            deviations = df["value"] - grouped.transform("mean")
+            ss_within = (deviations**2).groupby(df["protein_group_tag"]).sum().reindex(group_counts.index).to_numpy()
+            ss_total = ss_between + ss_within
 
-                ss_within = np.sum([
-                    np.sum((np.array(values) - df_pivot_mean.loc[protein_group_tag, g])**2)
-                    for g, values in groups.items()
-                ])
+            # ---------------------------
+            # Effect sizes
+            # ---------------------------
+            eta_squared = np.divide(ss_between, ss_total, out=np.zeros_like(ss_between, dtype=float), where=ss_total > 0)
+            cohen_f = np.where(eta_squared < 1, np.sqrt(eta_squared / np.clip(1 - eta_squared, 0, None)), np.nan)
 
-                ss_total = ss_between + ss_within
+            # Max pairwise fold change (log2 already): the largest absolute difference of two group means is the range of the means
+            max_fc = np.nanmax(means, axis=1) - np.nanmin(means, axis=1)
 
-                # ---------------------------
-                # Effect sizes
-                # ---------------------------
-                eta_squared = ss_between / ss_total if ss_total > 0 else 0
+            # Std of means
+            std_means = np.nanstd(means, axis=1)
 
-                cohen_f = np.sqrt(eta_squared / (1 - eta_squared)) if eta_squared < 1 else np.inf
+            # ---------------------------
+            # Exclusivity
+            # ---------------------------
+            # A protein group is exclusively quantified if it has values in exactly one condition application
+            # group and is quantified in at least two samples of that group. ANOVA is not applicable in that case.
+            exclusively = (n_groups == 1) & (total_counts > 1)
+            exclusively_ca_tags = np.where(exclusively, group_counts.idxmax(axis=1).astype(object), None)
 
-                # Max pairwise fold change (log2 already)
-                max_fc = 0
-                for g1, g2 in combinations(group_means.keys(), 2):
-                    fc = abs(group_means[g1] - group_means[g2])
-                    max_fc = max(max_fc, fc)
+            # ---------------------------
+            # ANOVA (one-way, vectorized: F = (ss_between/(k-1)) / (ss_within/(N-k)))
+            # ---------------------------
+            # Groups with a single observation carry no within-group variance and would inflate the F statistic.
+            multi = counts >= 2
+            k = multi.sum(axis=1)
+            n_anova = np.where(multi, counts, 0).sum(axis=1)
+            anova_grand_means = np.where(multi, np.nan_to_num(means) * counts, 0.0).sum(axis=1) / n_anova
+            ss_between_anova = np.where(multi, counts * (np.nan_to_num(means) - anova_grand_means[:, None])**2, 0.0).sum(axis=1)
+            group_sizes_per_row = grouped.transform("size")
+            ss_within_anova = (deviations**2).where(group_sizes_per_row >= 2).groupby(df["protein_group_tag"]).sum().reindex(group_counts.index).to_numpy()
 
-                # Std of means
-                std_means = np.std(list(group_means.values()))
+            with np.errstate(divide="ignore", invalid="ignore"):
+                f_stat = (ss_between_anova / np.maximum(k - 1, 1)) / (ss_within_anova / np.maximum(n_anova - k, 1))
+                p_value = stats.f.sf(f_stat, k - 1, n_anova - k)
+            anova_mask = (~exclusively) & (k >= 2) & (n_anova - k > 0)
+            finite = anova_mask & np.isfinite(f_stat) & np.isfinite(p_value) #zero within-group variance produces an infinite F statistic
+            f_stat = np.where(finite, f_stat, np.nan)
+            p_value = np.where(finite, p_value, np.nan)
 
-                # ---------------------------
-                # Data quality
-                # ---------------------------
-                total_expected = len(pdf["sample_tag"].unique())
-                observed = len(pdf)
-                missingness = 1 - (observed / total_expected)
+            # ---------------------------
+            # Data quality
+            # ---------------------------
+            observed = total_counts
+            missingness = 1 - (observed / n_samples)
 
-                n_groups = len(groups)
+            # ---------------------------
+            # Composite score
+            # ---------------------------
+            # For exclusively quantified protein groups, exclusivity is the maximal group effect:
+            # eta_squared and max_fc are treated as 1 so that they rank by the number of alternative
+            # groups they are absent from.
+            score = np.where(
+                exclusively,
+                np.log10(n_attribute_groups + 1),
+                eta_squared * max_fc * np.log10(n_groups + 1)
+            )
 
-                # ---------------------------
-                # Composite score
-                # ---------------------------
-                score = eta_squared * max_fc * np.log10(n_groups + 1)
-
-                results.append({
-                    "protein_group_tag": protein_group_tag,
-                    "attribute_tag": attribute_tag,
-                    "score": score,
-                    "mean": np.mean(all_values),
-                    "quantified_in_samples": observed,
-                    "F": f_stat,
-                    "p_value": p_value,
-                    "eta_squared": eta_squared,
-                    "cohen_f": cohen_f,
-                    "max_fc": max_fc,
-                    "std_means": std_means,
-                    "missingness": missingness,
-                    "n_groups": n_groups,
-                    "exclusively": exclusively,
-                    "exclusively_ca_tags": exclusively_ca_tags
-                })
-            df_attribute = pd.DataFrame(results)
+            df_attribute = pd.DataFrame({
+                "protein_group_tag": group_counts.index,
+                "attribute_tag": attribute_tag,
+                "score": score,
+                "mean": grand_means,
+                "quantified_in_samples": observed,
+                "F": f_stat,
+                "p_value": p_value,
+                "eta_squared": eta_squared,
+                "cohen_f": cohen_f,
+                "max_fc": max_fc,
+                "std_means": std_means,
+                "missingness": missingness,
+                "n_groups": n_groups,
+                "exclusively": exclusively,
+                "exclusively_ca_tags": [[tag] if tag is not None else [] for tag in exclusively_ca_tags]
+            })
             df_attribute.loc[:,"FDR"] = np.nan
             df_attribute.loc[:,"rank"] = df_attribute["score"].rank(ascending=False, method="min").values
             df_no_nan_attribute = df_attribute.dropna(subset=["p_value"])
