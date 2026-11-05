@@ -149,6 +149,7 @@ class FeatureRanking(object):
         pd.DataFrame
             DataFrame containing the computed metrics for each feature
         """
+        ca_annotation_counts = df.dropna(subset=["ca_tags"]).groupby(["attribute_tag", "ca_tags"])["sample_tag"].nunique()
         df_no_nan = df.dropna(subset=["value", "ca_tags"])
         
         total_results = []
@@ -156,13 +157,15 @@ class FeatureRanking(object):
 
             # A condition application group is only valid if it is annotated on at least two samples.
             # This avoids per-sample attributes (e.g. MouseID) where every sample forms its own group.
-            ca_group_sample_counts = df.groupby("ca_tags")["sample_tag"].nunique()
-            valid_ca_tags = ca_group_sample_counts[ca_group_sample_counts >= 2].index
+            attribute_ca_counts = ca_annotation_counts.xs(attribute_tag, level="attribute_tag")
+            valid_ca_tags = attribute_ca_counts[attribute_ca_counts >= 2].index
+            n_attribute_groups = len(valid_ca_tags)
             df = df[df["ca_tags"].isin(valid_ca_tags)]
             if df.empty:
                 continue
 
             results = []
+            n_samples = df["sample_tag"].nunique()
             df_pivot_mean = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="mean")
             df_pivot_count = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="count")
             df_grouped_values = df.groupby(["protein_group_tag","ca_tags"])["value"].apply(list)
@@ -190,18 +193,20 @@ class FeatureRanking(object):
                 # ANOVA
                 # ---------------------------
                 sizes = group_sizes.values() 
-                bools_group_size_not_null = [s > 0 for s in sizes]
-                bools_group_size_at_least_2 = [s >= 2 for s in sizes]
-                group_sizes_not_null_sum = sum(bools_group_size_not_null)
-                exclusively = group_sizes_not_null_sum == 1 and sum(sizes) > 1 #if only one group has non-null size and that size is > 4, we consider the protein exclusively present in that group. In this case, ANOVA is not applicable, but we can still compute effect sizes.
+                group_sizes_not_null_sum = sum([s > 0 for s in sizes])
+                exclusively = group_sizes_not_null_sum == 1 and sum(sizes) > 1 #if the protein group has values in exactly one condition application group and is quantified in at least two samples of that group, we consider it exclusively present in that group. In this case, ANOVA is not applicable, but we can still compute effect sizes.
                 if exclusively:
                     exclusively_ca_tags = [g for g, s in group_sizes.items() if s > 0]
                 
-                if not exclusively and group_sizes_not_null_sum > 1 and sum(bools_group_size_at_least_2) >= 2: #ANOVA requires at least 2 groups with non-null size
-                    try:
-                        f_stat, p_value = stats.f_oneway(*df_grouped_values.loc[protein_group_tag].values)
-                    except Exception:
-                        pass 
+                if not exclusively:
+                    anova_groups = [values for values in df_grouped_values.loc[protein_group_tag].values if len(values) >= 2] #groups with a single observation carry no within-group variance and would inflate the F statistic
+                    if len(anova_groups) >= 2:
+                        try:
+                            f_stat, p_value = stats.f_oneway(*anova_groups)
+                            if not np.isfinite(f_stat) or not np.isfinite(p_value): #zero within-group variance produces an infinite F statistic
+                                f_stat, p_value = np.nan, np.nan
+                        except Exception:
+                            pass 
         
                 # group means and counts as arrays
                 means = np.array([group_means[g] for g in groups.keys()])
@@ -229,7 +234,7 @@ class FeatureRanking(object):
                 # ---------------------------
                 eta_squared = ss_between / ss_total if ss_total > 0 else 0
 
-                cohen_f = np.sqrt(eta_squared / (1 - eta_squared)) if eta_squared < 1 else np.inf
+                cohen_f = np.sqrt(eta_squared / (1 - eta_squared)) if eta_squared < 1 else np.nan
 
                 # Max pairwise fold change (log2 already)
                 max_fc = 0
@@ -243,16 +248,20 @@ class FeatureRanking(object):
                 # ---------------------------
                 # Data quality
                 # ---------------------------
-                total_expected = len(pdf["sample_tag"].unique())
                 observed = len(pdf)
-                missingness = 1 - (observed / total_expected)
+                missingness = 1 - (observed / n_samples)
 
                 n_groups = len(groups)
 
                 # ---------------------------
                 # Composite score
                 # ---------------------------
-                score = eta_squared * max_fc * np.log10(n_groups + 1)
+                if exclusively:
+                    # Exclusivity is the maximal group effect: eta_squared and max_fc are treated as 1 so that
+                    # exclusively quantified proteins rank by the number of alternative groups they are absent from.
+                    score = np.log10(n_attribute_groups + 1)
+                else:
+                    score = eta_squared * max_fc * np.log10(n_groups + 1)
 
                 results.append({
                     "protein_group_tag": protein_group_tag,

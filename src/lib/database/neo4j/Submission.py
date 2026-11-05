@@ -1209,6 +1209,7 @@ class Neo4JSubmissions(SubmissionsABC):
             r_ca = pd.concat([r_ca, r_combined], ignore_index=True)
 
         df = FeatureRanking().compute_metrics(df = r_ca)
+        df = df.replace([np.inf, -np.inf], np.nan)
         rows = df.to_dict("records")
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i+batch_size]

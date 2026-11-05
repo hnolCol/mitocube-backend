@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import pytest
+from scipy import stats as scipy_stats
 
 from lib.data.ranking.FeatureRanking import FeatureRanking
 from lib.database.neo4j.Submission import build_combined_attribute_rows
@@ -140,3 +142,87 @@ def test_compute_metrics_no_exclusivity_for_single_quantified_sample():
 
     pg_2 = result[result["protein_group_tag"] == "pg_2"].iloc[0]
     assert pg_2["exclusively"] == False  # noqa: E712
+
+
+def test_compute_metrics_missingness_uses_all_samples_of_attribute():
+    df = _quantification_frame([
+        ["pg_1", 10.0, "att_treatment", "ca_dmso", "s1"],
+        ["pg_1", 10.5, "att_treatment", "ca_dmso", "s2"],
+        ["pg_1", 11.0, "att_treatment", "ca_treatment", "s3"],
+        ["pg_1", 11.5, "att_treatment", "ca_treatment", "s4"],
+        ["pg_2", 20.0, "att_treatment", "ca_dmso", "s1"],
+        ["pg_2", 21.0, "att_treatment", "ca_treatment", "s3"],
+    ])
+
+    result = FeatureRanking().compute_metrics(df=df)
+
+    pg_1 = result[result["protein_group_tag"] == "pg_1"].iloc[0]
+    assert pg_1["missingness"] == 0.0
+    pg_2 = result[result["protein_group_tag"] == "pg_2"].iloc[0]
+    assert pg_2["missingness"] == 0.5
+    assert pg_2["quantified_in_samples"] == 2
+
+
+def test_compute_metrics_sanitizes_infinite_anova_results():
+    df = _quantification_frame([
+        ["pg_1", 10.0, "att_treatment", "ca_dmso", "s1"],
+        ["pg_1", 10.0, "att_treatment", "ca_dmso", "s2"],
+        ["pg_1", 12.0, "att_treatment", "ca_treatment", "s3"],
+        ["pg_1", 12.0, "att_treatment", "ca_treatment", "s4"],
+    ])
+
+    result = FeatureRanking().compute_metrics(df=df)
+
+    row = result.iloc[0]
+    assert np.isnan(row["F"])
+    assert np.isnan(row["p_value"])
+    assert np.isnan(row["cohen_f"])
+    assert row["eta_squared"] == 1.0
+    assert np.isfinite(row["score"])
+
+
+def test_compute_metrics_gives_exclusive_proteins_a_score():
+    df = _quantification_frame([
+        ["pg_1", 10.0, "att_treatment", "ca_dmso", "s1"],
+        ["pg_1", 10.5, "att_treatment", "ca_dmso", "s2"],
+        ["pg_1", np.nan, "att_treatment", "ca_treatment", "s3"],
+        ["pg_1", np.nan, "att_treatment", "ca_treatment", "s4"],
+        ["pg_2", 20.0, "att_genotype", "geno_ko", "s1"],
+        ["pg_2", 20.5, "att_genotype", "geno_ko", "s2"],
+        ["pg_2", np.nan, "att_genotype", "geno_wt", "s3"],
+        ["pg_2", np.nan, "att_genotype", "geno_wt", "s4"],
+        ["pg_2", np.nan, "att_genotype", "geno_het", "s5"],
+        ["pg_2", np.nan, "att_genotype", "geno_het", "s6"],
+    ])
+
+    result = FeatureRanking().compute_metrics(df=df)
+
+    pg_1 = result[(result["protein_group_tag"] == "pg_1") & (result["attribute_tag"] == "att_treatment")].iloc[0]
+    assert pg_1["exclusively"] == True  # noqa: E712
+    assert pg_1["score"] == np.log10(2 + 1)
+    pg_2 = result[(result["protein_group_tag"] == "pg_2") & (result["attribute_tag"] == "att_genotype")].iloc[0]
+    assert pg_2["exclusively"] == True  # noqa: E712
+    assert pg_2["score"] == np.log10(3 + 1)
+    assert pg_2["score"] > pg_1["score"]
+
+
+def test_compute_metrics_anova_excludes_single_observation_groups():
+    df = _quantification_frame([
+        ["pg_1", 10.0, "att_treatment", "ca_dmso", "s1"],
+        ["pg_1", 10.2, "att_treatment", "ca_dmso", "s2"],
+        ["pg_1", 10.4, "att_treatment", "ca_dmso", "s3"],
+        ["pg_1", 12.0, "att_treatment", "ca_treatment", "s4"],
+        ["pg_1", 12.2, "att_treatment", "ca_treatment", "s5"],
+        ["pg_1", 15.0, "att_treatment", "ca_other", "s6"],
+        ["pg_1", 15.1, "att_treatment", "ca_other", "s7"],
+        ["pg_1", 30.0, "att_treatment", "ca_single", "s8"],
+        ["pg_1", np.nan, "att_treatment", "ca_single", "s9"],
+    ])
+
+    result = FeatureRanking().compute_metrics(df=df)
+
+    row = result.iloc[0]
+    expected_f, expected_p = scipy_stats.f_oneway([10.0, 10.2, 10.4], [12.0, 12.2], [15.0, 15.1])
+    assert row["n_groups"] == 4
+    assert row["F"] == pytest.approx(expected_f)
+    assert row["p_value"] == pytest.approx(expected_p)
