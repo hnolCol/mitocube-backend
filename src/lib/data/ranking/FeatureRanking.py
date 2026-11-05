@@ -153,7 +153,15 @@ class FeatureRanking(object):
         
         total_results = []
         for attribute_tag, df in df_no_nan.groupby("attribute_tag"):
-        
+
+            # A condition application group is only valid if it is annotated on at least two samples.
+            # This avoids per-sample attributes (e.g. MouseID) where every sample forms its own group.
+            ca_group_sample_counts = df.groupby("ca_tags")["sample_tag"].nunique()
+            valid_ca_tags = ca_group_sample_counts[ca_group_sample_counts >= 2].index
+            df = df[df["ca_tags"].isin(valid_ca_tags)]
+            if df.empty:
+                continue
+
             results = []
             df_pivot_mean = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="mean")
             df_pivot_count = pd.pivot_table(df, index="protein_group_tag", columns="ca_tags", values="value", aggfunc="count")

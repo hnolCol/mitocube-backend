@@ -26,11 +26,51 @@ from services.random_generators import get_random_string
 from services.encryption import create_hierarchical_hash
 from lib.data.ranking.FeatureRanking import FeatureRanking
 import numpy as np
-from itertools import islice
+from itertools import combinations, islice
 
 
 from config.models.calculations.quantile import QuantileModel
 from lib.cache.scope_cache import invalidate_cached_scope, get_cached_scope, cache_scope
+
+
+def build_combined_attribute_rows(df : pd.DataFrame) -> pd.DataFrame:
+    """Builds synthetic dual-attribute rows for the multiple comparison metrics. For every pair of attributes
+    a sample carries, the condition application tags of both attributes are combined into a single group key so
+    that exclusivity can be resolved at the level of attribute combinations (e.g. genotype x treatment).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with the columns protein_group_tag, value, attribute_tag, ca_tags, sample_tag. The ca_tags
+        column holds a comma separated string of condition application tags for one attribute of one sample.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with the same columns, where attribute_tag is the synthetic combined attribute tag
+        ('<attribute_tag_a>__<attribute_tag_b>') and ca_tags is the union of both attributes' tags.
+    """
+    attribute_tags = sorted(df["attribute_tag"].dropna().unique())
+    rows = []
+    for attribute_tag_a, attribute_tag_b in combinations(attribute_tags, 2):
+        df_pair = df[df["attribute_tag"].isin([attribute_tag_a, attribute_tag_b])]
+        pivot = df_pair.pivot(index=["protein_group_tag", "sample_tag"], columns="attribute_tag", values="ca_tags")
+        if attribute_tag_a not in pivot.columns or attribute_tag_b not in pivot.columns:
+            continue
+        pivot = pivot.dropna(subset=[attribute_tag_a, attribute_tag_b])
+        if pivot.empty:
+            continue
+        values = df_pair.groupby(["protein_group_tag", "sample_tag"])["value"].first()
+        for (protein_group_tag, sample_tag), row in pivot.iterrows():
+            ca_tags = sorted(set(str(row[attribute_tag_a]).split(",")) | set(str(row[attribute_tag_b]).split(",")))
+            rows.append({
+                "protein_group_tag" : protein_group_tag,
+                "value" : values.loc[(protein_group_tag, sample_tag)],
+                "attribute_tag" : f"{attribute_tag_a}__{attribute_tag_b}",
+                "ca_tags" : ",".join(ca_tags),
+                "sample_tag" : sample_tag
+            })
+    return pd.DataFrame(rows, columns=["protein_group_tag", "value", "attribute_tag", "ca_tags", "sample_tag"])
 
 
 def chunk_dict(d, size):
@@ -1164,6 +1204,10 @@ class Neo4JSubmissions(SubmissionsABC):
             r_g = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
             r_ca = pd.concat([r_ca, r_g], ignore_index=True)
         
+        r_combined = build_combined_attribute_rows(df = r_ca)
+        if not r_combined.empty:
+            r_ca = pd.concat([r_ca, r_combined], ignore_index=True)
+
         df = FeatureRanking().compute_metrics(df = r_ca)
         rows = df.to_dict("records")
         for i in range(0, len(rows), batch_size):
@@ -1172,7 +1216,8 @@ class Neo4JSubmissions(SubmissionsABC):
                 "UNWIND $batch as row "
                 "MATCH (p:ProteinGroup {tag : row.protein_group_tag}) "
                 "MATCH (submission:Submission {tag : $tag}) "
-                "MATCH (a:Attribute {tag : row.attribute_tag}) "
+                "MERGE (a:Attribute {tag : row.attribute_tag}) "
+                "ON CREATE SET a.name = row.attribute_tag, a.combined = true "
                 "MERGE (stats:Statistics {tag : 'stats_' + row.protein_group_tag + '_' + row.attribute_tag + '_' + $tag}) "
                 "SET stats.F = row.F,"
                 "stats.created_at = timestamp(),"

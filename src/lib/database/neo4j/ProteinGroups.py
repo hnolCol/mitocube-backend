@@ -205,13 +205,13 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         return True
     
     
-    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tags : Optional[List[str]] = None, limit : Optional[int] = 20) -> List[ProteinGroupSubmissionStatisticsModel]:
+    def get_statistical_ranking(self, tag : str, attribute_tags : Optional[List[str]] = None, submission_tags : Optional[List[str]] = None, limit : Optional[int] = 20, combined : bool = False) -> List[ProteinGroupSubmissionStatisticsModel]:
         ""
         if not self.exists(tag): raise ValueError(f"Protein group with tag {tag} does not exist.")
         
         query = (
             "MATCH (pg:ProteinGroup {tag : $tag})<-[:FOR_PROTEIN_GROUP]-(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute) "
-            "WHERE a.tag IN $attribute_tags OR $attribute_tags IS NULL "
+            "WHERE (a.tag IN $attribute_tags OR $attribute_tags IS NULL) AND coalesce(a.combined, false) = $combined "
             "MATCH (stats)<-[:HAS_STATS]-(submission:Submission) "
         )
         if submission_tags is not None:
@@ -224,16 +224,34 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         if limit is not None:
             query += "LIMIT $limit"
         
-        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, submission_tags = submission_tags, limit=limit, result_transformer_=Result.data)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, attribute_tags = attribute_tags, submission_tags = submission_tags, limit=limit, combined = combined, result_transformer_=Result.data)
         return [ProteinGroupSubmissionStatisticsModel(**ri) for ri in r]
     
-    def get_exclusively_quantified(self, submission_tag : str, annotation_tags : List[str] = None, limit : int = None) -> List[ExclusivelyQuantifiedModel]:
-        
+    def get_exclusively_quantified(self, submission_tag : str, annotation_tags : List[str] = None, limit : int = None, combined : bool = False) -> List[ExclusivelyQuantifiedModel]:
+        """Returns the list of protein group tags that are exclusively quantified in a given submission.
+
+        Parameters
+        ----------
+        submission_tag : str
+            The submission tag 
+        annotation_tags : List[str], optional
+            If provided, filters the results by the given annotation tags, by default None
+        limit : int, optional
+            If provided, limits the number of results returned, by default None
+        combined : bool, optional
+            If true, returns the exclusively quantified protein groups for combined dual-attribute groups
+            (e.g. genotype x treatment) instead of single attributes, by default False
+
+        Returns
+        -------
+        List[ExclusivelyQuantifiedModel]
+             A list of ExclusivelyQuantifiedModel that are exclusively quantified in the given submission.
+        """
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_STATS]->(stats:Statistics)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "MATCH (stats)-[:FOR_PROTEIN_GROUP]->(pg:ProteinGroup) "
-            "WHERE stats.exclusively = true "
+            "WHERE stats.exclusively = true AND coalesce(a.combined, false) = $combined "
         )
         
         if annotation_tags is not None and len(annotation_tags) > 0:
@@ -243,7 +261,7 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         )
         if limit is not None:
             query += "LIMIT $limit"
-        r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.data, annotation_tags = annotation_tags, limit = limit)
+        r = self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.data, annotation_tags = annotation_tags, limit = limit, combined = combined)
         return sorted([ExclusivelyQuantifiedModel(**ri) for ri in r], key=lambda x: ";".join(x.exclusively_ca_tags), reverse=True)
 
     def get_protein(self, protein_tag: str) -> List[str]:
