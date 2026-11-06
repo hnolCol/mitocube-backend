@@ -4,7 +4,7 @@ from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, Query
 from config.models.user import UserModel
-from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel
+from config.models.submissions.quantifications import ProteinGroupQuantificationModel, PrecursorQuantificationModel, ProteinQuantificationBulkInsertModel, PrecursorQuantificationBulkInsertModel
 from config.exceptions.HTTPExceptions import submission_tag_not_found
 from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import check_submission_access
@@ -151,7 +151,7 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
 @router.post("/{submission_tag}/quantifications/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
 def insert_precursor_quantifications(
     submission_tag: str,
-    quantifications: List[PrecursorQuantificationModel],
+    quantifications: PrecursorQuantificationBulkInsertModel,
     batch_size: int = 600,
     transaction_batch_size: int = 400,
     delete_if_exists: bool = False,
@@ -186,13 +186,13 @@ def insert_precursor_quantifications(
         If the submission with the given tag does not exist, the request body is empty or the batch sizes are invalid.
     """
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
-    if len(quantifications) == 0:
+    if len(quantifications.quantifications) == 0:
         raise HTTPException(status_code=400, detail="No precursor quantifications provided.")
     if batch_size < 1:
         raise HTTPException(status_code=400, detail="batch_size must be at least 1.")
     if transaction_batch_size < 1:
         raise HTTPException(status_code=400, detail="transaction_batch_size must be at least 1.")
-    return db.submissions.insert_precursor_quantifications(submission_tag=submission_tag, quantifications=quantifications, batch_size=batch_size, transaction_batch_size=transaction_batch_size, delete_if_exists=delete_if_exists)
+    return db.submissions.insert_precursor_quantifications(tag=submission_tag, quantifications=quantifications.quantifications, batch_size=batch_size, transaction_batch_size=transaction_batch_size, delete_if_exists=delete_if_exists)
 
 
 

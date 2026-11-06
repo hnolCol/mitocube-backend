@@ -16,7 +16,10 @@ templates = [email_settings.mail_verification_template,
              email_settings.mail_deposition_requested_template,
              email_settings.mail_deposition_complete_template,
              email_settings.mail_attribute_requested_template,
-             email_settings.mail_attribute_request_reviewed_template]
+             email_settings.mail_attribute_request_reviewed_template,
+             email_settings.mail_ticket_received_template,
+             email_settings.mail_ticket_new_template,
+             email_settings.mail_ticket_resolved_template]
 
 MAIL_CONFIG = ConnectionConfig(
                 MAIL_USERNAME=email_settings.mail_username,
