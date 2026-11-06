@@ -26,6 +26,7 @@ from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from lib.database.abstract.Consortium import ConsortiumABC
 from lib.database.abstract.Collaborations import CollaborationsABC
 from lib.database.abstract.Messages import MessagesABC
+from lib.database.abstract.Tickets import TicketsABC
 from lib.database.abstract.Phenotypes import PhenotypeABC
 from lib.database.abstract.Maintenance import MaintenanceProcedureABC, MaintenanceEventABC, ExternalServicesABC
 from lib.database.abstract.SpareParts import SparePartsABC
@@ -108,6 +109,7 @@ class DatabaseABC(ABC):
     consortiums : ConsortiumABC = None
     collaborations : CollaborationsABC = None
     messages : MessagesABC = None
+    tickets : TicketsABC = None
     phenotypes: PhenotypeABC = None
     maintenance_procedures : MaintenanceProcedureABC  = None 
     maintenance_events : MaintenanceEventABC = None
@@ -255,6 +257,8 @@ class DatabaseABC(ABC):
             raise TypeError("The collaborations class must be an instance of the CollaborationsABC.")
         if self.messages is None:
             raise NotImplementedError("A database class must have the messages attribute defined.")
+        if self.tickets is None:
+            raise NotImplementedError("A database class must have the tickets attribute defined.")
         if not isinstance(self.messages,MessagesABC):
             raise TypeError("The messages class must be an instance of the MessagesABC.")
         

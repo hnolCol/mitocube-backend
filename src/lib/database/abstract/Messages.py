@@ -47,7 +47,8 @@ class MessagesABC(ABC):
         not exist or a user does not exist."""
 
     @abstractmethod
-    def insert_message(self, conversation_tag : str, sender_tag : str, message : MessageInput) -> Optional[str]:
+    def insert_message(self, conversation_tag : str, sender_tag : str, message : MessageInput,
+                       created_at : Optional[int] = None) -> Optional[str]:
         """Adds a message to a conversation. Returns the message tag or None
         if the conversation does not exist."""
 

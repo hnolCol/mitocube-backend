@@ -42,6 +42,9 @@ class Email(BaseSettings):
     mail_attribute_requested_template : str = "attribute_requested.html"
     mail_attribute_request_reviewed_template : str = "attribute_request_reviewed.html"
     message_collaboration_request_reviewed_template : str = "collaboration_request_reviewed.txt"
+    mail_ticket_received_template : str = "ticket_received.html"
+    mail_ticket_new_template : str = "ticket_new.html"
+    mail_ticket_resolved_template : str = "ticket_resolved.html"
 
     # in-app notifications (same pattern as the emails, sent as read-only messages;
     # the .txt templates live in mail_template_dir next to the email templates)

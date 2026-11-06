@@ -785,7 +785,7 @@ class Neo4JSubmissions(SubmissionsABC):
             MATCH (submission:Submission {{tag: $tag}})
             UNWIND $qs as q
             MATCH (sample:Sample {{tag: q.sample_tag}})<-[:HAS_SAMPLE]-(submission)
-            MATCH (p:Precursor {{tag: q.tag}})
+            MERGE (p:Precursor {{tag: q.tag}})
             MERGE (sample)-[r:QUANTIFIED]->(p)
             SET r.value = q.value,
                 r.created_at = timestamp(),

@@ -310,8 +310,8 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
         key_figures = OrderedDict()
         if KEY_FIGURE_SETTINGS.number_submissions:
             key_figures["Submissions"] = len(db.get_submission_tags())
-        if KEY_FIGURE_SETTINGS.number_published_datasets:
-            key_figures["Active Submissions"] = db.submission_filter.count_v2(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE])
+        # if KEY_FIGURE_SETTINGS.number_published_datasets:
+        #     key_figures["Active Submissions"] = db.submission_filter.count_v2(current_user_tag=user.tag, state = [SubmissionStatesEnums.ACTIVE])
         if KEY_FIGURE_SETTINGS.number_proteins:
             key_figures["Quantified Proteins"] = db.protein_groups.count()
         if KEY_FIGURE_SETTINGS.number_quant_values:
@@ -327,7 +327,7 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
         keyfigureData = [{"label" : k, "metric" : v} for k,v in key_figures.items()]
         return keyfigureData
 
-    cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_keyfigures.v2", user.tag])    
+    cache_key = db_cache_runtime.make_cache_key(key_data = ["db.database.get_keyfigures", user.tag])    
     keyfigureData = db_cache_runtime.get_or_compute(cache_key = cache_key,
                                         compute_fn = lambda : _get_keyfigures(user, db),
                                         cache_time = timedelta(hours = 24))

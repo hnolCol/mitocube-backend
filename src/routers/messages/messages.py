@@ -141,6 +141,7 @@ def post_message(conversation_tag : str,
     message_tag = db.messages.insert_message(conversation_tag = conversation_tag, sender_tag = user.tag, message = message)
     if message_tag is None:
         raise conversation_not_found
+    db.tickets.reopen_by_conversation(conversation_tag = conversation_tag, user_tag = user.tag)
     return message_tag
 
 

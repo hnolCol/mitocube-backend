@@ -16,3 +16,6 @@ class PrecursorQuantificationModel(BaseModel):
     score : Optional[float] = 0.0  # Score of the precursor identification (e.g. DIA-NN or Spectronaut score)
     rt : Optional[float] = None # Retention time of the precursor
     im : Optional[float] = None # Ion mobility of the precursor (e.g. from timsTOF instruments, not all data contains ion mobility)
+
+class PrecursorQuantificationBulkInsertModel(BaseModel):
+    quantifications: List[PrecursorQuantificationModel]
