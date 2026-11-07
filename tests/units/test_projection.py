@@ -9,10 +9,12 @@ from services.statistics.projection import (
     assemble_pooled_pca,
     block_cache_key,
     build_submission_block,
+    compute_ca_separation,
     compute_condition_effects,
     compute_universe,
     enrich_result_with_conditions,
     find_driver,
+    get_ca_attribute_map,
     get_sample_condition_map,
     protein_condition_association,
     resolve_visible_submission_tags,
@@ -255,6 +257,30 @@ def test_compute_universe_matches_assemble_filtering():
         make_block("sub_2", ["s3", "s4"], ["p_shared", "p_other"], seed=17),
     ]
     assert compute_universe(blocks, min_block_occurrence=2) == ["p_shared"]
+
+
+def test_get_ca_attribute_map_maps_ca_to_attribute():
+    ca = pd.DataFrame({"att_compound": ["ca_a", "ca_b"], "att_disease": ["ca_c", "ca_c"]}, index=["s1", "s2"])
+    db = FakeDB({})
+    db.samples = FakeSamples({"sub_1": ca})
+    mapping = get_ca_attribute_map(db, ["sub_1"])
+    assert mapping == {"ca_a": "att_compound", "ca_b": "att_compound", "ca_c": "att_disease"}
+
+
+def test_compute_ca_separation_weights_centroid_distance_by_variance():
+    result = {
+        "n_components": 2,
+        "variance_explained": [0.6, 0.4],
+        "points": [
+            {"sample_tag": "s1", "submission_tag": "sub_1", "components": [2.0, 0.0]},
+            {"sample_tag": "s2", "submission_tag": "sub_1", "components": [0.0, 1.0]},
+            {"sample_tag": "s3", "submission_tag": "sub_1", "components": [-2.0, 0.0]},
+        ],
+    }
+    sample_ca_map = {("sub_1", "s1"): ["ca_x"], ("sub_1", "s2"): ["ca_x"], ("sub_1", "s3"): []}
+    # mean_in = [1, 0.5], mean_out = [-2, 0] -> diffs [3, 0.5] -> 0.6*9 + 0.4*0.25 = 5.5
+    assert compute_ca_separation(result, sample_ca_map, "ca_x") == pytest.approx(5.5)
+    assert compute_ca_separation(result, sample_ca_map, "ca_missing") == 0.0
 
 
 def test_projection_points_are_json_safe():

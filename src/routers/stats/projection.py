@@ -5,14 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
-from config.models.plots.projection import ProteomeProjectionResponseModel, ProteomeProjectionDriverResponseModel, ProteomeProjectionEffectResponseModel, ProjectionDriverModel
+from config.models.plots.projection import ProteomeProjectionResponseModel, ProteomeProjectionDriverResponseModel, ProteomeProjectionEffectResponseModel, ProteomeProjectionAttributeEffectResponseModel, ProjectionDriverModel
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from services.users import get_user_from_token
 from services.statistics.projection import (
     assemble_pooled_pca,
+    compute_ca_separation,
     compute_condition_effects,
     enrich_result_with_conditions,
     find_driver,
+    get_ca_attribute_map,
     get_sample_condition_map,
     get_submission_block_cached,
     protein_condition_association,
@@ -173,4 +175,57 @@ def get_proteome_projection_condition_effects(
         submission_tags=submission_tags,
         n_proteins=effects["n_proteins"],
         effects=effects["effects"],
+    )
+
+
+@router.get("/{proteome_tag}/projection/effects/attribute/{attribute_tag}", tags=["Dimensional reduction", "PCA"])
+def get_proteome_projection_attribute_effects(
+    proteome_tag: str,
+    attribute_tag: str,
+    n_components: int = 4,
+    top_proteins: int = 10,
+    min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> ProteomeProjectionAttributeEffectResponseModel:
+    """
+    Attribute-level view of condition effects: for every condition application value of the
+    given attribute (e.g. each chemical compound) among the user's visible submissions of
+    this proteome, returns a quantitative separation score on the pooled projection (which CA
+    values separate the samples along the components) and the top affected proteins per CA
+    (mean z in CA samples minus mean z in all other samples). Conditions are sorted by
+    separation, strongest first.
+    """
+    if not db.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found")
+    result, blocks = _compute_pooled_projection(db, user, proteome_tag, method="pca",
+                                                 n_components=n_components,
+                                                 min_valid_fraction=min_valid_fraction)
+    submission_tags = result["submission_tags"]
+    sample_ca_map = get_sample_condition_map(db, submission_tags)
+    ca_attribute_map = get_ca_attribute_map(db, submission_tags)
+    ca_tags = sorted(ca for ca, attr in ca_attribute_map.items() if attr == attribute_tag)
+    if not ca_tags:
+        raise HTTPException(status_code=404, detail="No condition applications of this attribute found among the samples of the accessible submissions of this proteome.")
+    n_samples = len(result["points"])
+    conditions = []
+    for ca_tag in ca_tags:
+        n_in = sum(1 for cas in sample_ca_map.values() if ca_tag in cas)
+        effects = compute_condition_effects(blocks, sample_ca_map, ca_tag, limit=top_proteins)
+        conditions.append({
+            "ca_tag": ca_tag,
+            "n_in": n_in,
+            "n_out": n_samples - n_in,
+            "separation": compute_ca_separation(result, sample_ca_map, ca_tag),
+            "effects": effects["effects"],
+        })
+    conditions.sort(key=lambda c: c["separation"], reverse=True)
+    return ProteomeProjectionAttributeEffectResponseModel(
+        proteome_tag=proteome_tag,
+        attribute_tag=attribute_tag,
+        n_components=result["n_components"],
+        variance_explained=result["variance_explained"],
+        n_submissions=result["n_submissions"],
+        submission_tags=submission_tags,
+        conditions=conditions,
     )

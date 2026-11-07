@@ -68,3 +68,21 @@ class ProteomeProjectionEffectResponseModel(BaseModel):
     submission_tags: List[str]
     n_proteins: int
     effects: List[ProteinEffectModel]
+
+
+class AttributeConditionEffectModel(BaseModel):
+    ca_tag: str
+    n_in: int
+    n_out: int
+    separation: float
+    effects: List[ProteinEffectModel]
+
+
+class ProteomeProjectionAttributeEffectResponseModel(BaseModel):
+    proteome_tag: str
+    attribute_tag: str
+    n_components: int
+    variance_explained: List[float]
+    n_submissions: int
+    submission_tags: List[str]
+    conditions: List[AttributeConditionEffectModel]

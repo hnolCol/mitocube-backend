@@ -266,6 +266,51 @@ def compute_condition_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, Lis
     }
 
 
+def get_ca_attribute_map(db, submission_tags: List[str]) -> Dict[str, str]:
+    """Maps each condition application tag to the attribute tag it belongs to, based on the
+    condition applications of the given submissions (e.g. ca_tag -> 'att_chemical_compound')."""
+    mapping: Dict[str, str] = {}
+    for submission_tag in submission_tags:
+        ca = db.samples.get_condition_applications_by_sample_for_submission(
+            submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)
+        for attribute_tag, column in ca.items():
+            for value in column.dropna().unique():
+                mapping[str(value)] = attribute_tag
+    return mapping
+
+
+def compute_ca_separation(result: Dict, sample_ca_map: Dict[tuple, List[str]], ca_tag: str) -> float:
+    """Quantitative separation of a condition application on the projection: the squared
+    distance between the mean component scores of samples with and without the CA, weighted
+    by the explained variance of each component. Higher means the CA separates samples more
+    along the projected axes."""
+    n_comp = result["n_components"]
+    variance_explained = result["variance_explained"]
+    in_sum = [0.0] * n_comp
+    out_sum = [0.0] * n_comp
+    n_in = 0
+    n_out = 0
+    for point in result["points"]:
+        cas = sample_ca_map.get((point["submission_tag"], point["sample_tag"]), [])
+        has_ca = ca_tag in cas
+        for i, value in enumerate(point["components"]):
+            if has_ca:
+                in_sum[i] += value
+            else:
+                out_sum[i] += value
+        if has_ca:
+            n_in += 1
+        else:
+            n_out += 1
+    if n_in == 0 or n_out == 0:
+        return 0.0
+    separation = 0.0
+    for c in range(n_comp):
+        diff = in_sum[c] / n_in - out_sum[c] / n_out
+        separation += variance_explained[c] * diff * diff
+    return separation
+
+
 def find_driver(result: Dict, protein_tag: str) -> Optional[Dict]:
     """Returns the driver entry (loadings on all components) of a single protein group
     from a pooled projection result, or None if the protein is not in the pooled universe."""
