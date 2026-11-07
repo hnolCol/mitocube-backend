@@ -1,15 +1,16 @@
-from typing import Literal
+from typing import Dict, List, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from config.models.user import UserModel
-from config.models.plots.projection import ProteomeProjectionResponseModel
+from config.models.plots.projection import ProteomeProjectionResponseModel, ProteomeProjectionDriverResponseModel, ProjectionDriverModel
 from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from services.users import get_user_from_token
 from services.statistics.projection import (
     assemble_pooled_pca,
+    find_driver,
     get_submission_block_cached,
     resolve_visible_submission_tags,
     result_cache_key,
@@ -24,24 +25,11 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     )
 
 
-@router.get("/{proteome_tag}/projection", tags=["Dimensional reduction", "PCA"])
-def get_proteome_projection(
-    proteome_tag: str,
-    method: Literal["pca"] = "pca",
-    n_components: int = 2,
-    min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
-    user: UserModel = Depends(get_user_from_token),
-    db: DatabaseABC = Depends(get_db),
-) -> ProteomeProjectionResponseModel:
-    """
-    Returns a pooled PCA projection of all samples of the submissions associated with the
-    given proteome that the requesting user has access to. Per-submission z-scored
-    quantification matrices are cached per submission; the user's submission scope is
-    applied when assembling the pooled matrix and the PCA is computed fresh per scope.
-    """
-    if not db.proteomes.exists(tag=proteome_tag):
-        raise HTTPException(status_code=404, detail="Proteome not found")
-
+def _compute_pooled_projection(db: DatabaseABC, user: UserModel, proteome_tag: str,
+                               method: str, n_components: int, min_valid_fraction: float) -> Dict:
+    """Computes (or fetches from cache) the pooled projection over all submissions of the
+    proteome that are inside the requesting user's submission scope. The result cache key
+    embeds a hash of the visible submission tags, so results are never shared across scopes."""
     proteome_submission_tags = db.submissions.get_tags_by_proteome(proteome_tag)
     scope = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
     visible_tags = resolve_visible_submission_tags(scope, proteome_submission_tags)
@@ -68,9 +56,68 @@ def get_proteome_projection(
             "drivers": result["drivers"],
         }
 
-    return ProteomeProjectionResponseModel(**db_cache_runtime.get_or_compute(
+    return db_cache_runtime.get_or_compute(
         cache_key=result_cache_key(proteome_tag, visible_tags, method=method,
                                    n_components=n_components, min_valid_fraction=min_valid_fraction),
         compute_fn=compute,
         cache_time=PROJECTION_RESULT_CACHE_TIME,
-    ))
+    )
+
+
+@router.get("/{proteome_tag}/projection", tags=["Dimensional reduction", "PCA"])
+def get_proteome_projection(
+    proteome_tag: str,
+    method: Literal["pca"] = "pca",
+    n_components: int = 2,
+    min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> ProteomeProjectionResponseModel:
+    """
+    Returns a pooled PCA projection of all samples of the submissions associated with the
+    given proteome that the requesting user has access to. Per-submission z-scored
+    quantification matrices are cached per submission; the user's submission scope is
+    applied when assembling the pooled matrix and the PCA is computed fresh per scope.
+    """
+    if not db.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found")
+    return ProteomeProjectionResponseModel(**_compute_pooled_projection(
+        db, user, proteome_tag, method=method, n_components=n_components,
+        min_valid_fraction=min_valid_fraction))
+
+
+@router.get("/{proteome_tag}/projection/drivers/{protein_tag}", tags=["Dimensional reduction", "PCA"])
+def get_proteome_projection_driver(
+    proteome_tag: str,
+    protein_tag: str,
+    n_components: int = 4,
+    min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> ProteomeProjectionDriverResponseModel:
+    """
+    Returns the driver loadings of a single protein group within the pooled PCA projection
+    of the proteome (the same user-scoped projection as /projection, computed with up to
+    n_components components). Useful for a protein-specific view. Returns 404 if the
+    protein group does not exist or is not part of the pooled projection universe.
+    """
+    if not db.proteomes.exists(tag=proteome_tag):
+        raise HTTPException(status_code=404, detail="Proteome not found")
+    if not db.protein_groups.exists(tag=protein_tag):
+        raise HTTPException(status_code=404, detail="Protein group not found")
+
+    result = _compute_pooled_projection(db, user, proteome_tag, method="pca",
+                                        n_components=n_components,
+                                        min_valid_fraction=min_valid_fraction)
+    driver = find_driver(result, protein_tag)
+    if driver is None:
+        raise HTTPException(status_code=404, detail="Protein group is not quantified in enough submissions of this proteome to be part of the projection universe.")
+    return ProteomeProjectionDriverResponseModel(
+        proteome_tag=proteome_tag,
+        protein_tag=protein_tag,
+        n_components=result["n_components"],
+        variance_explained=result["variance_explained"],
+        n_submissions=result["n_submissions"],
+        submission_tags=result["submission_tags"],
+        driver=ProjectionDriverModel(**driver),
+    )

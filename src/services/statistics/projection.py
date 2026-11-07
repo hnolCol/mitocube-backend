@@ -136,6 +136,15 @@ def assemble_pooled_pca(blocks: List[Dict], n_components: int = 2,
     }
 
 
+def find_driver(result: Dict, protein_tag: str) -> Optional[Dict]:
+    """Returns the driver entry (loadings on all components) of a single protein group
+    from a pooled projection result, or None if the protein is not in the pooled universe."""
+    for driver in result["drivers"]:
+        if driver["tag"] == protein_tag:
+            return driver
+    return None
+
+
 def invalidate_projection_caches(db, submission_tag: str) -> None:
     """Invalidates the cached projection block of a submission and all pooled projection
     results of the proteomes the submission belongs to. Called after quantification or

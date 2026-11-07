@@ -9,6 +9,7 @@ from services.statistics.projection import (
     assemble_pooled_pca,
     block_cache_key,
     build_submission_block,
+    find_driver,
     resolve_visible_submission_tags,
     result_cache_key,
 )
@@ -137,6 +138,19 @@ def test_result_cache_key_depends_on_visible_scope():
 def test_block_cache_key_is_namespaced_per_submission():
     assert block_cache_key("sub_a") != block_cache_key("sub_b")
     assert block_cache_key("sub_a").startswith("projection_block:")
+
+
+def test_find_driver_returns_loadings_or_none():
+    blocks = [
+        make_block("sub_1", ["s1", "s2"], ["p1", "p2"], seed=8),
+        make_block("sub_2", ["s3", "s4"], ["p1", "p2"], seed=9),
+    ]
+    result = assemble_pooled_pca(blocks, n_components=2)
+    driver = find_driver(result, "p1")
+    assert driver is not None
+    assert driver["tag"] == "p1"
+    assert len(driver["components"]) == 2
+    assert find_driver(result, "p_missing") is None
 
 
 def test_projection_points_are_json_safe():

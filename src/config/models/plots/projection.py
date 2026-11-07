@@ -24,3 +24,13 @@ class ProteomeProjectionResponseModel(BaseModel):
     submission_tags: List[str]
     points: List[ProjectionPointModel]
     drivers: List[ProjectionDriverModel]
+
+
+class ProteomeProjectionDriverResponseModel(BaseModel):
+    proteome_tag: str
+    protein_tag: str
+    n_components: int
+    variance_explained: List[float]
+    n_submissions: int
+    submission_tags: List[str]
+    driver: ProjectionDriverModel
