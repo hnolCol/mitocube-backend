@@ -10,6 +10,7 @@ from services.users import get_user_from_token, is_user_at_least_curator
 from services.submission import check_submission_access
 from typing import Dict, List, Literal, Tuple
 from routers.stats.submissions import parse_semicolon_list
+from services.statistics.projection import invalidate_projection_caches
 from collections import OrderedDict
 import numpy as np
 from config.models.calculations.quantile import QuantileModel
@@ -116,6 +117,8 @@ def insert_protein_quantifications(
         db.submissions.transform_quantification_to_zscore_along_protein_groups(tag = submission_tag)
         db.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
         db.submissions.transform_quantification_to_log2(tag = submission_tag)
+    if num_quantifications > 0:
+        invalidate_projection_caches(db, submission_tag)
     return num_quantifications
 
 
@@ -146,6 +149,7 @@ def calculate_protein_group_statistics(submission_tag : str, user : UserModel = 
     db.submissions.transform_quantification_to_zscore_along_samples(tag = submission_tag)
     db.submissions.transform_quantification_to_log2(tag = submission_tag)
     db.submissions.clear_stats_outdated(tag = submission_tag)
+    invalidate_projection_caches(db, submission_tag)
     return True
 
 @router.post("/{submission_tag}/quantifications/precursors", summary="Bulk insert of precursor quantifications for a given submission. Requires curator rights.")
