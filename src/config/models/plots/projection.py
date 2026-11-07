@@ -40,6 +40,16 @@ class ProteomeProjectionResponseModel(BaseModel):
     condition_centroids: List[ConditionCentroidModel] = []
 
 
+class ProteinAttributeEffectModel(BaseModel):
+    attribute_tag: str
+    ca_tag: str
+    effect: float
+    mean_z_in: float
+    mean_z_out: float
+    n_in: int
+    n_out: int
+
+
 class ProteomeProjectionDriverResponseModel(BaseModel):
     proteome_tag: str
     protein_tag: str
@@ -49,6 +59,7 @@ class ProteomeProjectionDriverResponseModel(BaseModel):
     submission_tags: List[str]
     driver: ProjectionDriverModel
     condition_associations: List[ConditionAssociationModel] = []
+    attribute_effects: List[ProteinAttributeEffectModel] = []
 
 
 class ProteinEffectModel(BaseModel):

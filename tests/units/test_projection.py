@@ -11,12 +11,14 @@ from services.statistics.projection import (
     build_submission_block,
     compute_ca_separation,
     compute_condition_effects,
+    compute_protein_ca_effects,
     compute_universe,
     enrich_result_with_conditions,
     find_driver,
     get_ca_attribute_map,
     get_sample_condition_map,
     protein_condition_association,
+    rank_protein_attributes,
     resolve_visible_submission_tags,
     result_cache_key,
 )
@@ -281,6 +283,43 @@ def test_compute_ca_separation_weights_centroid_distance_by_variance():
     # mean_in = [1, 0.5], mean_out = [-2, 0] -> diffs [3, 0.5] -> 0.6*9 + 0.4*0.25 = 5.5
     assert compute_ca_separation(result, sample_ca_map, "ca_x") == pytest.approx(5.5)
     assert compute_ca_separation(result, sample_ca_map, "ca_missing") == 0.0
+
+
+def test_compute_protein_ca_effects_and_rank_attributes():
+    block = make_block("sub_1", ["s1", "s2", "s3"], ["p1"], seed=18)
+    block["matrix"].loc["s1", "p1"] = 3.0
+    block["matrix"].loc["s2", "p1"] = 1.0
+    block["matrix"].loc["s3", "p1"] = -2.0
+    sample_ca_map = {
+        ("sub_1", "s1"): ["ca_drug"],
+        ("sub_1", "s2"): ["ca_drug", "ca_disease"],
+        ("sub_1", "s3"): ["ca_disease"],
+    }
+    ca_attribute_map = {"ca_drug": "att_compound", "ca_disease": "att_disease"}
+
+    effects = compute_protein_ca_effects([block], sample_ca_map, "p1")
+    # ca_drug: in mean (3+1)/2=2, out mean -2 -> effect 4; ca_disease: in mean (1-2)/2=-0.5, out 3 -> effect -3.5
+    assert effects["ca_drug"]["effect"] == pytest.approx(4.0)
+    assert effects["ca_disease"]["effect"] == pytest.approx(-3.5)
+    assert effects["ca_drug"]["n_in"] == 2 and effects["ca_drug"]["n_out"] == 1
+
+    ranked = rank_protein_attributes(effects, ca_attribute_map)
+    assert [r["attribute_tag"] for r in ranked] == ["att_compound", "att_disease"]
+    assert ranked[0]["ca_tag"] == "ca_drug"
+    assert ranked[0]["effect"] == pytest.approx(4.0)
+    json.dumps(ranked, allow_nan=False)
+
+
+def test_rank_protein_attributes_picks_best_ca_per_attribute():
+    ca_effects = {
+        "ca_a": {"effect": 1.0, "mean_z_in": 1.0, "mean_z_out": 0.0, "n_in": 2, "n_out": 2},
+        "ca_b": {"effect": -5.0, "mean_z_in": -2.0, "mean_z_out": 3.0, "n_in": 2, "n_out": 2},
+    }
+    ca_attribute_map = {"ca_a": "att_x", "ca_b": "att_x"}
+    ranked = rank_protein_attributes(ca_effects, ca_attribute_map)
+    assert len(ranked) == 1
+    assert ranked[0]["ca_tag"] == "ca_b"
+    assert ranked[0]["effect"] == pytest.approx(-5.0)
 
 
 def test_projection_points_are_json_safe():

@@ -311,6 +311,56 @@ def compute_ca_separation(result: Dict, sample_ca_map: Dict[tuple, List[str]], c
     return separation
 
 
+def compute_protein_ca_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, List[str]], protein_tag: str) -> Dict[str, Dict]:
+    """Effect of every condition application on a single protein group across the pooled
+    blocks: effect = mean z in samples with the CA minus mean z in all other samples."""
+    total_sum = 0.0
+    total_n = 0
+    in_stats: Dict[str, List[float]] = {}
+    for block in blocks:
+        matrix = block["matrix"]
+        if protein_tag not in matrix.columns:
+            continue
+        column = matrix[protein_tag]
+        for sample_tag in matrix.index:
+            value = float(column[sample_tag])
+            total_sum += value
+            total_n += 1
+            for ca in sample_ca_map.get((block["submission_tag"], sample_tag), []):
+                acc = in_stats.setdefault(ca, [0.0, 0])
+                acc[0] += value
+                acc[1] += 1
+    effects = {}
+    for ca, (sum_in, n_in) in in_stats.items():
+        n_out = total_n - n_in
+        if n_in == 0 or n_out == 0:
+            continue
+        mean_in = sum_in / n_in
+        mean_out = (total_sum - sum_in) / n_out
+        effects[ca] = {
+            "effect": mean_in - mean_out,
+            "mean_z_in": mean_in,
+            "mean_z_out": mean_out,
+            "n_in": n_in,
+            "n_out": n_out,
+        }
+    return effects
+
+
+def rank_protein_attributes(ca_effects: Dict[str, Dict], ca_attribute_map: Dict[str, str], top: int = 10) -> List[Dict]:
+    """Groups per-CA protein effects by attribute and keeps, per attribute, the CA with the
+    largest absolute effect. Returns the attributes ranked by that absolute effect."""
+    best: Dict[str, Dict] = {}
+    for ca, effect in ca_effects.items():
+        attribute_tag = ca_attribute_map.get(ca)
+        if attribute_tag is None:
+            continue
+        current = best.get(attribute_tag)
+        if current is None or abs(effect["effect"]) > abs(current["effect"]):
+            best[attribute_tag] = {"attribute_tag": attribute_tag, "ca_tag": ca, **effect}
+    return sorted(best.values(), key=lambda e: abs(e["effect"]), reverse=True)[:top]
+
+
 def find_driver(result: Dict, protein_tag: str) -> Optional[Dict]:
     """Returns the driver entry (loadings on all components) of a single protein group
     from a pooled projection result, or None if the protein is not in the pooled universe."""

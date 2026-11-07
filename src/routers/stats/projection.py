@@ -12,12 +12,14 @@ from services.statistics.projection import (
     assemble_pooled_pca,
     compute_ca_separation,
     compute_condition_effects,
+    compute_protein_ca_effects,
     enrich_result_with_conditions,
     find_driver,
     get_ca_attribute_map,
     get_sample_condition_map,
     get_submission_block_cached,
     protein_condition_association,
+    rank_protein_attributes,
     resolve_visible_submission_tags,
     result_cache_key,
     PROJECTION_RESULT_CACHE_TIME,
@@ -116,8 +118,10 @@ def get_proteome_projection_driver(
     """
     Returns the driver loadings of a single protein group within the pooled PCA projection
     of the proteome (the same user-scoped projection as /projection, computed with up to
-    n_components components). Useful for a protein-specific view. Returns 404 if the
-    protein group does not exist or is not part of the pooled projection universe.
+    n_components components), its condition associations, and the attributes with the
+    strongest effect on this protein (attribute_effects, ranked by absolute effect, each
+    with its best condition application). Useful for a protein-specific view. Returns 404
+    if the protein group does not exist or is not part of the pooled projection universe.
     """
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
@@ -131,6 +135,8 @@ def get_proteome_projection_driver(
     if driver is None:
         raise HTTPException(status_code=404, detail="Protein group is not quantified in enough submissions of this proteome to be part of the projection universe.")
     sample_ca_map = get_sample_condition_map(db, result["submission_tags"])
+    ca_attribute_map = get_ca_attribute_map(db, result["submission_tags"])
+    ca_effects = compute_protein_ca_effects(blocks, sample_ca_map, protein_tag)
     return ProteomeProjectionDriverResponseModel(
         proteome_tag=proteome_tag,
         protein_tag=protein_tag,
@@ -140,6 +146,7 @@ def get_proteome_projection_driver(
         submission_tags=result["submission_tags"],
         driver=ProjectionDriverModel(**driver),
         condition_associations=protein_condition_association(blocks, sample_ca_map, protein_tag),
+        attribute_effects=rank_protein_attributes(ca_effects, ca_attribute_map),
     )
 
 
