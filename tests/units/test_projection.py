@@ -9,7 +9,10 @@ from services.statistics.projection import (
     assemble_pooled_pca,
     block_cache_key,
     build_submission_block,
+    enrich_result_with_conditions,
     find_driver,
+    get_sample_condition_map,
+    protein_condition_association,
     resolve_visible_submission_tags,
     result_cache_key,
 )
@@ -151,6 +154,61 @@ def test_find_driver_returns_loadings_or_none():
     assert driver["tag"] == "p1"
     assert len(driver["components"]) == 2
     assert find_driver(result, "p_missing") is None
+
+
+class FakeSamples:
+    def __init__(self, ca_by_submission):
+        self._ca = ca_by_submission
+
+    def get_condition_applications_by_sample_for_submission(self, submission_tag, sort_ca_tags=True, return_sample_index=False):
+        return self._ca[submission_tag]
+
+
+def test_get_sample_condition_map_keys_by_submission_and_sample():
+    ca = pd.DataFrame({"att_disease": ["ca_a", "ca_b"], "att_treatment": [None, "ca_c"]}, index=["s1", "s2"])
+    db = FakeDB({})
+    db.samples = FakeSamples({"sub_1": ca})
+    mapping = get_sample_condition_map(db, ["sub_1"])
+    assert mapping[("sub_1", "s1")] == ["ca_a"]
+    assert mapping[("sub_1", "s2")] == ["ca_b", "ca_c"]
+
+
+def test_enrich_result_with_conditions_annotates_points_and_centroids():
+    blocks = [
+        make_block("sub_1", ["s1", "s2"], ["p1", "p2"], seed=10),
+        make_block("sub_2", ["s3"], ["p1", "p2"], seed=11),
+    ]
+    result = assemble_pooled_pca(blocks, n_components=2)
+    sample_ca_map = {("sub_1", "s1"): ["ca_a"], ("sub_1", "s2"): ["ca_a"], ("sub_2", "s3"): ["ca_b"]}
+    enriched = enrich_result_with_conditions(result, sample_ca_map)
+
+    by_sample = {p["sample_tag"]: p for p in enriched["points"]}
+    assert by_sample["s1"]["condition_applications"] == ["ca_a"]
+    assert by_sample["s3"]["condition_applications"] == ["ca_b"]
+
+    centroids = {c["condition_application_tag"]: c for c in enriched["condition_centroids"]}
+    assert centroids["ca_a"]["count"] == 2
+    assert centroids["ca_b"]["count"] == 1
+    expected_ca_a = (by_sample["s1"]["components"][0] + by_sample["s2"]["components"][0]) / 2
+    assert centroids["ca_a"]["components"][0] == pytest.approx(expected_ca_a)
+    # cached result is not mutated
+    assert "condition_centroids" not in result
+    assert "condition_applications" not in result["points"][0]
+    json.dumps(enriched, allow_nan=False)
+
+
+def test_protein_condition_association_ranks_conditions_by_mean_z():
+    block = make_block("sub_1", ["s1", "s2", "s3"], ["p1"], seed=12)
+    block["matrix"].loc["s1", "p1"] = 2.0
+    block["matrix"].loc["s2", "p1"] = 1.0
+    block["matrix"].loc["s3", "p1"] = -3.0
+    sample_ca_map = {("sub_1", "s1"): ["ca_high"], ("sub_1", "s2"): ["ca_high"], ("sub_1", "s3"): ["ca_low"]}
+    associations = protein_condition_association([block], sample_ca_map, "p1")
+    assert [a["condition_application_tag"] for a in associations] == ["ca_high", "ca_low"]
+    assert associations[0]["mean_z"] == pytest.approx(1.5)
+    assert associations[0]["n_samples"] == 2
+    assert associations[1]["mean_z"] == pytest.approx(-3.0)
+    assert protein_condition_association([block], sample_ca_map, "p_missing") == []
 
 
 def test_projection_points_are_json_safe():

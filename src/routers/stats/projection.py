@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal
+from typing import Dict, List, Literal, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -10,8 +10,11 @@ from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from services.users import get_user_from_token
 from services.statistics.projection import (
     assemble_pooled_pca,
+    enrich_result_with_conditions,
     find_driver,
+    get_sample_condition_map,
     get_submission_block_cached,
+    protein_condition_association,
     resolve_visible_submission_tags,
     result_cache_key,
     PROJECTION_RESULT_CACHE_TIME,
@@ -26,10 +29,11 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 def _compute_pooled_projection(db: DatabaseABC, user: UserModel, proteome_tag: str,
-                               method: str, n_components: int, min_valid_fraction: float) -> Dict:
+                               method: str, n_components: int, min_valid_fraction: float) -> Tuple[Dict, List[Dict]]:
     """Computes (or fetches from cache) the pooled projection over all submissions of the
     proteome that are inside the requesting user's submission scope. The result cache key
-    embeds a hash of the visible submission tags, so results are never shared across scopes."""
+    embeds a hash of the visible submission tags, so results are never shared across scopes.
+    Returns the result dict and the submission blocks it was built from."""
     proteome_submission_tags = db.submissions.get_tags_by_proteome(proteome_tag)
     scope = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
     visible_tags = resolve_visible_submission_tags(scope, proteome_submission_tags)
@@ -56,12 +60,13 @@ def _compute_pooled_projection(db: DatabaseABC, user: UserModel, proteome_tag: s
             "drivers": result["drivers"],
         }
 
-    return db_cache_runtime.get_or_compute(
+    result = db_cache_runtime.get_or_compute(
         cache_key=result_cache_key(proteome_tag, visible_tags, method=method,
                                    n_components=n_components, min_valid_fraction=min_valid_fraction),
         compute_fn=compute,
         cache_time=PROJECTION_RESULT_CACHE_TIME,
     )
+    return result, blocks
 
 
 @router.get("/{proteome_tag}/projection", tags=["Dimensional reduction", "PCA"])
@@ -81,9 +86,11 @@ def get_proteome_projection(
     """
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
-    return ProteomeProjectionResponseModel(**_compute_pooled_projection(
+    result, _ = _compute_pooled_projection(
         db, user, proteome_tag, method=method, n_components=n_components,
-        min_valid_fraction=min_valid_fraction))
+        min_valid_fraction=min_valid_fraction)
+    sample_ca_map = get_sample_condition_map(db, result["submission_tags"])
+    return ProteomeProjectionResponseModel(**enrich_result_with_conditions(result, sample_ca_map))
 
 
 @router.get("/{proteome_tag}/projection/drivers/{protein_tag}", tags=["Dimensional reduction", "PCA"])
@@ -106,12 +113,13 @@ def get_proteome_projection_driver(
     if not db.protein_groups.exists(tag=protein_tag):
         raise HTTPException(status_code=404, detail="Protein group not found")
 
-    result = _compute_pooled_projection(db, user, proteome_tag, method="pca",
-                                        n_components=n_components,
-                                        min_valid_fraction=min_valid_fraction)
+    result, blocks = _compute_pooled_projection(db, user, proteome_tag, method="pca",
+                                                 n_components=n_components,
+                                                 min_valid_fraction=min_valid_fraction)
     driver = find_driver(result, protein_tag)
     if driver is None:
         raise HTTPException(status_code=404, detail="Protein group is not quantified in enough submissions of this proteome to be part of the projection universe.")
+    sample_ca_map = get_sample_condition_map(db, result["submission_tags"])
     return ProteomeProjectionDriverResponseModel(
         proteome_tag=proteome_tag,
         protein_tag=protein_tag,
@@ -120,4 +128,5 @@ def get_proteome_projection_driver(
         n_submissions=result["n_submissions"],
         submission_tags=result["submission_tags"],
         driver=ProjectionDriverModel(**driver),
+        condition_associations=protein_condition_association(blocks, sample_ca_map, protein_tag),
     )

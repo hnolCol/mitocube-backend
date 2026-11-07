@@ -136,6 +136,75 @@ def assemble_pooled_pca(blocks: List[Dict], n_components: int = 2,
     }
 
 
+def get_sample_condition_map(db, submission_tags: List[str]) -> Dict[tuple, List[str]]:
+    """Maps (submission_tag, sample_tag) to the sorted list of condition application tags
+    of that sample, for the given submissions."""
+    mapping: Dict[tuple, List[str]] = {}
+    for submission_tag in submission_tags:
+        ca = db.samples.get_condition_applications_by_sample_for_submission(
+            submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)
+        for sample_tag, row in ca.iterrows():
+            mapping[(submission_tag, sample_tag)] = sorted({str(v) for v in row.dropna().unique()})
+    return mapping
+
+
+def enrich_result_with_conditions(result: Dict, sample_ca_map: Dict[tuple, List[str]]) -> Dict:
+    """Annotates each point of a pooled projection result with the condition applications of
+    its sample and adds condition centroids: for each condition application tag, the mean
+    component scores over all samples that have it. Shows which conditions align with which
+    principal components. Returns a new dict; the cached result is not mutated."""
+    enriched = dict(result)
+    points = []
+    sums: Dict[str, List[float]] = {}
+    counts: Dict[str, int] = {}
+    n_comp = result["n_components"]
+    for point in result["points"]:
+        cas = sample_ca_map.get((point["submission_tag"], point["sample_tag"]), [])
+        points.append({**point, "condition_applications": cas})
+        for ca in cas:
+            acc = sums.setdefault(ca, [0.0] * n_comp)
+            for i, v in enumerate(point["components"]):
+                acc[i] += v
+            counts[ca] = counts.get(ca, 0) + 1
+    centroids = [
+        {
+            "condition_application_tag": ca,
+            "count": counts[ca],
+            "components": [s / counts[ca] for s in sums[ca]],
+        }
+        for ca in sorted(sums)
+    ]
+    enriched["points"] = points
+    enriched["condition_centroids"] = centroids
+    return enriched
+
+
+def protein_condition_association(blocks: List[Dict], sample_ca_map: Dict[tuple, List[str]], protein_tag: str) -> List[Dict]:
+    """For a single protein group, computes the mean z-scored quantification per condition
+    application over all samples (of the given blocks) that carry the condition, sorted by
+    mean descending. Connects the protein's driver loadings to the conditions where it is
+    most highly expressed."""
+    sums: Dict[str, float] = {}
+    counts: Dict[str, int] = {}
+    for block in blocks:
+        matrix = block["matrix"]
+        if protein_tag not in matrix.columns:
+            continue
+        for sample_tag in matrix.index:
+            value = float(matrix.at[sample_tag, protein_tag])
+            for ca in sample_ca_map.get((block["submission_tag"], sample_tag), []):
+                sums[ca] = sums.get(ca, 0.0) + value
+                counts[ca] = counts.get(ca, 0) + 1
+    return [
+        {
+            "condition_application_tag": ca,
+            "mean_z": sums[ca] / counts[ca],
+            "n_samples": counts[ca],
+        }
+        for ca in sorted(sums, key=lambda c: sums[c] / counts[c], reverse=True)
+    ]
+
+
 def find_driver(result: Dict, protein_tag: str) -> Optional[Dict]:
     """Returns the driver entry (loadings on all components) of a single protein group
     from a pooled projection result, or None if the protein is not in the pooled universe."""

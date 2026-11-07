@@ -7,11 +7,24 @@ class ProjectionPointModel(BaseModel):
     sample_tag: str
     submission_tag: str
     components: List[float]
+    condition_applications: List[str] = []
 
 
 class ProjectionDriverModel(BaseModel):
     tag: str
     components: List[float]
+
+
+class ConditionCentroidModel(BaseModel):
+    condition_application_tag: str
+    count: int
+    components: List[float]
+
+
+class ConditionAssociationModel(BaseModel):
+    condition_application_tag: str
+    mean_z: float
+    n_samples: int
 
 
 class ProteomeProjectionResponseModel(BaseModel):
@@ -24,6 +37,7 @@ class ProteomeProjectionResponseModel(BaseModel):
     submission_tags: List[str]
     points: List[ProjectionPointModel]
     drivers: List[ProjectionDriverModel]
+    condition_centroids: List[ConditionCentroidModel] = []
 
 
 class ProteomeProjectionDriverResponseModel(BaseModel):
@@ -34,3 +48,4 @@ class ProteomeProjectionDriverResponseModel(BaseModel):
     n_submissions: int
     submission_tags: List[str]
     driver: ProjectionDriverModel
+    condition_associations: List[ConditionAssociationModel] = []
