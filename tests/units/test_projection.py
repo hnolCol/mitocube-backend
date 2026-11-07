@@ -100,6 +100,13 @@ def test_assemble_pooled_pca_matches_direct_pca_on_stacked_matrix():
     assert [p["submission_tag"] for p in result["points"]] == ["sub_1"] * 3 + ["sub_2"] * 2 + ["sub_3"] * 2
     assert [p["sample_tag"] for p in result["points"]] == ["s1", "s2", "s3", "s4", "s5", "s6", "s7"]
 
+    assert [d["tag"] for d in result["drivers"]] == universe
+    expected_loadings = pca.components_.T
+    actual_loadings = np.array([d["components"] for d in result["drivers"]])
+    assert actual_loadings.shape == (5, 2)
+    for col in range(2):
+        assert np.allclose(np.abs(actual_loadings[:, col]), np.abs(expected_loadings[:, col]))
+
 
 def test_assemble_pooled_pca_excludes_singleton_proteins():
     blocks = [

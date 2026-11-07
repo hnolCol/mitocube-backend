@@ -119,11 +119,20 @@ def assemble_pooled_pca(blocks: List[Dict], n_components: int = 2,
         }
         for (submission_tag, sample_tag), row in zip(owners, scores)
     ]
+    loadings = pca.components_.T  # proteins x components
+    drivers = [
+        {
+            "tag": protein,
+            "components": [float(v) for v in row],
+        }
+        for protein, row in zip(universe, loadings)
+    ]
     return {
         "n_components": n_comp,
         "variance_explained": [float(v) for v in pca.explained_variance_ratio_],
         "n_proteins": len(universe),
         "points": points,
+        "drivers": drivers,
     }
 
 

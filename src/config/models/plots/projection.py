@@ -9,6 +9,11 @@ class ProjectionPointModel(BaseModel):
     components: List[float]
 
 
+class ProjectionDriverModel(BaseModel):
+    tag: str
+    components: List[float]
+
+
 class ProteomeProjectionResponseModel(BaseModel):
     proteome_tag: str
     method: str
@@ -18,3 +23,4 @@ class ProteomeProjectionResponseModel(BaseModel):
     n_submissions: int
     submission_tags: List[str]
     points: List[ProjectionPointModel]
+    drivers: List[ProjectionDriverModel]

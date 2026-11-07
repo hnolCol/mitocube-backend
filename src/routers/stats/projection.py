@@ -65,6 +65,7 @@ def get_proteome_projection(
             "n_submissions": len(blocks),
             "submission_tags": sorted(block["submission_tag"] for block in blocks),
             "points": result["points"],
+            "drivers": result["drivers"],
         }
 
     return ProteomeProjectionResponseModel(**db_cache_runtime.get_or_compute(
