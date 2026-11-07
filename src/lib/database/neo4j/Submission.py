@@ -30,7 +30,7 @@ from itertools import islice
 
 
 from config.models.calculations.quantile import QuantileModel
-from lib.cache.scope_cache import invalidate_cached_scope, get_cached_scope, cache_scope
+from lib.cache.scope_cache import invalidate_cached_scope, invalidate_all_cached_scopes, get_cached_scope, cache_scope
 
 
 def chunk_dict(d, size):
@@ -929,6 +929,7 @@ class Neo4JSubmissions(SubmissionsABC):
         except Exception as e:
             print(e)
             return False 
+        invalidate_all_cached_scopes()  # the published state affects the scope of every user
         return True 
     
     def insert_state_history(self,tag : str, state_history : List[Dict]):
@@ -2310,11 +2311,23 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             result_transformer_=Result.value,
         )
         
+    def get_published_submission_tags(self) -> List[str]:
+        """Returns the tags of all submissions whose latest state is PUBLISHED.
+        Published submissions are visible to every user."""
+        query = (
+            "MATCH (submission:Submission)-[r:IN_STATE]->(s:State {tag: $published_state}) "
+            "WHERE NOT EXISTS { (submission)-[r2:IN_STATE]->(:State) WHERE r2.created_at > r.created_at } "
+            "RETURN DISTINCT submission.tag AS tag "
+        )
+        return self._driver.execute_query(query, routing_="r",
+                                          published_state=int(SubmissionStatesEnums.PUBLISHED),
+                                          result_transformer_=Result.value)
+
     def _get_users_submission_scope(self, current_user_tag: str) -> List[str]:
         """Get the submission scope for the current user. Cached with a short TTL;
         invalidate_cached_scope / invalidate_all_cached_scopes are called on every
-        membership-changing write. The None (curator, unrestricted) and [] (guest,
-        no access) cases are derived from the role on each request and are not cached."""
+        membership-changing write. The None (curator, unrestricted) case is derived
+        from the role on each request and is not cached."""
         cached = get_cached_scope(current_user_tag)
         if cached is not None:
             return cached
@@ -2324,8 +2337,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         user = self._users.get_user_by_tag(tag = current_user_tag)
         if user.role >= UserRolesEnum.CURATOR:
             return None  # Curators have access to all submissions
+        # Published submissions are visible to all users, regardless of role.
+        tags.update(self.get_published_submission_tags())
         if user.role == UserRolesEnum.GUEST:
-            return []  # Guests have no access to submissions
+            scope = list(tags)  # Guests only see published submissions
+            cache_scope(current_user_tag, scope)
+            return scope
         # Group curators are scoped like standard users: only their research
         # groups' submissions plus consortium-shared and own submissions.
         research_groups_tags = self._research_groups.find(user_tags=[current_user_tag])
@@ -2371,20 +2388,20 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         user = self._users.get_user_by_tag(tag=user_tag)
         if user.role >= UserRolesEnum.CURATOR:
             return True
-        if user.role == UserRolesEnum.GUEST:
-            return False
-
         query = (
             "MATCH (u:User {tag: $user_tag}), (submission:Submission {tag: $submission_tag}) "
             "RETURN "
             "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(:Consortium)<-[share:SHARED_WITH]-(submission) WHERE share.status = 'approved' } "
+            "  OR EXISTS { MATCH (submission)-[r:IN_STATE]->(s:State {tag: $published_state}) "
+            "              WHERE NOT EXISTS { (submission)-[r2:IN_STATE]->(:State) WHERE r2.created_at > r.created_at } } "
             "AS has_access "
         )
         r = self._driver.execute_query(query, routing_="r",
                                     user_tag=user_tag,
                                     submission_tag=submission_tag,
+                                    published_state=int(SubmissionStatesEnums.PUBLISHED),
                                     result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
     

@@ -785,6 +785,11 @@ Each submission is counted at most once per group and year, even if it has sever
     def get_user_submission_scope_tags(self, user_tag : str) -> List[str]:
         """Get the submission scope for a given user (e.g. where the user has access to)."""
     
+    @abstractmethod
+    def get_published_submission_tags(self) -> List[str]:
+        """Returns the tags of all submissions whose latest state is PUBLISHED.
+        Published submissions are visible to every user."""
+    
     
     @abstractmethod
     def find_v2(self,
