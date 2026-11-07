@@ -49,3 +49,22 @@ class ProteomeProjectionDriverResponseModel(BaseModel):
     submission_tags: List[str]
     driver: ProjectionDriverModel
     condition_associations: List[ConditionAssociationModel] = []
+
+
+class ProteinEffectModel(BaseModel):
+    tag: str
+    effect: float
+    mean_z_in: float
+    mean_z_out: float
+    n_in: int
+    n_out: int
+    cohens_d: float | None
+
+
+class ProteomeProjectionEffectResponseModel(BaseModel):
+    proteome_tag: str
+    ca_tag: str
+    n_submissions: int
+    submission_tags: List[str]
+    n_proteins: int
+    effects: List[ProteinEffectModel]

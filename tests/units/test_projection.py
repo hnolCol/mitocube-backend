@@ -9,6 +9,8 @@ from services.statistics.projection import (
     assemble_pooled_pca,
     block_cache_key,
     build_submission_block,
+    compute_condition_effects,
+    compute_universe,
     enrich_result_with_conditions,
     find_driver,
     get_sample_condition_map,
@@ -209,6 +211,50 @@ def test_protein_condition_association_ranks_conditions_by_mean_z():
     assert associations[0]["n_samples"] == 2
     assert associations[1]["mean_z"] == pytest.approx(-3.0)
     assert protein_condition_association([block], sample_ca_map, "p_missing") == []
+
+
+def test_compute_condition_effects_ranks_by_absolute_effect():
+    block = make_block("sub_1", ["s1", "s2", "s3"], ["p1", "p2"], seed=13)
+    block["matrix"].loc["s1", "p1"] = 2.0
+    block["matrix"].loc["s2", "p1"] = 1.0
+    block["matrix"].loc["s3", "p1"] = -3.0
+    block["matrix"].loc["s1", "p2"] = -1.0
+    block["matrix"].loc["s2", "p2"] = -1.0
+    block["matrix"].loc["s3", "p2"] = 1.0
+    sample_ca_map = {("sub_1", "s1"): ["ca_x"], ("sub_1", "s2"): ["ca_x"], ("sub_1", "s3"): []}
+
+    result = compute_condition_effects([block], sample_ca_map, "ca_x")
+
+    assert result["ca_tag"] == "ca_x"
+    assert result["n_proteins"] == 2
+    top = result["effects"][0]
+    assert top["tag"] == "p1"
+    assert top["effect"] == pytest.approx(4.5)
+    assert top["mean_z_in"] == pytest.approx(1.5)
+    assert top["mean_z_out"] == pytest.approx(-3.0)
+    assert top["n_in"] == 2 and top["n_out"] == 1
+    assert top["cohens_d"] == pytest.approx(9.0)
+    assert result["effects"][1]["tag"] == "p2"
+    assert result["effects"][1]["effect"] == pytest.approx(-2.0)
+    json.dumps(result, allow_nan=False)
+
+
+def test_compute_condition_effects_skips_proteins_missing_in_one_group():
+    block_in = make_block("sub_1", ["s1"], ["p_shared", "p_only_in"], seed=14)
+    block_out = make_block("sub_2", ["s2"], ["p_shared", "p_only_out"], seed=15)
+    sample_ca_map = {("sub_1", "s1"): ["ca_x"], ("sub_2", "s2"): []}
+    result = compute_condition_effects([block_in, block_out], sample_ca_map, "ca_x")
+    tags = [e["tag"] for e in result["effects"]]
+    assert tags == ["p_shared"]
+    assert result["n_proteins"] == 1
+
+
+def test_compute_universe_matches_assemble_filtering():
+    blocks = [
+        make_block("sub_1", ["s1", "s2"], ["p_shared", "p_unique"], seed=16),
+        make_block("sub_2", ["s3", "s4"], ["p_shared", "p_other"], seed=17),
+    ]
+    assert compute_universe(blocks, min_block_occurrence=2) == ["p_shared"]
 
 
 def test_projection_points_are_json_safe():

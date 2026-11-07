@@ -84,6 +84,15 @@ def get_submission_block_cached(db, submission_tag: str, min_valid_fraction: flo
     )
 
 
+def compute_universe(blocks: List[Dict], min_block_occurrence: int = DEFAULT_MIN_BLOCK_OCCURRENCE,
+                     min_block_fraction: float = DEFAULT_MIN_BLOCK_FRACTION) -> List[str]:
+    """The pooled protein universe: protein groups present in at least max(min_block_occurrence,
+    min_block_fraction * n_blocks) of the given blocks."""
+    counts = Counter(protein for block in blocks for protein in block["proteins"])
+    threshold = max(min_block_occurrence, math.ceil(min_block_fraction * len(blocks)))
+    return sorted(protein for protein, count in counts.items() if count >= threshold)
+
+
 def assemble_pooled_pca(blocks: List[Dict], n_components: int = 2,
                         min_block_occurrence: int = DEFAULT_MIN_BLOCK_OCCURRENCE,
                         min_block_fraction: float = DEFAULT_MIN_BLOCK_FRACTION) -> Dict:
@@ -93,9 +102,7 @@ def assemble_pooled_pca(blocks: List[Dict], n_components: int = 2,
     build_submission_block) and stacked, then PCA is fitted on the pooled matrix."""
     if not blocks:
         raise ValueError("No submission blocks to project.")
-    counts = Counter(protein for block in blocks for protein in block["proteins"])
-    threshold = max(min_block_occurrence, math.ceil(min_block_fraction * len(blocks)))
-    universe = sorted(protein for protein, count in counts.items() if count >= threshold)
+    universe = compute_universe(blocks, min_block_occurrence, min_block_fraction)
     if not universe:
         raise ValueError("No protein groups shared across enough submissions to project.")
 
@@ -203,6 +210,60 @@ def protein_condition_association(blocks: List[Dict], sample_ca_map: Dict[tuple,
         }
         for ca in sorted(sums, key=lambda c: sums[c] / counts[c], reverse=True)
     ]
+
+
+def compute_condition_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, List[str]],
+                              ca_tag: str, limit: int = 50) -> Dict:
+    """Quantitative effect of a condition application per protein group, computed on the
+    pooled z-scored blocks: effect = mean z in samples carrying the CA minus mean z in all
+    other samples, plus a Cohen's-d style standardized effect using the pooled within-group
+    standard deviation. Only proteins quantified in both groups are ranked. Returns the top
+    `limit` proteins by absolute effect, most affected first."""
+    in_stats: Dict[str, List[float]] = {}
+    out_stats: Dict[str, List[float]] = {}
+    for block in blocks:
+        matrix = block["matrix"]
+        rows_in = [s for s in matrix.index
+                   if ca_tag in sample_ca_map.get((block["submission_tag"], s), [])]
+        rows_out = [s for s in matrix.index if s not in set(rows_in)]
+        for rows, stats in ((rows_in, in_stats), (rows_out, out_stats)):
+            if not rows:
+                continue
+            sub = matrix.loc[rows]
+            sums = sub.sum()
+            sumsqs = (sub.astype(np.float64) ** 2).sum()
+            for protein in matrix.columns:
+                acc = stats.setdefault(protein, [0.0, 0.0, 0])
+                acc[0] += float(sums[protein])
+                acc[1] += float(sumsqs[protein])
+                acc[2] += len(rows)
+
+    effects = []
+    for protein in set(in_stats) & set(out_stats):
+        si, sqi, ni = in_stats[protein]
+        so, sqo, no = out_stats[protein]
+        mean_in = si / ni
+        mean_out = so / no
+        var_in = max(sqi / ni - mean_in ** 2, 0.0)
+        var_out = max(sqo / no - mean_out ** 2, 0.0)
+        pooled_var = ((ni - 1) * var_in + (no - 1) * var_out) / max(ni + no - 2, 1)
+        pooled_sd = math.sqrt(pooled_var)
+        effect = mean_in - mean_out
+        effects.append({
+            "tag": protein,
+            "effect": effect,
+            "mean_z_in": mean_in,
+            "mean_z_out": mean_out,
+            "n_in": ni,
+            "n_out": no,
+            "cohens_d": effect / pooled_sd if pooled_sd > 0 else None,
+        })
+    effects.sort(key=lambda e: abs(e["effect"]), reverse=True)
+    return {
+        "ca_tag": ca_tag,
+        "n_proteins": len(effects),
+        "effects": effects[:limit],
+    }
 
 
 def find_driver(result: Dict, protein_tag: str) -> Optional[Dict]:
