@@ -266,22 +266,7 @@ class AttributesABC(ABC):
             Maps each attribute tag to its ordered ancestor chain (root first).
         """
 
-    @abstractmethod
-    def get_trait_implied_parent_traits(self, trait_tags : List[str]) -> Dict[str, List[Tuple[str, str]]]:
-        """Returns the implied parent traits for the given trait tags as
-        (parent_attribute_tag, parent_trait_tag) tuples. Traits without implied
-        parent traits map to an empty list.
 
-        Parameters
-        ----------
-        trait_tags : List[str]
-            The trait tags for which the implied parent traits should be returned.
-
-        Returns
-        -------
-        Dict[str, List[Tuple[str, str]]]
-            Maps each trait tag to its implied parent traits.
-        """
 
     
     

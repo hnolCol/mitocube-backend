@@ -1,174 +1,41 @@
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, List
 
 from config.models.attributes import AttributeTree
 
 
-def resolve_trait_paths(
-    attribute_tag: str,
-    trait_tags: List[str],
-    parent_tags: List[str],
-    implied_edges: Dict[str, List[Tuple[str, str]]],
-) -> Dict[str, List[Dict[str, str]]]:
-    """Resolves the full hierarchy path for traits that deterministically imply
-    their parent traits.
-
-    Parameters
-    ----------
-    attribute_tag : str
-        The tag of the attribute the traits belong to.
-    trait_tags : List[str]
-        The trait tags of the attribute.
-    parent_tags : List[str]
-        The ordered ancestor chain of the attribute (root first).
-    implied_edges : Dict[str, List[Tuple[str, str]]]
-        Maps a trait tag to its implied parent traits as
-        (parent_attribute_tag, parent_trait_tag) tuples.
-
-    Returns
-    -------
-    Dict[str, List[Dict[str, str]]]
-        Maps each trait tag with a fully resolved chain to its path
-        (root first). Traits without a unique implied parent trait at every
-        level are omitted.
-    """
-    trait_paths = {}
-    if not parent_tags:
-        return trait_paths
-    for trait_tag in trait_tags:
-        path = [{"attribute_tag": attribute_tag, "trait_tag": trait_tag}]
-        current_trait = trait_tag
-        resolved = True
-        for parent_attribute in reversed(parent_tags):
-            candidates = [
-                parent_trait
-                for parent_attribute_tag, parent_trait in implied_edges.get(current_trait, [])
-                if parent_attribute_tag == parent_attribute
-            ]
-            if len(candidates) != 1:
-                resolved = False
-                break
-            path.append({"attribute_tag": parent_attribute, "trait_tag": candidates[0]})
-            current_trait = candidates[0]
-        if resolved:
-            trait_paths[trait_tag] = list(reversed(path))
-    return trait_paths
-
-
-def complete_or_validate_attribute_trees(
+def validate_attribute_trees(
     get_parents: Callable[[str], List[str]],
-    get_implied_parent_traits: Callable[[List[str]], Dict[str, List[Tuple[str, str]]]],
     attribute_trees: List[AttributeTree],
 ) -> List[AttributeTree]:
-    """Auto-completes child attribute trees with an unambiguous parent-trait
-    implication and validates the tree structure.
+    """Validates the structure of submitted attribute trees.
 
-    A root-level attribute that has parents is auto-completed when every trait
-    child of the node unambiguously implies its parent trait: the node is
-    attached under the parent attribute (an existing parent root when present,
-    otherwise a newly wrapped one). Implications are an opt-in convenience;
-    when no unambiguous implication exists the tree is passed through
-    unchanged and the parent trait is resolved by the user during selection.
-    Structurally invalid trees — a nested child attribute placed below a
-    non-parent — are rejected with a ValueError.
+    A nested child attribute must be placed below one of its parent
+    attributes; trees violating this are rejected with a ValueError.
+    Root-level child attributes are passed through unchanged — the parent
+    attribute and trait are selected by the user during selection, assisted
+    by the search ordering that prefers parentless attributes on equal
+    priority and by the parent_tags hierarchy metadata.
 
     Parameters
     ----------
     get_parents : Callable[[str], List[str]]
         Returns the parent attribute tags for an attribute tag.
-    get_implied_parent_traits : Callable[[List[str]], Dict[str, List[Tuple[str, str]]]]
-        Returns the implied (parent_attribute_tag, parent_trait_tag) pairs for
-        trait tags.
     attribute_trees : List[AttributeTree]
         The attribute trees submitted by the client.
 
     Returns
     -------
     List[AttributeTree]
-        The validated and auto-completed attribute trees.
+        The validated attribute trees.
 
     Raises
     ------
     ValueError
         When a nested child attribute is placed below a non-parent attribute.
     """
-    roots: List[AttributeTree] = []
-    pending: List[AttributeTree] = []
-    for tree in attribute_trees:
-        if get_parents(tree.tag):
-            pending.append(tree)
-        else:
-            roots.append(tree)
-
-    if pending:
-        trait_children = [
-            child for tree in pending for child in (tree.children or []) if child.type == "trait"
-        ]
-        implied = get_implied_parent_traits([child.tag for child in trait_children])
-        for tree in pending:
-            implied_map = _resolve_node_implications(tree, implied)
-            if implied_map is None:
-                roots.append(tree)
-                continue
-            parent_attribute_tag = implied_map["parent_attribute_tag"]
-            target = next((root for root in roots if root.tag == parent_attribute_tag), None)
-            if target is None:
-                target = AttributeTree(tag=parent_attribute_tag, type="attribute", children=[])
-                roots.append(target)
-            _attach_node(target, tree, implied_map)
-
-    for root in roots:
+    for root in attribute_trees:
         _validate_nested(get_parents, root, [])
-    return roots
-
-
-def _resolve_node_implications(
-    tree: AttributeTree,
-    implied: Dict[str, List[Tuple[str, str]]],
-) -> Dict | None:
-    """Resolves the implied parent trait for every trait child of a node.
-
-    Returns None when the node does not unambiguously imply a single parent
-    attribute with one parent trait per trait child; the caller then keeps
-    the node unchanged so the parent trait is selected by the user.
-    """
-    trait_children = [child for child in (tree.children or []) if child.type == "trait"]
-    if not trait_children:
-        return None
-    implied_map = {}
-    for trait_child in trait_children:
-        edges = implied.get(trait_child.tag, [])
-        if len(edges) != 1:
-            return None
-        implied_map[trait_child.tag] = edges[0]
-    parent_attributes = {parent_attribute_tag for parent_attribute_tag, _ in implied_map.values()}
-    if len(parent_attributes) != 1:
-        return None
-    return {
-        "parent_attribute_tag": parent_attributes.pop(),
-        "trait_map": implied_map,
-    }
-
-
-def _attach_node(target: AttributeTree, tree: AttributeTree, implied_map: Dict) -> None:
-    """Attaches a child attribute node below the parent trait nodes of an
-    existing or newly created parent attribute root."""
-    for trait_child in [child for child in (tree.children or []) if child.type == "trait"]:
-        parent_trait_tag = implied_map["trait_map"][trait_child.tag][1]
-        trait_node = next(
-            (child for child in (target.children or []) if child.type == "trait" and child.tag == parent_trait_tag),
-            None,
-        )
-        if trait_node is None:
-            trait_node = AttributeTree(tag=parent_trait_tag, type="trait", children=[])
-            target.children.append(trait_node)
-        trait_node.children.append(
-            AttributeTree(
-                tag=tree.tag,
-                type="attribute",
-                value=tree.value,
-                children=[trait_child],
-            )
-        )
+    return attribute_trees
 
 
 def _validate_nested(get_parents: Callable[[str], List[str]], node: AttributeTree, ancestors: List[str]) -> None:

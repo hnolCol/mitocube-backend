@@ -96,9 +96,7 @@ def get_attributes(
     Returns the stored attribute and traits.
     Allows multiple attribute groups separated by ';'.
     When include_parent_paths is true, each returned attribute additionally
-    carries its ordered ancestor chain (parent_tags) and, per trait, the fully
-    resolved hierarchy path (trait_paths) when the trait deterministically
-    implies its parent traits.
+    carries its ordered ancestor chain (parent_tags, root first).
     """
 
     if attribute_groups is not None:
