@@ -24,7 +24,7 @@ def get_ranking(tag : str, user : UserModel = Depends(get_user_from_token), db :
     
     
 @router.get("/{tag}/ranking/exclusively_quantified")
-def get_exclusively_quantified(tag : str, annotation_tags : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ExclusivelyQuantifiedModel]:
-    "Get the exclusively quantified proteins for a given submission."
+def get_exclusively_quantified(tag : str, annotation_tags : str = None, limit : int = None, combined : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ExclusivelyQuantifiedModel]:
+    "Get the exclusively quantified proteins for a given submission. If combined is true, the exclusively quantified proteins for combined dual-attribute groups (e.g. genotype x treatment) are returned instead."
     check_submission_access(submission_tag = tag, user = user, db = db)
-    return db.protein_groups.get_exclusively_quantified(submission_tag = tag, annotation_tags = APIParamString(param=annotation_tags).param, limit = limit)
+    return db.protein_groups.get_exclusively_quantified(submission_tag = tag, annotation_tags = APIParamString(param=annotation_tags).param, limit = limit, combined = combined)
