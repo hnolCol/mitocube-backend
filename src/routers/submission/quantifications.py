@@ -1,4 +1,5 @@
 import colorsys
+import math
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 
@@ -167,7 +168,8 @@ def insert_precursor_quantifications(
     quantifications : List[PrecursorQuantificationModel]
         List of precursor quantifications to insert. The precursor tags are the peptide sequence followed
         by the charge state (e.g. PEPTIDEK.2) and the precursors must already exist in the database.
-        The value is the log2 intensity of the precursor quantification.
+        The value is the log2 intensity of the precursor quantification. Quantifications with a value
+        of 0, NaN or infinity are excluded from the insert.
     batch_size : int, optional
         The number of quantifications sent to the database per query, by default 600
     transaction_batch_size : int, optional
@@ -179,7 +181,7 @@ def insert_precursor_quantifications(
     Returns
     -------
     int
-        Number of inserted precursor quantifications.
+        Number of inserted precursor quantifications (invalid values excluded).
     Raises
     ------
     HTTPException
@@ -188,6 +190,10 @@ def insert_precursor_quantifications(
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if len(quantifications.quantifications) == 0:
         raise HTTPException(status_code=400, detail="No precursor quantifications provided.")
+    quantifications.quantifications = [q for q in quantifications.quantifications
+                                       if q.value != 0 and math.isfinite(q.value)]
+    if len(quantifications.quantifications) == 0:
+        raise HTTPException(status_code=400, detail="No valid precursor quantifications provided. Values must be non-zero and not NaN or infinite.")
     if batch_size < 1:
         raise HTTPException(status_code=400, detail="batch_size must be at least 1.")
     if transaction_batch_size < 1:
