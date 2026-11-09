@@ -26,11 +26,58 @@ from services.random_generators import get_random_string
 from services.encryption import create_hierarchical_hash
 from lib.data.ranking.FeatureRanking import FeatureRanking
 import numpy as np
-from itertools import islice
+from itertools import combinations, islice
 
 
 from config.models.calculations.quantile import QuantileModel
-from lib.cache.scope_cache import invalidate_cached_scope, get_cached_scope, cache_scope
+from lib.cache.scope_cache import invalidate_cached_scope, invalidate_all_cached_scopes, get_cached_scope, cache_scope
+
+
+def build_combined_attribute_rows(df : pd.DataFrame) -> pd.DataFrame:
+    """Builds synthetic dual-attribute rows for the multiple comparison metrics. For every pair of attributes
+    a sample carries, the condition application tags of both attributes are combined into a single group key so
+    that exclusivity can be resolved at the level of attribute combinations (e.g. genotype x treatment).
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with the columns protein_group_tag, value, attribute_tag, ca_tags, sample_tag. The ca_tags
+        column holds a comma separated string of condition application tags for one attribute of one sample.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with the same columns, where attribute_tag is the synthetic combined attribute tag
+        ('<attribute_tag_a>__<attribute_tag_b>') and ca_tags is the union of both attributes' tags.
+    """
+    attribute_tags = sorted(df["attribute_tag"].dropna().unique())
+    if len(attribute_tags) < 2:
+        return pd.DataFrame(columns=["protein_group_tag", "value", "attribute_tag", "ca_tags", "sample_tag"])
+
+    pivot = df.pivot(index=["protein_group_tag", "sample_tag"], columns="attribute_tag", values="ca_tags")
+    values = df.groupby(["protein_group_tag", "sample_tag"])["value"].first().reindex(pivot.index)
+
+    frames = []
+    for attribute_tag_a, attribute_tag_b in combinations(attribute_tags, 2):
+        if attribute_tag_a not in pivot.columns or attribute_tag_b not in pivot.columns:
+            continue
+        pair = pivot[[attribute_tag_a, attribute_tag_b]].dropna()
+        if pair.empty:
+            continue
+        ca_tags = [
+            ",".join(sorted(set(str(ca_a).split(",")) | set(str(ca_b).split(","))))
+            for ca_a, ca_b in zip(pair[attribute_tag_a].to_numpy(), pair[attribute_tag_b].to_numpy())
+        ]
+        frames.append(pd.DataFrame({
+            "protein_group_tag" : pair.index.get_level_values("protein_group_tag"),
+            "value" : values.loc[pair.index].to_numpy(),
+            "attribute_tag" : f"{attribute_tag_a}__{attribute_tag_b}",
+            "ca_tags" : ca_tags,
+            "sample_tag" : pair.index.get_level_values("sample_tag")
+        }))
+    if len(frames) == 0:
+        return pd.DataFrame(columns=["protein_group_tag", "value", "attribute_tag", "ca_tags", "sample_tag"])
+    return pd.concat(frames, ignore_index=True)
 
 
 def chunk_dict(d, size):
@@ -137,13 +184,15 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0]
     
     
-    def get_samples(self, tag : str, ignore_excluded : bool = False) -> List[str]:
+    def get_samples(self, tag : str, ignore_excluded : bool = False, ignore_lost : bool = False) -> List[str]:
         "" 
         query = (
             "MATCH (submission:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
             "WHERE submission.tag = $tag ")
         if ignore_excluded:
             query += "AND coalesce(sample.excluded, false) = false "
+        if ignore_lost:
+            query += "AND coalesce(sample.lost, false) = false "
             
         query +="RETURN sample.tag ORDER BY sample.sample_index"
         
@@ -343,7 +392,7 @@ class Neo4JSubmissions(SubmissionsABC):
             if len(r) > 0:
                 return QuantileModel(tag=submission_tag, min=r[0]["min"], q25=r[0]["q25"], m=r[0]["m"], q75=r[0]["q75"], max=r[0]["max"], N=r[0]["N"])
             
-        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample) WHERE coalesce(sample.excluded, false) = false "
+        query = "MATCH (submission:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample) WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
 
         if quantification_type == "protein_groups":
             query += "MATCH (sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
@@ -689,7 +738,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = """MATCH (submission:Submission {tag: $tag})
                 -[:HAS_SAMPLE]->(sample:Sample)
                 -[q:QUANTIFIED]->(pg:ProteinGroup)
-                WHERE coalesce(sample.excluded, false) = false
+                WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false
 
                 WITH pg, avg(q.value) AS mean, stDev(q.value) AS stdev
                 WHERE stdev > 0
@@ -715,7 +764,7 @@ class Neo4JSubmissions(SubmissionsABC):
         query = """
             MATCH (submission:Submission {tag: $tag})
             MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup)
-            WHERE coalesce(sample.excluded, false) = false
+            WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false
 
             WITH submission, pg, avg(q.value) AS mean_log2
 
@@ -927,6 +976,7 @@ class Neo4JSubmissions(SubmissionsABC):
         except Exception as e:
             print(e)
             return False 
+        invalidate_all_cached_scopes()  # the published state affects the scope of every user
         return True 
     
     def insert_state_history(self,tag : str, state_history : List[Dict]):
@@ -1140,7 +1190,7 @@ class Neo4JSubmissions(SubmissionsABC):
         
         query = (
             "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample) "
-            "WHERE coalesce(s.excluded, false) = false "
+            "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
             "MATCH (s)-[q:QUANTIFIED]->(p:ProteinGroup) "
             "MATCH (s)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "WITH p, q, a, collect(ca.tag) as ca_tags, s "
@@ -1152,7 +1202,7 @@ class Neo4JSubmissions(SubmissionsABC):
               
             query = (
                 "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample) "
-                "WHERE coalesce(s.excluded, false) = false "
+                "WHERE coalesce(s.excluded, false) = false AND coalesce(s.lost, false) = false "
                 "MATCH (s)-[q:QUANTIFIED]->(p:ProteinGroup) "
                 "MATCH (s)-[:HAS_GENOTYPE]->(g:Genotype) "
                 "WITH p, q, collect(g.tag) as ca_tags, s "
@@ -1162,7 +1212,12 @@ class Neo4JSubmissions(SubmissionsABC):
             r_g = self._driver.execute_query(query, routing_="r", result_transformer_=Result.to_df, tag = tag)
             r_ca = pd.concat([r_ca, r_g], ignore_index=True)
         
+        r_combined = build_combined_attribute_rows(df = r_ca)
+        if not r_combined.empty:
+            r_ca = pd.concat([r_ca, r_combined], ignore_index=True)
+
         df = FeatureRanking().compute_metrics(df = r_ca)
+        df = df.replace([np.inf, -np.inf], np.nan)
         rows = df.to_dict("records")
         for i in range(0, len(rows), batch_size):
             batch = rows[i:i+batch_size]
@@ -1170,7 +1225,8 @@ class Neo4JSubmissions(SubmissionsABC):
                 "UNWIND $batch as row "
                 "MATCH (p:ProteinGroup {tag : row.protein_group_tag}) "
                 "MATCH (submission:Submission {tag : $tag}) "
-                "MATCH (a:Attribute {tag : row.attribute_tag}) "
+                "MERGE (a:Attribute {tag : row.attribute_tag}) "
+                "ON CREATE SET a.name = row.attribute_tag, a.combined = true "
                 "MERGE (stats:Statistics {tag : 'stats_' + row.protein_group_tag + '_' + row.attribute_tag + '_' + $tag}) "
                 "SET stats.F = row.F,"
                 "stats.created_at = timestamp(),"
@@ -2308,11 +2364,23 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             result_transformer_=Result.value,
         )
         
+    def get_published_submission_tags(self) -> List[str]:
+        """Returns the tags of all submissions whose latest state is PUBLISHED.
+        Published submissions are visible to every user."""
+        query = (
+            "MATCH (submission:Submission)-[r:IN_STATE]->(s:State {tag: $published_state}) "
+            "WHERE NOT EXISTS { (submission)-[r2:IN_STATE]->(:State) WHERE r2.created_at > r.created_at } "
+            "RETURN DISTINCT submission.tag AS tag "
+        )
+        return self._driver.execute_query(query, routing_="r",
+                                          published_state=int(SubmissionStatesEnums.PUBLISHED),
+                                          result_transformer_=Result.value)
+
     def _get_users_submission_scope(self, current_user_tag: str) -> List[str]:
         """Get the submission scope for the current user. Cached with a short TTL;
         invalidate_cached_scope / invalidate_all_cached_scopes are called on every
-        membership-changing write. The None (curator, unrestricted) and [] (guest,
-        no access) cases are derived from the role on each request and are not cached."""
+        membership-changing write. The None (curator, unrestricted) case is derived
+        from the role on each request and is not cached."""
         cached = get_cached_scope(current_user_tag)
         if cached is not None:
             return cached
@@ -2322,8 +2390,12 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         user = self._users.get_user_by_tag(tag = current_user_tag)
         if user.role >= UserRolesEnum.CURATOR:
             return None  # Curators have access to all submissions
+        # Published submissions are visible to all users, regardless of role.
+        tags.update(self.get_published_submission_tags())
         if user.role == UserRolesEnum.GUEST:
-            return []  # Guests have no access to submissions
+            scope = list(tags)  # Guests only see published submissions
+            cache_scope(current_user_tag, scope)
+            return scope
         # Group curators are scoped like standard users: only their research
         # groups' submissions plus consortium-shared and own submissions.
         research_groups_tags = self._research_groups.find(user_tags=[current_user_tag])
@@ -2369,20 +2441,20 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         user = self._users.get_user_by_tag(tag=user_tag)
         if user.role >= UserRolesEnum.CURATOR:
             return True
-        if user.role == UserRolesEnum.GUEST:
-            return False
-
         query = (
             "MATCH (u:User {tag: $user_tag}), (submission:Submission {tag: $submission_tag}) "
             "RETURN "
             "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(:Consortium)<-[share:SHARED_WITH]-(submission) WHERE share.status = 'approved' } "
+            "  OR EXISTS { MATCH (submission)-[r:IN_STATE]->(s:State {tag: $published_state}) "
+            "              WHERE NOT EXISTS { (submission)-[r2:IN_STATE]->(:State) WHERE r2.created_at > r.created_at } } "
             "AS has_access "
         )
         r = self._driver.execute_query(query, routing_="r",
                                     user_tag=user_tag,
                                     submission_tag=submission_tag,
+                                    published_state=int(SubmissionStatesEnums.PUBLISHED),
                                     result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
     

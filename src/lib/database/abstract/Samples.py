@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 from typing import List, Dict, Literal
 import pandas as pd 
 from config.models.conditions_applications import ConditionApplicationAttributeModel
-from config.models.samples import SampleModel
+from config.models.samples import SampleModel, SampleCommentModel
 from config.models.attributes import AttributeTree
 from config.models.calculations.quantile import QuantileModel
 
@@ -60,6 +60,9 @@ class SamplesABC(ABC):
             The number of quantified protein groups for the given sample.
         """
     @abstractmethod
+    def count_quantified_protein_groups_for_samples(self, submission_tag : str, tags : List[str] = None) -> Dict[str, int]:
+        """Counts the quantified protein groups for many samples of a submission in a single query. Excluded and lost samples are omitted from the result."""
+    @abstractmethod
     def calculate_test_quantification_distribution(self, submission_tag : str, testParam : Dict, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
         """Calculates the quantification distribution for a given submission and quantification type based on a statistical test. This is used to calculate the distribution for the test results in the volcano plot."""
         
@@ -68,6 +71,10 @@ class SamplesABC(ABC):
     def get(self, tag : str) -> SampleModel:
         """Returns the sample information for a given sample tag."""
         
+        
+    @abstractmethod
+    def get_quantified_data_for_features(self, tags : List[str], feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw") -> Dict[str, float]:
+        """Get the quantified data for one feature across many samples in a single query. Excluded and lost samples are skipped."""
         
     @abstractmethod
     def get_sample_condition_application_map_for_submission(self, submission_tag : str) -> pd.DataFrame:
@@ -237,6 +244,10 @@ class SamplesABC(ABC):
         """        
 
     @abstractmethod
+    def get_replicates(self, tags: List[str]) -> Dict[str, int]:
+        """Returns the replicate numbers for many samples in a single query. Samples without a replicate are omitted."""
+
+    @abstractmethod
     def set_replicate(self, tag: str, replicate: int) -> bool:
         """Set the replicate number for a given sample.
 
@@ -264,12 +275,37 @@ class SamplesABC(ABC):
         "Sets whether a sample is excluded from statistical analysis / quantification aggregation."
     
     @abstractmethod
+    def get_submission_tag(self, tag: str) -> str|None:
+        "Returns the tag of the submission the sample belongs to, or None if the sample does not exist."
+
+    @abstractmethod
+    def is_lost(self, tag: str) -> bool:
+        "Checks whether a sample is marked as lost (e.g. lost, corrupted or otherwise unusable)."
+
+    @abstractmethod
+    def set_lost(self, tag: str, lost: bool) -> bool:
+        "Marks a sample as lost. Lost samples are ignored in statistical analysis / quantification aggregation."
+
+    @abstractmethod
+    def insert_comment(self, tag: str, comment: SampleCommentModel) -> bool:
+        "Inserts a comment for a sample. The comment is stored as a separate Comment node linked via HAS_COMMENT so it is not loaded with the sample node."
+
+    @abstractmethod
+    def get_comments(self, tag: str) -> List[SampleCommentModel]:
+        "Returns the available comments for a given sample tag."
+    
+    @abstractmethod
     def has_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> bool:
         """Checks if a quantification distribution exists for a given sample and quantification type."""
         
     @abstractmethod
     def get_quantification_distribution(self, tag : str, quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> QuantileModel:
         """Returns the distribution of quantification values for a given sample and quantification type. The distribution is represented as a QuantileModel instance."""
+
+    @abstractmethod
+    def get_quantification_distributions(self, tags : List[str], quantification_type : Literal["protein_groups","precursors"], annotation_tag : str = None) -> Dict[str, QuantileModel]:
+        """Returns the quantification distributions for many samples in a batched fashion (single query for cached values, single query for missing values, single batch insert).
+        Excluded and lost samples are skipped. Returns a dict mapping sample tag to QuantileModel."""
 
         
 

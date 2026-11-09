@@ -96,6 +96,7 @@ Guidelines:
     ANALYSIS = 3 
     DONE = 4 
     ACTIVE = 5
+    PUBLISHED = 6
 Please note that submissions at state (ACTIVE) do have quantification values, the rest does not. 
 And these are the colors of the states:
     CANCELED = "#1e3f49"
@@ -106,6 +107,7 @@ And these are the colors of the states:
     ANALYSIS = "#dbae57" 
     DONE = "#eb6a47" 
     ACTIVE = "#ac3e30"
+    PUBLISHED = "#43a047"
     use these colors in the output when you mention the state of a submission!
 - protein_tags may be provided, you can link the data of proteins to https://mitocube.age.mpg.de/proteins/{protein_tag}. 
 - If a tool returns an empty list or "not_found", say so plainly — do not \

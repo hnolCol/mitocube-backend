@@ -1,4 +1,6 @@
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
@@ -74,10 +76,14 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
         for cluster_idx, cluster_data in grouped_clusters
     )
         
+    records_frame = stats_and_zscores.reset_index(names="tag")
+    records_frame = records_frame.replace([np.inf, -np.inf], np.nan)
+    records_frame = records_frame.astype(object).where(records_frame.notna(), None)
+
     return {
         "submission_tag" : submission_tag,
         "attribute_tag" : attribute_tag,
-        "data" : stats_and_zscores.reset_index(names="tag").to_dict(orient="records"),
+        "data" : records_frame.to_dict(orient="records"),
         "value_names" : condition_applications.index.to_list(),
         "label_names" : ["tag"],
         "color_names" : [],

@@ -399,8 +399,9 @@ def add_collaborators(submission_tag: str, collaborators: str, replace: bool = T
     if not replace and len(collaborator_tags) == 0:
         raise HTTPException(status_code=400, detail="No collaborator tags provided to add.")
 
+    existing_collaborators = set(user.tag for user in db.users.get_users_by_tags(tags = collaborator_tags))
     for user_tag in collaborator_tags:
-        if not db.users.exists(tag=user_tag):
+        if user_tag not in existing_collaborators:
             raise user_not_found
 
     ok = db.submissions.set_collaborators(tag=submission_tag, collaborator_tags=collaborator_tags, replace=replace)
@@ -716,7 +717,7 @@ def update_submission_state(background_task : BackgroundTasks,
     if ok:
         submission_title = db.submissions.get_title(tag = submission_tag) # to check if the submission exists and to get the title
         submission_user_tags = db.submissions.get_users(tag = submission_tag)
-        submission_users = [db.users.get_user_by_tag(tag = user_tag) for user_tag in submission_user_tags if db.users.exists(tag = user_tag)]
+        submission_users = [user for user in db.users.get_users_by_tags(tags = submission_user_tags) if user is not None]
         
         
         if len(submission_users) == 0:
@@ -815,11 +816,10 @@ def add_submission_samples(submission_tag : str, sample_names : List[str], user 
 
 
 @router.get("/submissions/{submission_tag}/samples")
-def get_submission_samples(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
-    "Returns the samples tags associated with the submission"
+def get_submission_samples(submission_tag : str, ignore_excluded : bool = False, ignore_lost : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    "Returns the samples tags associated with the submission. If ignore_excluded is True, excluded samples are omitted. If ignore_lost is True, lost samples are omitted."
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
-    sample_tags = db.submissions.get_samples(tag=submission_tag)
-    sample = db.samples.get(tag=sample_tags[0])
+    sample_tags = db.submissions.get_samples(tag=submission_tag, ignore_excluded=ignore_excluded, ignore_lost=ignore_lost)
     return sample_tags
 
 @router.get("/submissions/{submission_tag}/samplelist")
@@ -836,27 +836,47 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
     sample_tags = db.submissions.get_samples(tag=submission_tag)
-    result = []
-    
+    samples_by_tag = {}
     for sample_tag in sample_tags:
         sample = db.samples.get(tag=sample_tag)
-        genotype = db.samples.get_sample_genotype(tag=sample_tag)
-        condition_apps = db.samples.get_condition_applications(tag=sample_tag, group_by_attribute=True)
-        
+        if sample is not None:
+            samples_by_tag[sample_tag] = sample
+    genotypes_by_tag = {}
+    if db.submissions.has_genotypes(tag=submission_tag):
+        genotypes_df = db.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, join=None, pivot=False, sort_ca_tags=True, return_sample_index=False)
+        if not genotypes_df.empty:
+            genotypes_by_tag = genotypes_df.groupby(level=0)["condition_tags"].apply(list).to_dict()
+    ca_df = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, join=None, pivot=False, sort_ca_tags=True, return_sample_index=False)
+    if ca_df.empty:
+        ca_df = None
+    replicates = db.samples.get_replicates(tags=sample_tags)
+    
+    result = []
+    for sample_tag in sample_tags:
+        sample = samples_by_tag.get(sample_tag)
+        genotype = genotypes_by_tag.get(sample_tag)
         attributes = {}
-        for ca in condition_apps:
-            trees = []
-            for ca_tag in ca.condition_application_tags:
-                tree = db.condition_applications.get_tree(tag=ca_tag)
-                trees.extend([node.model_dump() for node in tree])
-            attributes[ca.attribute_tag] = trees
+        if ca_df is not None and sample_tag in ca_df.index:
+            rows = ca_df.loc[sample_tag]
+            if isinstance(rows, pd.DataFrame):
+                grouped = rows.groupby("attribute_tag")["condition_tags"].apply(list)
+            else:
+                grouped = rows.groupby("attribute_tag")["condition_tags"].apply(list)
+            for attribute_tag, ca_tags in grouped.items():
+                flat_ca_tags = [t for ca_tag_list in ca_tags for t in (ca_tag_list if isinstance(ca_tag_list, list) else [ca_tag_list])]
+                trees = []
+                for ca_tag in flat_ca_tags:
+                    tree = db.condition_applications.get_tree(tag=ca_tag)
+                    trees.extend([node.model_dump() for node in tree])
+                attributes[attribute_tag] = trees
         result.append({
             "tag": sample_tag,
             "index": sample.get("index") if sample else None,
             "excluded": sample.get("excluded", False) if sample else False,
+            "lost": sample.get("lost", False) if sample else False,
             "genotype": genotype,
             "attributes": attributes,
-            "replicate": db.samples.get_replicate(tag=sample_tag),
+            "replicate": replicates.get(sample_tag),
         })
 
     return result

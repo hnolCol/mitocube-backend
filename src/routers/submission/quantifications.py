@@ -304,7 +304,7 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     if not db.submissions.quantification_exists(tag=submission_tag, type=quantification_type):
         raise HTTPException(status_code=404, detail=f"No quantifications of type {quantification_type} found for this submission.")
-    sample_tags = db.submissions.get_samples(tag=submission_tag)
+    sample_tags = db.submissions.get_samples(tag=submission_tag, ignore_excluded=True, ignore_lost=True)  # excluded and lost samples have no valid quantification distribution
     ca = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, return_sample_index = False)  # Preload condition applications for efficiency
     #unique_ca_tags = 
         
@@ -335,8 +335,11 @@ def get_sample_quantification_distribution(submission_tag : str, quantification_
 
     # 5. (optional) map colors back onto the dataframe
     ca['color'] = ca['combo'].map(color_mapper)
+    distributions = db.samples.get_quantification_distributions(tags=sample_tags, quantification_type=quantification_type, annotation_tag=annotation_tag)
     qs = []
     for sample_tag in sample_tags:
-        q = db.samples.get_quantification_distribution(tag=sample_tag, quantification_type=quantification_type, annotation_tag=annotation_tag)
+        q = distributions.get(sample_tag)
+        if q is None:
+            continue
         qs.append((sample_tag, q, ca.loc[ca.index == sample_tag, 'color'].values[0] if sample_tag in ca.index else '#000000'))  # Default to black if not found
     return qs

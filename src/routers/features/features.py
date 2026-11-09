@@ -110,29 +110,24 @@ def get_feature_data(feature_tag : str, submission_tag : str, append_condition_p
         raise HTTPException(status_code=404, detail = "Feature tag not found in the database.")
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     
-    sample_tags = db.submissions.get_samples(tag = submission_tag, ignore_excluded=True) # check if submission has samples
+    sample_tags = db.submissions.get_samples(tag = submission_tag, ignore_excluded=True, ignore_lost=True) # check if submission has samples
     if not sample_tags:
         raise HTTPException(status_code=404, detail = "No samples found for submission tag.")
-    d = []
+    quantified_values = db.samples.get_quantified_data_for_features(tags=sample_tags, feature_tag=feature_tag, metrics=metrics)
+    condition_applications = None
     attribute_tags = set()
+    if append_condition_procedure:
+        condition_applications = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
+        if db.submissions.has_genotypes(tag = submission_tag):
+            genotypes = db.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
+            condition_applications = condition_applications.join(genotypes, how="outer")
+        attribute_tags = set(condition_applications.columns)
+    d = []
     for sample_tag in sample_tags:
-        di = {"tag" : sample_tag, "value" : None}
-        if not db.samples.exists(tag = sample_tag):
-            continue 
-        if db.samples.is_excluded(tag = sample_tag):
-            continue  # Skip excluded samples
-        quantified_value = db.samples.get_quantified_data_for_feature(tag=sample_tag, feature_tag=feature_tag, metrics=metrics)
-        di["value"] = quantified_value
-        if append_condition_procedure:
-            condition_applications = db.samples.get_condition_applications_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload condition applications
-            if db.submissions.has_genotypes(tag = submission_tag):
-                genotypes = db.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
-                condition_applications = condition_applications.join(genotypes, how="outer")
+        di = {"tag" : sample_tag, "value" : quantified_values.get(sample_tag)}
+        if condition_applications is not None and sample_tag in condition_applications.index:
             for attribute_tag in condition_applications.columns:
-                attribute_tags.add(attribute_tag)
-                condition_application_tags = condition_applications.loc[sample_tag, attribute_tag]
-                di[attribute_tag] = condition_application_tags
-                #else:
+                di[attribute_tag] = condition_applications.loc[sample_tag, attribute_tag]
         d.append(di)
 
     return {"data" : d, "attribute_tags" : list(attribute_tags), "feature_tag" : feature_tag, "submission_tag" : submission_tag}

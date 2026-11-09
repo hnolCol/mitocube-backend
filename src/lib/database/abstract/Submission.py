@@ -214,8 +214,8 @@ class SubmissionsABC(ABC):
         "Returns the comments associated with a submission."
         
     @abstractmethod
-    def get_samples(self, tag : str, ignore_excluded : bool = False)-> List[str]:
-        "Returns the samples of a submission"
+    def get_samples(self, tag : str, ignore_excluded : bool = False, ignore_lost : bool = False)-> List[str]:
+        "Returns the samples of a submission. If ignore_excluded is True, excluded samples are omitted. If ignore_lost is True, lost samples are omitted."
     
     @abstractmethod
     def get_states(self) -> List[int]:
@@ -784,6 +784,11 @@ Each submission is counted at most once per group and year, even if it has sever
     @abstractmethod
     def get_user_submission_scope_tags(self, user_tag : str) -> List[str]:
         """Get the submission scope for a given user (e.g. where the user has access to)."""
+    
+    @abstractmethod
+    def get_published_submission_tags(self) -> List[str]:
+        """Returns the tags of all submissions whose latest state is PUBLISHED.
+        Published submissions are visible to every user."""
     
     
     @abstractmethod
