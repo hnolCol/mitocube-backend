@@ -59,15 +59,17 @@ def complete_or_validate_attribute_trees(
     get_implied_parent_traits: Callable[[List[str]], Dict[str, List[Tuple[str, str]]]],
     attribute_trees: List[AttributeTree],
 ) -> List[AttributeTree]:
-    """Validates that child attribute traits are always submitted together with
-    their parent attribute and trait.
+    """Auto-completes child attribute trees with an unambiguous parent-trait
+    implication and validates the tree structure.
 
-    A root-level attribute that has parents is auto-completed: when every trait
-    child of the node unambiguously implies its parent trait, the node is
+    A root-level attribute that has parents is auto-completed when every trait
+    child of the node unambiguously implies its parent trait: the node is
     attached under the parent attribute (an existing parent root when present,
-    otherwise a newly wrapped one). When no unambiguous implication exists, a
-    ValueError is raised. Nested child attributes that are not placed below one
-    of their parents are rejected.
+    otherwise a newly wrapped one). Implications are an opt-in convenience;
+    when no unambiguous implication exists the tree is passed through
+    unchanged and the parent trait is resolved by the user during selection.
+    Structurally invalid trees — a nested child attribute placed below a
+    non-parent — are rejected with a ValueError.
 
     Parameters
     ----------
@@ -87,8 +89,7 @@ def complete_or_validate_attribute_trees(
     Raises
     ------
     ValueError
-        When a child attribute trait is present without its parent attribute
-        and trait and no unambiguous implication exists.
+        When a nested child attribute is placed below a non-parent attribute.
     """
     roots: List[AttributeTree] = []
     pending: List[AttributeTree] = []
@@ -105,6 +106,9 @@ def complete_or_validate_attribute_trees(
         implied = get_implied_parent_traits([child.tag for child in trait_children])
         for tree in pending:
             implied_map = _resolve_node_implications(tree, implied)
+            if implied_map is None:
+                roots.append(tree)
+                continue
             parent_attribute_tag = implied_map["parent_attribute_tag"]
             target = next((root for root in roots if root.tag == parent_attribute_tag), None)
             if target is None:
@@ -120,35 +124,25 @@ def complete_or_validate_attribute_trees(
 def _resolve_node_implications(
     tree: AttributeTree,
     implied: Dict[str, List[Tuple[str, str]]],
-) -> Dict:
+) -> Dict | None:
     """Resolves the implied parent trait for every trait child of a node.
 
-    Raises a ValueError when a trait child does not unambiguously imply a
-    parent trait or when the implied parent traits belong to different parent
-    attributes.
+    Returns None when the node does not unambiguously imply a single parent
+    attribute with one parent trait per trait child; the caller then keeps
+    the node unchanged so the parent trait is selected by the user.
     """
     trait_children = [child for child in (tree.children or []) if child.type == "trait"]
     if not trait_children:
-        raise ValueError(
-            f"The attribute '{tree.tag}' is a child attribute and requires its "
-            "parent attribute and trait to be selected as well."
-        )
+        return None
     implied_map = {}
     for trait_child in trait_children:
         edges = implied.get(trait_child.tag, [])
         if len(edges) != 1:
-            raise ValueError(
-                f"The trait '{trait_child.tag}' of the child attribute '{tree.tag}' "
-                "is selected without its parent attribute and trait, and the parent "
-                "trait cannot be unambiguously resolved. Select the parent trait first."
-            )
+            return None
         implied_map[trait_child.tag] = edges[0]
     parent_attributes = {parent_attribute_tag for parent_attribute_tag, _ in implied_map.values()}
     if len(parent_attributes) != 1:
-        raise ValueError(
-            f"The traits of the child attribute '{tree.tag}' imply different parent "
-            "attributes. Select the parent attribute and trait first."
-        )
+        return None
     return {
         "parent_attribute_tag": parent_attributes.pop(),
         "trait_map": implied_map,

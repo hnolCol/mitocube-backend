@@ -148,14 +148,30 @@ class TestCAUpdateHierarchyValidation:
         assert parent.children[0].tag == MS_TYPE_ORBITRAP
         assert parent.children[0].children[0].tag == MS_NAME
 
-    def test_ambiguous_child_without_parent_is_rejected(self, client):
-        c, _ = client
+    def test_child_without_implication_passes_through(self, client):
+        c, db = client
         payload = [{"tag": MS_NAME, "type": "attribute", "children": [
             {"tag": "att_ms:unknown", "type": "trait", "children": None}
         ]}]
         resp = c.post("/api/submissions/sub-1/ca/update", json=payload)
+        assert resp.status_code == 200
+        trees = db.submissions.edited_trees
+        assert len(trees) == 1
+        assert trees[0].tag == MS_NAME
+        assert trees[0].children[0].tag == "att_ms:unknown"
+
+    def test_nested_child_below_wrong_parent_is_rejected(self, client):
+        c, _ = client
+        payload = [{"tag": "att_other", "type": "attribute", "children": [
+            {"tag": "att_other:t", "type": "trait", "children": [
+                {"tag": MS_NAME, "type": "attribute", "children": [
+                    {"tag": MS_NAME_ECLIPSE, "type": "trait", "children": None}
+                ]}
+            ]}
+        ]}]
+        resp = c.post("/api/submissions/sub-1/ca/update", json=payload)
         assert resp.status_code == 409
-        assert "without its parent" in resp.json()["detail"]
+        assert "below one of its parent" in resp.json()["detail"]
 
     def test_parentless_attribute_passes_through(self, client):
         c, db = client

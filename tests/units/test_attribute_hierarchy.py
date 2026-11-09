@@ -134,26 +134,26 @@ class TestCompleteOrValidateAttributeTrees:
         trait_tags = [c.tag for c in result[0].children]
         assert trait_tags == ["att_ms_type:qtof", MS_TYPE_ORBITRAP]
 
-    def test_rejects_ambiguous_implication(self):
+    def test_passes_ambiguous_implication_through(self):
         db = make_db(
             parents={MS_NAME: [MS_TYPE]},
             implied={MS_NAME_ECLIPSE: [(MS_TYPE, "att_ms_type:orbitrap"), (MS_TYPE, "att_ms_type:qtof")]},
         )
         trees = [attribute(MS_NAME, [trait(MS_NAME_ECLIPSE)])]
-        with pytest.raises(ValueError, match="unambiguously"):
-            complete_or_validate_attribute_trees(db.get_parents, db.get_trait_implied_parent_traits, trees)
+        result = complete_or_validate_attribute_trees(db.get_parents, db.get_trait_implied_parent_traits, trees)
+        assert result == trees
 
-    def test_rejects_child_without_implication(self):
+    def test_passes_child_without_implication_through(self):
         db = make_db(parents={MS_NAME: [MS_TYPE]})
         trees = [attribute(MS_NAME, [trait(MS_NAME_ECLIPSE)])]
-        with pytest.raises(ValueError, match="without its parent"):
-            complete_or_validate_attribute_trees(db.get_parents, db.get_trait_implied_parent_traits, trees)
+        result = complete_or_validate_attribute_trees(db.get_parents, db.get_trait_implied_parent_traits, trees)
+        assert result == trees
 
-    def test_rejects_child_attribute_without_traits(self):
+    def test_passes_child_attribute_without_traits_through(self):
         db = make_db(parents={MS_NAME: [MS_TYPE]})
         trees = [attribute(MS_NAME)]
-        with pytest.raises(ValueError, match="parent attribute and trait"):
-            complete_or_validate_attribute_trees(db.get_parents, db.get_trait_implied_parent_traits, trees)
+        result = complete_or_validate_attribute_trees(db.get_parents, db.get_trait_implied_parent_traits, trees)
+        assert result == trees
 
     def test_rejects_nested_child_below_wrong_parent(self):
         db = make_db(parents={MS_NAME: [MS_TYPE]})
