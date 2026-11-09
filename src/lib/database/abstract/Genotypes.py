@@ -212,3 +212,21 @@ class GenotypeABC(ABC):
             The user tag of the creator of the genotype, or None if not found.
         """
 
+    @abstractmethod
+    def shares_group_with_creator(self, user_tag: str, tag: str) -> bool:
+        """Checks if the creator of the genotype is a member of one of the
+        research groups of the given user.
+
+        Parameters
+        ----------
+        user_tag : str
+            The user tag.
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        bool
+            True if the genotype creator shares a research group with the user.
+        """
+

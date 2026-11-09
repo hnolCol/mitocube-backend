@@ -226,3 +226,64 @@ class TestScopedStateChangeGate:
         for fn in (submission_router.update_submission_state, submission_router.update_submission):
             dep = inspect.signature(fn).parameters["user"].default
             assert dep.dependency.__name__ == "is_curator_or_scoped_group_curator"
+
+
+class TestGenotypeEditScopedGate:
+    """Group curators may only edit genotypes whose creator belongs to one of
+    their own research groups; global curators may edit any genotype."""
+
+    @staticmethod
+    def _call(user, db, tag="geno-1"):
+        from services.users import is_curator_or_genotype_scoped_group_curator
+        return is_curator_or_genotype_scoped_group_curator(tag, user, db)
+
+    def _make_user(self, role):
+        import time
+        from pydantic import SecretStr
+        from config.models.user import UserModel
+
+        return UserModel(
+            tag="groupcur", firstname="G", lastname="C",
+            email="g.c@age.mpg.de", created_at=time.time(),
+            password=SecretStr("x"), role=role, allow_login=True,
+        )
+
+    def _make_db(self, exists=True, shares=False):
+        class FG:
+            def exists(self, tag):
+                return exists
+
+            def shares_group_with_creator(self, user_tag, tag):
+                return shares
+        class DB:
+            def __init__(self):
+                self.genotypes = FG()
+        return DB()
+
+    def test_global_curator_passes_regardless_of_scope(self):
+        assert self._call(self._make_user(UserRolesEnum.CURATOR), self._make_db(shares=False)) is not None
+        assert self._call(self._make_user(UserRolesEnum.ADMIN), self._make_db(shares=False)) is not None
+
+    def test_group_curator_in_scope_passes(self):
+        assert self._call(self._make_user(UserRolesEnum.GROUP_CURATOR), self._make_db(shares=True)) is not None
+
+    def test_group_curator_out_of_scope_rejected(self):
+        with pytest.raises(HTTPException) as e:
+            self._call(self._make_user(UserRolesEnum.GROUP_CURATOR), self._make_db(shares=False))
+        assert e.value.status_code == 403
+
+    def test_standard_user_rejected(self):
+        with pytest.raises(HTTPException) as e:
+            self._call(self._make_user(UserRolesEnum.STANDARD), self._make_db(shares=True))
+        assert e.value.status_code == 403
+
+    def test_missing_genotype_raises_404(self):
+        with pytest.raises(HTTPException) as e:
+            self._call(self._make_user(UserRolesEnum.GROUP_CURATOR), self._make_db(exists=False))
+        assert e.value.status_code == 404
+
+    def test_edit_route_uses_scoped_gate(self):
+        import inspect
+        from routers.genotypes import genotypes as genotypes_router
+        dep = inspect.signature(genotypes_router.edit_genotype).parameters["user"].default
+        assert dep.dependency.__name__ == "is_curator_or_genotype_scoped_group_curator"
