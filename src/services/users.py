@@ -176,12 +176,15 @@ def is_curator_or_scoped_group_curator(submission_tag : str, user : UserModel = 
         return user
     raise user_role_too_low
 
-def is_curator_or_genotype_scoped_group_curator(genotype_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> UserModel:
-    """Checks if the user is a global curator or a group curator whose research
-    groups contain the creator of the genotype. raises an exception otherwise."""
+def is_genotype_creator_or_curator_or_scoped_group_curator(genotype_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> UserModel:
+    """Checks if the user may edit the genotype: the creator of the genotype, a
+    global curator, or a group curator whose research groups contain the creator
+    of the genotype. raises an exception otherwise."""
     if not db.genotypes.exists(tag = genotype_tag):
         raise tag_not_found
     if user.role >= UserRolesEnum.CURATOR:
+        return user
+    if db.genotypes.is_creator(user_tag = user.tag, tag = genotype_tag):
         return user
     if user.role == UserRolesEnum.GROUP_CURATOR and db.genotypes.shares_group_with_creator(user_tag = user.tag, tag = genotype_tag):
         return user

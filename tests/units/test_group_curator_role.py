@@ -229,13 +229,13 @@ class TestScopedStateChangeGate:
 
 
 class TestGenotypeEditScopedGate:
-    """Group curators may only edit genotypes whose creator belongs to one of
-    their own research groups; global curators may edit any genotype."""
+    """The genotype creator, global curators, and group curators whose group
+    contains the creator may edit a genotype; nobody else."""
 
     @staticmethod
     def _call(user, db, tag="geno-1"):
-        from services.users import is_curator_or_genotype_scoped_group_curator
-        return is_curator_or_genotype_scoped_group_curator(tag, user, db)
+        from services.users import is_genotype_creator_or_curator_or_scoped_group_curator
+        return is_genotype_creator_or_curator_or_scoped_group_curator(tag, user, db)
 
     def _make_user(self, role):
         import time
@@ -248,13 +248,16 @@ class TestGenotypeEditScopedGate:
             password=SecretStr("x"), role=role, allow_login=True,
         )
 
-    def _make_db(self, exists=True, shares=False):
+    def _make_db(self, exists=True, shares=False, creator=False):
         class FG:
             def exists(self, tag):
                 return exists
 
             def shares_group_with_creator(self, user_tag, tag):
                 return shares
+
+            def is_creator(self, user_tag, tag):
+                return creator
         class DB:
             def __init__(self):
                 self.genotypes = FG()
@@ -263,6 +266,10 @@ class TestGenotypeEditScopedGate:
     def test_global_curator_passes_regardless_of_scope(self):
         assert self._call(self._make_user(UserRolesEnum.CURATOR), self._make_db(shares=False)) is not None
         assert self._call(self._make_user(UserRolesEnum.ADMIN), self._make_db(shares=False)) is not None
+
+    def test_creator_passes_regardless_of_role(self):
+        for role in (UserRolesEnum.STANDARD, UserRolesEnum.GROUP_CURATOR):
+            assert self._call(self._make_user(role), self._make_db(creator=True)) is not None
 
     def test_group_curator_in_scope_passes(self):
         assert self._call(self._make_user(UserRolesEnum.GROUP_CURATOR), self._make_db(shares=True)) is not None
@@ -286,4 +293,4 @@ class TestGenotypeEditScopedGate:
         import inspect
         from routers.genotypes import genotypes as genotypes_router
         dep = inspect.signature(genotypes_router.edit_genotype).parameters["user"].default
-        assert dep.dependency.__name__ == "is_curator_or_genotype_scoped_group_curator"
+        assert dep.dependency.__name__ == "is_genotype_creator_or_curator_or_scoped_group_curator"

@@ -230,3 +230,20 @@ class GenotypeABC(ABC):
             True if the genotype creator shares a research group with the user.
         """
 
+    @abstractmethod
+    def is_creator(self, user_tag: str, tag: str) -> bool:
+        """Checks if the given user is the creator of the genotype.
+
+        Parameters
+        ----------
+        user_tag : str
+            The user tag.
+        tag : str
+            The genotype tag.
+
+        Returns
+        -------
+        bool
+            True if the user created the genotype.
+        """
+

@@ -8,7 +8,7 @@ from config.models.user import UserModel
 from config.models.parameter import APIParamString
 from config.models.genotype import GenotypeModel, MinimalGenotypeModel, InsertGeneticApplicationModel, GeneModificationModel
 from config.models.conditions_applications import ConditionApplicationTreeModel
-from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator, is_curator_or_genotype_scoped_group_curator
+from services.users import is_user_admin, get_user_from_token, is_user_at_least_curator, is_genotype_creator_or_curator_or_scoped_group_curator
 
 from services.random_generators import get_random_string
 
@@ -182,10 +182,11 @@ def insert_genotype(genotype: InsertGeneticApplicationModel, user: UserModel = D
     return tag
 
 @router.put("/{tag}")
-def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(is_curator_or_genotype_scoped_group_curator), db : DatabaseABC = Depends(get_db)):
+def edit_genotype(tag: str, genotype: InsertGeneticApplicationModel, user: UserModel = Depends(is_genotype_creator_or_curator_or_scoped_group_curator), db : DatabaseABC = Depends(get_db)):
     """
-    Edits a genotype. Global curators can edit any genotype; group curators can
-    only edit genotypes whose creator belongs to one of their own research groups.
+    Edits a genotype. The creator of the genotype and global curators can edit
+    any of their genotypes; group curators can only edit genotypes whose creator
+    belongs to one of their own research groups.
     Parameters
     ----------
     tag : str
