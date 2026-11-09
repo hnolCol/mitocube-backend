@@ -8,9 +8,9 @@ from lib.database.abstract.Tickets import TicketsABC
 from config.models.tickets import TicketInput, TicketModel, TicketCreatedResponse, TicketStatusEnum
 from services.random_generators import get_random_string
 
-# Once, with your other constraints:
-# CREATE CONSTRAINT ticket_tag IF NOT EXISTS FOR (t:Ticket) REQUIRE t.tag IS UNIQUE;
-# CREATE CONSTRAINT ticket_reference IF NOT EXISTS FOR (t:Ticket) REQUIRE t.reference IS UNIQUE;
+# The uniqueness constraints for Ticket.tag and Ticket.reference are created by
+# src/migration/create_ticket_constraints.py:
+#   PYTHONPATH=src python -m migration.create_ticket_constraints
 
 _TICKET_RETURN = (
     "OPTIONAL MATCH (a:User)-[:HANDLES]->(t) "
