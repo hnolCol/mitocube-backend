@@ -14,6 +14,7 @@ _IMAGE_SIGNATURES = [
 ]
 
 _SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._-]+")
+_SAFE_PATH_PART = re.compile(r"[^A-Za-z0-9_-]+")
 
 
 def detect_image_type(data : bytes) -> Optional[Tuple[str, str]]:
@@ -42,8 +43,8 @@ def get_attachment_root() -> Path:
 def get_attachment_path(ticket_tag : str, attachment_tag : str, extension : str) -> Path:
     """Returns the storage path of an attachment. The filename is derived from the
     attachment tag only, so ticket/attachment tags cannot escape the directory."""
-    safe_ticket = _SAFE_FILENAME.sub("_", ticket_tag)
-    safe_attachment = _SAFE_FILENAME.sub("_", attachment_tag)
+    safe_ticket = _SAFE_PATH_PART.sub("_", ticket_tag)
+    safe_attachment = _SAFE_PATH_PART.sub("_", attachment_tag)
     safe_ext = extension if re.fullmatch(r"\.[A-Za-z0-9]+", extension) else ""
     return get_attachment_root() / safe_ticket / f"{safe_attachment}{safe_ext}"
 

@@ -309,4 +309,5 @@ def download_attachment(ticket_tag: str,
     path = ticket_attachments.get_attachment_path(ticket_tag, attachment.tag, attachment.extension)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Attachment file not found.")
-    return FileResponse(path, media_type=attachment.content_type, filename=attachment.filename)
+    return FileResponse(path, media_type=attachment.content_type, filename=attachment.filename,
+                        headers={"X-Content-Type-Options": "nosniff"})

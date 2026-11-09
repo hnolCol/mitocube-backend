@@ -45,3 +45,10 @@ class TestAttachmentPath:
         path = get_attachment_path("../..", "..\\evil", ".png")
         assert path.parent.parent == tmp_path
         assert ".." not in path.parts
+
+    def test_dot_only_tags_are_neutralized(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ticket_attachments, "get_attachment_root", lambda: tmp_path)
+        for ticket_tag, attachment_tag in [("..", "abc12345"), ("tick1234", ".."), ("..", "..")]:
+            path = get_attachment_path(ticket_tag, attachment_tag, ".png")
+            assert path.parent.parent == tmp_path
+            assert "." not in path.parts and ".." not in path.parts

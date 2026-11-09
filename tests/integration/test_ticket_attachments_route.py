@@ -173,6 +173,8 @@ class TestListAndDownload:
         assert resp.status_code == 200
         assert resp.content == PNG_BYTES
         assert resp.headers["content-type"].startswith("image/png")
+        assert resp.headers["x-content-type-options"] == "nosniff"
+        assert "attachment" in resp.headers["content-disposition"]
 
     def test_download_from_other_ticket_gets_404(self, raiser_client):
         attachment = self._upload(raiser_client)
