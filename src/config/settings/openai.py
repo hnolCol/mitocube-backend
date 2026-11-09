@@ -49,7 +49,7 @@ class OpenAI(BaseSettings):
                             |                     | p_value, eta_squared, cohen_f, max_fc, std_means, missingness,                |                    |
                             |                     | n_groups, exclusively, exclusively_ca_tags                                    |                    |
 
-                            **State values:** CANCELED=-2, PAUSED=-1, SUBMITTED=0, PROCESSED=1, MEASURING=2, ANALYSIS=3, DONE=4, ACTIVE=5
+                            **State values:** CANCELED=-2, PAUSED=-1, SUBMITTED=0, PROCESSED=1, MEASURING=2, ANALYSIS=3, DONE=4, ACTIVE=5, PUBLISHED=6
                             State.tag is the integer value (not a string). `latestTag` in queries is always an INTEGER.
 
                             **`.s` properties** (Protein, Trait, Attribute, User) are always lowercase — never apply `toLower()` to them. You should always use the `.s` property for searching, and return the original case in results. For example, to search for a protein by gene name, use `WHERE p.s CONTAINS 'search_string'` and return `p.gene_name` in the results. Never return `.s` properties in results.

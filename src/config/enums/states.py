@@ -12,6 +12,7 @@ class SubmissionStatesEnums(IntEnum):
     ANALYSIS = 3 
     DONE = 4 
     ACTIVE = 5
+    PUBLISHED = 6
 
 
 class SubmissionStateColors(Enum):
@@ -23,4 +24,5 @@ class SubmissionStateColors(Enum):
     ANALYSIS = "#dbae57" 
     DONE = "#eb6a47" 
     ACTIVE = "#ac3e30"
+    PUBLISHED = "#43a047"
     
