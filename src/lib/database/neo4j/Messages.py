@@ -239,16 +239,18 @@ class Neo4JMessages(MessagesABC):
                                        result_transformer_=Result.value)
         return r[0] > 0 if len(r) > 0 else True
 
-    def insert_message(self, conversation_tag : str, sender_tag : str, message : MessageInput) -> Optional[str]:
+    def insert_message(self, conversation_tag : str, sender_tag : str, message : MessageInput,
+                       created_at : Optional[int] = None) -> Optional[str]:
         """Adds a message to a conversation. The message is linked to the sender
-        and the conversation and starts with the sender in read_by."""
+        and the conversation and starts with the sender in read_by. created_at
+        defaults to now; pass it to backdate (e.g. a ticket's original request)."""
         if not self.exists(conversation_tag):
             return None
         message_tag = get_random_string(N = 12)
         query = (
             "MATCH (c:Conversation {tag : $conversation_tag}) "
             "MATCH (u:User {tag : $sender_tag}) "
-            "CREATE (m:Message {tag : $message_tag, created_at : timestamp(), "
+            "CREATE (m:Message {tag : $message_tag, created_at : coalesce($created_at, timestamp()), "
             "content : $content, sender_tag : $sender_tag, read_by : [$sender_tag]}) "
             "MERGE (m)-[:IN_CONVERSATION]->(c) "
             "MERGE (u)-[:SENT]->(m) "
@@ -259,6 +261,7 @@ class Neo4JMessages(MessagesABC):
                                        sender_tag = sender_tag,
                                        message_tag = message_tag,
                                        content = message.content,
+                                       created_at = created_at,
                                        result_transformer_=Result.value)
         if len(r) == 0:
             return None

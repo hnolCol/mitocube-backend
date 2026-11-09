@@ -90,6 +90,7 @@ from routers.policy import policy
 from routers.policy import permissions as policy_permissions
 from routers.impressum import impressum
 from routers.plates import plates
+from routers.tickets import tickets
 
 # from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
@@ -148,6 +149,7 @@ router_sources = [policy_permissions,
                   researchgroup,
                   consortium,
                   collaboration,
+                  tickets,
                   messages,
                   phenotypes,
                   maintenance,
