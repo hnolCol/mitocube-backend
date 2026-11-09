@@ -77,6 +77,7 @@ from routers.metatexts import metatexts
 from routers.condition_applications import condition_applications
 from routers.ai import openai
 from routers.stats import submissions as submission_stats
+from routers.stats import projection as proteome_projection
 from routers.reports import year_report
 from routers.diseases import diseases
 from routers.variants import Variants
@@ -112,6 +113,7 @@ router_sources = [policy_permissions,
                   feature_ptms,
                   submissions_permissions, 
                   submission_stats, 
+                  proteome_projection,
                   year_report, 
                   quantifications,
                   researchaim,

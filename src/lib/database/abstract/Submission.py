@@ -522,6 +522,40 @@ class SubmissionsABC(ABC):
         """
 
     @abstractmethod
+    def get_tags_by_proteome(self, proteome_tag: str) -> List[str]:
+        """Returns the tags of all submissions that are associated with the given proteome
+        via a condition application of the attribute 'att_proteome'.
+
+        Parameters
+        ----------
+        proteome_tag : str
+            The proteome tag (trait tag of the att_proteome condition applications).
+
+        Returns
+        -------
+        List[str]
+            The submission tags associated with the proteome.
+        """
+
+    @abstractmethod
+    def get_zscore_matrix(self, tag: str) -> pd.DataFrame:
+        """Returns the quantification matrix of a submission as a DataFrame with protein group
+        tags as index and sample tags as columns. Uses the per-sample z-score
+        (q.z_score_sample) where available and falls back to the raw value (q.value).
+        Excluded and lost samples are not included.
+
+        Parameters
+        ----------
+        tag : str
+            The submission tag.
+
+        Returns
+        -------
+        pd.DataFrame
+            Protein group tags x sample tags matrix of quantification values.
+        """
+
+    @abstractmethod
     def edit_condition_applications(self, tag: str, attribute_trees: List[AttributeTree]) -> bool:
 
         """Edits a condition application that is connected to the submission.
