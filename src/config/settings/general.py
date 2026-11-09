@@ -27,6 +27,8 @@ class General(BaseSettings):
 
     explore_tag_search_enabled : bool = False
 
+    ticket_attachment_max_size_mb : int = 10
+
     """If True, the submissions explore endpoint additionally accepts ca_tags and
     user_tags filter parameters and the explore search allows searching by
     condition applications and users. If False, tag parameters are rejected."""

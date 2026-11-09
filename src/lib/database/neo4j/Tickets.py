@@ -5,7 +5,13 @@ from neo4j import Driver, Result
 from neo4j.exceptions import ConstraintError
 
 from lib.database.abstract.Tickets import TicketsABC
-from config.models.tickets import TicketInput, TicketModel, TicketCreatedResponse, TicketStatusEnum
+from config.models.tickets import (
+    TicketAttachmentModel,
+    TicketInput,
+    TicketModel,
+    TicketCreatedResponse,
+    TicketStatusEnum,
+)
 from services.random_generators import get_random_string
 
 # The uniqueness constraints for Ticket.tag and Ticket.reference are created by
@@ -139,3 +145,53 @@ class Neo4JTickets(TicketsABC):
         )
         self._driver.execute_query(query, routing_="w", user_tag = user_tag,
                                    conversation_tag = conversation_tag)
+
+    _ATTACHMENT_RETURN = (
+        "RETURN a.tag AS tag, t.tag AS ticket_tag, a.filename AS filename, "
+        "a.content_type AS content_type, a.size AS size, a.extension AS extension, "
+        "u.tag AS uploaded_by, "
+        "trim(coalesce(u.firstname, '') + ' ' + coalesce(u.lastname, '')) AS uploaded_by_name, "
+        "a.created_at AS created_at "
+    )
+
+    def insert_attachment(self, ticket_tag : str, attachment_tag : str, uploaded_by : str,
+                          filename : str, content_type : str, size : int,
+                          extension : str) -> Optional[TicketAttachmentModel]:
+        query = (
+            "MATCH (t:Ticket {tag : $ticket_tag}) "
+            "MATCH (u:User {tag : $uploaded_by}) "
+            "CREATE (a:Attachment {tag : $attachment_tag, filename : $filename, "
+            "content_type : $content_type, size : $size, extension : $extension, "
+            "created_at : timestamp()}) "
+            "MERGE (t)-[:HAS_ATTACHMENT]->(a) "
+            "MERGE (u)-[:UPLOADED]->(a) " + self._ATTACHMENT_RETURN
+        )
+        r = self._driver.execute_query(query, routing_="w",
+                                       ticket_tag = ticket_tag,
+                                       attachment_tag = attachment_tag,
+                                       uploaded_by = uploaded_by,
+                                       filename = filename,
+                                       content_type = content_type,
+                                       size = size,
+                                       extension = extension,
+                                       result_transformer_=Result.data)
+        return TicketAttachmentModel(**r[0]) if len(r) > 0 else None
+
+    def get_attachment(self, attachment_tag : str) -> Optional[TicketAttachmentModel]:
+        query = (
+            "MATCH (t:Ticket)-[:HAS_ATTACHMENT]->(a:Attachment {tag : $attachment_tag}) "
+            "MATCH (u:User)-[:UPLOADED]->(a) " + self._ATTACHMENT_RETURN
+        )
+        r = self._driver.execute_query(query, attachment_tag = attachment_tag,
+                                       result_transformer_=Result.data)
+        return TicketAttachmentModel(**r[0]) if len(r) > 0 else None
+
+    def get_attachments_for_ticket(self, ticket_tag : str) -> List[TicketAttachmentModel]:
+        query = (
+            "MATCH (t:Ticket {tag : $ticket_tag})-[:HAS_ATTACHMENT]->(a:Attachment) "
+            "MATCH (u:User)-[:UPLOADED]->(a) " + self._ATTACHMENT_RETURN + \
+            "ORDER BY a.created_at ASC "
+        )
+        r = self._driver.execute_query(query, routing_="r", ticket_tag = ticket_tag,
+                                       result_transformer_=Result.data)
+        return [TicketAttachmentModel(**row) for row in r]

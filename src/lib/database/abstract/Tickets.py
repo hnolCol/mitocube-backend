@@ -1,6 +1,12 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from config.models.tickets import TicketInput, TicketModel, TicketCreatedResponse, TicketStatusEnum
+from config.models.tickets import (
+    TicketAttachmentModel,
+    TicketInput,
+    TicketModel,
+    TicketCreatedResponse,
+    TicketStatusEnum,
+)
 
 
 class TicketsABC(ABC):
@@ -36,3 +42,19 @@ class TicketsABC(ABC):
     @abstractmethod
     def reopen_by_conversation(self, conversation_tag : str, user_tag : str) -> None: 
         """Reopens a ticket based on a conversation. This is typically called when a user replies to a conversation linked to a ticket."""
+
+    @abstractmethod
+    def insert_attachment(self, ticket_tag : str, attachment_tag : str, uploaded_by : str,
+                          filename : str, content_type : str, size : int,
+                          extension : str) -> Optional[TicketAttachmentModel]:
+        """Stores the metadata of an uploaded ticket attachment and links it to the ticket
+        and the uploading user. Returns the created attachment or None if ticket/user do not exist."""
+
+    @abstractmethod
+    def get_attachment(self, attachment_tag : str) -> Optional[TicketAttachmentModel]:
+        """Retrieves an attachment by its tag, including the tag of the ticket it belongs to.
+        Returns None if the attachment does not exist."""
+
+    @abstractmethod
+    def get_attachments_for_ticket(self, ticket_tag : str) -> List[TicketAttachmentModel]:
+        """Retrieves all attachments of a ticket, oldest first."""

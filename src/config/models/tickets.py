@@ -24,6 +24,18 @@ class TicketCreatedResponse(BaseModel):
     reference : str
 
 
+class TicketAttachmentModel(BaseModel):
+    tag : str
+    ticket_tag : str
+    filename : str           # original filename as uploaded
+    content_type : str       # detected MIME type, e.g. image/png
+    size : int               # size in bytes
+    extension : str          # stored file extension, e.g. .png
+    uploaded_by : str
+    uploaded_by_name : Optional[str] = None
+    created_at : int
+
+
 class TicketModel(BaseModel):
     tag : str
     reference : str
