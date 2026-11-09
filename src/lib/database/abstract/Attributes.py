@@ -223,7 +223,8 @@ class AttributesABC(ABC):
                                                    min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                                    limit : int = None,
                                                    attribute_tags : List[str] = None,
-                                                   attribute_groups : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None
+                                                   attribute_groups : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] = None,
+                                                   include_parent_paths : bool = False
                                                     ) -> List[AttributeTraitResponseModel]:
         """Finds attributes and attribute values by a search string the minimal required 
         state as well as a boolean param can be set. 
@@ -244,6 +245,42 @@ class AttributesABC(ABC):
         -------
         List[Tuple[AttributeModel,List[AttributeValueModel]]]
             If an attribute value matches the search string, the attribute must always be returned. 
+        """
+
+    
+    
+    @abstractmethod
+    def get_parent_chains(self, tags : List[str]) -> Dict[str, List[str]]:
+        """Returns the ordered ancestor chain (root first) for each attribute tag.
+        Only attributes with a single unambiguous ancestor chain receive a
+        non-empty result.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The attribute tags for which the ancestor chains should be returned.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            Maps each attribute tag to its ordered ancestor chain (root first).
+        """
+
+    @abstractmethod
+    def get_trait_implied_parent_traits(self, trait_tags : List[str]) -> Dict[str, List[Tuple[str, str]]]:
+        """Returns the implied parent traits for the given trait tags as
+        (parent_attribute_tag, parent_trait_tag) tuples. Traits without implied
+        parent traits map to an empty list.
+
+        Parameters
+        ----------
+        trait_tags : List[str]
+            The trait tags for which the implied parent traits should be returned.
+
+        Returns
+        -------
+        Dict[str, List[Tuple[str, str]]]
+            Maps each trait tag to its implied parent traits.
         """
 
     

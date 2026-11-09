@@ -11,6 +11,7 @@ from services.random_generators import get_random_string
 from config.exceptions.HTTPExceptions import tag_not_found
 from services.users import get_user_from_token
 from services.submission import check_submission_access
+from services.attribute_hierarchy import complete_or_validate_attribute_trees
 from typing import List, Dict, OrderedDict
 import pandas as pd
 
@@ -202,6 +203,14 @@ def update_submission_condition_applications(
     selected_traits: List[AttributeTree],
     user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    try:
+        selected_traits = complete_or_validate_attribute_trees(
+            get_parents=db.attributes.get_parents,
+            get_implied_parent_traits=db.attributes.get_trait_implied_parent_traits,
+            attribute_trees=selected_traits,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return db.submissions.edit_condition_applications(
         tag=submission_tag,
         attribute_trees=selected_traits

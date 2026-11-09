@@ -347,10 +347,21 @@ class AttributeTraitResponseModel(BaseModel):
     attribute: AttributeModel
     traits: List[TraitModel]
 
+class AttributeTraitPathNodeModel(BaseModel):
+    "A single attribute-trait step in a resolved attribute hierarchy path."
+    attribute_tag: str
+    trait_tag: str
+
 class AttributeTraitTagResponseModel(BaseModel):
-    "Returns an attribute (tag) and the corresponding trait tags."
+    """Returns an attribute (tag) and the corresponding trait tags.
+    When include_parent_paths is enabled, parent_tags contains the ordered
+    ancestor chain (root first) and trait_paths maps each trait tag that
+    deterministically implies its parent traits to the full resolved path
+    (root first)."""
     attribute_tag: str 
     trait_tags: List[str]
+    parent_tags: List[str] = []
+    trait_paths: Dict[str, List[AttributeTraitPathNodeModel]] = {}
 
 # class AttributeResponseModel(BaseModel):
 #     """
@@ -410,6 +421,7 @@ class InsertTraitModel(BaseModel):
     description: Optional[str] = ""
     priority: int = 500
     tag: Optional[str] = None
+    implies_trait_tags: Optional[List[str]] = None
 
     @model_validator(mode="after")
     def generate_tag(self):
@@ -420,7 +432,8 @@ class InsertTraitModel(BaseModel):
 
 class UpdateTraitModel(BaseModel):
     """Model for updating an existing trait. Only text, description,
-    and priority can be modified."""
+    priority and implied parent traits can be modified."""
     text: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[float] = None
+    implies_trait_tags: Optional[List[str]] = None

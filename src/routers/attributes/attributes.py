@@ -86,6 +86,7 @@ def get_attributes(
     min_state: SubmissionStatesEnums = None,
     attribute_groups: Optional[str] = None,  # Accept any string, handle parsing below
     include_traits: bool = True,
+    include_parent_paths: bool = False,
     limit: int = 20,
     attribute_tags : Optional[str] = None,
     group_by : Optional[Literal["attribute_group","min_state"]] = None,
@@ -94,6 +95,10 @@ def get_attributes(
     """
     Returns the stored attribute and traits.
     Allows multiple attribute groups separated by ';'.
+    When include_parent_paths is true, each returned attribute additionally
+    carries its ordered ancestor chain (parent_tags) and, per trait, the fully
+    resolved hierarchy path (trait_paths) when the trait deterministically
+    implies its parent traits.
     """
 
     if attribute_groups is not None:
@@ -105,7 +110,8 @@ def get_attributes(
                 min_state=min_state,
                 limit=limit,
                 attribute_groups=attribute_groups,
-                attribute_tags=APIParamString(param=attribute_tags).param 
+                attribute_tags=APIParamString(param=attribute_tags).param, 
+                include_parent_paths=include_parent_paths
             )
         
     if search_string is not None and isinstance(search_string, str) and len(search_string) > 0:

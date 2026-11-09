@@ -12,6 +12,7 @@ from config.models.annotations.feature import FeatureModel
 from config.models.feature import FeatureNeoModel
 from config.models.attributes import AttributeTreeNode, InsertTraitModel, UpdateTraitModel
 
+from services.attribute_hierarchy import resolve_trait_paths
 from services.json import read_json
 
 
@@ -877,7 +878,8 @@ class Neo4JAttributes(AttributesABC):
                                     min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                     limit : int = None, 
                                     attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] ]= None,
-                                    attribute_tags : List[str] = None) -> List[AttributeTraitTagResponseModel]:
+                                    attribute_tags : List[str] = None,
+                                    include_parent_paths : bool = False) -> List[AttributeTraitTagResponseModel]:
         """Finds the attribute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
         The result is ordered by the attribute priority and trait priority.
@@ -942,7 +944,27 @@ class Neo4JAttributes(AttributesABC):
             routing_="r", 
             database_="neo4j")
         
-        return [AttributeTraitTagResponseModel(**ri) for ri in r]
+        if not include_parent_paths:
+            return [AttributeTraitTagResponseModel(**ri) for ri in r]
+        
+        parent_chains = self.get_parent_chains([ri["attribute_tag"] for ri in r])
+        implied_edges = self.get_trait_implied_parent_traits(
+            [trait_tag for ri in r for trait_tag in ri["trait_tags"]]
+        )
+        
+        results = []
+        for ri in r:
+            parent_tags = parent_chains.get(ri["attribute_tag"], [])
+            trait_paths = resolve_trait_paths(
+                ri["attribute_tag"], ri["trait_tags"], parent_tags, implied_edges
+            )
+            results.append(AttributeTraitTagResponseModel(
+                attribute_tag=ri["attribute_tag"],
+                trait_tags=ri["trait_tags"],
+                parent_tags=parent_tags,
+                trait_paths=trait_paths
+            ))
+        return results
 
     def _build_relation_clauses(self, children: List[str], parents: List[str], required_trait_tags: List[str]) -> str:
         """Builds the optional UNWIND/MERGE clauses shared by insert() and update()."""
@@ -1112,6 +1134,65 @@ class Neo4JAttributes(AttributesABC):
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r if r else []
     
+    def get_parent_chains(self, tags : List[str]) -> Dict[str, List[str]]:
+        """Returns the ordered ancestor chain (root first) for each attribute tag.
+
+        Only attributes with a single unambiguous ancestor chain receive a
+        non-empty result; ambiguous chains (multiple parents or diamond
+        hierarchies) yield an empty list so callers can fall back to a
+        chained selection.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The attribute tags for which the ancestor chains should be returned.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            Maps each attribute tag to its ordered ancestor chain (root first).
+        """
+        query = (
+            "UNWIND $tags AS tag "
+            "MATCH (a:Attribute {tag: tag}) "
+            "OPTIONAL MATCH path = (a)<-[:IS_CHILD*]-(parent:Attribute) "
+            "WITH a, CASE WHEN path IS NULL THEN [a.tag] ELSE [node IN nodes(path) | node.tag] END AS chain "
+            "WITH a, collect(DISTINCT chain) AS chains "
+            "RETURN a.tag AS attribute_tag, "
+            "CASE WHEN size(chains) = 1 THEN reverse(tail(chains[0])) ELSE [] END AS parent_tags "
+        )
+        r = self._driver.execute_query(query, routing_="r", tags=tags, result_transformer_=Result.data)
+        return {ri["attribute_tag"]: ri["parent_tags"] for ri in r}
+    
+    def get_trait_implied_parent_traits(self, trait_tags : List[str]) -> Dict[str, List[Tuple[str, str]]]:
+        """Returns the implied parent traits for the given trait tags.
+
+        A trait implies a parent trait when a deterministic parent trait
+        exists for a hierarchically higher attribute, e.g. the explicit mass
+        spectrometer implies its mass spectrometer type. The implication is
+        stored on the trait level via the IMPLIED_TRAIT relationship.
+
+        Parameters
+        ----------
+        trait_tags : List[str]
+            The trait tags for which the implied parent traits should be returned.
+
+        Returns
+        -------
+        Dict[str, List[Tuple[str, str]]]
+            Maps each trait tag to a list of (parent_attribute_tag, parent_trait_tag)
+            tuples. Traits without implied parent traits map to an empty list.
+        """
+        query = (
+            "UNWIND $trait_tags AS trait_tag "
+            "MATCH (t:Trait {tag: trait_tag}) "
+            "OPTIONAL MATCH (t)-[:IMPLIED_TRAIT]->(implied:Trait) "
+            "RETURN t.tag AS trait_tag, "
+            "collect(DISTINCT CASE WHEN implied IS NULL THEN null ELSE [implied.attribute_tag, implied.tag] END) AS implied_traits "
+        )
+        r = self._driver.execute_query(query, routing_="r", trait_tags=trait_tags, result_transformer_=Result.data)
+        return {ri["trait_tag"]: [tuple(pair) for pair in ri["implied_traits"]] for ri in r}
+    
     def get_attribute_hierarchy(self, tags : List[str], submission_tag : str) -> List[AttributeTreeNode]:
         """_summary_
 
@@ -1215,11 +1296,29 @@ class Neo4JAttributes(AttributesABC):
             description=trait.description or "",
             priority=trait.priority,
         )
+        if trait.implies_trait_tags:
+            self._merge_implied_traits(trait.tag, trait.implies_trait_tags)
         return True
+    
+    def _merge_implied_traits(self, trait_tag: str, implies_trait_tags: List[str]):
+        """Creates the IMPLIED_TRAIT relationships from a trait to its implied parent traits."""
+        query = (
+            "MATCH (t:Trait {tag: $trait_tag}) "
+            "UNWIND $implies_trait_tags AS implied_tag "
+            "MATCH (implied:Trait {tag: implied_tag}) "
+            "MERGE (t)-[:IMPLIED_TRAIT]->(implied) "
+        )
+        self._driver.execute_query(
+            query,
+            routing_="w",
+            trait_tag=trait_tag,
+            implies_trait_tags=implies_trait_tags,
+        )
     
 
     def update_trait(self, trait_tag: str, trait: UpdateTraitModel) -> bool:
-        """Updates a trait's mutable properties (text, description, priority)."""
+        """Updates a trait's mutable properties (text, description, priority)
+        and, when provided, replaces its implied parent traits."""
         query = (
             "MATCH (t:Trait {tag: $trait_tag}) "
             "SET t += $props "
@@ -1227,12 +1326,21 @@ class Neo4JAttributes(AttributesABC):
             "    t.modified_at = timestamp() "
         )
 
+        props = trait.model_dump(exclude_none=True, exclude={"implies_trait_tags"})
         self._driver.execute_query(
             query,
             routing_="w",
             trait_tag=trait_tag,
-            props=trait.model_dump(exclude_none=True),
+            props=props,
         )
+        if trait.implies_trait_tags is not None:
+            delete_query = (
+                "MATCH (t:Trait {tag: $trait_tag})-[r:IMPLIED_TRAIT]->() "
+                "DELETE r "
+            )
+            self._driver.execute_query(delete_query, routing_="w", trait_tag=trait_tag)
+            if trait.implies_trait_tags:
+                self._merge_implied_traits(trait_tag, trait.implies_trait_tags)
         return True
     
 
