@@ -65,6 +65,9 @@ class FakeSubmissionsDB:
     def exists(self, tag):
         return tag == "sub-1"
 
+    def get_creator(self, tag):
+        return getattr(self, "creator_tag", "abcdefgh")
+
     def get_samples(self, tag, ignore_excluded=False, ignore_lost=False):
         return self.sample_tags
 
@@ -122,11 +125,33 @@ def test_get_sample_returns_lost_flag(client):
 
 
 def test_patch_lost(client, db):
+    """The default test user is the creator of sub-1, so the creator may mark a sample lost."""
     r = client.patch("/api/samples/sub-1|s1/lost?lost=true")
     assert r.status_code == 200
     assert r.json() is True
     assert db.samples.set_lost_calls == [("sub-1|s1", True)]
     assert db.samples.samples["sub-1|s1"]["lost"] is True
+
+
+def test_patch_lost_forbidden_for_non_creator(client, db, monkeypatch):
+    """A standard user who is not the creator (and not a curator) must not mark a sample lost."""
+    db.submissions.creator_tag = "someone-else"
+    r = client.patch("/api/samples/sub-1|s1/lost?lost=true")
+    assert r.status_code == 403
+    assert db.samples.set_lost_calls == []
+
+
+def test_patch_lost_allowed_for_group_curator(client, db, monkeypatch):
+    """A group curator with access to the submission may mark a sample lost."""
+    import tests.integration.test_sample_lost_comments_route as t
+    from config.enums.users.roles import UserRolesEnum
+
+    db.submissions.creator_tag = "someone-else"
+    client.app.dependency_overrides[get_user_from_token] = lambda: make_user(role=UserRolesEnum.GROUP_CURATOR)
+    r = client.patch("/api/samples/sub-1|s1/lost?lost=true")
+    assert r.status_code == 200
+    assert db.samples.set_lost_calls == [("sub-1|s1", True)]
+    client.app.dependency_overrides[get_user_from_token] = lambda: make_user()
 
 
 def test_patch_lost_unfound_sample_404(client):
@@ -139,6 +164,13 @@ def test_patch_exclude_still_works(client, db):
     assert r.status_code == 200
     assert r.json() is True
     assert db.samples.set_excluded_calls == [("sub-1|s1", True)]
+
+
+def test_patch_exclude_forbidden_for_non_creator(client, db):
+    db.submissions.creator_tag = "someone-else"
+    r = client.patch("/api/samples/sub-1|s1/exclude?excluded=true")
+    assert r.status_code == 403
+    assert db.samples.set_excluded_calls == []
 
 
 def test_insert_comment_sets_user_tag(client, db):
@@ -182,14 +214,8 @@ def test_comment_requires_access_to_parent_submission(client, monkeypatch):
     assert r.status_code == 403
 
 
-def test_lost_requires_access_to_parent_submission(client, monkeypatch):
-    import routers.samples.samples as samples_router_module
-
-    def deny(submission_tag, user, db=None):
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=403, detail="no access")
-
-    monkeypatch.setattr(samples_router_module, "check_submission_access", deny)
+def test_lost_requires_access_to_parent_submission(client, db, monkeypatch):
+    """A non-creator standard user with submission access (e.g. a collaborator) must not mark a sample lost."""
+    db.submissions.creator_tag = "someone-else"
     r = client.patch("/api/samples/sub-1|s1/lost?lost=true")
     assert r.status_code == 403
