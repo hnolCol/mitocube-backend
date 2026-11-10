@@ -1120,11 +1120,8 @@ class Neo4JSubmissions(SubmissionsABC):
     
     def get_proteomes(self, tag : str) -> List[str]:
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue)<-[:HAS_VALUE]-(a:Attribute {tag : 'att_proteome'}) "
-            "RETURN av.tag "
-            "UNION "
             "MATCH (submission:Submission {tag : $tag})-[:HAS_APPLICATION]->(ca:ConditionApplication) "
-            "MATCH (ca)-[:HAS_VALUE*0..]->(cv)-[:OF_ATTRIBUTE]->(a2:Attribute {tag : 'att_proteome'}) "
+            "MATCH (ca)-[:HAS_VALUE*0..]->(cv)-[:OF_ATTRIBUTE]->(a:Attribute {tag : 'att_proteome'}) "
             "WHERE EXISTS {(cv)-[:INSTANCE_OF]->(t:Trait)} "
             "RETURN t.tag "
         )
@@ -1133,11 +1130,8 @@ class Neo4JSubmissions(SubmissionsABC):
 
     def get_tags_by_proteome(self, proteome_tag : str) -> List[str]:
         query = (
-            "MATCH (submission:Submission)-[:HAS_ATTRIBUTE_VALUE]->(av:AttributeValue {tag : $proteome_tag})<-[:HAS_VALUE]-(a:Attribute {tag : 'att_proteome'}) "
-            "RETURN DISTINCT submission.tag "
-            "UNION "
             "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication) "
-            "MATCH (ca)-[:HAS_VALUE*0..]->(cv)-[:OF_ATTRIBUTE]->(a2:Attribute {tag : 'att_proteome'}) "
+            "MATCH (ca)-[:HAS_VALUE*0..]->(cv)-[:OF_ATTRIBUTE]->(a:Attribute {tag : 'att_proteome'}) "
             "WHERE EXISTS {(cv)-[:INSTANCE_OF]->(:Trait {tag : $proteome_tag})} "
             "RETURN DISTINCT submission.tag "
         )

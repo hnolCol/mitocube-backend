@@ -523,9 +523,8 @@ class SubmissionsABC(ABC):
 
     @abstractmethod
     def get_tags_by_proteome(self, proteome_tag: str) -> List[str]:
-        """Returns the tags of all submissions that are associated with the given proteome,
-        either via a submission attribute value of the attribute 'att_proteome' or via a
-        condition application (or nested condition value) of that attribute.
+        """Returns the tags of all submissions that are associated with the given proteome
+        via a condition application (or nested condition value) of the attribute 'att_proteome'.
 
         Parameters
         ----------
