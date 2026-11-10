@@ -71,7 +71,7 @@ class MFASettings(BaseSettings):
     MFA_LOCKOUT_MINUTES: int = 15
     MFA_ENCRYPTION_KEY: SecretStr = Field(
         ...,
-        description="MFA encryption key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --api-key"
+        description="MFA encryption key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --mfa-key"
         )
     LOGIN_RATE_LIMIT_MAX_ATTEMPTS: int = 10
     LOGIN_RATE_LIMIT_WINDOW_MINUTES: int = 10

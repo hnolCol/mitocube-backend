@@ -21,7 +21,8 @@ Usage:
 import secrets
 import string
 import argparse
-import sys
+
+from cryptography.fernet import Fernet
 
 
 def generate_jwt_key(length: int = 32) -> str:
@@ -37,8 +38,6 @@ def generate_jwt_key(length: int = 32) -> str:
     Returns:
         Secure JWT key string
     """
-    # Generate random bytes and encode as URL-safe base64
-    random_bytes = secrets.token_bytes(length)
     return secrets.token_urlsafe(length)
 
 
@@ -85,6 +84,20 @@ def generate_password(length: int = 24) -> str:
     secrets.SystemRandom().shuffle(password)
     
     return ''.join(password)
+
+
+def generate_mfa_encryption_key() -> str:
+    """
+    Generate a Fernet-compatible MFA encryption key.
+    
+    The MFA_ENCRYPTION_KEY is passed directly to cryptography's Fernet,
+    which requires a 32-byte key encoded as url-safe base64 with padding
+    (44 characters ending in '=').
+    
+    Returns:
+        Fernet-compatible encryption key string
+    """
+    return Fernet.generate_key().decode()
 
 
 def generate_api_key(length: int = 32) -> str:
@@ -144,6 +157,11 @@ def main():
         help="Generate API key"
     )
     parser.add_argument(
+        "--mfa-key", 
+        action="store_true", 
+        help="Generate Fernet-compatible MFA encryption key"
+    )
+    parser.add_argument(
         "--all", 
         action="store_true", 
         help="Generate all secrets"
@@ -177,6 +195,9 @@ def main():
         secrets_output["MAIL_PASSWORD"] = generate_password(args.length)
         secrets_output["SHARE_TOKEN_PW"] = generate_password(args.length)
     
+    if args.all or args.mfa_key:
+        secrets_output["MFA_ENCRYPTION_KEY"] = generate_mfa_encryption_key()
+    
     if args.all or args.api_key:
         secrets_output["OPENAI_API_KEY"] = generate_api_key()
     
@@ -189,6 +210,7 @@ def main():
             "MONGO_PASSWORD": generate_password(args.length),
             "MAIL_PASSWORD": generate_password(args.length),
             "SHARE_TOKEN_PW": generate_password(args.length),
+            "MFA_ENCRYPTION_KEY": generate_mfa_encryption_key(),
             "OPENAI_API_KEY": generate_api_key(),
         }
     
