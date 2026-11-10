@@ -1138,13 +1138,16 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", proteome_tag = proteome_tag, result_transformer_=Result.value)
         return r
 
-    def get_zscore_matrix(self, tag : str) -> pd.DataFrame:
+    def get_zscore_matrix(self, tag : str, annotation_tag : str = None) -> pd.DataFrame:
         query = (
             "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(f:Protein|ProteinGroup) "
             "WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
+            "AND ($annotation_tag IS NULL OR "
+            "  (f:ProteinGroup AND EXISTS {(f)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(:Annotation {tag : $annotation_tag})}) OR "
+            "  (f:Protein AND EXISTS {(f)<-[:ANNOTATES]-(:Annotation {tag : $annotation_tag})})) "
             "RETURN f.tag AS tag, sample.tag AS sample_tag, coalesce(q.z_score_sample, q.value) AS value "
         )
-        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df)
+        r = self._driver.execute_query(query, routing_="r", tag = tag, annotation_tag = annotation_tag, result_transformer_=Result.to_df)
         if r.empty:
             return pd.DataFrame()
         r = r.drop_duplicates(subset=["tag", "sample_tag"])

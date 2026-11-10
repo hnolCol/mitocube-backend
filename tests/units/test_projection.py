@@ -28,7 +28,7 @@ class FakeSubmissions:
     def __init__(self, matrices):
         self._matrices = matrices
 
-    def get_zscore_matrix(self, tag):
+    def get_zscore_matrix(self, tag, annotation_tag=None):
         return self._matrices.get(tag)
 
 
@@ -147,6 +147,32 @@ def test_result_cache_key_depends_on_visible_scope():
 def test_block_cache_key_is_namespaced_per_submission():
     assert block_cache_key("sub_a") != block_cache_key("sub_b")
     assert block_cache_key("sub_a").startswith("projection_block:")
+
+
+def test_cache_keys_depend_on_annotation_filter():
+    assert block_cache_key("sub_a", annotation_tag="ann_1") != block_cache_key("sub_a")
+    assert block_cache_key("sub_a", annotation_tag="ann_1") != block_cache_key("sub_a", annotation_tag="ann_2")
+    assert result_cache_key("prot_1", ["sub_a"], annotation_tag="ann_1") != result_cache_key("prot_1", ["sub_a"])
+    assert result_cache_key("prot_1", ["sub_a"], annotation_tag="ann_1") != result_cache_key("prot_1", ["sub_a"], annotation_tag="ann_2")
+
+
+def test_build_submission_block_passes_annotation_tag_to_db():
+    seen = {}
+
+    class RecordingSubmissions:
+        def get_zscore_matrix(self, tag, annotation_tag=None):
+            seen[tag] = annotation_tag
+            return pd.DataFrame(
+                [[1.0, 2.0], [3.0, 4.0]],
+                index=["pg_1", "pg_2"],
+                columns=["s1", "s2"],
+            )
+
+    class RecordingDB:
+        submissions = RecordingSubmissions()
+
+    assert build_submission_block(RecordingDB(), "sub_1", annotation_tag="ann_1") is not None
+    assert seen == {"sub_1": "ann_1"}
 
 
 def test_find_driver_returns_loadings_or_none():

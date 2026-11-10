@@ -34,27 +34,29 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 def _resolve_visible_blocks(db: DatabaseABC, user: UserModel, proteome_tag: str,
-                            min_valid_fraction: float) -> Tuple[List[str], List[Dict]]:
+                            min_valid_fraction: float, annotation_tag: str = None) -> Tuple[List[str], List[Dict]]:
     """Resolves the submissions of the proteome that are inside the requesting user's
-    submission scope and returns their (cached) projection blocks."""
+    submission scope and returns their (cached) projection blocks. If annotation_tag is
+    given, the blocks are restricted to proteins carrying that annotation."""
     proteome_submission_tags = db.submissions.get_tags_by_proteome(proteome_tag)
     scope = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
     visible_tags = resolve_visible_submission_tags(scope, proteome_submission_tags)
 
     blocks = [block for tag in visible_tags
-              if (block := get_submission_block_cached(db, tag, min_valid_fraction)) is not None]
+              if (block := get_submission_block_cached(db, tag, min_valid_fraction, annotation_tag)) is not None]
     if not blocks:
         raise no_data_found_http_exception
     return visible_tags, blocks
 
 
 def _compute_pooled_projection(db: DatabaseABC, user: UserModel, proteome_tag: str,
-                               method: str, n_components: int, min_valid_fraction: float) -> Tuple[Dict, List[Dict]]:
+                               method: str, n_components: int, min_valid_fraction: float,
+                               annotation_tag: str = None) -> Tuple[Dict, List[Dict]]:
     """Computes (or fetches from cache) the pooled projection over all submissions of the
     proteome that are inside the requesting user's submission scope. The result cache key
     embeds a hash of the visible submission tags, so results are never shared across scopes.
     Returns the result dict and the submission blocks it was built from."""
-    visible_tags, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction)
+    visible_tags, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction, annotation_tag)
 
     def compute():
         try:
@@ -75,7 +77,8 @@ def _compute_pooled_projection(db: DatabaseABC, user: UserModel, proteome_tag: s
 
     result = db_cache_runtime.get_or_compute(
         cache_key=result_cache_key(proteome_tag, visible_tags, method=method,
-                                   n_components=n_components, min_valid_fraction=min_valid_fraction),
+                                   n_components=n_components, min_valid_fraction=min_valid_fraction,
+                                   annotation_tag=annotation_tag),
         compute_fn=compute,
         cache_time=PROJECTION_RESULT_CACHE_TIME,
     )
@@ -88,6 +91,7 @@ def get_proteome_projection(
     method: Literal["pca"] = "pca",
     n_components: int = 2,
     min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    annotation_tag: str = None,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db),
 ) -> ProteomeProjectionResponseModel:
@@ -96,12 +100,15 @@ def get_proteome_projection(
     given proteome that the requesting user has access to. Per-submission z-scored
     quantification matrices are cached per submission; the user's submission scope is
     applied when assembling the pooled matrix and the PCA is computed fresh per scope.
+    If annotation_tag is given, only proteins carrying that annotation are used.
     """
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
+    if annotation_tag is not None and not db.annotations.exists(tag=annotation_tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
     result, _ = _compute_pooled_projection(
         db, user, proteome_tag, method=method, n_components=n_components,
-        min_valid_fraction=min_valid_fraction)
+        min_valid_fraction=min_valid_fraction, annotation_tag=annotation_tag)
     sample_ca_map = get_sample_condition_map(db, result["submission_tags"])
     return ProteomeProjectionResponseModel(**enrich_result_with_conditions(result, sample_ca_map))
 
@@ -112,6 +119,7 @@ def get_proteome_projection_driver(
     protein_tag: str,
     n_components: int = 4,
     min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    annotation_tag: str = None,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db),
 ) -> ProteomeProjectionDriverResponseModel:
@@ -127,10 +135,13 @@ def get_proteome_projection_driver(
         raise HTTPException(status_code=404, detail="Proteome not found")
     if not db.protein_groups.exists(tag=protein_tag):
         raise HTTPException(status_code=404, detail="Protein group not found")
+    if annotation_tag is not None and not db.annotations.exists(tag=annotation_tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
 
     result, blocks = _compute_pooled_projection(db, user, proteome_tag, method="pca",
                                                  n_components=n_components,
-                                                 min_valid_fraction=min_valid_fraction)
+                                                 min_valid_fraction=min_valid_fraction,
+                                                 annotation_tag=annotation_tag)
     driver = find_driver(result, protein_tag)
     if driver is None:
         raise HTTPException(status_code=404, detail="Protein group is not quantified in enough submissions of this proteome to be part of the projection universe.")
@@ -156,6 +167,7 @@ def get_proteome_projection_condition_effects(
     ca_tag: str,
     limit: int = 50,
     min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    annotation_tag: str = None,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db),
 ) -> ProteomeProjectionEffectResponseModel:
@@ -165,11 +177,14 @@ def get_proteome_projection_condition_effects(
     effect is the mean z-score in samples carrying the condition application minus the mean
     z-score in all other samples, ranked by absolute effect (most affected proteins first),
     with a standardized effect size (Cohen's d). Computed on the same user-scoped pooled
-    data as the projection endpoints.
+    data as the projection endpoints. If annotation_tag is given, only proteins carrying
+    that annotation are ranked.
     """
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
-    _, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction)
+    if annotation_tag is not None and not db.annotations.exists(tag=annotation_tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
+    _, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction, annotation_tag)
     submission_tags = sorted(block["submission_tag"] for block in blocks)
     sample_ca_map = get_sample_condition_map(db, submission_tags)
     if not any(ca_tag in cas for cas in sample_ca_map.values()):
@@ -192,6 +207,7 @@ def get_proteome_projection_attribute_effects(
     n_components: int = 4,
     top_proteins: int = 10,
     min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+    annotation_tag: str = None,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db),
 ) -> ProteomeProjectionAttributeEffectResponseModel:
@@ -201,13 +217,17 @@ def get_proteome_projection_attribute_effects(
     this proteome, returns a quantitative separation score on the pooled projection (which CA
     values separate the samples along the components) and the top affected proteins per CA
     (mean z in CA samples minus mean z in all other samples). Conditions are sorted by
-    separation, strongest first.
+    separation, strongest first. If annotation_tag is given, only proteins carrying that
+    annotation are used for the projection and the per-condition effects.
     """
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
+    if annotation_tag is not None and not db.annotations.exists(tag=annotation_tag):
+        raise HTTPException(status_code=404, detail="Annotation not found")
     result, blocks = _compute_pooled_projection(db, user, proteome_tag, method="pca",
                                                  n_components=n_components,
-                                                 min_valid_fraction=min_valid_fraction)
+                                                 min_valid_fraction=min_valid_fraction,
+                                                 annotation_tag=annotation_tag)
     submission_tags = result["submission_tags"]
     sample_ca_map = get_sample_condition_map(db, submission_tags)
     ca_attribute_map = get_ca_attribute_map(db, submission_tags)

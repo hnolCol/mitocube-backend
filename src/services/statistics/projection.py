@@ -21,17 +21,21 @@ DEFAULT_MIN_BLOCK_OCCURRENCE = 2
 DEFAULT_MIN_BLOCK_FRACTION = 0.05
 
 
-def block_cache_key(submission_tag: str, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION) -> str:
+def block_cache_key(submission_tag: str, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+                    annotation_tag: Optional[str] = None) -> str:
     return db_cache_runtime.make_cache_key(
-        key_data={"submission_tag": submission_tag, "min_valid_fraction": min_valid_fraction},
+        key_data={"submission_tag": submission_tag, "min_valid_fraction": min_valid_fraction,
+                  "annotation_tag": annotation_tag},
         namespace=PROJECTION_BLOCK_NAMESPACE,
     )
 
 
 def result_cache_key(proteome_tag: str, visible_submission_tags: List[str], method: str = "pca",
-                     n_components: int = 2, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION) -> str:
+                     n_components: int = 2, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+                     annotation_tag: Optional[str] = None) -> str:
     """Cache key for a pooled projection result. The key includes a hash of the user's
-    visible submission tags, so results are never shared across different scopes."""
+    visible submission tags, so results are never shared across different scopes, and the
+    annotation filter so different filters never share a cached result."""
     scope_hash = hashlib.sha256(json.dumps(sorted(visible_submission_tags)).encode()).hexdigest()
     return db_cache_runtime.make_cache_key(
         key_data={
@@ -39,6 +43,7 @@ def result_cache_key(proteome_tag: str, visible_submission_tags: List[str], meth
             "method": method,
             "n_components": n_components,
             "min_valid_fraction": min_valid_fraction,
+            "annotation_tag": annotation_tag,
             "scope_hash": scope_hash,
         },
         namespace=f"{PROJECTION_RESULT_NAMESPACE}:{proteome_tag}",
@@ -55,12 +60,14 @@ def resolve_visible_submission_tags(scope: Optional[List[str]], proteome_submiss
     return [tag for tag in proteome_submission_tags if tag in scope_set]
 
 
-def build_submission_block(db, submission_tag: str, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION) -> Optional[Dict]:
+def build_submission_block(db, submission_tag: str, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+                           annotation_tag: Optional[str] = None) -> Optional[Dict]:
     """Builds the cacheable per-submission block: the per-sample z-scored quantification
-    matrix (samples x protein groups), restricted to protein groups quantified in at least
+    matrix (samples x proteins), restricted to proteins quantified in at least
     min_valid_fraction of the submission's samples, with remaining missing values imputed
-    as 0 (neutral for z-scored data)."""
-    matrix = db.submissions.get_zscore_matrix(submission_tag)
+    as 0 (neutral for z-scored data). If annotation_tag is given, only proteins carrying
+    that annotation are included."""
+    matrix = db.submissions.get_zscore_matrix(submission_tag, annotation_tag=annotation_tag)
     if matrix is None or matrix.empty:
         return None
     valid_fraction = matrix.notna().mean(axis=1)
@@ -76,10 +83,11 @@ def build_submission_block(db, submission_tag: str, min_valid_fraction: float = 
     }
 
 
-def get_submission_block_cached(db, submission_tag: str, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION) -> Optional[Dict]:
+def get_submission_block_cached(db, submission_tag: str, min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
+                                annotation_tag: Optional[str] = None) -> Optional[Dict]:
     return db_cache_runtime.get_or_compute(
-        cache_key=block_cache_key(submission_tag, min_valid_fraction),
-        compute_fn=lambda: build_submission_block(db, submission_tag, min_valid_fraction),
+        cache_key=block_cache_key(submission_tag, min_valid_fraction, annotation_tag),
+        compute_fn=lambda: build_submission_block(db, submission_tag, min_valid_fraction, annotation_tag),
         cache_time=PROJECTION_BLOCK_CACHE_TIME,
     )
 

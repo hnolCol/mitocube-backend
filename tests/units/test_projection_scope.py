@@ -40,7 +40,7 @@ class FakeSubmissions:
         assert proteome_tag == PROTEOME
         return list(ALL_SUBMISSIONS)
 
-    def get_zscore_matrix(self, tag):
+    def get_zscore_matrix(self, tag, annotation_tag=None):
         self.requested_matrices.append(tag)
         return make_matrix(seed=abs(hash(tag)) % 1000)
 
