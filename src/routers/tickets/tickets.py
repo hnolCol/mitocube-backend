@@ -1,9 +1,11 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from typing import List, Optional
 
 from config.enums.users.roles import UserRolesEnum
 from config.models.messages import ConversationInput, MessageInput
 from config.models.tickets import (
+    TicketAttachmentModel,
     TicketCreatedResponse,
     TicketInput,
     TicketModel,
@@ -15,7 +17,9 @@ from config.settings.email import get_email_settings
 from config.settings.general import get_general_settings
 from lib.database.abstract.Database import DatabaseABC
 from lib.database.Database import get_db
+from services import ticket_attachments
 from services.mail import send_email_in_background
+from services.random_generators import get_random_string
 from services.users import get_user_from_token
 
 EMAIL_SETTINGS = get_email_settings()
@@ -51,6 +55,14 @@ def _get_ticket_or_404(ticket_tag: str, db: DatabaseABC) -> TicketModel:
     ticket = db.tickets.get_ticket(ticket_tag)
     if ticket is None:
         raise HTTPException(status_code=404, detail="Ticket not found.")
+    return ticket
+
+
+def _get_ticket_with_access(ticket_tag: str, user: UserModel, db: DatabaseABC) -> TicketModel:
+    """Returns the ticket if the user raised it or is an admin, 404/403 otherwise."""
+    ticket = _get_ticket_or_404(ticket_tag, db)
+    if ticket.raised_by != user.tag and user.role < UserRolesEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="You have no access to this ticket.")
     return ticket
 
 
@@ -187,10 +199,7 @@ def get_ticket(ticket_tag: str,
                user: UserModel = Depends(get_user_from_token),
                db: DatabaseABC = Depends(get_db)) -> TicketModel:
     """Returns a single ticket including its handler and conversation tag."""
-    ticket = _get_ticket_or_404(ticket_tag, db)
-    if ticket.raised_by != user.tag and user.role < UserRolesEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="You have no access to this ticket.")
-    return ticket
+    return _get_ticket_with_access(ticket_tag, user, db)
 
 
 @router.post("/tickets/{ticket_tag}/reply", summary="Replies to and/or resolves a ticket. The first admin to act becomes the handler. Admin rights required.")
@@ -229,3 +238,76 @@ def reply_to_ticket(ticket_tag: str,
             _notify_ticket_resolved(background_task, db, ticket, user)
 
     return db.tickets.get_ticket(ticket_tag)
+
+
+# ---------- attachments ----------
+
+async def _read_upload(file: UploadFile, max_size: int) -> bytes:
+    """Reads the whole upload, raising 413 as soon as the size limit is exceeded."""
+    data = bytearray()
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > max_size:
+            raise HTTPException(status_code=413,
+                                detail=f"The image is larger than {max_size // (1024 * 1024)} MB.")
+    return bytes(data)
+
+
+@router.post("/tickets/{ticket_tag}/attachments", status_code=201,
+             summary="Uploads an image (e.g. a screenshot) to a ticket. Ticket raiser or admin required.")
+async def upload_attachment(ticket_tag: str,
+                            file: UploadFile = File(...),
+                            user: UserModel = Depends(get_user_from_token),
+                            db: DatabaseABC = Depends(get_db)) -> TicketAttachmentModel:
+    """Stores a PNG/JPEG/GIF/WebP image on disk and its metadata in the database.
+    The image type is verified from the file's magic bytes, not the filename."""
+    ticket = _get_ticket_with_access(ticket_tag, user, db)
+    max_size = GENERAL_SETTINGS.ticket_attachment_max_size_mb * 1024 * 1024
+    data = await _read_upload(file, max_size)
+    detected = ticket_attachments.detect_image_type(data)
+    if detected is None:
+        raise HTTPException(status_code=415, detail="Only PNG, JPEG, GIF or WebP images are allowed.")
+    mime, ext = detected
+    attachment_tag = get_random_string(N=12)
+    path = ticket_attachments.get_attachment_path(ticket.tag, attachment_tag, ext)
+    ticket_attachments.save_attachment_file(path, data)
+    attachment = db.tickets.insert_attachment(ticket_tag=ticket.tag,
+                                              attachment_tag=attachment_tag,
+                                              uploaded_by=user.tag,
+                                              filename=ticket_attachments.sanitize_filename(file.filename),
+                                              content_type=mime,
+                                              size=len(data),
+                                              extension=ext)
+    if attachment is None:
+        path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="Attachment could not be stored.")
+    return attachment
+
+
+@router.get("/tickets/{ticket_tag}/attachments",
+            summary="Lists the image attachments of a ticket. Ticket raiser or admin required.")
+def list_attachments(ticket_tag: str,
+                     user: UserModel = Depends(get_user_from_token),
+                     db: DatabaseABC = Depends(get_db)) -> List[TicketAttachmentModel]:
+    _get_ticket_with_access(ticket_tag, user, db)
+    return db.tickets.get_attachments_for_ticket(ticket_tag)
+
+
+@router.get("/tickets/{ticket_tag}/attachments/{attachment_tag}",
+            summary="Downloads an image attachment. Ticket raiser or admin required.")
+def download_attachment(ticket_tag: str,
+                        attachment_tag: str,
+                        user: UserModel = Depends(get_user_from_token),
+                        db: DatabaseABC = Depends(get_db)) -> FileResponse:
+    _get_ticket_with_access(ticket_tag, user, db)
+    attachment = db.tickets.get_attachment(attachment_tag)
+    if attachment is None or attachment.ticket_tag != ticket_tag:
+        raise HTTPException(status_code=404, detail="Attachment not found.")
+    path = ticket_attachments.get_attachment_path(ticket_tag, attachment.tag, attachment.extension)
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Attachment file not found.")
+    return FileResponse(path, media_type=attachment.content_type, filename=attachment.filename,
+                        headers={"X-Content-Type-Options": "nosniff"})
