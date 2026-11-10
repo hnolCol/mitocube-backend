@@ -10,6 +10,7 @@ from config.exceptions.HTTPExceptions import no_data_found_http_exception
 from services.users import get_user_from_token
 from services.statistics.projection import (
     assemble_pooled_pca,
+    attribute_protein_effects_cache_key,
     compute_attribute_protein_effects,
     compute_ca_separation,
     compute_condition_effects,
@@ -88,6 +89,7 @@ def get_proteome_attribute_protein_effects(
     proteome_tag: str,
     attribute_tag: str,
     limit: int = 50,
+    annotation_tag: str = None,
     min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db),
@@ -97,25 +99,46 @@ def get_proteome_attribute_protein_effects(
     in the user's visible submissions of this proteome, the effect is the mean z-score in
     samples carrying any condition application of the given attribute minus the mean
     z-score in samples carrying none of them, ranked by absolute effect (most affected
-    proteins first, 1-based rank). Each protein also carries, per condition application of
-    the attribute, the mean z-score, sample count and contributing submission count.
+    proteins first, 1-based rank). Each protein also carries max_abs_ca_effect (its largest
+    absolute per-CA effect, so proteins responding to a single condition are not hidden by
+    opposing conditions cancelling out in the pooled effect) and, per condition application
+    of the attribute, the mean z-score, sample count and contributing submission count.
+    If annotation_tag is given, only protein groups of that annotation are ranked. The result
+    is cached per user scope (visible submission tags, attribute, annotation and parameters).
     """
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
-    _, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction)
+    if annotation_tag is not None and not db.annotations.exists(tag=annotation_tag):
+        raise HTTPException(status_code=404, detail=f"Annotation tag {annotation_tag} not found.")
+    visible_tags, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction)
     submission_tags = sorted(block["submission_tag"] for block in blocks)
-    sample_ca_map = get_sample_condition_map(db, submission_tags)
-    ca_attribute_map = get_ca_attribute_map(db, submission_tags)
-    ca_tags = sorted(ca for ca, attr in ca_attribute_map.items() if attr == attribute_tag)
-    if not ca_tags:
-        raise HTTPException(status_code=404, detail="No condition applications of this attribute found among the samples of the accessible submissions of this proteome.")
-    proteins = compute_attribute_protein_effects(blocks, sample_ca_map, ca_tags, limit=limit)
-    return ProteomeAttributeProteinEffectsResponseModel(
-        attribute_tag=attribute_tag,
-        n_submissions=len(blocks),
-        ca_tags=ca_tags,
-        proteins=proteins,
+
+    def compute():
+        sample_ca_map = get_sample_condition_map(db, submission_tags)
+        ca_attribute_map = get_ca_attribute_map(db, submission_tags)
+        ca_tags = sorted(ca for ca, attr in ca_attribute_map.items() if attr == attribute_tag)
+        if not ca_tags:
+            raise HTTPException(status_code=404, detail="No condition applications of this attribute found among the samples of the accessible submissions of this proteome.")
+        annotation_proteins = None
+        if annotation_tag is not None:
+            annotation_proteins = db.annotations.get_protein_tags(tag=annotation_tag)
+        proteins = compute_attribute_protein_effects(blocks, sample_ca_map, ca_tags, limit=limit,
+                                                     protein_tags=annotation_proteins)
+        return {
+            "attribute_tag": attribute_tag,
+            "n_submissions": len(blocks),
+            "ca_tags": ca_tags,
+            "proteins": proteins,
+        }
+
+    result = db_cache_runtime.get_or_compute(
+        cache_key=attribute_protein_effects_cache_key(proteome_tag, visible_tags, attribute_tag,
+                                                      annotation_tag=annotation_tag, limit=limit,
+                                                      min_valid_fraction=min_valid_fraction),
+        compute_fn=compute,
+        cache_time=PROJECTION_RESULT_CACHE_TIME,
     )
+    return ProteomeAttributeProteinEffectsResponseModel(**result)
 
 
 @router.get("/{proteome_tag}/projection", tags=["Dimensional reduction", "PCA"])

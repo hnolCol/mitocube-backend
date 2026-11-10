@@ -45,6 +45,27 @@ def result_cache_key(proteome_tag: str, visible_submission_tags: List[str], meth
     )
 
 
+def attribute_protein_effects_cache_key(proteome_tag: str, visible_submission_tags: List[str],
+                                       attribute_tag: str, annotation_tag: Optional[str] = None,
+                                       limit: int = 50,
+                                       min_valid_fraction: float = DEFAULT_MIN_VALID_FRACTION) -> str:
+    """Cache key for an attribute protein effects result. The key includes a hash of the
+    user's visible submission tags (and the optional annotation filter), so results are
+    never shared across different scopes or protein universes."""
+    scope_hash = hashlib.sha256(json.dumps(sorted(visible_submission_tags)).encode()).hexdigest()
+    return db_cache_runtime.make_cache_key(
+        key_data={
+            "proteome_tag": proteome_tag,
+            "attribute_tag": attribute_tag,
+            "annotation_tag": annotation_tag,
+            "limit": limit,
+            "min_valid_fraction": min_valid_fraction,
+            "scope_hash": scope_hash,
+        },
+        namespace=f"{PROJECTION_RESULT_NAMESPACE}:{proteome_tag}",
+    )
+
+
 def resolve_visible_submission_tags(scope: Optional[List[str]], proteome_submission_tags: List[str]) -> List[str]:
     """Intersects the proteome's submissions with the user's submission scope.
     A scope of None means unrestricted (curator/admin) and returns all proteome submissions;
@@ -348,13 +369,19 @@ def compute_protein_ca_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, Li
 
 
 def compute_attribute_protein_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, List[str]],
-                                        ca_tags: List[str], limit: int = 50) -> List[Dict]:
+                                        ca_tags: List[str], limit: int = 50,
+                                        protein_tags: Optional[List[str]] = None) -> List[Dict]:
     """Per-protein effect of an attribute across its condition applications, pooled over
     all given blocks: effect = mean z in samples carrying any CA of the attribute minus
     mean z in samples carrying none of them. Each protein additionally carries its mean z,
-    sample count and contributing submission count per CA. Returns the top `limit` proteins
-    by absolute effect, most affected first, with 1-based ranks."""
+    sample count and contributing submission count per CA, plus max_abs_ca_effect: the
+    largest absolute per-CA effect (mean z in samples with that CA minus the attribute-level
+    out mean), which surfaces proteins that respond strongly to a single condition even when
+    opposing conditions cancel out in the pooled effect. If protein_tags is given, only those
+    protein groups are ranked (e.g. the members of an annotation). Returns the top `limit`
+    proteins by absolute effect, most affected first, with 1-based ranks."""
     ca_set = set(ca_tags)
+    allowed = set(protein_tags) if protein_tags is not None else None
     in_sums: Dict[str, float] = {}
     in_counts: Dict[str, int] = {}
     out_sums: Dict[str, float] = {}
@@ -395,28 +422,34 @@ def compute_attribute_protein_effects(blocks: List[Dict], sample_ca_map: Dict[tu
 
     ranked = []
     for protein in set(in_sums) & set(out_sums):
+        if allowed is not None and protein not in allowed:
+            continue
         mean_in = in_sums[protein] / in_counts[protein]
         mean_out = out_sums[protein] / out_counts[protein]
-        ranked.append((protein, mean_in - mean_out))
+        ranked.append((protein, mean_in - mean_out, mean_out))
     ranked.sort(key=lambda item: abs(item[1]), reverse=True)
 
     proteins = []
-    for rank, (protein, effect) in enumerate(ranked[:limit], start=1):
+    for rank, (protein, effect, mean_out) in enumerate(ranked[:limit], start=1):
         conditions = []
+        max_abs_ca_effect = 0.0
         for ca in sorted(ca_set):
             if protein not in ca_sums[ca]:
                 continue
             n_samples = ca_counts[ca][protein]
+            mean_z = ca_sums[ca][protein] / n_samples
             conditions.append({
                 "ca_tag": ca,
-                "mean_z": ca_sums[ca][protein] / n_samples,
+                "mean_z": mean_z,
                 "n_samples": n_samples,
                 "n_submissions": len(ca_submissions[ca]),
             })
+            max_abs_ca_effect = max(max_abs_ca_effect, abs(mean_z - mean_out))
         proteins.append({
             "tag": protein,
             "rank": rank,
             "effect": effect,
+            "max_abs_ca_effect": max_abs_ca_effect,
             "conditions": conditions,
         })
     return proteins

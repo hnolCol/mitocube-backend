@@ -100,6 +100,7 @@ class AttributeProteinEffectModel(BaseModel):
     tag: str
     rank: int
     effect: float
+    max_abs_ca_effect: float
     conditions: List[AttributeProteinConditionModel] = []
 
 
