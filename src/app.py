@@ -227,7 +227,7 @@ templates = Jinja2Templates(directory=GENERAL_SETTINGS.frontend_build)
 
 @app.get("/", include_in_schema=False)
 def frontend(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 app.mount("/assets", StaticFiles(directory=GENERAL_SETTINGS.frontend_build_assets, html=True), name="frontend assets")
 
