@@ -622,3 +622,21 @@ class Neo4JGenotype(GenotypeABC):
         )
         r = self._driver.execute_query(query, tag=tag, routing_="r", result_transformer_=Result.value)
         return r[0] if r else None
+
+    def shares_group_with_creator(self, user_tag: str, tag: str) -> bool:
+        """Checks if the creator of the genotype shares a research group with the user."""
+        query = (
+            "MATCH (u:User {tag: $user_tag}), (g:Genotype {tag: $tag}) "
+            "RETURN EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(g) } AS shares_group"
+        )
+        r = self._driver.execute_query(query, user_tag=user_tag, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if r else False
+
+    def is_creator(self, user_tag: str, tag: str) -> bool:
+        """Checks if the given user is the creator of the genotype."""
+        query = (
+            "MATCH (u:User {tag: $user_tag}), (g:Genotype {tag: $tag}) "
+            "RETURN EXISTS { (u)-[:CREATED]->(g) } AS is_creator"
+        )
+        r = self._driver.execute_query(query, user_tag=user_tag, tag=tag, routing_="r", result_transformer_=Result.value)
+        return r[0] if r else False
