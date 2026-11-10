@@ -203,10 +203,10 @@ class Neo4JAttributes(AttributesABC):
                 query += "MATCH (groupByNode:State)<-[:REQUIRES_STATE]-(a) "
 
             query += "WITH groupByNode.tag as group_by_node, a.tag as tag, a.priority as priority "
-            query += "ORDER BY priority DESC, a.text ASC "
+            query += "ORDER BY priority DESC, CASE WHEN EXISTS {(a)<-[:IS_CHILD]-(:Attribute)} THEN 1 ELSE 0 END, a.text ASC "
             query += "RETURN group_by_node, collect(tag) as tags "
         else:
-            query += "RETURN a.tag ORDER BY a.priority DESC, a.text ASC "
+            query += "RETURN a.tag ORDER BY a.priority DESC, CASE WHEN EXISTS {(a)<-[:IS_CHILD]-(:Attribute)} THEN 1 ELSE 0 END, a.text ASC "
 
 
         if limit is not None:
@@ -877,10 +877,13 @@ class Neo4JAttributes(AttributesABC):
                                     min_state : SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED, 
                                     limit : int = None, 
                                     attribute_groups : List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] ]= None,
-                                    attribute_tags : List[str] = None) -> List[AttributeTraitTagResponseModel]:
+                                    attribute_tags : List[str] = None,
+                                    include_parent_paths : bool = False) -> List[AttributeTraitTagResponseModel]:
         """Finds the attribute and the corresponding attribute values. 
         Please note that if a search matches the attribute, then all attribute value are returned.
-        The result is ordered by the attribute priority and trait priority.
+        The result is ordered by the attribute priority and trait priority; on equal
+        attribute priority, attributes without parents are preferred over child
+        attributes so that hierarchy entry points surface first.
         If the search string is None, then all attributes are returned.
         
         Parameters
@@ -924,7 +927,9 @@ class Neo4JAttributes(AttributesABC):
 
             
         query += (
-            "WITH a, t ORDER BY a.priority DESC, t.priority DESC "
+            "WITH a, t ORDER BY a.priority DESC, "
+            "CASE WHEN EXISTS {(a)<-[:IS_CHILD]-(:Attribute)} THEN 1 ELSE 0 END, "
+            "t.priority DESC "
             "RETURN a.tag as attribute_tag, collect(DISTINCT t.tag) as trait_tags "
         )
 
@@ -942,7 +947,19 @@ class Neo4JAttributes(AttributesABC):
             routing_="r", 
             database_="neo4j")
         
-        return [AttributeTraitTagResponseModel(**ri) for ri in r]
+        if not include_parent_paths:
+            return [AttributeTraitTagResponseModel(**ri) for ri in r]
+        
+        parent_chains = self.get_parent_chains([ri["attribute_tag"] for ri in r])
+        
+        results = []
+        for ri in r:
+            results.append(AttributeTraitTagResponseModel(
+                attribute_tag=ri["attribute_tag"],
+                trait_tags=ri["trait_tags"],
+                parent_tags=parent_chains.get(ri["attribute_tag"], [])
+            ))
+        return results
 
     def _build_relation_clauses(self, children: List[str], parents: List[str], required_trait_tags: List[str]) -> str:
         """Builds the optional UNWIND/MERGE clauses shared by insert() and update()."""
@@ -1111,6 +1128,36 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r if r else []
+    
+    def get_parent_chains(self, tags : List[str]) -> Dict[str, List[str]]:
+        """Returns the ordered ancestor chain (root first) for each attribute tag.
+
+        Only attributes with a single unambiguous ancestor chain receive a
+        non-empty result; ambiguous chains (multiple parents or diamond
+        hierarchies) yield an empty list so callers can fall back to a
+        chained selection.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The attribute tags for which the ancestor chains should be returned.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            Maps each attribute tag to its ordered ancestor chain (root first).
+        """
+        query = (
+            "UNWIND $tags AS tag "
+            "MATCH (a:Attribute {tag: tag}) "
+            "OPTIONAL MATCH path = (a)<-[:IS_CHILD*]-(parent:Attribute) "
+            "WITH a, CASE WHEN path IS NULL THEN [a.tag] ELSE [node IN nodes(path) | node.tag] END AS chain "
+            "WITH a, collect(DISTINCT chain) AS chains "
+            "RETURN a.tag AS attribute_tag, "
+            "CASE WHEN size(chains) = 1 THEN reverse(tail(chains[0])) ELSE [] END AS parent_tags "
+        )
+        r = self._driver.execute_query(query, routing_="r", tags=tags, result_transformer_=Result.data)
+        return {ri["attribute_tag"]: ri["parent_tags"] for ri in r}
     
     def get_attribute_hierarchy(self, tags : List[str], submission_tag : str) -> List[AttributeTreeNode]:
         """_summary_

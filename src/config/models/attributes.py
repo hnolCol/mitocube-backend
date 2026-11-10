@@ -348,9 +348,12 @@ class AttributeTraitResponseModel(BaseModel):
     traits: List[TraitModel]
 
 class AttributeTraitTagResponseModel(BaseModel):
-    "Returns an attribute (tag) and the corresponding trait tags."
+    """Returns an attribute (tag) and the corresponding trait tags.
+    When include_parent_paths is enabled, parent_tags contains the ordered
+    ancestor chain (root first)."""
     attribute_tag: str 
     trait_tags: List[str]
+    parent_tags: List[str] = []
 
 # class AttributeResponseModel(BaseModel):
 #     """
