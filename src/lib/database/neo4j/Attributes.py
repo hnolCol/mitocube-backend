@@ -164,7 +164,13 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         
-        return AttributeModel(**r[0])
+        props = r[0]
+        if props.get("combined"):
+            # Synthetic dual-attribute nodes created by the statistics pipeline
+            # only carry name/combined; fill the required model fields.
+            props.setdefault("text", props.get("name") or tag)
+            props.setdefault("allow_input", False)
+        return AttributeModel(**props)
     
     
     def find_attribute(self, search_string : str = None, 
@@ -174,26 +180,21 @@ class Neo4JAttributes(AttributesABC):
                        group_by : Literal["attribute_group"] = None) -> List[str]|Dict[str, List[str]]:
         if all(a is None for a in [search_string, attribute_groups]): raise ValueError("Either 'search_string', 'attribute_groups' or 'min_state' must be provided.")
 
-        query = "MATCH (a:Attribute) WHERE "
+        query = "MATCH (a:Attribute) WHERE coalesce(a.combined, false) = false "
             
         if search_string is not None:
-            query += "a.s CONTAINS $search_string "
+            query += "AND a.s CONTAINS $search_string "
         
         if attribute_groups is not None:
 
             if isinstance(attribute_groups, str):
                 attribute_groups = [attribute_groups]
 
-            if search_string is not None:
-                query += "AND "
-
-            query += "EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
+            query += "AND EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
             
             
         if min_state is not None:
-            if search_string is not None or (attribute_groups is not None and len(attribute_groups) > 0):
-                query += "AND "
-            query += " EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
+            query += "AND EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             
         
         if group_by is not None:
@@ -355,27 +356,19 @@ class Neo4JAttributes(AttributesABC):
         
         query = (
             "MATCH (a:Attribute) "
+            "WHERE coalesce(a.combined, false) = false "
         )
         if tags is not None:
-            query = (
-                "MATCH (a:Attribute) "
-                "WHERE a.tag in $tags "
-            )
+            query += "AND a.tag in $tags "
         
         if attribute_groups is not None:
             if isinstance(attribute_groups,str):
                 attribute_groups = [attribute_groups]
                 
-            if tags is None:
-                query += "WHERE EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups}"
-            else:
-                query += "AND EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
+            query += "AND EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
             
         if min_state is not None:
-            if tags is None and attribute_groups is None:
-                query += "WHERE EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
-            else:
-                query += "AND EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
+            query += "AND EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
             
         if group_by is not None:
             if group_by == "attribute_group":
