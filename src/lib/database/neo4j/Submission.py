@@ -1138,13 +1138,14 @@ class Neo4JSubmissions(SubmissionsABC):
 
     def get_zscore_matrix(self, tag : str) -> pd.DataFrame:
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(pg:ProteinGroup) "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(sample:Sample)-[q:QUANTIFIED]->(f:Protein|ProteinGroup) "
             "WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
-            "RETURN pg.tag AS tag, sample.tag AS sample_tag, coalesce(q.z_score_sample, q.value) AS value "
+            "RETURN f.tag AS tag, sample.tag AS sample_tag, coalesce(q.z_score_sample, q.value) AS value "
         )
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.to_df)
         if r.empty:
             return pd.DataFrame()
+        r = r.drop_duplicates(subset=["tag", "sample_tag"])
         return r.pivot(index="tag", columns="sample_tag", values="value").astype(float)
     
     def get_protein_group_counts_by_year(self, years : List[int] = None, states : List[str] = None, user_tags : List[str] = None, ca_tags : List[str] = None, include_sample_ca : bool = False, genotype_tags : List[str] = None) -> pd.DataFrame:

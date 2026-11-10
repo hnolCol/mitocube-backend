@@ -539,10 +539,11 @@ class SubmissionsABC(ABC):
 
     @abstractmethod
     def get_zscore_matrix(self, tag: str) -> pd.DataFrame:
-        """Returns the quantification matrix of a submission as a DataFrame with protein group
+        """Returns the quantification matrix of a submission as a DataFrame with protein (group)
         tags as index and sample tags as columns. Uses the per-sample z-score
         (q.z_score_sample) where available and falls back to the raw value (q.value).
-        Excluded and lost samples are not included.
+        Excluded and lost samples are not included. Quantifications on both Protein and
+        ProteinGroup nodes are included.
 
         Parameters
         ----------
