@@ -347,6 +347,81 @@ def compute_protein_ca_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, Li
     return effects
 
 
+def compute_attribute_protein_effects(blocks: List[Dict], sample_ca_map: Dict[tuple, List[str]],
+                                        ca_tags: List[str], limit: int = 50) -> List[Dict]:
+    """Per-protein effect of an attribute across its condition applications, pooled over
+    all given blocks: effect = mean z in samples carrying any CA of the attribute minus
+    mean z in samples carrying none of them. Each protein additionally carries its mean z,
+    sample count and contributing submission count per CA. Returns the top `limit` proteins
+    by absolute effect, most affected first, with 1-based ranks."""
+    ca_set = set(ca_tags)
+    in_sums: Dict[str, float] = {}
+    in_counts: Dict[str, int] = {}
+    out_sums: Dict[str, float] = {}
+    out_counts: Dict[str, int] = {}
+    ca_sums: Dict[str, Dict[str, float]] = {ca: {} for ca in ca_set}
+    ca_counts: Dict[str, Dict[str, int]] = {ca: {} for ca in ca_set}
+    ca_submissions: Dict[str, set] = {ca: set() for ca in ca_set}
+
+    for block in blocks:
+        matrix = block["matrix"]
+        submission_tag = block["submission_tag"]
+        ca_lists = {sample_tag: sample_ca_map.get((submission_tag, sample_tag), [])
+                   for sample_tag in matrix.index}
+        rows_in = [s for s in matrix.index if ca_set.intersection(ca_lists[s])]
+        rows_in_set = set(rows_in)
+        rows_out = [s for s in matrix.index if s not in rows_in_set]
+
+        for rows, sums, counts in ((rows_in, in_sums, in_counts), (rows_out, out_sums, out_counts)):
+            if not rows:
+                continue
+            sub = matrix.loc[rows]
+            column_sums = sub.sum()
+            for protein in matrix.columns:
+                acc_sum = sums.setdefault(protein, 0.0)
+                sums[protein] = acc_sum + float(column_sums[protein])
+                counts[protein] = counts.get(protein, 0) + len(rows)
+
+        for ca in ca_set:
+            rows_ca = [s for s in rows_in if ca in ca_lists[s]]
+            if not rows_ca:
+                continue
+            ca_submissions[ca].add(submission_tag)
+            column_sums = matrix.loc[rows_ca].sum()
+            for protein in matrix.columns:
+                acc_sum = ca_sums[ca].setdefault(protein, 0.0)
+                ca_sums[ca][protein] = acc_sum + float(column_sums[protein])
+                ca_counts[ca][protein] = ca_counts[ca].get(protein, 0) + len(rows_ca)
+
+    ranked = []
+    for protein in set(in_sums) & set(out_sums):
+        mean_in = in_sums[protein] / in_counts[protein]
+        mean_out = out_sums[protein] / out_counts[protein]
+        ranked.append((protein, mean_in - mean_out))
+    ranked.sort(key=lambda item: abs(item[1]), reverse=True)
+
+    proteins = []
+    for rank, (protein, effect) in enumerate(ranked[:limit], start=1):
+        conditions = []
+        for ca in sorted(ca_set):
+            if protein not in ca_sums[ca]:
+                continue
+            n_samples = ca_counts[ca][protein]
+            conditions.append({
+                "ca_tag": ca,
+                "mean_z": ca_sums[ca][protein] / n_samples,
+                "n_samples": n_samples,
+                "n_submissions": len(ca_submissions[ca]),
+            })
+        proteins.append({
+            "tag": protein,
+            "rank": rank,
+            "effect": effect,
+            "conditions": conditions,
+        })
+    return proteins
+
+
 def rank_protein_attributes(ca_effects: Dict[str, Dict], ca_attribute_map: Dict[str, str], top: int = 10) -> List[Dict]:
     """Groups per-CA protein effects by attribute and keeps, per attribute, the CA with the
     largest absolute effect. Returns the attributes ranked by that absolute effect."""
