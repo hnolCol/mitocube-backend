@@ -44,7 +44,7 @@ class PTMSiteInsertModel(PTMSiteBaseModel):
     Model for inserting a PTM site. The tag is derived and validated from the protein
     tag (or protein group tag), the position and the modification. The site is linked
     to the given protein group via [:OF_PROTEIN_GROUP] and to the supporting precursors
-    via [:SUPPORTED_BY].
+    via [:SUPPORTED_BY] (or [:MAPS_TO] from the precursor side for PTM precursor uploads).
     value is the log2 intensity of the site quantification, score the identification
     score and site_localization the localization probability (e.g. from DIA-NN or
     Spectronaut) of the modification within the site.

@@ -13,7 +13,8 @@ class PTMSitesABC(ABC):
     protein tag (or the protein group tag for group level identifications), the position
     and the modification, e.g. P12345_S473_PHOSPHO.
     A site is linked to the protein group it was identified in via [:OF_PROTEIN_GROUP]
-    and is supported by one or multiple modified precursors via [:SUPPORTED_BY].
+    and is supported by one or multiple modified precursors via [:SUPPORTED_BY]
+    (site-first insert) or [:MAPS_TO] from the precursor (PTM precursor upload).
     Sites are quantified per sample via a [:QUANTIFIED] relationship that carries the
     value (log2 intensity), the score and the site_localization (localization probability).
     """

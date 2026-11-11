@@ -84,7 +84,8 @@ class Neo4JPTMSites(PTMSitesABC):
         query = (
             "MATCH (ptm:PTMSite {tag : $tag})-[:OF_PROTEIN_GROUP]->(pg:ProteinGroup) "
             "OPTIONAL MATCH (ptm)-[:SUPPORTED_BY]->(pre:Precursor) "
-            "WITH ptm, pg, collect(pre.tag) as precursor_tags "
+            "OPTIONAL MATCH (ptm)<-[:MAPS_TO]-(mapped:Precursor) "
+            "WITH ptm, pg, [t IN (collect(DISTINCT pre.tag) + collect(DISTINCT mapped.tag)) WHERE t IS NOT NULL] as precursor_tags "
             "RETURN ptm.tag as tag, pg.tag as protein_group_tag, ptm.protein_tag as protein_tag, "
             "ptm.position as position, ptm.modification as modification, ptm.residue as residue, "
             "ptm.sequence_window as sequence_window, ptm.unimod_id as unimod_id, ptm.unimod_name as unimod_name, "
