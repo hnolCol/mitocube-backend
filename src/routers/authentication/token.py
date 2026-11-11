@@ -1,4 +1,4 @@
-import time 
+
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 
@@ -6,16 +6,16 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Request
 import pyotp
 
 from config.models.user import UserModel
-from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword, TokenValidResponse
+from config.models.token.token import TokenVerificationCode, TokenResponse, TokenValidResponse
 from config.settings.general import get_general_settings
 from config.settings.email import get_email_settings
 
 from services.date import get_time_stamp
 from services.mail import send_email_in_background
 from services.random_generators import get_random_string
-from services.users import get_user_from_login, check_user_allowed, is_user_admin, get_user_from_token, check_pending_mfa_token
+from services.users import get_user_from_login, get_user_from_token, check_pending_mfa_token
 from services.encryption import create_access_token, check_for_verification_code_in_token #, check_share_token_password
-from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked, mfa_locked_out, user_not_found
+from config.exceptions.HTTPExceptions import verification_code_incorrect, user_blocked, mfa_locked_out
 from lib.mfa.mfa import mfa_runtime
 from config.settings.token import get_mfa_settings
 from config.settings.token import get_user_token_settings
