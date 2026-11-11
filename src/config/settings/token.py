@@ -6,14 +6,21 @@ from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file 
 from pydantic import SecretStr, Field, BeforeValidator, AliasChoices
 
+def _strip_env_value(value):
+    if isinstance(value, str):
+        value = value.split("#", 1)[0].strip()
+    return value
+
 def _duration_from_hours(value):
-    if isinstance(value, str) and value.strip().isdigit():
-        return timedelta(hours=int(value.strip()))
+    value = _strip_env_value(value)
+    if isinstance(value, str) and value.replace(".", "", 1).isdigit():
+        return timedelta(hours=float(value))
     return value
 
 def _duration_from_minutes(value):
-    if isinstance(value, str) and value.strip().isdigit():
-        return timedelta(minutes=int(value.strip()))
+    value = _strip_env_value(value)
+    if isinstance(value, str) and value.replace(".", "", 1).isdigit():
+        return timedelta(minutes=float(value))
     return value
 
 HoursDuration = Annotated[timedelta, BeforeValidator(_duration_from_hours)]

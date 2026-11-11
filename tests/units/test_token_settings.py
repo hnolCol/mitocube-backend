@@ -26,6 +26,21 @@ def test_share_expires_after_hours_alias_is_case_insensitive(monkeypatch, env_na
     assert settings.expires_after_hours == timedelta(hours=5)
 
 
+@pytest.mark.parametrize(
+    "raw_value",
+    ["5", " 5 ", "5  # 120 days", "5#comment", "2.5"],
+)
+def test_share_expires_after_hours_tolerates_inline_comments(monkeypatch, raw_value):
+    monkeypatch.setenv("SHARE_EXPIRES_AFTER_HOURS", raw_value)
+    for key, value in REQUIRED_SECRETS.items():
+        monkeypatch.setenv(key, value)
+
+    settings = ShareToken(_env_file=None)
+
+    expected = timedelta(hours=float(raw_value.split("#", 1)[0].strip()))
+    assert settings.expires_after_hours == expected
+
+
 def test_share_expires_after_hours_default(monkeypatch):
     for key, value in REQUIRED_SECRETS.items():
         monkeypatch.setenv(key, value)
