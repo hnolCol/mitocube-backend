@@ -14,7 +14,7 @@ from services.date import get_time_stamp
 from services.mail import send_email_in_background
 from services.random_generators import get_random_string
 from services.users import get_user_from_login, check_user_allowed, is_user_admin, get_user_from_token, check_pending_mfa_token
-from services.encryption import create_access_token, check_for_verification_code_in_token, check_share_token_password
+from services.encryption import create_access_token, check_for_verification_code_in_token #, check_share_token_password
 from config.exceptions.HTTPExceptions import verification_code_incorrect, share_token_pw_incorrect, user_blocked, mfa_locked_out, user_not_found
 from lib.mfa.mfa import mfa_runtime
 from config.settings.token import get_mfa_settings
@@ -206,16 +206,16 @@ def verify_token_by_code(verification : TokenVerificationCode,
                           lastname=user.lastname, tag=user.tag)
 ### Share Token
 
-@router.post("/share", 
-             summary="Share tokens can be used to push qc runs to the app without login in every time. Creating a share token requires admin rights and the application specific password.")
-def create_share_token(inputPassword: ShareTokenPassword, user : UserModel = Depends(is_user_admin)):
-    """
-    Share tokens require user admin rights as well as a password which is defined in the env file.
-    """
-    if check_share_token_password(inputPassword.pw):
-        jwt_token = create_access_token(user.model_dump(), key_subset=["id"], add_dict={"created_at" : get_time_stamp()}, share_token=True)
-        return TokenResponse(success=True,token= jwt_token,verified=False, role=0)
-    raise share_token_pw_incorrect
+# @router.post("/share", 
+#              summary="Share tokens can be used to push qc runs to the app without login in every time. Creating a share token requires admin rights and the application specific password.")
+# def create_share_token(inputPassword: ShareTokenPassword, user : UserModel = Depends(is_user_admin)):
+#     """
+#     Share tokens require user admin rights as well as a password which is defined in the env file.
+#     """
+#     if check_share_token_password(inputPassword.pw):
+#         jwt_token = create_access_token(user.model_dump(), key_subset=["id"], add_dict={"created_at" : get_time_stamp()}, share_token=True)
+#         return TokenResponse(success=True,token= jwt_token,verified=False, role=0)
+#     raise share_token_pw_incorrect
 
 
 
