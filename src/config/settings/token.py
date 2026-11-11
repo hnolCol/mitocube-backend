@@ -32,6 +32,7 @@ class UserToken(BaseSettings):
     class Config:
         env_file = get_env_file()
         extra = "ignore"
+        case_sensitive = False
 
 
 class ShareToken(BaseSettings):
