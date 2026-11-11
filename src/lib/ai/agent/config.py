@@ -37,5 +37,5 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_mongo_db_settings() -> Settings:
-    print(Settings().AGENT_MONGO_URI)
+    #print(Settings().AGENT_MONGO_URI)
     return Settings()
