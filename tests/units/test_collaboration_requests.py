@@ -244,3 +244,45 @@ class TestExploreTagSearchSetting:
         db = FakeCollaborationsDB()
         db.explore = lambda **kw: []
         assert self._invoke(db=self._wrap(db)) == []
+
+
+class TestExploreTokenizedSearch:
+    def _make_db(self, captured):
+        from lib.database.neo4j.Collaborations import Neo4JCollaborations
+
+        class FakeDriver:
+            def execute_query(self, query, routing_=None, result_transformer_=None, **params):
+                captured["query"] = query
+                captured["params"] = params
+                return []
+
+        return Neo4JCollaborations(FakeDriver())
+
+    def test_search_string_split_into_tokens(self):
+        captured = {}
+        db = self._make_db(captured)
+        db.explore(search_string="Parl MB")
+        assert captured["params"]["search_tokens"] == ["parl", "mb"]
+        assert "ALL(token IN $search_tokens WHERE toLower(s.title) CONTAINS token)" in captured["query"]
+
+    def test_all_tokens_must_match_and_semantics(self):
+        captured = {}
+        db = self._make_db(captured)
+        db.explore(search_string="parl mb", ca_tags=["ca-1"])
+        conditions = captured["query"].split("WHERE ", 2)[2].split("OPTIONAL MATCH")[0]
+        assert "ALL(token IN $search_tokens WHERE toLower(s.title) CONTAINS token)" in conditions
+        assert " AND size(matched_ca_tags) = size($ca_tags)" in conditions
+
+    def test_tag_filters_without_search_string_build_valid_query(self):
+        captured = {}
+        db = self._make_db(captured)
+        db.explore(search_string=None, ca_tags=["ca-1"], user_tags=["user-1"])
+        assert "WHERE size(matched_ca_tags) = size($ca_tags) AND size(matched_user_tags) = size($user_tags) " in captured["query"]
+        assert "OPTIONAL MATCH" in captured["query"]  # clause properly terminated, no dangling AND
+
+    def test_blank_search_string_keeps_unfiltered_behavior(self):
+        captured = {}
+        db = self._make_db(captured)
+        db.explore(search_string="   ")
+        assert "search_tokens" not in captured["params"]
+        assert "CONTAINS" not in captured["query"]
