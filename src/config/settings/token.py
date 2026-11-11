@@ -31,8 +31,9 @@ class UserToken(BaseSettings):
 
     class Config:
         env_file = get_env_file()
-        extra = "ignore"
         case_sensitive = False
+        extra = "ignore"
+        
 
 
 class ShareToken(BaseSettings):
@@ -55,6 +56,7 @@ class ShareToken(BaseSettings):
     class Config:
         env_file = get_env_file()
         extra = "ignore"
+        case_sensitive = False
 
 
 @lru_cache()
@@ -83,6 +85,7 @@ class MFASettings(BaseSettings):
     class Config:
         env_file = get_env_file()
         extra = "ignore"
+        case_sensitive = False
 
 def get_mfa_settings() -> MFASettings:
     return MFASettings()
