@@ -1,3 +1,4 @@
+import re
 from typing import Dict, List, Optional
 
 from neo4j import Driver, Result
@@ -361,13 +362,18 @@ class Neo4JCollaborations(CollaborationsABC):
             "[user_tag IN $user_tags WHERE COUNT { (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) } > 0] AS matched_user_tags "
         )
         params = {"limit" : limit, "ca_tags" : ca_tags, "user_tags" : user_tags}
+        conditions = []
         if search_string is not None:
-            query += "WHERE toLower(s.title) CONTAINS toLower($search_string) "
-            params["search_string"] = search_string
+            tokens = [token.lower() for token in re.split(r"\s+", search_string.strip()) if token]
+            if tokens:
+                conditions.append("ALL(token IN $search_tokens WHERE toLower(s.title) CONTAINS token)")
+                params["search_tokens"] = tokens
         if ca_tags:
-            query += "AND size(matched_ca_tags) = size($ca_tags) "
+            conditions.append("size(matched_ca_tags) = size($ca_tags)")
         if user_tags:
-            query += "AND size(matched_user_tags) = size($user_tags) "
+            conditions.append("size(matched_user_tags) = size($user_tags)")
+        if conditions:
+            query += "WHERE " + " AND ".join(conditions) + " "
         query += (
             "OPTIONAL MATCH (owner:User)-[:CREATED]->(s) "
             "OPTIONAL MATCH (owner)-[:MEMBER_OF]->(rg:ResearchGroup) "
