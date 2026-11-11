@@ -7,9 +7,11 @@ from sklearn.decomposition import PCA
 
 from services.statistics.projection import (
     assemble_pooled_pca,
+    attribute_protein_effects_cache_key,
     block_cache_key,
     build_submission_block,
     compute_ca_separation,
+    compute_attribute_protein_effects,
     compute_condition_effects,
     compute_protein_ca_effects,
     compute_universe,
@@ -329,3 +331,97 @@ def test_projection_points_are_json_safe():
     ]
     result = assemble_pooled_pca(blocks, n_components=2)
     json.dumps(result, allow_nan=False)
+
+
+def test_compute_attribute_protein_effects_ranks_and_reports_conditions():
+    block_1 = make_block("sub_1", ["s1", "s2", "s3"], ["p1", "p2"], seed=20)
+    block_1["matrix"]["p1"] = [3.0, 1.0, -2.0]
+    block_1["matrix"]["p2"] = [0.5, 0.5, 0.5]
+    block_2 = make_block("sub_2", ["s4", "s5"], ["p1", "p2"], seed=21)
+    block_2["matrix"]["p1"] = [-1.0, 2.0]
+    block_2["matrix"]["p2"] = [1.0, 1.0]
+    blocks = [block_1, block_2]
+    sample_ca_map = {
+        ("sub_1", "s1"): ["ca_a"],
+        ("sub_1", "s2"): ["ca_b"],
+        ("sub_1", "s3"): [],
+        ("sub_2", "s4"): ["ca_a"],
+        ("sub_2", "s5"): ["ca_b"],
+    }
+
+    proteins = compute_attribute_protein_effects(blocks, sample_ca_map, ["ca_b", "ca_a"], limit=10)
+
+    # attribute group: s1, s2, s4, s5 in; s3 out
+    # p1: mean_in (3+1-1+2)/4 = 1.25, mean_out -2 -> effect 3.25
+    # p2: mean_in (0.5+0.5+1+1)/4 = 0.75, mean_out 0.5 -> effect 0.25
+    assert [p["tag"] for p in proteins] == ["p1", "p2"]
+    assert proteins[0]["rank"] == 1 and proteins[1]["rank"] == 2
+    assert proteins[0]["effect"] == pytest.approx(3.25)
+    assert proteins[1]["effect"] == pytest.approx(0.25)
+
+    conditions = {c["ca_tag"]: c for c in proteins[0]["conditions"]}
+    # ca_a on p1: samples s1, s4 -> mean (3-1)/2 = 1, from 2 submissions
+    assert conditions["ca_a"]["mean_z"] == pytest.approx(1.0)
+    assert conditions["ca_a"]["n_samples"] == 2
+    assert conditions["ca_a"]["n_submissions"] == 2
+    # ca_b on p1: samples s2, s5 -> mean (1+2)/2 = 1.5
+    assert conditions["ca_b"]["mean_z"] == pytest.approx(1.5)
+    assert conditions["ca_b"]["n_samples"] == 2
+    assert [c["ca_tag"] for c in proteins[0]["conditions"]] == ["ca_a", "ca_b"]
+    json.dumps(proteins, allow_nan=False)
+
+
+def test_compute_attribute_protein_effects_respects_limit_and_missing_proteins():
+    block = make_block("sub_1", ["s1", "s2"], ["p1", "p2", "p3"], seed=22)
+    block["matrix"]["p1"] = [5.0, -5.0]
+    block["matrix"]["p2"] = [1.0, -1.0]
+    block["matrix"]["p3"] = [0.0, 0.0]
+    sample_ca_map = {("sub_1", "s1"): ["ca_a"], ("sub_1", "s2"): []}
+
+    proteins = compute_attribute_protein_effects([block], sample_ca_map, ["ca_a"], limit=1)
+    assert len(proteins) == 1
+    assert proteins[0]["tag"] == "p1"
+    assert proteins[0]["effect"] == pytest.approx(10.0)
+    assert proteins[0]["conditions"][0]["n_submissions"] == 1
+
+
+def test_compute_attribute_protein_effects_max_abs_and_annotation_filter():
+    block_1 = make_block("sub_1", ["s1", "s2", "s3"], ["p1", "p2"], seed=23)
+    block_1["matrix"]["p1"] = [3.0, 1.0, -2.0]
+    block_1["matrix"]["p2"] = [0.5, 0.5, 0.5]
+    block_2 = make_block("sub_2", ["s4", "s5"], ["p1", "p2"], seed=24)
+    block_2["matrix"]["p1"] = [-1.0, 2.0]
+    block_2["matrix"]["p2"] = [1.0, 1.0]
+    blocks = [block_1, block_2]
+    sample_ca_map = {
+        ("sub_1", "s1"): ["ca_a"],
+        ("sub_1", "s2"): ["ca_b"],
+        ("sub_1", "s3"): [],
+        ("sub_2", "s4"): ["ca_a"],
+        ("sub_2", "s5"): ["ca_b"],
+    }
+
+    proteins = compute_attribute_protein_effects(blocks, sample_ca_map, ["ca_a", "ca_b"], limit=10)
+    # p1: attribute-level out mean -2; ca_a mean 1 -> |3|, ca_b mean 1.5 -> |3.5|
+    assert proteins[0]["max_abs_ca_effect"] == pytest.approx(3.5)
+    # p2: out mean 0.5; both CA means 0.75 -> 0.25
+    assert proteins[1]["max_abs_ca_effect"] == pytest.approx(0.25)
+    json.dumps(proteins, allow_nan=False)
+
+    filtered = compute_attribute_protein_effects(blocks, sample_ca_map, ["ca_a", "ca_b"],
+                                                 limit=10, protein_tags=["p2"])
+    assert [p["tag"] for p in filtered] == ["p2"]
+    assert filtered[0]["rank"] == 1
+
+    empty = compute_attribute_protein_effects(blocks, sample_ca_map, ["ca_a", "ca_b"],
+                                              limit=10, protein_tags=["p_missing"])
+    assert empty == []
+
+
+def test_attribute_protein_effects_cache_key_is_scope_and_annotation_sensitive():
+    base = attribute_protein_effects_cache_key("proteome_1", ["sub_1", "sub_2"], "att_x")
+    assert base != attribute_protein_effects_cache_key("proteome_1", ["sub_1"], "att_x")
+    assert base != attribute_protein_effects_cache_key("proteome_1", ["sub_2", "sub_1"], "att_y")
+    assert base != attribute_protein_effects_cache_key("proteome_1", ["sub_1", "sub_2"], "att_x",
+                                                       annotation_tag="ann_1")
+    assert base != attribute_protein_effects_cache_key("proteome_1", ["sub_1", "sub_2"], "att_x", limit=10)

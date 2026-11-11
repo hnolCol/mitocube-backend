@@ -89,6 +89,28 @@ class AttributeConditionEffectModel(BaseModel):
     effects: List[ProteinEffectModel]
 
 
+class AttributeProteinConditionModel(BaseModel):
+    ca_tag: str
+    mean_z: float
+    n_samples: int
+    n_submissions: int
+
+
+class AttributeProteinEffectModel(BaseModel):
+    tag: str
+    rank: int
+    effect: float
+    max_abs_ca_effect: float
+    conditions: List[AttributeProteinConditionModel] = []
+
+
+class ProteomeAttributeProteinEffectsResponseModel(BaseModel):
+    attribute_tag: str
+    n_submissions: int
+    ca_tags: List[str]
+    proteins: List[AttributeProteinEffectModel]
+
+
 class ProteomeProjectionAttributeEffectResponseModel(BaseModel):
     proteome_tag: str
     attribute_tag: str
