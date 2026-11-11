@@ -32,7 +32,7 @@ router = APIRouter(
     tags=["Token", "Authentication"]
     )
 
-print(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value(), "IN ROUTE")
+#print(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value(), "IN ROUTE")
 
 fernet = Fernet(MFA_SETTINGS.MFA_ENCRYPTION_KEY.get_secret_value())
 

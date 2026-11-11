@@ -38,7 +38,7 @@ def generate_jwt_key(length: int = 32) -> str:
         Secure JWT key string
     """
     # Generate random bytes and encode as URL-safe base64
-    random_bytes = secrets.token_bytes(length)
+    #random_bytes = secrets.token_bytes(length)
     return secrets.token_urlsafe(length)
 
 

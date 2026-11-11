@@ -33,16 +33,24 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
     )
 
 
-def _resolve_visible_blocks(db: DatabaseABC, user: UserModel, proteome_tag: str,
-                            min_valid_fraction: float) -> Tuple[List[str], List[Dict]]:
-    """Resolves the submissions of the proteome that are inside the requesting user's
-    submission scope and returns their (cached) projection blocks."""
+def _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction):
     proteome_submission_tags = db.submissions.get_tags_by_proteome(proteome_tag)
-    scope = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
-    visible_tags = resolve_visible_submission_tags(scope, proteome_submission_tags)
+    print("1) proteome submissions:", proteome_submission_tags)
 
-    blocks = [block for tag in visible_tags
-              if (block := get_submission_block_cached(db, tag, min_valid_fraction)) is not None]
+    scope = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
+    print("2) user scope:", "UNRESTRICTED (curator+)" if scope is None else scope)
+
+    visible_tags = resolve_visible_submission_tags(scope, proteome_submission_tags)
+    print("3) visible (intersection):", visible_tags)
+
+    blocks = []
+    for tag in visible_tags:
+        block = get_submission_block_cached(db, tag, min_valid_fraction)
+        print(f"4) block {tag}:",
+              "None" if block is None else block["matrix"].shape)
+        if block is not None:
+            blocks.append(block)
+
     if not blocks:
         raise no_data_found_http_exception
     return visible_tags, blocks
@@ -54,12 +62,14 @@ def _compute_pooled_projection(db: DatabaseABC, user: UserModel, proteome_tag: s
     proteome that are inside the requesting user's submission scope. The result cache key
     embeds a hash of the visible submission tags, so results are never shared across scopes.
     Returns the result dict and the submission blocks it was built from."""
+    print("reaced? _compute_pooled_projection")
     visible_tags, blocks = _resolve_visible_blocks(db, user, proteome_tag, min_valid_fraction)
-
+    print(visible_tags, "visible_tags", blocks)
     def compute():
         try:
             result = assemble_pooled_pca(blocks, n_components=n_components)
         except ValueError as e:
+            print(e, "ValueError in assemble_pooled_pca")
             raise no_data_found_http_exception from e
         return {
             "proteome_tag": proteome_tag,
@@ -97,12 +107,18 @@ def get_proteome_projection(
     quantification matrices are cached per submission; the user's submission scope is
     applied when assembling the pooled matrix and the PCA is computed fresh per scope.
     """
+    print(proteome_tag, "proteome_tag")
+    print(db.proteomes.exists(tag=proteome_tag))
+    print(proteome_tag, "proteome_tag")
     if not db.proteomes.exists(tag=proteome_tag):
         raise HTTPException(status_code=404, detail="Proteome not found")
+    
     result, _ = _compute_pooled_projection(
         db, user, proteome_tag, method=method, n_components=n_components,
         min_valid_fraction=min_valid_fraction)
     sample_ca_map = get_sample_condition_map(db, result["submission_tags"])
+    print(result, "result")
+    print(sample_ca_map, "sample_ca_map")
     return ProteomeProjectionResponseModel(**enrich_result_with_conditions(result, sample_ca_map))
 
 

@@ -1129,7 +1129,7 @@ class Neo4JSubmissions(SubmissionsABC):
 
     def get_tags_by_proteome(self, proteome_tag : str) -> List[str]:
         query = (
-            "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)<-[:OF_ATTRIBUTE]-(a:Attribute {tag : 'att_proteome'}) "
+            "MATCH (submission:Submission)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:OF_ATTRIBUTE]->(a:Attribute {tag : 'att_proteome'}) "
             "MATCH (ca)-[:INSTANCE_OF]->(t:Trait {tag : $proteome_tag}) "
             "RETURN DISTINCT submission.tag "
         )

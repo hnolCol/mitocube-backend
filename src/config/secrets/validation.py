@@ -73,10 +73,10 @@ class SecretValidator:
     
     # Minimum lengths for different secret types
     MIN_LENGTHS = {
-        "JWT_KEY": 4,
-        "JWT_SHARE_KEY": 4,
-        "PASSWORD": 4,
-        "API_KEY": 4,
+        "JWT_KEY": 5,
+        "JWT_SHARE_KEY": 5,
+        "PASSWORD": 5,
+        "API_KEY": 5,
     }
     
     @classmethod
@@ -95,9 +95,8 @@ class SecretValidator:
         - At least one uppercase letter
         - At least one lowercase letter
         - At least one digit
-        - At least one special character
         """
-        if len(value) < 4:
+        if len(value) < 5:
             return False
         if not re.search(r'[A-Z]', value):
             return False
@@ -117,10 +116,6 @@ class SecretValidator:
     @classmethod
     def validate_password(cls, value: str) -> bool:
         """Passwords should meet complexity requirements."""
-        print(value)
-        print(cls.validate_length(value, "PASSWORD"))
-        print(cls.validate_complexity(value))
-        print(f"Validating password: {value}")
         return cls.validate_complexity(value) and cls.validate_length(value, "PASSWORD")
 
     @classmethod
