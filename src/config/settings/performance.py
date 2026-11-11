@@ -8,6 +8,7 @@ class PerformanceSettings(BaseSettings):
     class Config:
         env_file = get_env_file()
         extra = "ignore"
+        case_sensitive = False
     
 @lru_cache()
 def get_performance_settings():

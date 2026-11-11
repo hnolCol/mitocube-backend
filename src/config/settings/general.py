@@ -35,7 +35,7 @@ class General(BaseSettings):
     
     class Config:
          env_file = get_env_file()
-        # case_sensitive = True
+         case_sensitive = False
          extra = "ignore"
 
 
