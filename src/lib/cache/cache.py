@@ -73,8 +73,8 @@ class DBCacheRuntime:
     # DataFrames, numpy scalars, custom class instances - needs converting
     # first. We auto-handle pandas since it's a common case; anything else
     # unencodable is caught in `set()` with an actionable error message.
-    @staticmethod
-    def _serialize(data: Any) -> Any:
+    @classmethod
+    def _serialize(cls, data: Any) -> Any:
         try:
             import pandas as pd
         except ImportError:
@@ -98,10 +98,15 @@ class DBCacheRuntime:
                 "name": data.name,
             }
 
+        if isinstance(data, dict):
+            return {key: cls._serialize(value) for key, value in data.items()}
+        if isinstance(data, (list, tuple)):
+            return [cls._serialize(item) for item in data]
+
         return data
 
-    @staticmethod
-    def _deserialize(stored: Any) -> Any:
+    @classmethod
+    def _deserialize(cls, stored: Any) -> Any:
         if isinstance(stored, dict) and "__cache_type__" in stored:
             import pandas as pd  # only reached if we serialized pandas data in the first place
 
@@ -109,6 +114,11 @@ class DBCacheRuntime:
                 return pd.DataFrame(data=stored["data"], index=stored["index"], columns=stored["columns"])
             if stored["__cache_type__"] == "pandas.Series":
                 return pd.Series(data=stored["data"], index=stored["index"], name=stored["name"])
+
+        if isinstance(stored, dict):
+            return {key: cls._deserialize(value) for key, value in stored.items()}
+        if isinstance(stored, list):
+            return [cls._deserialize(item) for item in stored]
 
         return stored
 
