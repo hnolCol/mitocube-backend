@@ -49,18 +49,27 @@ def _load_env_file_values() -> Dict[str, str]:
             if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in ("'", '"'):
                 raw = raw[1:-1]
             if key:
-                values[key] = raw
+                values[key.upper()] = raw
     except OSError:
         logger.warning(f"Could not read env file {env_path}")
     return values
 
 
 def _get_secret_value(secret_name: str) -> str | None:
-    """Resolve a secret from the environment, then the .env file."""
+    """Resolve a secret from the environment, then the .env file.
+
+    Lookup is case-insensitive to mirror pydantic-settings
+    ``case_sensitive = False`` behaviour: a .env entry like
+    ``jwt_share_key=...`` must satisfy ``JWT_SHARE_KEY``.
+    """
     value = os.environ.get(secret_name)
     if value is not None:
         return value
-    return _load_env_file_values().get(secret_name)
+    for key, candidate in os.environ.items():
+        if key.upper() == secret_name:
+            return candidate
+    file_values = _load_env_file_values()
+    return file_values.get(secret_name)
 
 
 def _is_dev_mode() -> bool:

@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file 
-from pydantic import SecretStr, Field, BeforeValidator
+from pydantic import SecretStr, Field, BeforeValidator, AliasChoices
 
 def _duration_from_hours(value):
     if isinstance(value, str) and value.strip().isdigit():
@@ -42,7 +42,7 @@ class ShareToken(BaseSettings):
     or datasets to the application.
     The BaseSettings define the security settings. 
     """
-    expires_after_hours : HoursDuration = Field(default=timedelta(days=120), validation_alias="SHARE_EXPIRES_AFTER_HOURS") #4 months 
+    expires_after_hours : HoursDuration = Field(default=timedelta(days=120), validation_alias=AliasChoices("SHARE_EXPIRES_AFTER_HOURS", "share_expires_after_hours")) #4 months 
     jwt_share_key : SecretStr = Field(
         ...,
         description="JWT share key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
