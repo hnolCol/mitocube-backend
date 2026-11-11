@@ -19,6 +19,8 @@ class PTMSiteBaseModel(BaseModel):
     modification : str
     residue : Optional[str] = None
     sequence_window : Optional[str] = None #the sequence window around the modification, e.g. the flanking residues; although derivable from the protein sequence it is stored since it is what the search engine localized against
+    unimod_id : Optional[int] = None # UniMod accession of the modification, e.g. 21 for Phospho
+    unimod_name : Optional[str] = None # UniMod interim name of the modification, e.g. Phospho
     precursor_tags : List[str] = []
 
     @model_validator(mode="after")
@@ -42,7 +44,7 @@ class PTMSiteInsertModel(PTMSiteBaseModel):
     Model for inserting a PTM site. The tag is derived and validated from the protein
     tag (or protein group tag), the position and the modification. The site is linked
     to the given protein group via [:OF_PROTEIN_GROUP] and to the supporting precursors
-    via [:SUPPORTED_BY].
+    via [:SUPPORTED_BY] (or [:MAPS_TO] from the precursor side for PTM precursor uploads).
     value is the log2 intensity of the site quantification, score the identification
     score and site_localization the localization probability (e.g. from DIA-NN or
     Spectronaut) of the modification within the site.

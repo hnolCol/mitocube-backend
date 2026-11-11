@@ -39,6 +39,7 @@ from routers.features.precursors import precursors as feature_precursors
 from routers.features.ptms import ptms as feature_ptms
 from routers.features.precursors import count as precursor_count
 from routers.features.precursors import insert as precursor_insert
+from routers.features.ptm_precursors import insert as ptm_precursor_insert
 from routers.features import correlations as feature_correlation
 from routers.genotypes import permissions as genotype_permissions
 from routers.genotypes import genotypes
@@ -109,6 +110,7 @@ router_sources = [policy_permissions,
                   protein_receive,
                   precursor_count,
                   precursor_insert,
+                  ptm_precursor_insert,
                   feature_precursors,
                   feature_ptms,
                   submissions_permissions, 
