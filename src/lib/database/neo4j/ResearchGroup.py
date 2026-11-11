@@ -125,7 +125,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
         "Returns the number of submissions associated with the research group"
         query = (
             "MATCH (rg:ResearchGroup {tag : $tag})<-[:MEMBER_OF]-(u:User)-[:CREATED|COLLABORATES]->(s:Submission) "
-            "RETURN count(s) "
+            "RETURN count(DISTINCT s) "
         )
         
         r = self._driver.execute_query(query, tag = tag, routing_= "r", result_transformer_=Result.value)
@@ -149,7 +149,7 @@ class Neo4JResearchGroup(ResearchGroupABC):
         "Returns the number of samples associated with the research group"
         query = (
             "MATCH (rg:ResearchGroup {tag : $tag})<-[:MEMBER_OF]-(u:User)-[:CREATED]->(s:Submission)-[:HAS_SAMPLE]->(sa:Sample) "
-            "RETURN count(sa) "
+            "RETURN count(DISTINCT sa) "
         )
         
         r = self._driver.execute_query(query, tag = tag, routing_= "r", result_transformer_=Result.value)
