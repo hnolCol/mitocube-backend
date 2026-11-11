@@ -115,3 +115,15 @@ class TestPTMPrecursorModel:
 
 def test_ptm_site_tag_helper():
     assert ptm_site_tag("P12345", 473, "Phospho") == "P12345_473_PHOSPHO"
+
+
+class TestPrecursorInsertModelSemicolonTags:
+    def test_base_precursor_model_splits_semicolon_string(self):
+        from config.models.precursors import PrecursorInsertModel
+        precursor = PrecursorInsertModel(tag="PEPTIDEK.2", sequence="PEPTIDEK", charge=2, protein_group_tags="pg1; pg2;;pg3")
+        assert precursor.protein_group_tags == ["pg1", "pg2", "pg3"]
+
+    def test_list_passes_through(self):
+        from config.models.precursors import PrecursorInsertModel
+        precursor = PrecursorInsertModel(tag="PEPTIDEK.2", sequence="PEPTIDEK", charge=2, protein_group_tags=["pg1", "pg2"])
+        assert precursor.protein_group_tags == ["pg1", "pg2"]

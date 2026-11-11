@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, model_validator
 from typing import Optional, List
 
 from config.models.precursors import PrecursorInsertModel
@@ -31,15 +31,6 @@ class PTMPrecursorInsertModel(PrecursorInsertModel):
     """
     protein_tag: str
     modifications: List[PTMModificationModel]
-
-    @field_validator("protein_group_tags", mode="before")
-    @classmethod
-    def split_protein_group_tags(cls, v):
-        """Accepts the protein group tags as a semicolon separated string (e.g. "pg1;pg2")
-        in the upload table and splits them into a list."""
-        if isinstance(v, str):
-            return [t.strip() for t in v.split(";") if t.strip()]
-        return v
 
     @model_validator(mode="after")
     def validate_modifications(self):

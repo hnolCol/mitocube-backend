@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
 
@@ -33,3 +33,12 @@ class PrecursorInsertModel(PrecursorBaseModel):
     value: Optional[float] = None  # log2 intensity of the precursor quantification
     score: Optional[float] = None
     protein_group_tags: List[str]
+
+    @field_validator("protein_group_tags", mode="before")
+    @classmethod
+    def split_protein_group_tags(cls, v):
+        """Accepts the protein group tags as a semicolon separated string (e.g. "pg1;pg2")
+        and splits them into a list."""
+        if isinstance(v, str):
+            return [t.strip() for t in v.split(";") if t.strip()]
+        return v
