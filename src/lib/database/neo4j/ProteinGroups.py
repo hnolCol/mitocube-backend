@@ -97,8 +97,8 @@ class Neo4JProteinGroups(ProteinGroupsABC):
         where_clauses = []
         if annotation_tags is not None and len(annotation_tags) > 0:
             where_clauses.append("""EXISTS {
-                    MATCH (pg)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(a:Annotation)
-                    WHERE a.tag IN $annotation_tags
+                    MATCH (pg)-[:HAS_PROTEINS]->(:Protein)<-[:ANNOTATES]-(an:Annotation)
+                    WHERE an.tag IN $annotation_tags
                         }""")
 
         if search_string is not None and search_string.strip() != "":
