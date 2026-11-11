@@ -851,24 +851,26 @@ def get_submission_samples_full(submission_tag: str, user: UserModel = Depends(g
         ca_df = None
     replicates = db.samples.get_replicates(tags=sample_tags)
     
+    ca_tags_by_sample = {}
+    if ca_df is not None:
+        for sample_tag, attribute_tag, ca_tags in zip(ca_df.index, ca_df["attribute_tag"], ca_df["condition_tags"]):
+            flat_ca_tags = ca_tags if isinstance(ca_tags, list) else [ca_tags]
+            ca_tags_by_sample.setdefault(sample_tag, {}).setdefault(attribute_tag, []).extend(flat_ca_tags)
+    
+    tree_cache = {}
     result = []
     for sample_tag in sample_tags:
         sample = samples_by_tag.get(sample_tag)
         genotype = genotypes_by_tag.get(sample_tag)
         attributes = {}
-        if ca_df is not None and sample_tag in ca_df.index:
-            rows = ca_df.loc[sample_tag]
-            if isinstance(rows, pd.DataFrame):
-                grouped = rows.groupby("attribute_tag")["condition_tags"].apply(list)
-            else:
-                grouped = rows.groupby("attribute_tag")["condition_tags"].apply(list)
-            for attribute_tag, ca_tags in grouped.items():
-                flat_ca_tags = [t for ca_tag_list in ca_tags for t in (ca_tag_list if isinstance(ca_tag_list, list) else [ca_tag_list])]
-                trees = []
-                for ca_tag in flat_ca_tags:
+        for attribute_tag, ca_tags in ca_tags_by_sample.get(sample_tag, {}).items():
+            trees = []
+            for ca_tag in ca_tags:
+                if ca_tag not in tree_cache:
                     tree = db.condition_applications.get_tree(tag=ca_tag)
-                    trees.extend([node.model_dump() for node in tree])
-                attributes[attribute_tag] = trees
+                    tree_cache[ca_tag] = [node.model_dump() for node in tree] if tree else []
+                trees.extend(tree_cache[ca_tag])
+            attributes[attribute_tag] = trees
         result.append({
             "tag": sample_tag,
             "index": sample.get("index") if sample else None,
