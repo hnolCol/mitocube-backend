@@ -101,7 +101,7 @@ def complete_linkage(D, n_clusters):
 def cluster(X, n_clusters):
     """Convenience wrapper: X is (n_samples, n_features) numpy array."""
     D = pairwise_euclidean(np.ascontiguousarray(X, dtype=np.float64))
-    return complete_linkage(D, n_clusters)
+    return complete_linkage(sanitize_distance_matrix(D), n_clusters)
 
 
 def silhouette_from_D(D, labels):
@@ -141,6 +141,7 @@ def find_best_k(X, k_range):
     Reuses the same distance matrix across all k values for efficiency.
     """
     D = pairwise_euclidean(np.ascontiguousarray(X, dtype=np.float64))
+    D = sanitize_distance_matrix(D)
     scores = {}
     for k in k_range:
         labels = complete_linkage(D, k)
@@ -219,18 +220,36 @@ def leaf_order_from_history(merge_bi, merge_bj, n):
     return leaves_at[root]
 
 
+def sanitize_distance_matrix(D):
+    """
+    Replace infinite pairwise distances (rows with no overlapping non-NaN
+    features) with a large finite sentinel so linkage can always complete.
+    Such pairs merge only as a last resort, after every pair with real
+    shared evidence, instead of aborting the whole clustering.
+    """
+    D = D.copy()
+    finite = D[np.isfinite(D)]
+    sentinel = finite.max() * 2.0 if finite.size else 1.0
+    if not np.isfinite(sentinel) or sentinel <= 0.0:
+        sentinel = 1.0
+    D[~np.isfinite(D)] = sentinel
+    return D
+
+
 def cluster_to_dataframe(X, n_clusters, index=None, columns=None):
     X_arr = np.asarray(X, dtype=np.float64)
     n = X_arr.shape[0]
+    if n == 0:
+        return pd.DataFrame(X_arr, index=index, columns=columns)
+    if n == 1:
+        df = pd.DataFrame(X_arr, index=index, columns=columns)
+        df["cluster"] = 0
+        return df
+
     D = pairwise_euclidean(np.ascontiguousarray(X_arr))
+    D = sanitize_distance_matrix(D)
 
     merge_bi, merge_bj, merge_dist = complete_linkage_history(D)
-
-    if np.any(merge_bi == -1) or np.any(merge_bj == -1):
-        raise ValueError(
-            "Clustering failed: some rows have no overlapping non-NaN features "
-            "with any other row, so a valid merge could not be found."
-        )
 
     labels = labels_from_history(merge_bi, merge_bj, n, n_clusters)
     order = leaf_order_from_history(merge_bi, merge_bj, n)
