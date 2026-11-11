@@ -87,6 +87,17 @@ class TestPTMPrecursorModel:
                 modifications=[],
             )
 
+    def test_protein_group_tags_semicolon_string(self):
+        precursor = PTMPrecursorInsertModel(
+            tag="PEPTS[Phospho]IDEK.2",
+            sequence="PEPTS[Phospho]IDEK",
+            charge=2,
+            protein_group_tags="pg0007; pg0008",
+            protein_tag="P12345",
+            modifications=[{"position": 473, "modification": "Phospho"}],
+        )
+        assert precursor.protein_group_tags == ["pg0007", "pg0008"]
+
     def test_duplicate_positions_rejected(self):
         with pytest.raises(ValueError):
             PTMPrecursorInsertModel(
