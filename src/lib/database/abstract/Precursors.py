@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from abc import abstractmethod, ABC
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 import pandas as pd
 
 from config.models.precursors import PrecursorInsertModel, PrecursorResponseModel
+from config.models.ptm_precursors import PTMPrecursorInsertModel
 
 
 class PrecursorsABC(ABC):
@@ -187,6 +188,47 @@ class PrecursorsABC(ABC):
         -------
         int
             The number of inserted precursors.
+        """
+
+    @abstractmethod
+    def insert_ptm_precursor(self, precursor: PTMPrecursorInsertModel) -> bool:
+        """Inserts a PTM precursor (a modified precursor, e.g. a phosphopeptide) into the database.
+        The precursor tag is derived from the (modified) sequence and the charge state (sequence.charge).
+        The precursor is connected to the given protein groups and maps to one PTMSite per modification
+        via [:MAPS_TO]; the PTMSite nodes are merged on the fly. Quantification happens at the precursor
+        level via Sample-[:QUANTIFIED]->Precursor.
+
+        Parameters
+        ----------
+        precursor : PTMPrecursorInsertModel
+            The PTM precursor to insert. Each modification must carry the resolved unimod_id/unimod_name.
+
+        Returns
+        -------
+        bool
+            True if the insertion was successful, False otherwise.
+        """
+
+    @abstractmethod
+    def bulk_insert_ptm_precursors(self, precursors: List[PTMPrecursorInsertModel], batch_size: int = 1000, transaction_batch_size: int = 400) -> Dict:
+        """Bulk inserts PTM precursors into the database. Like bulk_insert, but each precursor additionally
+        maps to one PTMSite per modification via [:MAPS_TO]. Precursors whose protein groups do not exist are
+        skipped and reported. Uses the same CALL { ... } IN TRANSACTIONS chunking as bulk_insert.
+
+        Parameters
+        ----------
+        precursors : List[PTMPrecursorInsertModel]
+            The PTM precursors to insert.
+        batch_size : int, optional
+            The number of precursors sent to the database per query, by default 1000
+        transaction_batch_size : int, optional
+            The number of rows per internal transaction (IN TRANSACTIONS OF ... ROWS), by default 400
+
+        Returns
+        -------
+        Dict
+            A report with the number of inserted precursors (valid), the skipped precursors
+            whose protein groups do not exist (not_found) including their tags.
         """
 
     @abstractmethod

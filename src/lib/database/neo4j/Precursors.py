@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 from neo4j import Driver, Result
 import pandas as pd
 
@@ -6,6 +6,7 @@ from lib.database.abstract.Precursors import PrecursorsABC
 from lib.database.abstract.Samples import SamplesABC
 from lib.database.abstract.Cache import CacheABC
 from config.models.precursors import PrecursorInsertModel, PrecursorResponseModel
+from config.models.ptm_precursors import PTMPrecursorInsertModel
 
 
 class Neo4JPrecursors(PrecursorsABC):
@@ -280,7 +281,8 @@ class Neo4JPrecursors(PrecursorsABC):
     def bulk_insert(self, precursors: List[PrecursorInsertModel], batch_size: int = 1000, transaction_batch_size: int = 400) -> int:
         """Bulk inserts a list of precursors into the database. The precursor tags are derived from the
         peptide sequence and the charge state (sequence.charge). The precursors are connected
-        to their respective protein groups. Precursors that already exist are merged.
+        to their respective protein groups. Precursors that already exist are merged. Precursors
+        whose protein groups do not exist are skipped (no orphan precursor nodes are created).
 
         The input is chunked on the client side (batch_size) and each chunk is inserted using a
         CALL { ... } IN TRANSACTIONS subquery so that Neo4J commits the insert in smaller
@@ -306,16 +308,15 @@ class Neo4JPrecursors(PrecursorsABC):
         query = f"""
         CALL () {{
             UNWIND $precursors as precursor
+            UNWIND precursor.protein_group_tags as protein_group_tag
+            MATCH (pg:ProteinGroup {{tag: protein_group_tag}})
             MERGE (p:Precursor {{tag: precursor.sequence + '.' + toString(precursor.charge)}})
             SET p.sequence = precursor.sequence, p.charge = precursor.charge, p.created_at = timestamp()
             SET p.mz = CASE WHEN precursor.mz IS NOT NULL THEN precursor.mz ELSE p.mz END,
                 p.im = CASE WHEN precursor.im IS NOT NULL THEN precursor.im ELSE p.im END
-            WITH p, precursor
-            UNWIND precursor.protein_group_tags as protein_group_tag
-            MATCH (pg:ProteinGroup {{tag: protein_group_tag}})
             MERGE (p)<-[r:HAS_PRECURSOR]-(pg)
             SET r.created_at = timestamp()
-            RETURN count(r) AS created
+            RETURN count(DISTINCT p) AS created
         }} IN TRANSACTIONS OF {transaction_batch_size} ROWS
         RETURN sum(created) AS total
         """
@@ -329,6 +330,150 @@ class Neo4JPrecursors(PrecursorsABC):
                 record = result.single()
                 total += record["total"] if record else 0
         return total
+
+    def _ptm_site_maps(self, precursor: PTMPrecursorInsertModel) -> List[Dict]:
+        sites = []
+        for m in precursor.modifications:
+            name = (m.unimod_name or m.modification).upper()
+            sites.append({
+                "tag": f"{precursor.protein_tag}_{m.position}_{name}",
+                "position": m.position,
+                "modification": name,
+                "residue": m.residue,
+                "unimod_id": m.unimod_id,
+                "unimod_name": m.unimod_name,
+            })
+        return sites
+
+    def insert_ptm_precursor(self, precursor: PTMPrecursorInsertModel) -> bool:
+        """Inserts a PTM precursor into the database. The precursor tag is derived from the
+        (modified) sequence and the charge state (sequence.charge). The precursor is connected
+        to the given protein groups via [:HAS_PRECURSOR] and maps to one PTMSite per
+        modification via [:MAPS_TO]; the PTMSite nodes are merged on the fly and linked to
+        the protein groups via [:OF_PROTEIN_GROUP].
+
+        Parameters
+        ----------
+        precursor : PTMPrecursorInsertModel
+            The PTM precursor to insert. Each modification must carry the resolved
+            unimod_id/unimod_name.
+
+        Returns
+        -------
+        bool
+            True if the insertion was successful, False otherwise.
+        """
+        precursor_tag = f"{precursor.sequence}.{precursor.charge}"
+        query = (
+            "MERGE (p:Precursor {tag: $precursor_tag}) "
+            "SET p.sequence = $sequence, p.charge = $charge, p.is_ptm = true, p.protein_tag = $protein_tag, p.created_at = timestamp() "
+            "SET p.mz = CASE WHEN $mz IS NOT NULL THEN $mz ELSE p.mz END, "
+            "p.im = CASE WHEN $im IS NOT NULL THEN $im ELSE p.im END "
+            "WITH p "
+            "UNWIND $protein_group_tags as protein_group_tag "
+            "MATCH (pg:ProteinGroup {tag: protein_group_tag}) "
+            "MERGE (p)<-[r:HAS_PRECURSOR]-(pg) "
+            "SET r.created_at = timestamp() "
+            "WITH DISTINCT p "
+            "UNWIND $sites as site "
+            "MERGE (ptm:PTMSite {tag: site.tag}) "
+            "SET ptm.protein_tag = $protein_tag, ptm.protein_group_tag = $primary_protein_group_tag, "
+            "ptm.position = site.position, ptm.modification = site.modification, ptm.residue = site.residue, "
+            "ptm.unimod_id = coalesce(site.unimod_id, ptm.unimod_id), "
+            "ptm.unimod_name = coalesce(site.unimod_name, ptm.unimod_name), "
+            "ptm.created_at = timestamp() "
+            "MERGE (p)-[m:MAPS_TO]->(ptm) "
+            "SET m.created_at = timestamp() "
+            "WITH DISTINCT ptm "
+            "UNWIND $protein_group_tags as protein_group_tag "
+            "MATCH (pg:ProteinGroup {tag: protein_group_tag}) "
+            "MERGE (ptm)-[:OF_PROTEIN_GROUP]->(pg) "
+            "RETURN count(ptm) > 0"
+        )
+        r = self._driver.execute_query(query, precursor_tag=precursor_tag, sequence=precursor.sequence, charge=precursor.charge,
+                                       mz=precursor.mz, im=precursor.im, protein_tag=precursor.protein_tag,
+                                       primary_protein_group_tag=precursor.protein_group_tags[0],
+                                       protein_group_tags=precursor.protein_group_tags, sites=self._ptm_site_maps(precursor),
+                                       routing_="w", result_transformer_=Result.value)
+        return r[0]
+
+    def bulk_insert_ptm_precursors(self, precursors: List[PTMPrecursorInsertModel], batch_size: int = 1000, transaction_batch_size: int = 400) -> Dict:
+        """Bulk inserts PTM precursors into the database. Like bulk_insert (same chunking via
+        CALL { ... } IN TRANSACTIONS), but each precursor additionally maps to one PTMSite per
+        modification via [:MAPS_TO]. Precursors whose protein groups do not exist are skipped
+        and reported.
+
+        Parameters
+        ----------
+        precursors : List[PTMPrecursorInsertModel]
+            The PTM precursors to insert. Each modification must carry the resolved
+            unimod_id/unimod_name.
+        batch_size : int, optional
+            The number of precursors sent to the database per query, by default 1000
+        transaction_batch_size : int, optional
+            The number of rows per internal transaction (IN TRANSACTIONS OF ... ROWS), by default 400
+
+        Returns
+        -------
+        Dict
+            A report with the number of inserted precursors (valid), the skipped precursors
+            whose protein groups do not exist (not_found) including their tags.
+        """
+        def group_exists(tag: str) -> bool:
+            query = "MATCH (pg:ProteinGroup {tag : $tag}) RETURN count(pg) > 0 as exists"
+            r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, tag=tag)
+            return r.records[0]
+
+        valid = [p for p in precursors if any(group_exists(t) for t in p.protein_group_tags)]
+        not_found = [f"{p.sequence}.{p.charge}" for p in precursors if p not in valid]
+        report = {"valid": len(valid), "not_found": len(not_found), "not_found_tags": not_found}
+        if len(valid) == 0:
+            return report
+        precursors_data = []
+        for p in valid:
+            d = p.model_dump()
+            d["tag"] = f"{p.sequence}.{p.charge}"
+            d["sites"] = self._ptm_site_maps(p)
+            precursors_data.append(d)
+        total = 0
+        query = f"""
+        CALL () {{
+            UNWIND $precursors as precursor
+            UNWIND precursor.protein_group_tags as protein_group_tag
+            MATCH (pg:ProteinGroup {{tag: protein_group_tag}})
+            MERGE (p:Precursor {{tag: precursor.tag}})
+            SET p.sequence = precursor.sequence, p.charge = precursor.charge, p.is_ptm = true,
+                p.protein_tag = precursor.protein_tag, p.created_at = timestamp()
+            SET p.mz = CASE WHEN precursor.mz IS NOT NULL THEN precursor.mz ELSE p.mz END,
+                p.im = CASE WHEN precursor.im IS NOT NULL THEN precursor.im ELSE p.im END
+            MERGE (p)<-[r:HAS_PRECURSOR]-(pg)
+            SET r.created_at = timestamp()
+            WITH DISTINCT p, precursor
+            UNWIND precursor.sites as site
+            MERGE (ptm:PTMSite {{tag: site.tag}})
+            SET ptm.protein_tag = precursor.protein_tag, ptm.protein_group_tag = precursor.protein_group_tags[0],
+                ptm.position = site.position, ptm.modification = site.modification, ptm.residue = site.residue,
+                ptm.unimod_id = coalesce(site.unimod_id, ptm.unimod_id),
+                ptm.unimod_name = coalesce(site.unimod_name, ptm.unimod_name),
+                ptm.created_at = timestamp()
+            MERGE (p)-[m:MAPS_TO]->(ptm)
+            SET m.created_at = timestamp()
+            WITH DISTINCT ptm, precursor
+            UNWIND precursor.protein_group_tags as pgt
+            MATCH (pg2:ProteinGroup {{tag: pgt}})
+            MERGE (ptm)-[:OF_PROTEIN_GROUP]->(pg2)
+            RETURN count(DISTINCT p) AS created
+        }} IN TRANSACTIONS OF {transaction_batch_size} ROWS
+        RETURN sum(created) AS total
+        """
+        with self._driver.session() as session:
+            for i in range(0, len(precursors_data), batch_size):
+                batch = precursors_data[i:i+batch_size]
+                result = session.run(query, precursors=batch)
+                record = result.single()
+                total += record["total"] if record and record["total"] is not None else 0
+        report["valid"] = total
+        return report
 
     def is_quantified(self, precursor_tag: str) -> bool:
         """Checks if a precursor is quantified.

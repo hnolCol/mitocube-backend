@@ -19,6 +19,8 @@ class PTMSiteBaseModel(BaseModel):
     modification : str
     residue : Optional[str] = None
     sequence_window : Optional[str] = None #the sequence window around the modification, e.g. the flanking residues; although derivable from the protein sequence it is stored since it is what the search engine localized against
+    unimod_id : Optional[int] = None # UniMod accession of the modification, e.g. 21 for Phospho
+    unimod_name : Optional[str] = None # UniMod interim name of the modification, e.g. Phospho
     precursor_tags : List[str] = []
 
     @model_validator(mode="after")
