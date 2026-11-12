@@ -291,11 +291,11 @@ class Neo4JPlates(PlatesABC):
 
     _SUBMISSIONS_QUERY = (
         "MATCH (p:Plate {tag : $tag})<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
-        "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+        "OPTIONAL MATCH (u:User)-[:CREATED]->(s) "
         "WITH s, rl, count(r) AS n_runs_on_plate "
         "RETURN s.tag AS submission_tag, coalesce(s.label, s.tag) AS submission_label, "
         "   s.title AS submission_title, "
-        "   rl.user_tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "
+        "   u.tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "
         "   sum(n_runs_on_plate) AS n_runs_on_plate, count(DISTINCT rl) AS n_runlists "
         "ORDER BY s.tag "
     )
@@ -308,12 +308,12 @@ class Neo4JPlates(PlatesABC):
     _LAYOUT_QUERY = (
         "MATCH (p:Plate {tag : $tag}) "
         "OPTIONAL MATCH (p)<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
-        "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+        "OPTIONAL MATCH (u:User)-[:CREATED]->(s) "
         "RETURN p.tag AS plate_tag, p.rows AS rows, p.columns AS columns, "
         "   collect(DISTINCT {row_index: o.row_index, column_index: o.column_index, position: o.position, "
         "       submission_tag: s.tag, runlist_tag: rl.tag, run_name: r.text, measured_at: rl.created_at}) AS used, "
         "   collect(DISTINCT {submission_tag: s.tag, submission_label: coalesce(s.label, s.tag), "
-        "       submission_title: s.title, user_tag: rl.user_tag, "
+        "       submission_title: s.title, user_tag: u.tag, "
         "       user_firstname: u.firstname, user_lastname: u.lastname}) AS submissions "
     )
 
