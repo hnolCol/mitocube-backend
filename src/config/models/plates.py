@@ -45,6 +45,8 @@ class PlateModel(BaseModel):
     user_tag : Optional[str] = None
     created_by : Optional[str] = None
     n_used_wells : int = 0
+    n_runlists : int = 0
+    n_submissions : int = 0
     format : Optional[str] = None
     cold_storage : Optional[str] = None
     plate_type : Optional[str] = None
@@ -58,6 +60,67 @@ class PlateOptionModel(BaseModel):
     description : Optional[str] = None
     rows : Optional[int] = None      # only for formats
     columns : Optional[int] = None   # only for formats
+
+
+class PlateRunlistModel(BaseModel):
+    "A runlist that has at least one run on a plate, with the per-plate usage."
+    runlist_tag : str
+    created_at : float
+    instrument_tag : Optional[str] = None
+    instrument_text : Optional[str] = None
+    fractionated : bool = False
+    scrambled : bool = False
+    n_runs_on_plate : int
+    used_positions : list[str] = []
+    user_tag : Optional[str] = None
+    user_firstname : Optional[str] = None
+    user_lastname : Optional[str] = None
+    submission_tag : str
+    submission_label : str
+    submission_title : Optional[str] = None
+
+
+class PlateSubmissionModel(BaseModel):
+    "A submission that was measured (via any runlist) on a plate."
+    submission_tag : str
+    submission_label : str
+    submission_title : Optional[str] = None
+    user_tag : Optional[str] = None
+    user_firstname : Optional[str] = None
+    user_lastname : Optional[str] = None
+    n_runs_on_plate : int = 0
+    n_runlists : int = 0
+
+
+class PlateWellSubmissionModel(BaseModel):
+    "A single well of a plate, empty wells have submission_tag None."
+    row_index : int
+    column_index : int
+    position : str
+    submission_tag : Optional[str] = None
+    runlist_tag : Optional[str] = None
+    run_name : Optional[str] = None
+    measured_at : Optional[float] = None
+
+
+class PlateSubmissionLegendModel(BaseModel):
+    "Legend entry for one distinct submission measured on a plate."
+    submission_tag : str
+    submission_label : str
+    submission_title : Optional[str] = None
+    user_tag : Optional[str] = None
+    user_firstname : Optional[str] = None
+    user_lastname : Optional[str] = None
+    n_wells : int
+
+
+class PlateSubmissionsLayoutModel(BaseModel):
+    "Full well grid of a plate with the well -> submission mapping and the submission legend."
+    plate_tag : str
+    rows : int
+    columns : int
+    wells : list[PlateWellSubmissionModel] = []
+    submissions : list[PlateSubmissionLegendModel] = []
 
 
 class PlateOptionsModel(BaseModel):

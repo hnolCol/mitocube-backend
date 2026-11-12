@@ -1,8 +1,9 @@
 import re
+from string import ascii_uppercase
 from typing import List, Optional, Tuple
 from neo4j import Driver, Result
 
-from config.models.plates import PlateInsertModel, PlateModel, PlateOptionModel, PlateOptionsModel
+from config.models.plates import PlateInsertModel, PlateModel, PlateOptionModel, PlateOptionsModel, PlateRunlistModel, PlateSubmissionModel, PlateSubmissionsLayoutModel, PlateWellSubmissionModel, PlateSubmissionLegendModel
 from config.models.attributes import AttributeTree
 from lib.database.abstract.Plates import PlatesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
@@ -67,6 +68,8 @@ class Neo4JPlates(PlatesABC):
         "OPTIONAL MATCH (u:User)-[:CREATED]->(p) "
         "RETURN p{.*, user_tag: u.tag, created_by: u.firstname + ' ' + u.lastname, "
         "   n_used_wells: COUNT {(p)<-[:ON_PLATE]-(:Run)}, "
+        "   n_runlists: COUNT { MATCH (p)<-[:ON_PLATE]-(:Run)<-[:HAS_RUN]-(rl:RunList) RETURN DISTINCT rl }, "
+        "   n_submissions: COUNT { MATCH (p)<-[:ON_PLATE]-(:Run)<-[:HAS_RUN]-(:RunList)<-[:HAS_RUNLIST]-(s:Submission) RETURN DISTINCT s }, "
         f"   format: coalesce(p.format, {_trait_text(PLATE_ATTRIBUTES['format'])}), "
         f"   cold_storage: {_trait_text(PLATE_ATTRIBUTES['cold_storage'])}, "
         f"   plate_type: {_trait_text(PLATE_ATTRIBUTES['plate_type'])}, "
@@ -267,6 +270,84 @@ class Neo4JPlates(PlatesABC):
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
         return [(w["row_index"], w["column_index"], w["position"]) for w in r]
+
+    _RUNLISTS_QUERY = (
+        "MATCH (p:Plate {tag : $tag})<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
+        "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+        "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
+        "RETURN rl.tag AS runlist_tag, rl.created_at AS created_at, "
+        "   inst.tag AS instrument_tag, inst.text AS instrument_text, "
+        "   rl.fractionated AS fractionated, rl.scrambled AS scrambled, "
+        "   count(r) AS n_runs_on_plate, collect(DISTINCT o.position) AS used_positions, "
+        "   u.tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "
+        "   s.tag AS submission_tag, coalesce(s.label, s.tag) AS submission_label, s.title AS submission_title "
+        "ORDER BY rl.created_at DESC "
+    )
+
+    def get_runlists(self, tag : str) -> List[PlateRunlistModel]:
+        "Returns all runlists that have at least one run on the plate, newest first."
+        r = self._driver.execute_query(self._RUNLISTS_QUERY, routing_="r", tag=tag, result_transformer_=Result.data)
+        return [PlateRunlistModel(**row) for row in r]
+
+    _SUBMISSIONS_QUERY = (
+        "MATCH (p:Plate {tag : $tag})<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
+        "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+        "WITH s, rl, count(r) AS n_runs_on_plate "
+        "RETURN s.tag AS submission_tag, coalesce(s.label, s.tag) AS submission_label, "
+        "   s.title AS submission_title, "
+        "   rl.user_tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "
+        "   sum(n_runs_on_plate) AS n_runs_on_plate, count(DISTINCT rl) AS n_runlists "
+        "ORDER BY s.tag "
+    )
+
+    def get_submissions(self, tag : str) -> List[PlateSubmissionModel]:
+        "Returns the distinct submissions that were measured on the plate via any runlist."
+        r = self._driver.execute_query(self._SUBMISSIONS_QUERY, routing_="r", tag=tag, result_transformer_=Result.data)
+        return [PlateSubmissionModel(**row) for row in r]
+
+    _LAYOUT_QUERY = (
+        "MATCH (p:Plate {tag : $tag}) "
+        "OPTIONAL MATCH (p)<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
+        "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
+        "RETURN p.tag AS plate_tag, p.rows AS rows, p.columns AS columns, "
+        "   collect(DISTINCT {row_index: o.row_index, column_index: o.column_index, position: o.position, "
+        "       submission_tag: s.tag, runlist_tag: rl.tag, run_name: r.text, measured_at: rl.created_at}) AS used, "
+        "   collect(DISTINCT {submission_tag: s.tag, submission_label: coalesce(s.label, s.tag), "
+        "       submission_title: s.title, user_tag: rl.user_tag, "
+        "       user_firstname: u.firstname, user_lastname: u.lastname}) AS submissions "
+    )
+
+    def get_submission_layout(self, tag : str) -> Optional[PlateSubmissionsLayoutModel]:
+        """Returns the full well grid of the plate with the well -> submission mapping
+        and the submission legend. Returns None if the plate does not exist."""
+        r = self._driver.execute_query(self._LAYOUT_QUERY, routing_="r", tag=tag, result_transformer_=Result.data)
+        if len(r) == 0:
+            return None
+        row = r[0]
+        used = {(w["row_index"], w["column_index"]): w for w in row["used"]
+                if w["row_index"] is not None and w["submission_tag"] is not None}
+        wells = []
+        for row_index in range(row["rows"]):
+            for column_index in range(row["columns"]):
+                position = f"{ascii_uppercase[row_index]}{column_index + 1}"
+                w = used.get((row_index, column_index))
+                wells.append(PlateWellSubmissionModel(
+                    row_index=row_index, column_index=column_index, position=position,
+                    submission_tag=w["submission_tag"] if w else None,
+                    runlist_tag=w["runlist_tag"] if w else None,
+                    run_name=w["run_name"] if w else None,
+                    measured_at=w["measured_at"] if w else None,
+                ))
+        n_wells = {}
+        submissions = []
+        for s in row["submissions"]:
+            if s["submission_tag"] is None or s["submission_tag"] in n_wells:
+                continue
+            n_wells[s["submission_tag"]] = sum(1 for w in used.values() if w["submission_tag"] == s["submission_tag"])
+            submissions.append(PlateSubmissionLegendModel(**s, n_wells=n_wells[s["submission_tag"]]))
+        submissions.sort(key=lambda s : s.submission_tag)
+        return PlateSubmissionsLayoutModel(plate_tag=row["plate_tag"], rows=row["rows"], columns=row["columns"],
+                                           wells=wells, submissions=submissions)
 
     def check_positions(self, tag : str, positions : List[List[bool]]) -> None:
         plate = self.get(tag=tag)
