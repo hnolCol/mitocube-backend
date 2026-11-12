@@ -292,7 +292,7 @@ class Neo4JPlates(PlatesABC):
     _SUBMISSIONS_QUERY = (
         "MATCH (p:Plate {tag : $tag})<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
         "OPTIONAL MATCH (u:User)-[:CREATED]->(s) "
-        "WITH s, rl, count(r) AS n_runs_on_plate "
+        "WITH s, rl, u, count(r) AS n_runs_on_plate "
         "RETURN s.tag AS submission_tag, coalesce(s.label, s.tag) AS submission_label, "
         "   s.title AS submission_title, "
         "   u.tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "
