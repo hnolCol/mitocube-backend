@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from config.models.plates import PlateInsertModel, PlateModel, PlateOptionsModel
+from config.models.plates import PlateInsertModel, PlateModel, PlateOptionsModel, PlateRunlistModel, PlateSubmissionModel, PlateSubmissionsLayoutModel
 
 
 class PlatesABC(ABC):
@@ -44,6 +44,18 @@ class PlatesABC(ABC):
     @abstractmethod
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:
         "Returns (row_index, column_index, position) of all wells on the plate that hold a run."
+
+    @abstractmethod
+    def get_runlists(self, tag : str) -> List[PlateRunlistModel]:
+        "Returns all runlists that have at least one run on the plate, newest first."
+
+    @abstractmethod
+    def get_submissions(self, tag : str) -> List[PlateSubmissionModel]:
+        "Returns the distinct submissions that were measured on the plate via any runlist."
+
+    @abstractmethod
+    def get_submission_layout(self, tag : str) -> PlateSubmissionsLayoutModel:
+        "Returns the full well grid of the plate with the well -> submission mapping and the submission legend."
 
     @abstractmethod
     def check_positions(self, tag : str, positions : List[List[bool]]) -> None:
