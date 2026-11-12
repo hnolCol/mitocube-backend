@@ -138,8 +138,8 @@ def _notify_ticket_resolved(background_task: BackgroundTasks, db: DatabaseABC,
 
 def _ensure_conversation(ticket: TicketModel, admin: UserModel, db: DatabaseABC) -> str:
     """Returns the ticket's conversation, creating it on first contact with the user's
-    original request as first message (backdated to ticket creation). Adds the admin
-    as participant if needed."""
+    original request as first message (backdated to ticket creation, with the screenshots
+    from the contact form attached). Adds the admin as participant if needed."""
     if ticket.conversation_tag is not None:
         if not db.messages.is_participant(conversation_tag=ticket.conversation_tag, user_tag=admin.tag):
             db.messages.add_participants(conversation_tag=ticket.conversation_tag, user_tags=[admin.tag])
@@ -155,9 +155,12 @@ def _ensure_conversation(ticket: TicketModel, admin: UserModel, db: DatabaseABC)
     if conversation_tag is None:
         raise HTTPException(status_code=400, detail="Conversation could not be created.")
     db.tickets.link_conversation(ticket_tag=ticket.tag, conversation_tag=conversation_tag)
+    initial_attachments = [a.tag for a in db.tickets.get_attachments_for_ticket(ticket.tag)
+                           if a.uploaded_by == ticket.raised_by and a.message_tag is None]
     db.messages.insert_message(conversation_tag=conversation_tag,
                                sender_tag=ticket.raised_by,
-                               message=MessageInput(content=ticket.description),
+                               message=MessageInput(content=ticket.description,
+                                                    attachment_tags=initial_attachments),
                                created_at=ticket.created_at)
     return conversation_tag
 
@@ -210,11 +213,12 @@ def reply_to_ticket(ticket_tag: str,
                     db: DatabaseABC = Depends(get_db)) -> TicketModel:
     """A reply moves the ticket to In Progress; `resolve` marks it as Resolved, posts a
     note to the user's conversation and emails the user. Only the handler can act on
-    a ticket once it is assigned."""
+    a ticket once it is assigned. Attachments in `attachment_tags` (uploaded beforehand)
+    are shown with the reply."""
     ticket = _get_ticket_or_404(ticket_tag, db)
 
     content = body.content.strip()
-    if not content and not body.resolve:
+    if not content and not body.resolve and not body.attachment_tags:
         raise HTTPException(status_code=400, detail="Write a reply or resolve the ticket.")
 
     if not db.tickets.assign(ticket_tag=ticket_tag, admin_tag=user.tag):
@@ -224,10 +228,11 @@ def reply_to_ticket(ticket_tag: str,
     new_status = TicketStatusEnum.RESOLVED if body.resolve else TicketStatusEnum.IN_PROGRESS
     conversation_tag = _ensure_conversation(ticket, user, db)
 
-    if content:
+    if content or body.attachment_tags:
         db.messages.insert_message(conversation_tag=conversation_tag,
                                    sender_tag=user.tag,
-                                   message=MessageInput(content=content))
+                                   message=MessageInput(content=content,
+                                                        attachment_tags=body.attachment_tags))
 
     if new_status != ticket.status:
         db.tickets.set_status(ticket_tag=ticket_tag, status=new_status)

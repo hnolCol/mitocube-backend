@@ -133,9 +133,10 @@ class Neo4JMessages(MessagesABC):
             "MATCH (c:Conversation {tag : $conversation_tag}) "
             "OPTIONAL MATCH (u:User)-[:PARTICIPATES]->(c) "
             "OPTIONAL MATCH (c)-[:ABOUT_SUBMISSION]->(s:Submission) "
+            "OPTIONAL MATCH (t:Ticket)-[:HAS_CONVERSATION]->(c) "
             "RETURN c.tag AS tag, c.created_at AS created_at, c.created_by AS created_by, "
             "c.title AS title, s.tag AS submission_tag, collect(u.tag) AS user_tags, "
-            "coalesce(c.read_only, false) AS read_only "
+            "coalesce(c.read_only, false) AS read_only, t.tag AS ticket_tag "
         )
         r = self._driver.execute_query(query, conversation_tag = conversation_tag, result_transformer_=Result.data)
         if len(r) == 0: return None
@@ -145,7 +146,8 @@ class Neo4JMessages(MessagesABC):
                                  user_tags = [t for t in row["user_tags"] if t is not None],
                                  submission_tag = row.get("submission_tag"),
                                  title = row.get("title"),
-                                 read_only = bool(row.get("read_only")))
+                                 read_only = bool(row.get("read_only")),
+                                 ticket_tag = row.get("ticket_tag"))
 
     def get_conversations_for_user(self, user_tag : str, submission_tag : str = None) -> List[ConversationResponseModel]:
         """Returns all conversations of the given user, optionally filtered by
@@ -243,7 +245,8 @@ class Neo4JMessages(MessagesABC):
                        created_at : Optional[int] = None) -> Optional[str]:
         """Adds a message to a conversation. The message is linked to the sender
         and the conversation and starts with the sender in read_by. created_at
-        defaults to now; pass it to backdate (e.g. a ticket's original request)."""
+        defaults to now; pass it to backdate (e.g. a ticket's original request).
+        Attachments in message.attachment_tags are linked to the message."""
         if not self.exists(conversation_tag):
             return None
         message_tag = get_random_string(N = 12)
@@ -265,13 +268,35 @@ class Neo4JMessages(MessagesABC):
                                        result_transformer_=Result.value)
         if len(r) == 0:
             return None
+        if message.attachment_tags:
+            self._link_attachments(conversation_tag, sender_tag, message_tag, message.attachment_tags)
         return message_tag
+
+    def _link_attachments(self, conversation_tag : str, sender_tag : str,
+                          message_tag : str, attachment_tags : List[str]) -> None:
+        """Links ticket attachments to a message. Only attachments of the ticket behind
+        this conversation, uploaded by the sender and not yet linked to another message."""
+        query = (
+            "MATCH (m:Message {tag : $message_tag})-[:IN_CONVERSATION]->(c:Conversation {tag : $conversation_tag}) "
+            "MATCH (t:Ticket)-[:HAS_CONVERSATION]->(c) "
+            "MATCH (t)-[:HAS_ATTACHMENT]->(a:Attachment)<-[:UPLOADED]-(:User {tag : $sender_tag}) "
+            "WHERE a.tag IN $attachment_tags AND NOT EXISTS { (:Message)-[:HAS_ATTACHMENT]->(a) } "
+            "MERGE (m)-[:HAS_ATTACHMENT]->(a) "
+        )
+        self._driver.execute_query(query, routing_="w",
+                                   message_tag = message_tag,
+                                   conversation_tag = conversation_tag,
+                                   sender_tag = sender_tag,
+                                   attachment_tags = attachment_tags)
 
     def get_messages(self, conversation_tag : str, limit : int = None) -> List[MessageModel]:
         query = (
             "MATCH (m:Message)-[:IN_CONVERSATION]->(c:Conversation {tag : $conversation_tag}) "
+            "OPTIONAL MATCH (m)-[:HAS_ATTACHMENT]->(a:Attachment) "
+            "WITH m, a ORDER BY a.created_at ASC "
+            "WITH m, collect(a {.tag, .filename, .content_type, .size}) AS attachments "
             "RETURN m.tag AS tag, m.created_at AS created_at, m.sender_tag AS sender_tag, "
-            "m.content AS content, m.read_by AS read_by "
+            "m.content AS content, m.read_by AS read_by, attachments "
             "ORDER BY m.created_at ASC "
         )
         params = {"conversation_tag" : conversation_tag}
@@ -281,7 +306,8 @@ class Neo4JMessages(MessagesABC):
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data, **params)
         return [MessageModel(tag = row["tag"], created_at = row["created_at"],
                              sender_tag = row["sender_tag"], content = row["content"],
-                             read_by = row.get("read_by") or []) for row in r]
+                             read_by = row.get("read_by") or [],
+                             attachments = row.get("attachments") or []) for row in r]
 
     def mark_read(self, conversation_tag : str, user_tag : str) -> bool:
         """Marks all messages of the conversation as read for the given user

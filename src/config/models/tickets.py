@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -17,6 +17,7 @@ class TicketInput(BaseModel):
 class TicketReplyInput(BaseModel):
     content : str = Field("", max_length = 10_000)
     resolve : bool = False   # True = mark as Resolved; otherwise a reply moves it to In Progress
+    attachment_tags : List[str] = Field(default_factory=list, max_length=10)   # uploaded beforehand, sent with the reply
 
 
 class TicketCreatedResponse(BaseModel):
@@ -34,6 +35,7 @@ class TicketAttachmentModel(BaseModel):
     uploaded_by : str
     uploaded_by_name : Optional[str] = None
     created_at : int
+    message_tag : Optional[str] = None   # message the attachment was sent with, None if not linked
 
 
 class TicketModel(BaseModel):
