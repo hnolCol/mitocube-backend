@@ -138,6 +138,7 @@ def get_submission_by_query(state : str|int = None,
                             protein_tags: str = None,
                             user_tags : str = None,
                             consortium_tags : str = None,
+                            research_group_tags : str = None,
                             user_role : Literal["creator", "collaborator", "any"] = "any",  
                             include_sample_ca : bool = False,
                             ca_search_string : str = None,
@@ -146,6 +147,7 @@ def get_submission_by_query(state : str|int = None,
                             sort_by_views : bool = False,
                             group_by_state : bool = True,
                             group_by_user : bool = False,
+                            group_by_research_group : bool = False,
                             group_by_date : bool = False,
                             user : UserModel = Depends(get_user_from_token)
 , db : DatabaseABC = Depends(get_db)) -> List[str]| Dict[str|int, List[str]]: 
@@ -205,13 +207,14 @@ def get_submission_by_query(state : str|int = None,
             user_role=user_role,   
             genotype_tag = APIParamString(param=genotype_tag).param,
             consortium_tags = APIParamString(param=consortium_tags).param,
+            research_group_tags = APIParamString(param=research_group_tags).param,
             include_sample_ca = include_sample_ca,
             ca_search_string = ca_search_string,
             protein_tags = APIParamString(param=protein_tags).param,
             ordered = ordered,
             limit = limit
             )
-    if len(tags) == 0 and any([group_by_date,group_by_state,group_by_user]):
+    if len(tags) == 0 and any([group_by_date,group_by_state,group_by_user,group_by_research_group]):
         return {}
     
     if sort_by_views:
@@ -224,6 +227,9 @@ def get_submission_by_query(state : str|int = None,
     elif group_by_user:
         #group by user
         tags = db.submission_filter.group_by_user(tags = tags)
+    elif group_by_research_group:
+        #group by research group
+        tags = db.submission_filter.group_by_research_group(tags = tags)
     elif group_by_date:
         #group by date
         tags = db.submission_filter.group_by_date(tags = tags)
@@ -584,7 +590,7 @@ def insert_submission_view(submission_tag : str, user : UserModel = Depends(get_
     return True
 
 @router.get("/submissions/count", response_model=Dict[str|int,SubmissionCountResponse])
-def get_submissions_by_user_label(tags : str = None, group : Literal["state","user","attribute","attribute_value","feature","genotype"] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+def get_submissions_by_user_label(tags : str = None, group : Literal["state","user","attribute","attribute_value","feature","genotype","research_group"] = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     """Returns the the number submissions by a property. 
 
 

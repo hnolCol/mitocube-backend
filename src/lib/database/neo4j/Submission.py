@@ -1657,7 +1657,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         r = self._driver.execute_query(query, routing_="r",limit=limit, result_transformer_=Result.value)
         return r
     
-    def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value"] = "state") -> pd.DataFrame:
+    def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value","research_group"] = "state") -> pd.DataFrame:
         """Counts the submissions and groups them from the Neo4j database. 
 
         Parameters
@@ -1684,6 +1684,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         elif by == "attribute_value":
             query = ("MATCH (n:Trait) "
                      "MATCH (n)<-[:HAS_TRAIT]-(submission:Submission) ")
+        elif by == "research_group":
+            query = ("MATCH (n:ResearchGroup) "
+                     "MATCH (n)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission:Submission) ")
         if tags is not None:
             query += "WHERE submission.tag in $tags "
             
@@ -1952,6 +1955,42 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
         r = self._driver.execute_query(query, tags = tags, routing_="r", database_="neo4j", result_transformer_=Result.data)
         return dict((ri.get("user_tag"),ri.get("submission_tags")) for ri in r) 
     
+
+    def group_by_research_group(self, tags = None) -> Dict[str, List[str]]:
+        """Groups the submissions by the research group of their creator and returns the tags of each group.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The submission tags to use. If None, all tags in the database are used.
+            If tags is an empty list, all tags in the database are used.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary with the research group tag as key and a list of submission tags as value.
+            If no submissions are found, an empty dictionary is returned.
+
+        Raises
+        ------
+        TypeError
+            If the tags parameter is not a list of strings or None.
+        """
+
+        if tags is not None and not isinstance(tags, list):
+            raise TypeError("The tags parameter must be a list of strings or None.")
+        elif tags is not None and len(tags) == 0:
+            tags = None
+
+        query = "MATCH (rg:ResearchGroup)<-[:MEMBER_OF]-(u:User)-[:CREATED]->(submission:Submission) "
+
+        if tags is not None:
+            query += "WHERE submission.tag in $tags "
+        query += "ORDER BY submission.created_at DESC "
+        query += "RETURN rg.tag AS research_group_tag, collect(submission.tag) AS submission_tags "
+
+        r = self._driver.execute_query(query, tags = tags, routing_="r", database_="neo4j", result_transformer_=Result.data)
+        return dict((ri.get("research_group_tag"),ri.get("submission_tags")) for ri in r)
 
     def group_by_date(self, tags = None) -> Dict[str, List[str]]:
         """Groups the submissions by their creation date and returns the counts of each date.
@@ -2611,7 +2650,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     
     def _build_v2_where(self, scope_tags, search_string, state, trait_tags, attribute_tag,
                         ca_tags, protein_tags, ca_search_string, user_tags, user_role,
-                        genotype_tag, consortium_tags, include_sample_ca, ca_match_all):
+                        genotype_tag, consortium_tags, research_group_tags, include_sample_ca, ca_match_all):
         """Builds the WHERE conditions and query parameters shared by find_v2 and count_v2.
         scope_tags is the requesting users submission scope (None = unrestricted, e.g. curator)."""
         where = []
@@ -2743,6 +2782,14 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             )
             params["consortium_tags"] = consortium_tags
 
+        # ---- research groups: submission created by a member of one of the groups ----
+        if research_group_tags is not None:
+            where.append(
+                "EXISTS { MATCH (rg:ResearchGroup)<-[:MEMBER_OF]-(u:User)-[:CREATED]->(submission) "
+                "WHERE rg.tag IN $research_group_tags }"
+            )
+            params["research_group_tags"] = research_group_tags
+
         return where, params
 
     def count_v2(self,
@@ -2758,6 +2805,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_role : Literal["creator", "collaborator", "any"] = "any",
             genotype_tag : List[str] = None,
             consortium_tags : List[str] = None,
+            research_group_tags : List[str] = None,
             include_sample_ca : bool = False,
             ca_match_all : bool = True) -> int:
         """Single-query count variant. Counts the submissions matching all given filters
@@ -2779,6 +2827,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_role = user_role,
             genotype_tag = genotype_tag,
             consortium_tags = consortium_tags,
+            research_group_tags = research_group_tags,
             include_sample_ca = include_sample_ca,
             ca_match_all = ca_match_all,
         )
@@ -2804,6 +2853,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_role : Literal["creator", "collaborator", "any"] = "any",
             genotype_tag : List[str] = None,
             consortium_tags : List[str] = None,
+            research_group_tags : List[str] = None,
             include_sample_ca : bool = False,
             ordered : bool = True,
             ca_match_all : bool = True,
@@ -2828,6 +2878,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             user_role = user_role,
             genotype_tag = genotype_tag,
             consortium_tags = consortium_tags,
+            research_group_tags = research_group_tags,
             include_sample_ca = include_sample_ca,
             ca_match_all = ca_match_all,
         )

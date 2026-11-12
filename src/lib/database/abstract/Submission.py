@@ -659,7 +659,7 @@ class SubmissionFilterABC(ABC):
         """
         
     @abstractmethod
-    def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value"] = "state") -> pd.DataFrame:
+    def get_counts(self, tags : List[str] = None, by : Literal["user","state","attribute","attribute_value","research_group"] = "state") -> pd.DataFrame:
         """Returns the number of submissions/dataset associated with a certain param tag. A common
         use case would be to ask the question how many and which dataset/submission tags are associated with 
         a certain user or state or attribute_value (for example: Hypoxia, LC-Instrument)
@@ -794,6 +794,19 @@ Each submission is counted at most once per group and year, even if it has sever
         Dict[str, List[str]]
             A dictionary where the keys are the state tags and the values are the submission tags associated with the state. 
         """
+    def group_by_research_group(self, tags = None) -> Dict[str, List[str]]:
+        """Groups the submissions by the research group of their creator and returns the tags of each group.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The submission tags to use. If None, all tags in the database are used.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary with the research group tag as key and a list of submission tags as value.
+        """
     @abstractmethod
     def group_by_date(self, tags = None) -> Dict[str, List[str]]:
         """Groups the submissions by their creation date and returns the counts of each date.
@@ -839,6 +852,7 @@ Each submission is counted at most once per group and year, even if it has sever
             user_tags : List[str] = None,
             genotype_tag : List[str] = None,
             consortium_tags : List[str] = None,
+            research_group_tags : List[str] = None,
             include_sample_ca : bool = False,
             ordered : bool = True,
             ca_match_all : bool = True,
@@ -861,6 +875,7 @@ Each submission is counted at most once per group and year, even if it has sever
             user_role : Literal["creator", "collaborator", "any"] = "any",
             genotype_tag : List[str] = None,
             consortium_tags : List[str] = None,
+            research_group_tags : List[str] = None,
             include_sample_ca : bool = False,
             ca_match_all : bool = True) -> int:
         """Single-query count variant of the find_v2 filtering. Counts the matching
