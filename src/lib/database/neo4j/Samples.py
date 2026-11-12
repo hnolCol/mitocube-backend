@@ -708,7 +708,7 @@ class Neo4JSamples(SamplesABC):
         
         query = (
             "MATCH (sample:Sample {tag : $tag}) "
-            "OPTIONAL MATCH (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : $qd_tag}) "
+            "OPTIONAL MATCH (sample)-[:HAS_QUANTIFICATION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : $qd_tag}) "
             "RETURN coalesce(sample.excluded, false) AS excluded, coalesce(sample.lost, false) AS lost, "
             "qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
         )
@@ -760,7 +760,7 @@ class Neo4JSamples(SamplesABC):
         cache_query = (
             "UNWIND $rows AS row "
             "MATCH (sample:Sample {tag : row.tag}) "
-            "OPTIONAL MATCH (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : row.qd_tag}) "
+            "OPTIONAL MATCH (sample)-[:HAS_QUANTIFICATION_DISTRIBUTION]->(qd:QuantificationDistribution {tag : row.qd_tag}) "
             "RETURN row.tag AS tag, row.qd_tag AS qd_tag, coalesce(sample.excluded, false) AS excluded, coalesce(sample.lost, false) AS lost, "
             "qd.min AS min, qd.q25 AS q25, qd.m AS m, qd.q75 AS q75, qd.max AS max, qd.N AS N "
         )
@@ -819,7 +819,7 @@ class Neo4JSamples(SamplesABC):
                 "qd.min = row.distribution.min, qd.q25 = row.distribution.q25, qd.m = row.distribution.m, "
                 "qd.q75 = row.distribution.q75, qd.max = row.distribution.max, qd.N = row.distribution.N, qd.outlier_removed = $outlier_removed "
                 "WITH sample, qd "
-                "MERGE (sample)-[:HAS_QUAN********ION_DISTRIBUTION]->(qd) "
+                "MERGE (sample)-[:HAS_QUANTIFICATION_DISTRIBUTION]->(qd) "
             )
             self._driver.execute_query(insert_query, routing_="w", rows = insert_rows, quantification_type = quantification_type, annotation_tag = annotation_tag, outlier_removed = remove_outlier)
 
