@@ -36,15 +36,15 @@ RESOLVED_NOTE = (
 )
 
 
-def is_user_admin(user: UserModel = Depends(get_user_from_token)) -> UserModel:
-    if user.role < UserRolesEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Only admins can manage support tickets.")
+def is_user_staff(user: UserModel = Depends(get_user_from_token)) -> UserModel:
+    if user.role < UserRolesEnum.CURATOR:
+        raise HTTPException(status_code=403, detail="Only curators and admins can manage support tickets.")
     return user
 
 
-def _get_admin_emails(db: DatabaseABC) -> List[str]:
+def _get_staff_emails(db: DatabaseABC) -> List[str]:
     return [u.email for u in db.users.get_users()
-            if u.role >= UserRolesEnum.ADMIN and u.email is not None]
+            if u.role >= UserRolesEnum.CURATOR and u.email is not None]
 
 
 def _full_name(user: UserModel) -> str:
@@ -59,16 +59,16 @@ def _get_ticket_or_404(ticket_tag: str, db: DatabaseABC) -> TicketModel:
 
 
 def _get_ticket_with_access(ticket_tag: str, user: UserModel, db: DatabaseABC) -> TicketModel:
-    """Returns the ticket if the user raised it or is an admin, 404/403 otherwise."""
+    """Returns the ticket if the user raised it or is staff (curator/admin), 404/403 otherwise."""
     ticket = _get_ticket_or_404(ticket_tag, db)
-    if ticket.raised_by != user.tag and user.role < UserRolesEnum.ADMIN:
+    if ticket.raised_by != user.tag and user.role < UserRolesEnum.CURATOR:
         raise HTTPException(status_code=403, detail="You have no access to this ticket.")
     return ticket
 
 
 def _notify_ticket_created(background_task: BackgroundTasks, db: DatabaseABC, user: UserModel,
                            ticket: TicketInput, reference: str) -> None:
-    """Emails the user a confirmation with the ticket reference and notifies all admins.
+    """Emails the user a confirmation with the ticket reference and notifies all staff (curators and admins).
     The ticket is already stored at this point, so mail problems are logged instead of raised."""
     if user.email is not None:
         try:
@@ -86,9 +86,9 @@ def _notify_ticket_created(background_task: BackgroundTasks, db: DatabaseABC, us
         except Exception as e:
             print(f"[mail] Failed to queue the confirmation email for ticket {reference}: {e}")
 
-    emails = _get_admin_emails(db)
+    emails = _get_staff_emails(db)
     if len(emails) == 0:
-        print(f"[mail] No admin with an email found for ticket {reference}, sending to the CC address only.")
+        print(f"[mail] No staff member with an email found for ticket {reference}, sending to the CC address only.")
         return
     try:
         send_email_in_background(background_tasks=background_task,
@@ -105,7 +105,7 @@ def _notify_ticket_created(background_task: BackgroundTasks, db: DatabaseABC, us
                                  },
                                  template_name=EMAIL_SETTINGS.mail_ticket_new_template)
     except Exception as e:
-        print(f"[mail] Failed to queue the admin email for ticket {reference}: {e}")
+        print(f"[mail] Failed to queue the staff email for ticket {reference}: {e}")
 
 
 def _notify_ticket_resolved(background_task: BackgroundTasks, db: DatabaseABC,
@@ -136,17 +136,17 @@ def _notify_ticket_resolved(background_task: BackgroundTasks, db: DatabaseABC,
         print(f"[mail] Failed to queue the resolved email for ticket {ticket.reference}: {e}")
 
 
-def _ensure_conversation(ticket: TicketModel, admin: UserModel, db: DatabaseABC) -> str:
+def _ensure_conversation(ticket: TicketModel, staff: UserModel, db: DatabaseABC) -> str:
     """Returns the ticket's conversation, creating it on first contact with the user's
     original request as first message (backdated to ticket creation, with the screenshots
-    from the contact form attached). Adds the admin as participant if needed."""
+    from the contact form attached). Adds the staff member as participant if needed."""
     if ticket.conversation_tag is not None:
-        if not db.messages.is_participant(conversation_tag=ticket.conversation_tag, user_tag=admin.tag):
-            db.messages.add_participants(conversation_tag=ticket.conversation_tag, user_tags=[admin.tag])
+        if not db.messages.is_participant(conversation_tag=ticket.conversation_tag, user_tag=staff.tag):
+            db.messages.add_participants(conversation_tag=ticket.conversation_tag, user_tags=[staff.tag])
         return ticket.conversation_tag
 
     conversation_tag = db.messages.insert_conversation(
-        created_by=admin.tag,
+        created_by=staff.tag,
         conversation=ConversationInput(
             user_tags=[ticket.raised_by],
             title=f"[{ticket.reference}] {ticket.title}",
@@ -172,7 +172,7 @@ def create_ticket(body: TicketInput,
                   background_task: BackgroundTasks,
                   user: UserModel = Depends(get_user_from_token),
                   db: DatabaseABC = Depends(get_db)) -> TicketCreatedResponse:
-    """Creates an open ticket. No conversation is created until an admin replies."""
+    """Creates an open ticket. No conversation is created until a staff member replies."""
     created = db.tickets.insert_ticket(user_tag=user.tag, ticket=body)
     if created is None:
         raise HTTPException(status_code=400, detail="Ticket could not be created.")
@@ -189,15 +189,15 @@ def get_my_tickets(user: UserModel = Depends(get_user_from_token),
 
 # ---------- admin ----------
 
-@router.get("/tickets", summary="Returns the ticket queue, optionally filtered by status. Admin rights required.")
+@router.get("/tickets", summary="Returns the ticket queue, optionally filtered by status. Curator or admin rights required.")
 def get_ticket_queue(status: Optional[TicketStatusEnum] = None,
-                     user: UserModel = Depends(is_user_admin),
+                     user: UserModel = Depends(is_user_staff),
                      db: DatabaseABC = Depends(get_db)) -> List[TicketModel]:
     """Returns all tickets. Tickets awaiting a reply come first, then by status and activity."""
     return db.tickets.get_tickets(status=status)
 
 
-@router.get("/tickets/{ticket_tag}", summary="Returns a ticket. Admin rights or being the ticket raiser required.")
+@router.get("/tickets/{ticket_tag}", summary="Returns a ticket. Staff rights or being the ticket raiser required.")
 def get_ticket(ticket_tag: str,
                user: UserModel = Depends(get_user_from_token),
                db: DatabaseABC = Depends(get_db)) -> TicketModel:
@@ -205,11 +205,11 @@ def get_ticket(ticket_tag: str,
     return _get_ticket_with_access(ticket_tag, user, db)
 
 
-@router.post("/tickets/{ticket_tag}/reply", summary="Replies to and/or resolves a ticket. The first admin to act becomes the handler. Admin rights required.")
+@router.post("/tickets/{ticket_tag}/reply", summary="Replies to and/or resolves a ticket. The first staff member to act becomes the handler. Curator or admin rights required.")
 def reply_to_ticket(ticket_tag: str,
                     body: TicketReplyInput,
                     background_task: BackgroundTasks,
-                    user: UserModel = Depends(is_user_admin),
+                    user: UserModel = Depends(is_user_staff),
                     db: DatabaseABC = Depends(get_db)) -> TicketModel:
     """A reply moves the ticket to In Progress; `resolve` marks it as Resolved, posts a
     note to the user's conversation and emails the user. Only the handler can act on
@@ -223,7 +223,7 @@ def reply_to_ticket(ticket_tag: str,
 
     if not db.tickets.assign(ticket_tag=ticket_tag, admin_tag=user.tag):
         raise HTTPException(status_code=409,
-                            detail=f"This ticket is already handled by {ticket.assigned_to_name or 'another admin'}.")
+                            detail=f"This ticket is already handled by {ticket.assigned_to_name or 'another staff member'}.")
 
     new_status = TicketStatusEnum.RESOLVED if body.resolve else TicketStatusEnum.IN_PROGRESS
     conversation_tag = _ensure_conversation(ticket, user, db)
@@ -262,7 +262,7 @@ async def _read_upload(file: UploadFile, max_size: int) -> bytes:
 
 
 @router.post("/tickets/{ticket_tag}/attachments", status_code=201,
-             summary="Uploads an image (e.g. a screenshot) to a ticket. Ticket raiser or admin required.")
+             summary="Uploads an image (e.g. a screenshot) to a ticket. Ticket raiser or staff required.")
 async def upload_attachment(ticket_tag: str,
                             file: UploadFile = File(...),
                             user: UserModel = Depends(get_user_from_token),
@@ -293,7 +293,7 @@ async def upload_attachment(ticket_tag: str,
 
 
 @router.get("/tickets/{ticket_tag}/attachments",
-            summary="Lists the image attachments of a ticket. Ticket raiser or admin required.")
+            summary="Lists the image attachments of a ticket. Ticket raiser or staff required.")
 def list_attachments(ticket_tag: str,
                      user: UserModel = Depends(get_user_from_token),
                      db: DatabaseABC = Depends(get_db)) -> List[TicketAttachmentModel]:
@@ -302,7 +302,7 @@ def list_attachments(ticket_tag: str,
 
 
 @router.get("/tickets/{ticket_tag}/attachments/{attachment_tag}",
-            summary="Downloads an image attachment. Ticket raiser or admin required.")
+            summary="Downloads an image attachment. Ticket raiser or staff required.")
 def download_attachment(ticket_tag: str,
                         attachment_tag: str,
                         user: UserModel = Depends(get_user_from_token),
