@@ -1,7 +1,15 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
 
 from services.date import get_time_stamp
+
+
+class MessageAttachmentModel(BaseModel):
+    """An image attached to a message (support ticket conversations only)."""
+    tag : str
+    filename : str
+    content_type : str
+    size : int
 
 
 class MessageModel(BaseModel):
@@ -11,6 +19,7 @@ class MessageModel(BaseModel):
     sender_tag : str
     content : str
     read_by : List[str] = []
+    attachments : List[MessageAttachmentModel] = []
 
 
 class ConversationModel(BaseModel):
@@ -24,11 +33,19 @@ class ConversationModel(BaseModel):
     submission_tag : Optional[str] = None
     title : Optional[str] = None
     read_only : bool = False
+    ticket_tag : Optional[str] = None   # set when the conversation belongs to a support ticket
 
 
 class MessageInput(BaseModel):
-    """Input model to post a message to a conversation."""
-    content : str = Field(..., min_length=1)
+    """Input model to post a message to a conversation. Text, attachments or both."""
+    content : str = ""
+    attachment_tags : List[str] = Field(default_factory=list, max_length=10)
+
+    @model_validator(mode="after")
+    def _not_empty(self):
+        if not self.content.strip() and not self.attachment_tags:
+            raise ValueError("A message needs text or an attachment.")
+        return self
 
 
 class ConversationInput(BaseModel):

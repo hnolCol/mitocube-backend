@@ -146,12 +146,15 @@ class Neo4JTickets(TicketsABC):
         self._driver.execute_query(query, routing_="w", user_tag = user_tag,
                                    conversation_tag = conversation_tag)
 
+    # WITH is required here because this follows CREATE/MERGE in insert_attachment.
     _ATTACHMENT_RETURN = (
+        "WITH t, u, a "
+        "OPTIONAL MATCH (msg:Message)-[:HAS_ATTACHMENT]->(a) "
         "RETURN a.tag AS tag, t.tag AS ticket_tag, a.filename AS filename, "
         "a.content_type AS content_type, a.size AS size, a.extension AS extension, "
         "u.tag AS uploaded_by, "
         "trim(coalesce(u.firstname, '') + ' ' + coalesce(u.lastname, '')) AS uploaded_by_name, "
-        "a.created_at AS created_at "
+        "a.created_at AS created_at, msg.tag AS message_tag "
     )
 
     def insert_attachment(self, ticket_tag : str, attachment_tag : str, uploaded_by : str,
@@ -190,7 +193,7 @@ class Neo4JTickets(TicketsABC):
         query = (
             "MATCH (t:Ticket {tag : $ticket_tag})-[:HAS_ATTACHMENT]->(a:Attachment) "
             "MATCH (u:User)-[:UPLOADED]->(a) " + self._ATTACHMENT_RETURN + \
-            "ORDER BY a.created_at ASC "
+            "ORDER BY created_at ASC "
         )
         r = self._driver.execute_query(query, routing_="r", ticket_tag = ticket_tag,
                                        result_transformer_=Result.data)
