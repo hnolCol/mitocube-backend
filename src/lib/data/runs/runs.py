@@ -400,7 +400,7 @@ class RunListCreator:
             if self._scramble_across_plates:
                 scrambled_runs = assigned_runs.sample(frac=1.0)
             else:
-                scrambled_runs = assigned_runs.groupby(by = "plate_index").apply(lambda df : df.sample(frac=1.0)).reset_index(drop=True)
+                scrambled_runs = assigned_runs.groupby(by = "plate_index").sample(frac=1.0).reset_index(drop=True)
             run_list = scrambled_runs.reset_index(drop=True).to_dict(orient="records")
         else:
             run_list = assigned_runs.reset_index(drop=True).to_dict(orient="records")
