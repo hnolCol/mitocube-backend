@@ -533,6 +533,29 @@ class Neo4JSubmissions(SubmissionsABC):
         r = self._driver.execute_query(query, routing_="r", state_01 = state_01, state_02 = state_02, result_transformer_=Result.value, **filter_params)
         return r
 
+    def get_current_state_durations(self, states : List[SubmissionStatesEnums] = None) -> List[Dict]:
+        """Returns for every submission whose current state is one of the given states
+        how long it has been in that state (longest first), together with its sample count and creator."""
+        if states is None or len(states) == 0:
+            states = [SubmissionStatesEnums.SUBMITTED, SubmissionStatesEnums.PROCESSED, SubmissionStatesEnums.MEASURING, SubmissionStatesEnums.ANALYSIS]
+        state_tags = [int(state) for state in states]
+        query = (
+            "MATCH (submission:Submission)-[r:IN_STATE]->(state:State) "
+            "WHERE r.created_at IS NOT NULL AND state.tag IN $state_tags "
+            "WITH submission, state, r ORDER BY r.created_at DESC "
+            "WITH submission, head(collect({state_tag: state.tag, state_since: r.created_at})) AS current "
+            "WHERE current.state_tag IN $state_tags "
+            "OPTIONAL MATCH (user:User)-[:CREATED]->(submission) "
+            "OPTIONAL MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample) "
+            "WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
+            "WITH submission, current, user, count(DISTINCT sample) AS sample_count "
+            "RETURN {submission_tag: submission.tag, state_tag: current.state_tag, state_since: current.state_since, "
+            "duration_days: (timestamp() - current.state_since) / 86400000.0, sample_count: sample_count, user_tag: user.tag} "
+            "ORDER BY current.state_since ASC "
+        )
+        r = self._driver.execute_query(query, routing_="r", state_tags = state_tags, result_transformer_=Result.value)
+        return r
+
     def has_genotypes(self, tag : str) -> bool:
         """Checks if the submission has genotypes associated with it."""
         query = (

@@ -190,6 +190,34 @@ class SubmissionsABC(ABC):
         pass
 
     @abstractmethod
+    def get_current_state_durations(self, states : List[SubmissionStatesEnums] = None) -> List[Dict]:
+        """Returns for every submission whose current state is one of the given states
+        how long it has been in that state, together with its sample count and creator.
+
+        Parameters
+        ----------
+        states : List[SubmissionStatesEnums], optional
+            The states to include, by default None meaning the open work states
+            (SUBMITTED, PROCESSED, MEASURING, ANALYSIS).
+
+        Returns
+        -------
+        List[Dict]
+            List of dictionaries with the following structure:
+            ```
+            {
+                "submission_tag": str,
+                "state_tag": int,
+                "state_since": float, # timestamp of the state change in milliseconds
+                "duration_days": float,
+                "sample_count": int,
+                "user_tag": str
+            }
+            ```
+        """
+        pass
+
+    @abstractmethod
     def get(self, tag : str) -> DatasetSubmissionModel:
         """Returns the submission
 
