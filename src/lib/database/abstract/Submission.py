@@ -884,6 +884,7 @@ Each submission is counted at most once per group and year, even if it has sever
             research_group_tags : List[str] = None,
             include_sample_ca : bool = False,
             ordered : bool = True,
+            sort_order : Literal["asc", "desc"] = "desc",
             ca_match_all : bool = True,
             limit : int = 10) -> List[str]:
         """Single-query variant of find(). Returns the submission tags that match
@@ -949,6 +950,24 @@ Each submission is counted at most once per group and year, even if it has sever
             True if the user has access to the submission, False otherwise.
         """
     
+    @abstractmethod
+    def sort_by_state_duration(self, tags : List[str], limit : int = None) -> List[str]:
+        """Sorts the submission tags by how long they have been in their current state,
+        longest duration first. The sorting is performed on the given list of submission tags.
+
+        Parameters
+        ----------
+        tags : List[str]
+            The list of submission tags to sort.
+        limit : int, optional
+            The maximum number of submission tags to return, by default None
+
+        Returns
+        -------
+        List[str]
+            The sorted list of submission tags by current-state duration in descending order.
+        """
+
     @abstractmethod
     def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
         """Sorts the submission tags by the number of views in descending order. 
