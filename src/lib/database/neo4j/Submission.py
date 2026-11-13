@@ -541,7 +541,7 @@ class Neo4JSubmissions(SubmissionsABC):
         state_tags = [int(state) for state in states]
         query = (
             "MATCH (submission:Submission)-[r:IN_STATE]->(state:State) "
-            "WHERE r.created_at IS NOT NULL AND state.tag IN $state_tags "
+            "WHERE r.created_at IS NOT NULL "
             "WITH submission, state, r ORDER BY r.created_at DESC "
             "WITH submission, head(collect({state_tag: state.tag, state_since: r.created_at})) AS current "
             "WHERE current.state_tag IN $state_tags "
