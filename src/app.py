@@ -28,6 +28,7 @@ from routers.submission import submission, comments, count, ca, metatext, quanti
 from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap, compare
 from routers.submission import permissions as submissions_permissions
 from routers.submission import export as submission_export 
+from routers.submission import durations as submission_durations
 from routers.authentication import token, user
 from routers.info import info
 from routers.features import features
@@ -181,7 +182,8 @@ router_sources = [policy_permissions,
                   protocols,
                   submission_export,
                   plates,
-                  modular_procedures
+                  modular_procedures,
+                  submission_durations
 ]
     
 
