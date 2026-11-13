@@ -543,7 +543,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (submission:Submission)-[r:IN_STATE]->(state:State) "
             "WHERE r.created_at IS NOT NULL "
             "WITH submission, state, r ORDER BY r.created_at DESC "
-            "WITH submission, head(collect({state_tag: state.tag, state_since: r.created_at})) AS current "
+            "WITH submission, collect({state_tag: state.tag, state_since: r.created_at}) AS rels "
+            "WITH submission, rels, head(rels) AS current "
             "WHERE current.state_tag IN $state_tags "
             "OPTIONAL MATCH (user:User)-[:CREATED]->(submission) "
             "OPTIONAL MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample) "
@@ -554,7 +555,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "collect({procedure_tag: procedure.tag, position: pr.position, done: pr.done}) AS procedure_links "
             "RETURN {submission_tag: submission.tag, state_tag: current.state_tag, state_since: current.state_since, "
             "duration_days: (timestamp() - current.state_since) / 86400000.0, sample_count: sample_count, user_tag: user.tag, "
-            "procedures: [p IN procedure_links WHERE p.procedure_tag IS NOT NULL]} "
+            "procedures: [p IN procedure_links WHERE p.procedure_tag IS NOT NULL], "
+            "history: reverse([rel IN rels | {state_tag: rel.state_tag, state_since: rel.state_since}])} "
             "ORDER BY current.state_since ASC "
         )
         r = self._driver.execute_query(query, routing_="r", state_tags = state_tags, result_transformer_=Result.value)
