@@ -144,7 +144,9 @@ def get_submission_by_query(state : str|int = None,
                             ca_search_string : str = None,
                             limit : int = 20, 
                             ordered : bool = True,
+                            sort_order : Literal["asc", "desc"] = "desc",
                             sort_by_views : bool = False,
+                            sort_by_state_duration : bool = False,
                             group_by_state : bool = True,
                             group_by_user : bool = False,
                             group_by_research_group : bool = False,
@@ -191,8 +193,9 @@ def get_submission_by_query(state : str|int = None,
     #         - 'total_count' (int) : The number of all submissions in the dataset. 
     """
 
-    if sort_by_views: 
-        #get all tags then sort by views 
+    requested_limit = limit 
+    if sort_by_views or sort_by_state_duration: 
+        #get all tags then sort by views or state duration
         ordered = False 
         limit = None 
         
@@ -212,12 +215,16 @@ def get_submission_by_query(state : str|int = None,
             ca_search_string = ca_search_string,
             protein_tags = APIParamString(param=protein_tags).param,
             ordered = ordered,
+            sort_order = sort_order,
             limit = limit
             )
     if len(tags) == 0 and any([group_by_date,group_by_state,group_by_user,group_by_research_group]):
         return {}
     
-    if sort_by_views:
+    if sort_by_state_duration:
+        #sort by the time the submissions have been in their current state
+        tags = db.submission_filter.sort_by_state_duration(tags = tags, limit = requested_limit)
+    elif sort_by_views:
         #sort by views
         tags = db.submission_filter.sort_by_views(tags = tags)
 

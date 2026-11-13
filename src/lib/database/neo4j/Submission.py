@@ -2856,6 +2856,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             research_group_tags : List[str] = None,
             include_sample_ca : bool = False,
             ordered : bool = True,
+            sort_order : Literal["asc", "desc"] = "desc",
             ca_match_all : bool = True,
             limit : int = 10) -> List[str]:
         """Single-query variant of find(). Composes every filter into one Cypher query
@@ -2888,7 +2889,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             query += "WHERE " + " AND ".join(where) + " "
         query += "WITH DISTINCT submission RETURN submission.tag AS submission_tag "
         if ordered:
-            query += "ORDER BY submission.created_at DESC "
+            query += f"ORDER BY submission.created_at {sort_order.upper()} "
         query = self._add_limit(query, limit)
 
         r = self._driver.execute_query(query, routing_="r", limit = limit, result_transformer_=Result.value, **params)
@@ -2914,6 +2915,19 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
                                        limit = limit,
                                        result_transformer_=Result.value)
         return r
+
+    def sort_by_state_duration(self, tags : List[str], limit : int = None) -> List[str]:
+        """Sorts the submission tags by how long they have been in their current state, longest first."""
+        query = (
+            "MATCH (submission:Submission)-[r:IN_STATE]->(:State) "
+            "WHERE submission.tag in $tags "
+            "WITH submission, max(r.created_at) AS state_since "
+            "RETURN submission.tag AS tag, timestamp() - state_since AS duration "
+            "ORDER BY duration DESC "
+        )
+        query = self._add_limit(query,limit)
+        r = self._driver.execute_query(query, tags = tags, limit = limit, routing_="r", result_transformer_=Result.data)
+        return [ri.get("tag") for ri in r]
 
     def sort_by_views(self, tags : List[str], limit : int = 10) -> List[str]:
         """Sorts the submission tags by the number of views in descending order."""
