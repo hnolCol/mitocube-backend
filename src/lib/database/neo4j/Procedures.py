@@ -43,7 +43,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         "Inserts a new draft modular procedure. The tag is generated based on the title and description."
         condition_application_tags = condition_application_tags or []
         protocol_tags = protocol_tags or []
-        tag = create_hierarchical_hash([title, description])
+        tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
         if self.exists(tag=tag):
             raise ValueError("Tag is already in the database.")
 
@@ -60,6 +60,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "description": description,
             "status": "DRAFT",
             "version": 1,
+            "lineage_tag": tag,
             "user_tag": user_tag,
         }
 
@@ -90,7 +91,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "OPTIONAL MATCH (m)-[:HAS_PROTOCOL]->(p:Protocol) "
             "WITH m, collect(DISTINCT c.tag) as ca_tags, collect(DISTINCT p.tag) as protocol_tags "
             "RETURN {tag: m.tag, title: m.title, description: m.description, status: m.status, "
-            "version: m.version, content_hash: m.content_hash, user_tag: m.user_tag, "
+            "version: m.version, lineage_tag: m.lineage_tag, content_hash: m.content_hash, user_tag: m.user_tag, "
             "created_at: m.created_at, published_at: m.published_at, "
             "condition_application_tags: ca_tags, protocol_tags: protocol_tags} as procedure"
         )
@@ -99,8 +100,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise KeyError("Modular procedure not found.")
         return ModularProcedureBaseModel(**r[0]["procedure"])
 
-    def find(self, search_string: str = None, status: str = None, limit: int = None) -> List[str]:
-        "Returns the tags of modular procedures, sorted by creation date, most recent last."
+    def find(self, search_string: str = None, status: str = None, limit: int = None, latest_only: bool = False) -> List[str]:
+        """Returns the tags of modular procedures, sorted by creation date, most recent last.
+        If latest_only is True, only the highest-version procedure of each lineage is returned."""
         query = "MATCH (m:ModularProcedure) "
         params = {}
         if search_string is not None:
@@ -109,12 +111,80 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if status is not None:
             query += ("AND " if "WHERE" in query else "WHERE ") + "m.status = $status "
             params["status"] = status
+        if latest_only:
+            query += ("AND " if "WHERE" in query else "WHERE ") + "NOT EXISTS { "
+            query += "MATCH (m2:ModularProcedure {lineage_tag : m.lineage_tag}) "
+            if status is not None:
+                query += "WHERE m2.status = $status AND m2.version > m.version "
+            else:
+                query += "WHERE m2.version > m.version "
+            query += "} "
         query += "RETURN m.tag as tag ORDER BY m.created_at ASC"
         if limit is not None:
             query += " LIMIT $limit"
             params["limit"] = limit
         r = self._driver.execute_query(query, routing_="r", parameters_=params, result_transformer_=Result.value)
         return r
+
+    def create_version(self, tag: str, user_tag: str) -> "ModularProcedureBaseModel":
+        """Creates a new draft version of the given published modular procedure, copying its content.
+        Submissions stay linked to the version they were assigned to."""
+        parent = self.get(tag=tag)
+        if parent.status != "PUBLISHED":
+            raise ValueError("New versions can only be created from published modular procedures.")
+        max_version = self._driver.execute_query(
+            "MATCH (m:ModularProcedure {lineage_tag : $lineage_tag}) "
+            "RETURN max(m.version) as max_version",
+            routing_="r", lineage_tag=parent.lineage_tag, result_transformer_=Result.value)
+        new_version = (max_version[0] if len(max_version) > 0 and max_version[0] is not None else parent.version) + 1
+        new_tag = create_hierarchical_hash([parent.title, parent.description,
+                                            sorted(parent.condition_application_tags), str(new_version)])
+        if self.exists(tag=new_tag):
+            raise ValueError("Tag is already in the database.")
+
+        query = (
+            "MATCH (u:User {tag : $user_tag}) "
+            "MERGE (m:ModularProcedure {tag : $tag}) "
+            "SET m.created_at = timestamp(), m += $props "
+            "MERGE (u)-[:CREATED]->(m) "
+            "WITH m "
+            "MATCH (parent:ModularProcedure {tag : $parent_tag}) "
+            "MERGE (m)-[:PREVIOUS_VERSION]->(parent) "
+            "RETURN m.tag as tag"
+        )
+        props = {
+            "title": parent.title,
+            "description": parent.description,
+            "status": "DRAFT",
+            "version": new_version,
+            "lineage_tag": parent.lineage_tag,
+            "user_tag": user_tag,
+        }
+        r = self._driver.execute_query(query, routing_="w", tag=new_tag, user_tag=user_tag,
+                                       parent_tag=tag, props=props, result_transformer_=Result.value)
+        if len(r) == 0 or r[0] is None:
+            raise ValueError("Modular procedure version could not be created.")
+
+        for ca_tag in parent.condition_application_tags:
+            self._driver.execute_query(
+                "MATCH (m:ModularProcedure {tag : $tag}) MATCH (c:ConditionApplication {tag : $ca_tag}) "
+                "MERGE (m)-[:HAS_CONDITION_APPLICATION]->(c)",
+                routing_="w", tag=new_tag, ca_tag=ca_tag)
+        for protocol_tag in parent.protocol_tags:
+            self._driver.execute_query(
+                "MATCH (m:ModularProcedure {tag : $tag}) MATCH (p:Protocol {tag : $protocol_tag}) "
+                "MERGE (m)-[:HAS_PROTOCOL]->(p)",
+                routing_="w", tag=new_tag, protocol_tag=protocol_tag)
+
+        return self.get(tag=new_tag)
+
+    def get_versions(self, tag: str) -> List[str]:
+        "Returns the tags of all versions in the lineage of the given procedure, oldest first."
+        procedure = self.get(tag=tag)
+        return self._driver.execute_query(
+            "MATCH (m:ModularProcedure {lineage_tag : $lineage_tag}) "
+            "RETURN m.tag as tag ORDER BY m.version ASC",
+            routing_="r", lineage_tag=procedure.lineage_tag, result_transformer_=Result.value)
 
     def update(self, tag: str, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
@@ -318,6 +388,15 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 if output_position not in output_positions:
                     raise ValueError(f"Output well {output_position} is not defined.")
                 output_well_samples[output_position].update(well.sample_tags)
+
+        occupied_output_wells = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
+            "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
+            "RETURN collect(DISTINCT w.position) as occupied",
+            routing_="r", output_plate_tag=execution.output_plate_tag,
+            positions=sorted(output_positions), result_transformer_=Result.value)
+        if len(occupied_output_wells) > 0 and len(occupied_output_wells[0]) > 0:
+            raise ValueError(f"Output wells already used by another execution: {', '.join(occupied_output_wells[0])}")
 
         all_sample_tags = sorted({sample_tag for well in execution.input_wells for sample_tag in well.sample_tags})
         missing_samples = self._driver.execute_query(

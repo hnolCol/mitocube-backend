@@ -17,6 +17,7 @@ class ModularProcedureBaseModel(BaseModel):
     description : str
     status : ModularProcedureStatusEnum = ModularProcedureStatusEnum.DRAFT
     version : int = 1
+    lineage_tag : Optional[str] = None
     content_hash : Optional[str] = None
     user_tag : str
     created_at : Optional[float] = None

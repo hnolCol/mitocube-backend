@@ -41,11 +41,11 @@ class FakeModularProceduresDB:
         self.procedures = {
             "proc-1": ModularProcedureBaseModel(
                 tag="proc-1", title="Protein Concentration Measurement", description="Measure it.",
-                status="DRAFT", version=1, user_tag="abcdefgh", created_at=1.0,
+                status="DRAFT", version=1, lineage_tag="proc-1", user_tag="abcdefgh", created_at=1.0,
                 condition_application_tags=["ca-1"], protocol_tags=["protocol-1"]),
             "proc-2": ModularProcedureBaseModel(
                 tag="proc-2", title="SP3 Digestion", description="Digest it.",
-                status="PUBLISHED", version=1, content_hash="abc123", user_tag="abcdefgh",
+                status="PUBLISHED", version=1, lineage_tag="proc-2", content_hash="abc123", user_tag="abcdefgh",
                 created_at=2.0, published_at=3.0,
                 condition_application_tags=[], protocol_tags=["protocol-2"]),
         }
@@ -78,15 +78,40 @@ class FakeModularProceduresDB:
             raise KeyError("Modular procedure not found.")
         return self.procedures[tag]
 
-    def find(self, search_string=None, status=None, limit=None):
+    def find(self, search_string=None, status=None, limit=None, latest_only=False):
         tags = []
         for tag, procedure in self.procedures.items():
             if search_string is not None and search_string not in procedure.title:
                 continue
             if status is not None and procedure.status != status:
                 continue
+            if latest_only:
+                newer = [p for p in self.procedures.values()
+                         if p.lineage_tag == procedure.lineage_tag and p.version > procedure.version
+                         and (status is None or p.status == status)]
+                if len(newer) > 0:
+                    continue
             tags.append(tag)
         return tags
+
+    def create_version(self, tag, user_tag):
+        parent = self.get(tag)
+        if parent.status != "PUBLISHED":
+            raise ValueError("New versions can only be created from published modular procedures.")
+        new_version = max([p.version for p in self.procedures.values()
+                           if p.lineage_tag == parent.lineage_tag], default=parent.version) + 1
+        new_tag = f"proc-v{new_version}"
+        self.procedures[new_tag] = ModularProcedureBaseModel(
+            tag=new_tag, title=parent.title, description=parent.description,
+            status="DRAFT", version=new_version, lineage_tag=parent.lineage_tag,
+            user_tag=user_tag, condition_application_tags=parent.condition_application_tags,
+            protocol_tags=parent.protocol_tags)
+        return self.procedures[new_tag]
+
+    def get_versions(self, tag):
+        procedure = self.get(tag)
+        return [t for t, p in sorted(self.procedures.items(), key=lambda kv: kv[1].version)
+                if p.lineage_tag == procedure.lineage_tag]
 
     def insert(self, title, description, user_tag, condition_application_tags=None, protocol_tags=None):
         tag = "proc-new"
@@ -146,6 +171,12 @@ class FakeModularProceduresDB:
         return self.submission_procedures.get(submission_tag, [])
 
     def execute(self, tag, execution, user_tag):
+        occupied = [well.position for exec_model in self.executions.values()
+                    for well in exec_model.output_wells
+                    if exec_model.output_plate_tag == execution.output_plate_tag]
+        conflicts = sorted(set(occupied) & {w.position for w in execution.output_wells})
+        if len(conflicts) > 0:
+            raise ValueError(f"Output wells already used by another execution: {', '.join(conflicts)}")
         if tag not in self.procedures:
             raise KeyError("Modular procedure not found.")
         if self.procedures[tag].status != "PUBLISHED":
@@ -411,3 +442,66 @@ class TestModularProcedureExecutionRoutes:
                 "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
                 "input_wells": [], "output_wells": []})
             assert resp.status_code == 403
+
+class TestModularProcedureVersionRoutes:
+    def test_create_version_from_published(self, client):
+        resp = client.post("/api/procedures/proc-2/versions")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["version"] == 2
+        assert body["status"] == "DRAFT"
+        assert body["lineage_tag"] == "proc-2"
+        assert body["title"] == "SP3 Digestion"
+        assert body["protocol_tags"] == ["protocol-2"]
+
+    def test_create_version_from_draft_rejected(self, client):
+        resp = client.post("/api/procedures/proc-1/versions")
+        assert resp.status_code == 400
+
+    def test_create_version_from_missing_404(self, client):
+        resp = client.post("/api/procedures/does-not-exist/versions")
+        assert resp.status_code == 404
+
+    def test_get_versions(self, client):
+        client.post("/api/procedures/proc-2/versions")
+        resp = client.get("/api/procedures/proc-2/versions")
+        assert resp.status_code == 200
+        assert resp.json() == ["proc-2", "proc-v2"]
+
+    def test_query_latest_only_returns_latest_published(self, client):
+        client.post("/api/procedures/proc-2/versions")
+        resp = client.get("/api/procedures/q", params={"status": "PUBLISHED", "latest_only": True})
+        assert resp.status_code == 200
+        assert resp.json() == ["proc-2"]
+
+    def test_standard_user_rejected_on_create_version(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/proc-2/versions")
+            assert resp.status_code == 403
+
+
+class TestModularProcedureExecutionOccupancy:
+    def test_output_well_occupied_by_other_execution_rejected(self, client):
+        first = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert first.status_code == 200
+        second = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "B1", "sample_tags": ["sample-2"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert second.status_code == 400
+        assert "already used" in second.json()["detail"]
+
+    def test_output_well_on_other_plate_allowed(self, client):
+        first = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert first.status_code == 200
+        second = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-3",
+            "input_wells": [{"position": "B1", "sample_tags": ["sample-2"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert second.status_code == 200

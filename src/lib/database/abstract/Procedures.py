@@ -39,9 +39,11 @@ class ModularProceduresABC(ABC):
         Raises a KeyError if the tag is not found."""
 
     @abstractmethod
-    def find(self, search_string: str = None, status: str = None, limit: int = None) -> List[str]:
+    def find(self, search_string: str = None, status: str = None, limit: int = None, latest_only: bool = False) -> List[str]:
         """Returns the tags of modular procedures, optionally filtered by a
-        search string and status, sorted by creation date, most recent last."""
+        search string and status, sorted by creation date, most recent last.
+        If latest_only is True, only the highest-version procedure of each
+        lineage is returned."""
 
     @abstractmethod
     def update(self, tag: str, title: str, description: str, user_tag: str,
@@ -123,3 +125,15 @@ class ModularProceduresABC(ABC):
         """Returns the tags of the executions of the given procedure, sorted by
         creation date, most recent last. Raises a KeyError if the procedure tag
         is not found."""
+
+    @abstractmethod
+    def create_version(self, tag: str, user_tag: str):
+        """Creates a new draft version of the given published modular procedure,
+        copying its content, condition applications and protocols. Submissions
+        stay linked to the version they were assigned to.
+        Raises a ValueError if the procedure does not exist or is not published."""
+
+    @abstractmethod
+    def get_versions(self, tag: str) -> List[str]:
+        """Returns the tags of all versions in the lineage of the given procedure,
+        oldest first. Raises a KeyError if the tag is not found."""

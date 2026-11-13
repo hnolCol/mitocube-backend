@@ -24,9 +24,9 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 
 @router.get("/q", response_model=List[str])
-def get_modular_procedures(search_string : str = None, status : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
-    "Returns the tags of modular procedures that match the search string and status."
-    return db.modular_procedures.find(search_string=search_string, status=status, limit=limit)
+def get_modular_procedures(search_string : str = None, status : str = None, limit : int = None, latest_only : bool = False, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    "Returns the tags of modular procedures that match the search string and status. If latest_only, only the highest version per lineage is returned."
+    return db.modular_procedures.find(search_string=search_string, status=status, limit=limit, latest_only=latest_only)
 
 
 @router.get("/executions/{execution_tag}", response_model=ProcedureExecutionModel)
@@ -149,6 +149,26 @@ def execute_modular_procedure(procedure_tag : str, execution : InsertProcedureEx
     input samples as done in the procedure. The user must be at least curator."""
     try:
         return db.modular_procedures.execute(tag=procedure_tag, execution=execution, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Modular procedure not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/{procedure_tag}/versions", response_model=List[str])
+def get_modular_procedure_versions(procedure_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    "Returns the tags of all versions in the lineage of the given modular procedure, oldest first."
+    try:
+        return db.modular_procedures.get_versions(tag=procedure_tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Modular procedure not found.")
+
+
+@router.post("/{procedure_tag}/versions", response_model=ModularProcedureBaseModel)
+def create_modular_procedure_version(procedure_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ModularProcedureBaseModel:
+    """Creates a new draft version of the given published modular procedure, copying its content.
+    Submissions stay linked to the version they were assigned to. The user must be at least curator."""
+    try:
+        return db.modular_procedures.create_version(tag=procedure_tag, user_tag=user.tag)
     except KeyError:
         raise HTTPException(status_code=404, detail="Modular procedure not found.")
     except ValueError as e:
