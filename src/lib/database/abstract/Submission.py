@@ -211,7 +211,8 @@ class SubmissionsABC(ABC):
                 "state_since": float, # timestamp of the state change in milliseconds
                 "duration_days": float,
                 "sample_count": int,
-                "user_tag": str
+                "user_tag": str,
+                "procedures": List[Dict] # ordered assigned modular procedure  with keys "procedure_tag", "position" and "done"
             }
             ```
         """
