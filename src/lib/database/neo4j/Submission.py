@@ -549,8 +549,12 @@ class Neo4JSubmissions(SubmissionsABC):
             "OPTIONAL MATCH (submission)-[:HAS_SAMPLE]->(sample:Sample) "
             "WHERE coalesce(sample.excluded, false) = false AND coalesce(sample.lost, false) = false "
             "WITH submission, current, user, count(DISTINCT sample) AS sample_count "
+            "OPTIONAL MATCH (submission)-[pr:IN_PROCEDURE]->(procedure:ModularProcedure) "
+            "WITH submission, current, user, sample_count, "
+            "collect({procedure_tag: procedure.tag, position: pr.position, done: pr.done}) AS procedure_links "
             "RETURN {submission_tag: submission.tag, state_tag: current.state_tag, state_since: current.state_since, "
-            "duration_days: (timestamp() - current.state_since) / 86400000.0, sample_count: sample_count, user_tag: user.tag} "
+            "duration_days: (timestamp() - current.state_since) / 86400000.0, sample_count: sample_count, user_tag: user.tag, "
+            "procedures: [p IN procedure_links WHERE p.procedure_tag IS NOT NULL]} "
             "ORDER BY current.state_since ASC "
         )
         r = self._driver.execute_query(query, routing_="r", state_tags = state_tags, result_transformer_=Result.value)
