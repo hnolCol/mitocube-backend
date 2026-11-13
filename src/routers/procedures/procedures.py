@@ -6,8 +6,10 @@ from typing import List
 from config.models.user import UserModel
 from config.models.procedures import (
     InsertModularProcedureModel,
+    InsertProcedureExecutionModel,
     ModularProcedureBaseModel,
     ModularProcedureSubmissionModel,
+    ProcedureExecutionModel,
     PublishModularProcedureModel,
     UpdateModularProcedureModel,
 )
@@ -25,6 +27,15 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 def get_modular_procedures(search_string : str = None, status : str = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the tags of modular procedures that match the search string and status."
     return db.modular_procedures.find(search_string=search_string, status=status, limit=limit)
+
+
+@router.get("/executions/{execution_tag}", response_model=ProcedureExecutionModel)
+def get_modular_procedure_execution(execution_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    "Returns the procedure execution identified by the given tag."
+    try:
+        return db.modular_procedures.get_execution(execution_tag=execution_tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
 
 
 @router.get("/submissions/{submission_tag}", response_model=List[ModularProcedureSubmissionModel])
@@ -118,5 +129,27 @@ def reopen_modular_procedure_submission(procedure_tag : str, submission_tag : st
     "Reverts the done flag of the given submission in the specified modular procedure. The user must be at least curator."
     try:
         return db.modular_procedures.reopen(tag=procedure_tag, submission_tag=submission_tag)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{procedure_tag}/executions", response_model=List[str])
+def get_modular_procedure_executions(procedure_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    "Returns the tags of the executions of the given modular procedure."
+    try:
+        return db.modular_procedures.get_executions(tag=procedure_tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Modular procedure not found.")
+
+
+@router.post("/{procedure_tag}/execute", response_model=ProcedureExecutionModel)
+def execute_modular_procedure(procedure_tag : str, execution : InsertProcedureExecutionModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Executes the given published modular procedure on a set of samples: maps the input plate wells
+    to the output plate wells (pooling and splitting supported) and marks the submissions owning the
+    input samples as done in the procedure. The user must be at least curator."""
+    try:
+        return db.modular_procedures.execute(tag=procedure_tag, execution=execution, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Modular procedure not found.")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

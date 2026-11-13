@@ -17,6 +17,7 @@ from config.models.user import UserModel
 from config.models.procedures import (
     ModularProcedureBaseModel,
     ModularProcedureSubmissionModel,
+    ProcedureExecutionModel,
     PublishModularProcedureModel,
 )
 from services.users import get_user_from_token
@@ -67,6 +68,7 @@ class FakeModularProceduresDB:
         self.done = []
         self.reopened = []
         self.unlinked = []
+        self.executions = {}
 
     def exists(self, tag):
         return tag in self.procedures
@@ -143,6 +145,49 @@ class FakeModularProceduresDB:
     def get_submission_procedures(self, submission_tag):
         return self.submission_procedures.get(submission_tag, [])
 
+    def execute(self, tag, execution, user_tag):
+        if tag not in self.procedures:
+            raise KeyError("Modular procedure not found.")
+        if self.procedures[tag].status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be executed.")
+        if execution.input_plate_tag == "missing-plate" or execution.output_plate_tag == "missing-plate":
+            raise ValueError("Plate not found.")
+        input_positions = [well.position for well in execution.input_wells]
+        output_positions = {well.position for well in execution.output_wells}
+        if len(set(input_positions)) != len(input_positions):
+            raise ValueError("Duplicate well positions are not allowed.")
+        for well in execution.input_wells:
+            if len(well.sample_tags) == 0:
+                raise ValueError(f"Input well {well.position} has no samples.")
+            for output_position in well.output_positions:
+                if output_position not in output_positions:
+                    raise ValueError(f"Output well {output_position} is not defined.")
+        if "missing-sample" in [t for well in execution.input_wells for t in well.sample_tags]:
+            raise ValueError("Samples not found: missing-sample")
+        execution_tag = "exec-1"
+        self.executions[execution_tag] = ProcedureExecutionModel(
+            tag=execution_tag, procedure_tag=tag,
+            input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
+            user_tag=user_tag, created_at=4.0, done_submission_tags=["subm-1"],
+            input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+                          "sample_tags": w.sample_tags, "output_positions": w.output_positions}
+                         for w in execution.input_wells],
+            output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+                           "sample_tags": [], "condition_application_tags": w.condition_application_tags}
+                          for w in execution.output_wells])
+        return self.executions[execution_tag]
+
+    def get_execution(self, execution_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        return self.executions[execution_tag]
+
+    def get_executions(self, tag):
+        if tag not in self.procedures:
+            raise KeyError("Modular procedure not found.")
+        return [execution_tag for execution_tag, execution in self.executions.items()
+                if execution.procedure_tag == tag]
+
 
 class FakeDB:
     def __init__(self):
@@ -156,7 +201,8 @@ def _make_client(user):
 
     app = FastAPI()
     app.include_router(procedures_router)
-    app.dependency_overrides[get_db] = lambda: FakeDB()
+    fake_db = FakeDB()
+    app.dependency_overrides[get_db] = lambda: fake_db
     app.dependency_overrides[get_user_from_token] = lambda: user
     return TestClient(app)
 
@@ -281,3 +327,87 @@ class TestModularProcedurePermissions:
         with _make_client(make_user(role=UserRolesEnum.ADMIN)) as c:
             resp = c.post("/api/procedures/proc-2/link/subm-1/done")
             assert resp.status_code == 200
+
+class TestModularProcedureExecutionRoutes:
+    def test_execute_published_procedure(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [
+                {"position": "A1", "sample_tags": ["sample-1", "sample-2"], "output_positions": ["A1"]},
+                {"position": "B1", "sample_tags": ["sample-3"], "output_positions": ["A1", "B1", "C1"]},
+            ],
+            "output_wells": [
+                {"position": "A1", "condition_application_tags": ["ca-heat"]},
+                {"position": "B1", "condition_application_tags": []},
+                {"position": "C1", "condition_application_tags": []},
+            ]})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["tag"] == "exec-1"
+        assert body["procedure_tag"] == "proc-2"
+        assert body["done_submission_tags"] == ["subm-1"]
+        assert len(body["input_wells"]) == 2
+        assert body["input_wells"][0]["sample_tags"] == ["sample-1", "sample-2"]
+        assert body["input_wells"][1]["output_positions"] == ["A1", "B1", "C1"]
+        assert len(body["output_wells"]) == 3
+        assert body["output_wells"][0]["condition_application_tags"] == ["ca-heat"]
+
+    def test_execute_draft_procedure_rejected(self, client):
+        resp = client.post("/api/procedures/proc-1/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2", "input_wells": [], "output_wells": []})
+        assert resp.status_code == 400
+
+    def test_execute_with_missing_plate_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "missing-plate", "output_plate_tag": "plate-2", "input_wells": [], "output_wells": []})
+        assert resp.status_code == 400
+
+    def test_execute_with_undefined_output_well_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["Z9"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+
+    def test_execute_with_empty_input_well_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": [], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+
+    def test_execute_with_missing_sample_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["missing-sample"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+
+    def test_get_execution(self, client):
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.get("/api/procedures/executions/exec-1")
+        assert resp.status_code == 200
+        assert resp.json()["procedure_tag"] == "proc-2"
+
+    def test_get_missing_execution_404(self, client):
+        resp = client.get("/api/procedures/executions/does-not-exist")
+        assert resp.status_code == 404
+
+    def test_get_executions_of_procedure(self, client):
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.get("/api/procedures/proc-2/executions")
+        assert resp.status_code == 200
+        assert resp.json() == ["exec-1"]
+
+    def test_standard_user_rejected_on_execute(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/proc-2/execute", json={
+                "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+                "input_wells": [], "output_wells": []})
+            assert resp.status_code == 403

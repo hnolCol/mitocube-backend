@@ -103,3 +103,23 @@ class ModularProceduresABC(ABC):
     def get_protocols(self, tag: str) -> List[str]:
         """Returns the protocol tags of the given procedure.
         Raises a KeyError if the tag is not found."""
+
+    @abstractmethod
+    def execute(self, tag: str, execution, user_tag: str):
+        """Executes a published modular procedure on a set of samples.
+        Maps input plate wells to output plate wells (pooling and splitting
+        supported) and marks the submissions owning the input samples as done
+        in the procedure.
+        Raises a ValueError if the procedure does not exist, is not published,
+        a plate or sample does not exist or the transfer map is inconsistent."""
+
+    @abstractmethod
+    def get_execution(self, execution_tag: str):
+        """Returns the procedure execution by its tag.
+        Raises a KeyError if the tag is not found."""
+
+    @abstractmethod
+    def get_executions(self, tag: str) -> List[str]:
+        """Returns the tags of the executions of the given procedure, sorted by
+        creation date, most recent last. Raises a KeyError if the procedure tag
+        is not found."""
