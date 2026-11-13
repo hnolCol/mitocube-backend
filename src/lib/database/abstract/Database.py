@@ -54,6 +54,7 @@ from lib.database.abstract.Annotations import AnnotationsABC, AnnotationGroupsAB
 from lib.database.abstract.Crosslink import CrosslinkABC
 from lib.database.abstract.external_resource import ExternalResourceABC
 from lib.database.abstract.Protocols import ProtocolsABC
+from lib.database.abstract.Procedures import ModularProceduresABC
 from lib.database.abstract.Policy import PolicyABC
 from lib.database.abstract.Impressum import ImpressumABC
 from lib.database.abstract.Plates import PlatesABC
@@ -132,6 +133,7 @@ class DatabaseABC(ABC):
     crosslinks : CrosslinkABC = None
     external_resources : ExternalResourceABC = None
     protocols : ProtocolsABC = None
+    modular_procedures : ModularProceduresABC = None
     policy : PolicyABC = None
     impressum : ImpressumABC = None
     plates : PlatesABC = None
@@ -310,6 +312,11 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the protocols attribute defined.")
         if not isinstance(self.protocols, ProtocolsABC):
             raise TypeError("The protocols class must be an instance of the ProtocolABC.")
+
+        if self.modular_procedures is None:
+            raise NotImplementedError("A database class must have the modular_procedures attribute defined.")
+        if not isinstance(self.modular_procedures, ModularProceduresABC):
+            raise TypeError("The modular_procedures class must be an instance of the ModularProceduresABC.")
 
         if self.policy is None:
             raise NotImplementedError("A database class must have the policy attribute defined.")

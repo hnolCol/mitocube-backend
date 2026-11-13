@@ -86,6 +86,7 @@ from routers.phenotypes import PhenotypeAssociation as PhenotypeAssociation
 from routers.crosslink import external_resource as crosslink_external_resource
 from routers.crosslink import crosslink
 from routers.protocols import protocols
+from routers.procedures import procedures as modular_procedures
 from routers.mfa import mfa
 from routers.policy import policy
 from routers.policy import permissions as policy_permissions
@@ -179,7 +180,8 @@ router_sources = [policy_permissions,
                   crosslink_external_resource,
                   protocols,
                   submission_export,
-                  plates
+                  plates,
+                  modular_procedures
 ]
     
 
