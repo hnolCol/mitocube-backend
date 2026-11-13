@@ -212,8 +212,7 @@ class SubmissionsABC(ABC):
                 "duration_days": float,
                 "sample_count": int,
                 "user_tag": str,
-                "procedures": List[Dict] # ordered assigned modular procedures
-                with keys "procedure_tag", "position" and "done"
+                "procedures": List[Dict] # ordered assigned modular procedure  with keys "procedure_tag", "position" and "done"
             }
             ```
         """
