@@ -5,6 +5,7 @@ from typing import List
 
 from config.models.user import UserModel
 from config.models.procedures import (
+    ExecutionWellMetricModel,
     InsertModularProcedureModel,
     InsertProcedureExecutionModel,
     ModularProcedureBaseModel,
@@ -36,6 +37,18 @@ def get_modular_procedure_execution(execution_tag : str, user : UserModel = Depe
         return db.modular_procedures.get_execution(execution_tag=execution_tag)
     except KeyError:
         raise HTTPException(status_code=404, detail="Procedure execution not found.")
+
+
+@router.post("/executions/{execution_tag}/metrics", response_model=ProcedureExecutionModel)
+def set_modular_procedure_execution_metrics(execution_tag : str, well_metrics : List[ExecutionWellMetricModel], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Sets or updates the measured attribute values (metrics) of the output wells of a procedure
+    execution, e.g. the protein concentration of each well. The user must be at least curator."""
+    try:
+        return db.modular_procedures.set_execution_metrics(execution_tag=execution_tag, well_metrics=well_metrics, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/submissions/{submission_tag}", response_model=List[ModularProcedureSubmissionModel])

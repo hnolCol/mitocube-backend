@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from enum import Enum
 
 
@@ -77,12 +77,23 @@ class ExecutionOutputWellModel(BaseModel):
 
 
 
+class ExecutionWellMetricModel(BaseModel):
+    "Measured values (attribute tag -> numeric value) of a single output well, e.g. the protein concentration."
+    position : str
+    values : Dict[str, float] = Field(default_factory=dict)
+
+
+
 class InsertProcedureExecutionModel(BaseModel):
-    "The user input to execute a published modular procedure on a set of samples."
+    """The user input to execute a published modular procedure on a set of samples.
+    The responsible user defaults to the executing user; well metrics map measured
+    attributes (e.g. protein concentration) to output wells."""
     input_plate_tag : str
     output_plate_tag : str
+    responsible_user_tag : Optional[str] = None
     input_wells : List[ExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ExecutionOutputWellModel] = Field(default_factory=list)
+    output_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)
 
 
 
@@ -103,6 +114,7 @@ class ProcedureExecutionOutputWellModel(BaseModel):
     column_index : int
     sample_tags : List[str] = Field(default_factory=list)
     condition_application_tags : List[str] = Field(default_factory=list)
+    metrics : Dict[str, float] = Field(default_factory=dict)
 
 
 
@@ -113,6 +125,7 @@ class ProcedureExecutionModel(BaseModel):
     input_plate_tag : str
     output_plate_tag : str
     user_tag : str
+    responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
     done_submission_tags : List[str] = Field(default_factory=list)
     input_wells : List[ProcedureExecutionInputWellModel] = Field(default_factory=list)

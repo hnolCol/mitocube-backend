@@ -137,3 +137,10 @@ class ModularProceduresABC(ABC):
     def get_versions(self, tag: str) -> List[str]:
         """Returns the tags of all versions in the lineage of the given procedure,
         oldest first. Raises a KeyError if the tag is not found."""
+
+    @abstractmethod
+    def set_execution_metrics(self, execution_tag: str, well_metrics, user_tag: str):
+        """Sets or updates the measured attribute values (metrics) of the output
+        wells of a procedure execution. Raises a KeyError if the execution does
+        not exist and a ValueError if a well is not an output well of the
+        execution or an attribute does not exist."""

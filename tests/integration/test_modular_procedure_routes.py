@@ -195,16 +195,27 @@ class FakeModularProceduresDB:
                     raise ValueError(f"Output well {output_position} is not defined.")
         if "missing-sample" in [t for well in execution.input_wells for t in well.sample_tags]:
             raise ValueError("Samples not found: missing-sample")
+        responsible_user_tag = execution.responsible_user_tag or user_tag
+        if responsible_user_tag == "missing-user":
+            raise ValueError("Responsible user not found: missing-user")
+        for metric in execution.output_well_metrics:
+            if metric.position not in {w.position for w in execution.output_wells}:
+                raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
+            if "missing-attribute" in metric.values:
+                raise ValueError("Attributes not found: missing-attribute")
         execution_tag = "exec-1"
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
             input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
-            user_tag=user_tag, created_at=4.0, done_submission_tags=["subm-1"],
+            user_tag=user_tag, responsible_user_tag=responsible_user_tag,
+            created_at=4.0, done_submission_tags=["subm-1"],
             input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
                           "sample_tags": w.sample_tags, "output_positions": w.output_positions}
                          for w in execution.input_wells],
             output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
-                           "sample_tags": [], "condition_application_tags": w.condition_application_tags}
+                           "sample_tags": [], "condition_application_tags": w.condition_application_tags,
+                           "metrics": next((m.values for m in execution.output_well_metrics
+                                             if m.position == w.position), {})}
                           for w in execution.output_wells])
         return self.executions[execution_tag]
 
@@ -218,6 +229,25 @@ class FakeModularProceduresDB:
             raise KeyError("Modular procedure not found.")
         return [execution_tag for execution_tag, execution in self.executions.items()
                 if execution.procedure_tag == tag]
+
+    def set_execution_metrics(self, execution_tag, well_metrics, user_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        execution = self.executions[execution_tag]
+        output_positions = {w.position for w in execution.output_wells}
+        positions = [m.position for m in well_metrics]
+        if len(set(positions)) != len(positions):
+            raise ValueError("Duplicate metric positions are not allowed.")
+        for position in positions:
+            if position not in output_positions:
+                raise ValueError(f"Metrics were given for wells that are not output wells of this execution: {position}")
+        for metric in well_metrics:
+            if "missing-attribute" in metric.values:
+                raise ValueError("Attributes not found: missing-attribute")
+        execution.output_wells = [w.model_copy(update={"metrics": dict(w.metrics) | next(
+            (m.values for m in well_metrics if m.position == w.position), {})})
+            for w in execution.output_wells]
+        return execution
 
 
 class FakeDB:
@@ -505,3 +535,70 @@ class TestModularProcedureExecutionOccupancy:
             "input_wells": [{"position": "B1", "sample_tags": ["sample-2"], "output_positions": ["A1"]}],
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         assert second.status_code == 200
+
+class TestModularProcedureExecutionMetricsRoutes:
+    def test_execute_with_responsible_user_and_metrics(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "responsible_user_tag": "ijklmnop",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "output_well_metrics": [{"position": "A1", "values": {"protein-concentration": 2.5}}]})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["responsible_user_tag"] == "ijklmnop"
+        assert body["output_wells"][0]["metrics"] == {"protein-concentration": 2.5}
+
+    def test_execute_responsible_user_defaults_to_executing_user(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        assert resp.json()["responsible_user_tag"] == "abcdefgh"
+
+    def test_execute_with_missing_responsible_user_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "responsible_user_tag": "missing-user",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+
+    def test_execute_with_metrics_for_undefined_well_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "output_well_metrics": [{"position": "Z9", "values": {"protein-concentration": 1.0}}]})
+        assert resp.status_code == 400
+
+    def test_set_metrics_after_execution(self, client):
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.post("/api/procedures/executions/exec-1/metrics",
+            json=[{"position": "A1", "values": {"protein-concentration": 3.1}}])
+        assert resp.status_code == 200
+        assert resp.json()["output_wells"][0]["metrics"] == {"protein-concentration": 3.1}
+
+    def test_set_metrics_for_non_output_well_rejected(self, client):
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.post("/api/procedures/executions/exec-1/metrics",
+            json=[{"position": "B1", "values": {"protein-concentration": 3.1}}])
+        assert resp.status_code == 400
+
+    def test_set_metrics_on_missing_execution_404(self, client):
+        resp = client.post("/api/procedures/executions/does-not-exist/metrics",
+            json=[{"position": "A1", "values": {"protein-concentration": 3.1}}])
+        assert resp.status_code == 404
+
+    def test_standard_user_rejected_on_set_metrics(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/executions/exec-1/metrics",
+                json=[{"position": "A1", "values": {"protein-concentration": 3.1}}])
+            assert resp.status_code == 403
