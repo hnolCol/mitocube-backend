@@ -983,14 +983,14 @@ class Neo4JAttributes(AttributesABC):
     def _execute_upsert(self, query: str, tag: str, text: str, priority: int, allow_input: bool,
                         abbreviation: str, group_tags: List[str], children: List[str],
                         parents: List[str], required_trait_tags: List[str],
-                        min_state: SubmissionStatesEnums, search_string: str) -> bool:
+                        min_state: SubmissionStatesEnums, search_string: str, placeholder: str = None) -> bool:
         """Runs the final insert/update query with the shared parameter set."""
         ok = self._driver.execute_query(
             query,
             tag=tag, text=text, priority=priority, abbreviation=abbreviation,
             group_tags=group_tags, children=children, parents=parents,
             required_trait_tags=required_trait_tags, allow_input=allow_input,
-            min_state=min_state, search_string=search_string,
+            min_state=min_state, search_string=search_string, placeholder=placeholder,
             routing_="w", result_transformer_=Result.value
         )
         return ok[0] if len(ok) > 0 else False
@@ -999,7 +999,7 @@ class Neo4JAttributes(AttributesABC):
     def insert(self, tag: str, text: str, priority: int = 500, allow_input: bool = False,
             abbreviation: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
             group_tags: List[str] = [], parents: List[str] = [], children: List[str] = [],
-            required_trait_tags: List[str] = []) -> bool:
+            required_trait_tags: List[str] = [], placeholder: str = None) -> bool:
         "Insert attributes"
         if self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} already exists.")
@@ -1007,7 +1007,7 @@ class Neo4JAttributes(AttributesABC):
 
         query = (
             "MERGE (a:Attribute {tag : $tag}) "
-            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.created_at = timestamp(), a.s = $search_string "
+            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.placeholder = $placeholder, a.created_at = timestamp(), a.s = $search_string "
             "WITH a "
             "MATCH (s:State {tag : $min_state}) "
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
@@ -1023,13 +1023,13 @@ class Neo4JAttributes(AttributesABC):
 
         return self._execute_upsert(query, tag, text, priority, allow_input, abbreviation,
                                     group_tags, children, parents, required_trait_tags,
-                                    min_state, search_string)
+                                    min_state, search_string, placeholder)
 
 
     def update(self, tag: str, text: str, priority: int = 500, allow_input: bool = False,
             abbreviation: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
             group_tags: List[str] = [], parents: List[str] = [], children: List[str] = [],
-            required_trait_tags: List[str] = []) -> bool:
+            required_trait_tags: List[str] = [], placeholder: str = None) -> bool:
         "Update attributes"
         if not self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} does not exist.")
@@ -1048,7 +1048,7 @@ class Neo4JAttributes(AttributesABC):
 
         query = (
             "MATCH (a:Attribute {tag : $tag}) "
-            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.modified_at = timestamp(), a.s = $search_string "
+            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.placeholder = $placeholder, a.modified_at = timestamp(), a.s = $search_string "
             "WITH a "
             "MATCH (s:State {tag : $min_state}) "
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
@@ -1064,7 +1064,7 @@ class Neo4JAttributes(AttributesABC):
 
         return self._execute_upsert(query, tag, text, priority, allow_input, abbreviation,
                                     group_tags, children, parents, required_trait_tags,
-                                    min_state, search_string)
+                                    min_state, search_string, placeholder)
         
         
         
@@ -1322,7 +1322,7 @@ class Neo4JAttributes(AttributesABC):
             "WITH a, s, collect(DISTINCT ag.tag) as group_tags, collect(DISTINCT child.tag) as children, "
             "collect(DISTINCT rt.tag) as required_trait_tags "
             "RETURN a.tag as tag, a.text as text, a.priority as priority, a.allow_input as allow_input, "
-            "a.abbr as abbr, s.tag as min_state, group_tags, children, required_trait_tags "
+            "a.abbr as abbr, a.placeholder as placeholder, s.tag as min_state, group_tags, children, required_trait_tags "
             "ORDER BY a.priority DESC "
         )
         attributes = self._driver.execute_query(attributes_query, routing_="r", result_transformer_=Result.data)

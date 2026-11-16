@@ -119,6 +119,7 @@ class AttributeModel(AttributeBaseModel):
     allow_input : bool #if the attribute allows for data input by the user. For example, a concentration.
     min_state : int = 0  # The minimal state the submission must have in order to define the attribute.
     abbr : Optional[str] = None  # optional abbreviation for the attribute, used in UI
+    placeholder : Optional[str] = None  # optional example value displayed as input placeholder, only relevant if allow_input is True
     class Config:
         use_enum_values = True
 
@@ -164,9 +165,18 @@ class AttributeInsertModel(BaseModel):
     min_state: int = 0
     parents : List[str] = []  # list of parent attribute tags, if any
     abbr: Optional[str] = None
+    placeholder: Optional[str] = None  # optional example value displayed as input placeholder, requires allow_input to be True
     children : List[str] = [] 
     required_trait_tags : List[str] = []  # list of trait tags that are required for this attribute. For example, if the attribute is "att_organism", the required_trait_tags could be ["att_organism:human", "att_organism:mouse"] to indicate that the user must select one of these traits when defining the attribute.
     traits : List[MinimalTraitModel] = []  # list of traits to be inserted along with the attribute. Each trait is represented by a MinimalTraitModel which includes the text, description, and priority.
+
+    @model_validator(mode="after")
+    def check_placeholder(self):
+        if isinstance(self.placeholder, str):
+            self.placeholder = self.placeholder.strip() or None
+        if self.placeholder is not None and not self.allow_input:
+            raise ValueError("A placeholder can only be defined if allow_input is True.")
+        return self
 
 class AttributeEditModel(BaseModel):
     """
@@ -180,11 +190,21 @@ class AttributeEditModel(BaseModel):
     min_state: int = 0
     parents : List[str] = []  # list of parent attribute tags, if any
     abbr: Optional[str] = None
+    placeholder: Optional[str] = None  # optional example value displayed as input placeholder, requires allow_input to be True
     children : List[str] = [] 
     required_trait_tags : List[str] = []  # list of trait tags that are required for this attribute. For example, if the attribute is "att_organism", the required_trait_tags could be ["att_organism:human", "att_organism:mouse"] to indicate that the user must select one of these traits when defining the attribute.
 
+    @model_validator(mode="after")
+    def check_placeholder(self):
+        if isinstance(self.placeholder, str):
+            self.placeholder = self.placeholder.strip() or None
+        if self.placeholder is not None and not self.allow_input:
+            raise ValueError("A placeholder can only be defined if allow_input is True.")
+        return self
+
 class AttributeResponseModel(AttributeBaseModel):
     allow_input : bool = False  # if the attribute allows for data input by the user. For example, a concentration.
+    placeholder : Optional[str] = None  # optional example value displayed as input placeholder, only relevant if allow_input is True
 
 
 AttributeTreeNode = ForwardRef('AttributeTreeNode')

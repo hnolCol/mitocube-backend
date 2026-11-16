@@ -382,7 +382,7 @@ class AttributesABC(ABC):
         """Returns the number of traits for a single attribute tag"""
         
     @abstractmethod
-    def insert(self, tag : str, text : str, priority : int = 500, abbreviation : str = None, min_state : SubmissionStatesEnums =  SubmissionStatesEnums.SUBMITTED, allow_input : bool = False, group_tags : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = []) -> bool:
+    def insert(self, tag : str, text : str, priority : int = 500, abbreviation : str = None, min_state : SubmissionStatesEnums =  SubmissionStatesEnums.SUBMITTED, allow_input : bool = False, group_tags : List[str] = [], children : List[str] = [], required_trait_tags : List[str] = [], placeholder : str = None) -> bool:
         """Inserts an attribute and corresponding attribute_values to the database. 
         
 
