@@ -116,7 +116,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.cache = Neo4JCache()
         self.openai = Neo4JOpenAI(driver = self.connection.driver)
         self.protocols = Neo4JProtocols(driver = self.connection.driver)
-        self.modular_procedures = Neo4JModularProcedures(driver = self.connection.driver)
+        self.modular_procedures = Neo4JModularProcedures(driver = self.connection.driver, condition_applications = self.condition_applications)
         #checks if all is correctly defined 
         self.__create_fulltext_search()
         super(MCNeo4JDatabase, self).__init__()

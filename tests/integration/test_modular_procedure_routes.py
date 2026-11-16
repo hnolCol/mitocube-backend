@@ -36,6 +36,12 @@ def make_user(role=UserRolesEnum.STANDARD):
     )
 
 
+class FakeAttributesDB:
+    "Minimal attributes stub: only what the procedure routes need (tree validation)."
+    def get_parents(self, attribute_tag):
+        return []
+
+
 class FakeModularProceduresDB:
     def __init__(self):
         self.procedures = {
@@ -122,7 +128,14 @@ class FakeModularProceduresDB:
         return [t for t, p in sorted(self.procedures.items(), key=lambda kv: kv[1].version)
                 if p.lineage_tag == procedure.lineage_tag]
 
-    def insert(self, title, description, user_tag, condition_application_tags=None, protocol_tags=None):
+    def insert(self, title, description, user_tag, condition_application_tags=None,
+               condition_application_trees=None, protocol_tags=None):
+        condition_application_tags = list(condition_application_tags or [])
+        for tree in (condition_application_trees or []):
+            # simulate the condition application insert: hash-tagged, idempotent
+            ca_tag = "ca-tree-" + tree.tag
+            if ca_tag not in condition_application_tags:
+                condition_application_tags.append(ca_tag)
         tag = "proc-new"
         if tag in self.procedures:
             raise ValueError("Tag is already in the database.")
@@ -132,7 +145,8 @@ class FakeModularProceduresDB:
             protocol_tags=protocol_tags or [])
         return tag
 
-    def update(self, tag, title, description, user_tag, condition_application_tags=None, protocol_tags=None):
+    def update(self, tag, title, description, user_tag, condition_application_tags=None,
+               condition_application_trees=None, protocol_tags=None):
         if tag not in self.procedures:
             raise ValueError("Modular procedure not found.")
         if self.procedures[tag].status == "PUBLISHED":
@@ -283,6 +297,7 @@ class FakeModularProceduresDB:
 class FakeDB:
     def __init__(self):
         self.modular_procedures = FakeModularProceduresDB()
+        self.attributes = FakeAttributesDB()
 
 
 def _make_client(user):
@@ -695,3 +710,45 @@ class TestSingleOpenModuleConstraint:
         client.delete("/api/procedures/proc-2/link/subm-1/done")
         resp = client.post("/api/procedures/proc-1/link/subm-1")
         assert resp.status_code == 400
+
+class TestModularProcedureConditionApplicationTrees:
+    def test_insert_with_new_condition_application_tree(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "Liquid Handling", "description": "Define it newly.",
+            "condition_application_trees": [
+                {"tag": "att_liquid_handler", "type": "attribute", "children": [
+                    {"tag": "att_liquid_handler:hamilton", "type": "trait", "children": []}
+                ]}
+            ]})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["tag"] == "proc-new"
+        assert body["condition_application_tags"] == ["ca-tree-att_liquid_handler"]
+
+    def test_insert_reuses_existing_ca_tags_and_trees_together(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "Mixed", "description": "Reuse and define.",
+            "condition_application_tags": ["ca-1"],
+            "condition_application_trees": [
+                {"tag": "att_liquid_handler", "type": "attribute", "children": [
+                    {"tag": "att_liquid_handler:hamilton", "type": "trait", "children": []}
+                ]}
+            ]})
+        assert resp.status_code == 200
+        assert sorted(resp.json()["condition_application_tags"]) == ["ca-1", "ca-tree-att_liquid_handler"]
+
+    def test_insert_with_nested_tree(self, client):
+        # attribute -> trait -> child attribute -> trait with value (like a submission insert)
+        resp = client.post("/api/procedures/", json={
+            "title": "Nested", "description": "Nested tree.",
+            "condition_application_trees": [
+                {"tag": "att_compound", "type": "attribute", "children": [
+                    {"tag": "att_compound:dmso", "type": "trait", "children": [
+                        {"tag": "att_concentration", "type": "attribute", "children": [
+                            {"tag": "mM", "type": "trait", "value": 2, "children": []}
+                        ]}
+                    ]}
+                ]}
+            ]})
+        assert resp.status_code == 200
+        assert resp.json()["condition_application_tags"] == ["ca-tree-att_compound"]

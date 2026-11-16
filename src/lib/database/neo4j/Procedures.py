@@ -17,8 +17,20 @@ from config.models.procedures import (
 
 class Neo4JModularProcedures(ModularProceduresABC):
 
-    def __init__(self, driver: Driver) -> None:
+    def __init__(self, driver: Driver, condition_applications=None) -> None:
         self._driver = driver
+        self._condition_applications = condition_applications
+
+    def _resolve_condition_application_tags(self, condition_application_tags, condition_application_trees) -> List[str]:
+        """Combines reused condition application tags with newly defined attribute/trait trees:
+        each tree is inserted via the condition applications database (idempotent, hash-tagged)
+        and the resulting tags are merged with the reused ones."""
+        tags = list(condition_application_tags or [])
+        for tree in (condition_application_trees or []):
+            ca_tag = self._condition_applications.insert(tree)
+            if ca_tag not in tags:
+                tags.append(ca_tag)
+        return tags
 
     def _compute_content_hash(self, title: str, description: str,
                                condition_application_tags: List[str],
@@ -39,9 +51,12 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
     def insert(self, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
+               condition_application_trees: List = None,
                protocol_tags: List[str] = None) -> str:
-        "Inserts a new draft modular procedure. The tag is generated based on the title and description."
-        condition_application_tags = condition_application_tags or []
+        """Inserts a new draft modular procedure. The tag is generated based on the title,
+        description, condition applications and version. Condition applications can be reused
+        by tag or newly defined as attribute/trait trees (resolved to tags on insert)."""
+        condition_application_tags = self._resolve_condition_application_tags(condition_application_tags, condition_application_trees)
         protocol_tags = protocol_tags or []
         tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
         if self.exists(tag=tag):
@@ -188,13 +203,14 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
     def update(self, tag: str, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
+               condition_application_trees: List = None,
                protocol_tags: List[str] = None) -> bool:
         "Updates a draft modular procedure. Published procedures are immutable."
         if not self.exists(tag=tag):
             raise ValueError("Modular procedure not found.")
         if self.get(tag=tag).status == "PUBLISHED":
             raise ValueError("Published modular procedures are immutable.")
-        condition_application_tags = condition_application_tags or []
+        condition_application_tags = self._resolve_condition_application_tags(condition_application_tags, condition_application_trees)
         protocol_tags = protocol_tags or []
 
         query = (

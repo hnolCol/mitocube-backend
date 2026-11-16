@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 from enum import Enum
 
+from config.models.attributes import AttributeTree
+
 
 
 class ModularProcedureStatusEnum(str, Enum):
@@ -31,14 +33,17 @@ class InsertModularProcedureModel(BaseModel):
     title : str
     description : str
     condition_application_tags : List[str] = Field(default_factory=list)
+    """Tags of existing condition applications to reuse."""
+    condition_application_trees : List[AttributeTree] = Field(default_factory=list)
+    """New condition applications defined as hierarchical attribute/trait trees (like when inserting a submission)."""
     protocol_tags : List[str] = Field(default_factory=list)
-
 
 
 class UpdateModularProcedureModel(BaseModel):
     title : str
     description : str
     condition_application_tags : List[str] = Field(default_factory=list)
+    condition_application_trees : List[AttributeTree] = Field(default_factory=list)
     protocol_tags : List[str] = Field(default_factory=list)
 
 
