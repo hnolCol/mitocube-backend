@@ -40,19 +40,55 @@ class ConsortiumABC(ABC):
 
     @abstractmethod
     def get_user_tags(self, tag : str) -> List[str]:
-        """Returns the user tags of all users that are members of the consortiums research groups"""
+        """Returns the user tags of all users that are direct members of the consortium"""
+
+    @abstractmethod
+    def get_eligible_user_tags(self, tag : str) -> List[str]:
+        """Returns the user tags of all users that are members of the consortiums eligible research groups"""
 
     @abstractmethod
     def find_by_user(self, user_tag : str, limit : int = 40) -> List[str]:
-        """Returns the tags of all consortiums the users research groups are members of"""
+        """Returns the tags of all consortiums the user is a direct member of"""
 
     @abstractmethod
-    def insert_groups(self, tag : str, group_tags : List[str]):
-        """Adds research groups to the consortium"""
+    def insert_groups(self, tag : str, group_tags : List[str], user_tag : str = None):
+        """Adds research groups to the consortium as eligible groups and joins their heads (PIs) as members"""
 
     @abstractmethod
     def remove_groups(self, tag : str, group_tags : List[str]):
-        """Removes research groups from the consortium"""
+        """Removes research groups from the consortium, blocked while dependent members exist"""
+
+    @abstractmethod
+    def insert_users(self, tag : str, user_tags : List[str], user_tag : str = None):
+        """Adds users as direct members of the consortium if they are eligible"""
+
+    @abstractmethod
+    def remove_users(self, tag : str, user_tags : List[str]):
+        """Removes direct user memberships, blocked while dependent members exist"""
+
+    @abstractmethod
+    def is_head_of_user_in_consortium(self, head_tag : str, user_tag : str, consortium_tag : str) -> bool:
+        """Checks if the user is a head (PI) of an eligible group of the consortium the given user is a member of"""
+
+    @abstractmethod
+    def insert_membership_request(self, consortium_tag : str, user_tag : str, kind : str, requested_by : str) -> bool:
+        """Creates a pending membership request of kind 'add' or 'remove' for the user"""
+
+    @abstractmethod
+    def get_pending_membership_requests(self, consortium_tag : str = None) -> List[Dict]:
+        """Returns all pending membership requests, optionally restricted to one consortium"""
+
+    @abstractmethod
+    def get_pending_membership_requests_for_head(self, user_tag : str) -> List[Dict]:
+        """Returns the pending membership requests that concern the research groups the user leads"""
+
+    @abstractmethod
+    def approve_membership_request(self, consortium_tag : str, user_tag : str, decided_by : str) -> bool:
+        """Approves a pending membership request"""
+
+    @abstractmethod
+    def deny_membership_request(self, consortium_tag : str, user_tag : str) -> bool:
+        """Denies a pending membership request"""
 
     @abstractmethod
     def get_submission_tags(self, tag : str) -> List[str]:

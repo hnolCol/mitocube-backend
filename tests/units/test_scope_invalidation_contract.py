@@ -74,6 +74,17 @@ class FakeDriver:
         return [True]
 
 
+class ConsortiumFakeDriver:
+    """Neo4j driver stub for consortium writes: returns a truthy list, but an
+    empty list for the dependency blocking queries (RETURN DISTINCT d.tag) so
+    that removals are not blocked in the contract tests."""
+    def execute_query(self, *args, **kwargs):
+        query = args[0] if args else kwargs.get("query") or ""
+        if isinstance(query, str) and "RETURN DISTINCT d.tag" in query:
+            return []
+        return [True]
+
+
 def make_submissions_db():
     from lib.database.neo4j.Submission import Neo4JSubmissions
     db = Neo4JSubmissions.__new__(Neo4JSubmissions)
@@ -91,7 +102,7 @@ def make_research_group_db():
 def make_consortium_db():
     from lib.database.neo4j.Consortium import Neo4JConsortium
     db = Neo4JConsortium.__new__(Neo4JConsortium)
-    db._driver = FakeDriver()
+    db._driver = ConsortiumFakeDriver()
     return db
 
 
@@ -172,3 +183,25 @@ class TestConsortiumWrites:
         db.exists = lambda tag: True
         db.remove_groups(tag="cons-1", group_tags=["rg-1"])
         assert recording_scope_cache.invalidated_all == 1
+
+    def test_insert_users_invalidates_namespace(self, recording_scope_cache):
+        db = make_consortium_db()
+        db.exists = lambda tag: True
+        db.insert_users(tag="cons-1", user_tags=["u-1", "u-2"], user_tag="curator-1")
+        assert recording_scope_cache.invalidated_all == 1
+
+    def test_remove_users_invalidates_namespace(self, recording_scope_cache):
+        db = make_consortium_db()
+        db.exists = lambda tag: True
+        db.remove_users(tag="cons-1", user_tags=["u-1"])
+        assert recording_scope_cache.invalidated_all == 1
+
+    def test_approve_membership_request_invalidates_namespace(self, recording_scope_cache):
+        db = make_consortium_db()
+        db.approve_membership_request("cons-1", "u-1", decided_by="curator-1")
+        assert recording_scope_cache.invalidated_all == 1
+
+    def test_deny_membership_request_does_not_invalidate(self, recording_scope_cache):
+        db = make_consortium_db()
+        db.deny_membership_request("cons-1", "u-1")
+        assert recording_scope_cache.invalidated_all == 0
