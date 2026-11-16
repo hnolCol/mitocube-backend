@@ -78,9 +78,18 @@ class ExecutionOutputWellModel(BaseModel):
 
 
 class ExecutionWellMetricModel(BaseModel):
-    "Measured values (attribute tag -> numeric value) of a single output well, e.g. the protein concentration."
+    "A measured value of a single output well: the trait defines the measured quantity (e.g. u g/uL of the concentration attribute)."
     position : str
-    values : Dict[str, float] = Field(default_factory=dict)
+    trait_tag : str
+    value : float
+
+
+
+class ProcedureExecutionWellMetricModel(BaseModel):
+    "A stored well metric of a procedure execution: a value that is an instance of a trait (like condition values)."
+    trait_tag : str
+    attribute_tag : Optional[str] = None
+    value : float
 
 
 
@@ -93,7 +102,7 @@ class InsertProcedureExecutionModel(BaseModel):
     responsible_user_tag : Optional[str] = None
     input_wells : List[ExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ExecutionOutputWellModel] = Field(default_factory=list)
-    output_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)
+    output_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)  # [{position, trait_tag, value}]
 
 
 
@@ -114,7 +123,7 @@ class ProcedureExecutionOutputWellModel(BaseModel):
     column_index : int
     sample_tags : List[str] = Field(default_factory=list)
     condition_application_tags : List[str] = Field(default_factory=list)
-    metrics : Dict[str, float] = Field(default_factory=dict)
+    metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
 
 
 

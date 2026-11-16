@@ -201,8 +201,8 @@ class FakeModularProceduresDB:
         for metric in execution.output_well_metrics:
             if metric.position not in {w.position for w in execution.output_wells}:
                 raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
-            if "missing-attribute" in metric.values:
-                raise ValueError("Attributes not found: missing-attribute")
+            if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
+                raise ValueError(f"Traits not found: {metric.trait_tag}")
         execution_tag = "exec-1"
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
@@ -214,8 +214,8 @@ class FakeModularProceduresDB:
                          for w in execution.input_wells],
             output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
                            "sample_tags": [], "condition_application_tags": w.condition_application_tags,
-                           "metrics": next((m.values for m in execution.output_well_metrics
-                                             if m.position == w.position), {})}
+                           "metrics": [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                                       for m in execution.output_well_metrics if m.position == w.position]}
                           for w in execution.output_wells])
         return self.executions[execution_tag]
 
@@ -242,10 +242,11 @@ class FakeModularProceduresDB:
             if position not in output_positions:
                 raise ValueError(f"Metrics were given for wells that are not output wells of this execution: {position}")
         for metric in well_metrics:
-            if "missing-attribute" in metric.values:
-                raise ValueError("Attributes not found: missing-attribute")
-        execution.output_wells = [w.model_copy(update={"metrics": dict(w.metrics) | next(
-            (m.values for m in well_metrics if m.position == w.position), {})})
+            if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
+                raise ValueError(f"Traits not found: {metric.trait_tag}")
+        execution.output_wells = [w.model_copy(update={"metrics":
+            list(w.metrics) + [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                               for m in well_metrics if m.position == w.position]})
             for w in execution.output_wells]
         return execution
 
@@ -543,11 +544,11 @@ class TestModularProcedureExecutionMetricsRoutes:
             "responsible_user_tag": "ijklmnop",
             "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
             "output_wells": [{"position": "A1", "condition_application_tags": []}],
-            "output_well_metrics": [{"position": "A1", "values": {"protein-concentration": 2.5}}]})
+            "output_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5}]})
         assert resp.status_code == 200
         body = resp.json()
         assert body["responsible_user_tag"] == "ijklmnop"
-        assert body["output_wells"][0]["metrics"] == {"protein-concentration": 2.5}
+        assert body["output_wells"][0]["metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 2.5}]
 
     def test_execute_responsible_user_defaults_to_executing_user(self, client):
         resp = client.post("/api/procedures/proc-2/execute", json={
@@ -570,7 +571,7 @@ class TestModularProcedureExecutionMetricsRoutes:
             "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
             "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
             "output_wells": [{"position": "A1", "condition_application_tags": []}],
-            "output_well_metrics": [{"position": "Z9", "values": {"protein-concentration": 1.0}}]})
+            "output_well_metrics": [{"position": "Z9", "trait_tag": "trait-ugul", "value": 1.0}]})
         assert resp.status_code == 400
 
     def test_set_metrics_after_execution(self, client):
@@ -579,9 +580,9 @@ class TestModularProcedureExecutionMetricsRoutes:
             "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         resp = client.post("/api/procedures/executions/exec-1/metrics",
-            json=[{"position": "A1", "values": {"protein-concentration": 3.1}}])
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.1}])
         assert resp.status_code == 200
-        assert resp.json()["output_wells"][0]["metrics"] == {"protein-concentration": 3.1}
+        assert resp.json()["output_wells"][0]["metrics"][-1] == {"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 3.1}
 
     def test_set_metrics_for_non_output_well_rejected(self, client):
         client.post("/api/procedures/proc-2/execute", json={
@@ -589,16 +590,25 @@ class TestModularProcedureExecutionMetricsRoutes:
             "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         resp = client.post("/api/procedures/executions/exec-1/metrics",
-            json=[{"position": "B1", "values": {"protein-concentration": 3.1}}])
+            json=[{"position": "B1", "trait_tag": "trait-ugul", "value": 3.1}])
         assert resp.status_code == 400
 
     def test_set_metrics_on_missing_execution_404(self, client):
         resp = client.post("/api/procedures/executions/does-not-exist/metrics",
-            json=[{"position": "A1", "values": {"protein-concentration": 3.1}}])
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.1}])
         assert resp.status_code == 404
 
     def test_standard_user_rejected_on_set_metrics(self):
         with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
             resp = c.post("/api/procedures/executions/exec-1/metrics",
-                json=[{"position": "A1", "values": {"protein-concentration": 3.1}}])
+                json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.1}])
             assert resp.status_code == 403
+
+    def test_execute_with_unknown_trait_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "output_well_metrics": [{"position": "A1", "trait_tag": "missing-trait", "value": 1.0}]})
+        assert resp.status_code == 400
+        assert "Traits not found" in resp.json()["detail"]
