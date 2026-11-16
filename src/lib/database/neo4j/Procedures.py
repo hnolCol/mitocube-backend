@@ -17,8 +17,20 @@ from config.models.procedures import (
 
 class Neo4JModularProcedures(ModularProceduresABC):
 
-    def __init__(self, driver: Driver) -> None:
+    def __init__(self, driver: Driver, condition_applications=None) -> None:
         self._driver = driver
+        self._condition_applications = condition_applications
+
+    def _resolve_condition_application_tags(self, condition_application_tags, condition_application_trees) -> List[str]:
+        """Combines reused condition application tags with newly defined attribute/trait trees:
+        each tree is inserted via the condition applications database (idempotent, hash-tagged)
+        and the resulting tags are merged with the reused ones."""
+        tags = list(condition_application_tags or [])
+        for tree in (condition_application_trees or []):
+            ca_tag = self._condition_applications.insert(tree)
+            if ca_tag not in tags:
+                tags.append(ca_tag)
+        return tags
 
     def _compute_content_hash(self, title: str, description: str,
                                condition_application_tags: List[str],
@@ -39,9 +51,12 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
     def insert(self, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
+               condition_application_trees: List = None,
                protocol_tags: List[str] = None) -> str:
-        "Inserts a new draft modular procedure. The tag is generated based on the title and description."
-        condition_application_tags = condition_application_tags or []
+        """Inserts a new draft modular procedure. The tag is generated based on the title,
+        description, condition applications and version. Condition applications can be reused
+        by tag or newly defined as attribute/trait trees (resolved to tags on insert)."""
+        condition_application_tags = self._resolve_condition_application_tags(condition_application_tags, condition_application_trees)
         protocol_tags = protocol_tags or []
         tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
         if self.exists(tag=tag):
@@ -188,13 +203,14 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
     def update(self, tag: str, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
+               condition_application_trees: List = None,
                protocol_tags: List[str] = None) -> bool:
         "Updates a draft modular procedure. Published procedures are immutable."
         if not self.exists(tag=tag):
             raise ValueError("Modular procedure not found.")
         if self.get(tag=tag).status == "PUBLISHED":
             raise ValueError("Published modular procedures are immutable.")
-        condition_application_tags = condition_application_tags or []
+        condition_application_tags = self._resolve_condition_application_tags(condition_application_tags, condition_application_trees)
         protocol_tags = protocol_tags or []
 
         query = (
@@ -203,8 +219,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "WITH DISTINCT m "
             "OPTIONAL MATCH (m)-[r2:HAS_PROTOCOL]->() DELETE r2 "
             "WITH DISTINCT m "
+            "MATCH (u:User {tag : $user_tag}) "
             "SET m.title = $title, m.description = $description, m.modified_at = timestamp() "
-            "MERGE (u:User {tag : $user_tag})-[:UPDATED]->(m) "
+            "MERGE (u)-[:UPDATED]->(m) "
             "RETURN m.tag as tag"
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, title=title, description=description,
@@ -236,9 +253,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
                                                   protocol_tags=procedure.protocol_tags)
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
+            "MATCH (u:User {tag : $user_tag}) "
             "SET m.status = 'PUBLISHED', m.content_hash = $content_hash, "
             "m.published_at = timestamp() "
-            "MERGE (u:User {tag : $user_tag})-[:PUBLISHED]->(m) "
+            "MERGE (u)-[:PUBLISHED]->(m) "
             "RETURN m.version as version"
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, content_hash=content_hash,

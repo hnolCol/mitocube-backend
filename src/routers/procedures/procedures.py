@@ -4,6 +4,7 @@ from lib.database.abstract.Database import DatabaseABC
 from typing import List
 
 from config.models.user import UserModel
+from services.attribute_hierarchy import validate_attribute_trees
 from config.models.procedures import (
     ExecutionWellMetricModel,
     InsertModularProcedureModel,
@@ -77,10 +78,20 @@ def get_modular_procedure_submissions(procedure_tag : str, user : UserModel = De
 
 @router.post("/", response_model=ModularProcedureBaseModel)
 def insert_modular_procedure(procedure : InsertModularProcedureModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ModularProcedureBaseModel:
-    "Creates a new draft modular procedure. The user must be at least curator."
+    """Creates a new draft modular procedure. Condition applications can be reused by tag
+    or newly defined as hierarchical attribute/trait trees (like when inserting a submission).
+    The user must be at least curator."""
+    try:
+        procedure.condition_application_trees = validate_attribute_trees(
+            get_parents=db.attributes.get_parents,
+            attribute_trees=procedure.condition_application_trees,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     try:
         tag = db.modular_procedures.insert(title=procedure.title, description=procedure.description, user_tag=user.tag,
                                           condition_application_tags=procedure.condition_application_tags,
+                                          condition_application_trees=procedure.condition_application_trees,
                                           protocol_tags=procedure.protocol_tags)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -89,10 +100,20 @@ def insert_modular_procedure(procedure : InsertModularProcedureModel, user : Use
 
 @router.patch("/{procedure_tag}", response_model=ModularProcedureBaseModel)
 def update_modular_procedure(procedure_tag : str, updated_procedure : UpdateModularProcedureModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ModularProcedureBaseModel:
-    "Updates a draft modular procedure. Published modular procedures are immutable. The user must be at least curator."
+    """Updates a draft modular procedure (published procedures are immutable). Condition
+    applications can be reused by tag or newly defined as hierarchical attribute/trait trees.
+    The user must be at least curator."""
+    try:
+        updated_procedure.condition_application_trees = validate_attribute_trees(
+            get_parents=db.attributes.get_parents,
+            attribute_trees=updated_procedure.condition_application_trees,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     try:
         db.modular_procedures.update(tag=procedure_tag, title=updated_procedure.title, description=updated_procedure.description,
                                      user_tag=user.tag, condition_application_tags=updated_procedure.condition_application_tags,
+                                     condition_application_trees=updated_procedure.condition_application_trees,
                                      protocol_tags=updated_procedure.protocol_tags)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

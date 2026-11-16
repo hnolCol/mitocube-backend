@@ -28,8 +28,11 @@ class ModularProceduresABC(ABC):
     @abstractmethod
     def insert(self, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
+               condition_application_trees: List = None,
                protocol_tags: List[str] = None) -> str:
-        """Adds a new draft modular procedure.
+        """Adds a new draft modular procedure. Condition applications can be reused by
+        tag or newly defined as hierarchical attribute/trait trees (like when inserting
+        a submission); trees are resolved to condition application tags on insert.
         Returns the tag of the created procedure.
         Raises a ValueError if a procedure with the same tag already exists."""
 
@@ -48,8 +51,10 @@ class ModularProceduresABC(ABC):
     @abstractmethod
     def update(self, tag: str, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
+               condition_application_trees: List = None,
                protocol_tags: List[str] = None) -> bool:
-        """Updates a draft modular procedure.
+        """Updates a draft modular procedure. Condition application trees are resolved
+        to tags like on insert.
         Raises a ValueError if the procedure does not exist or is published
         (published procedures are immutable)."""
 
