@@ -11,6 +11,7 @@ Welcome to the MitoCube Backend documentation! This directory contains comprehen
 | [Production Setup Guide](PRODUCTION_SETUP.md) | Complete step-by-step production deployment | System administrators, DevOps |
 | [Secret Management Guide](SECRET_MANAGEMENT.md) | Secure secret management for all environments | Developers, System administrators |
 | [Deployment Checklist](DEPLOYMENT_CHECKLIST.md) | Complete checklist for deployment verification | DevOps, System administrators |
+| [Modular Procedures](modular-procedures.md) | Facility workflow modules: procedures, versions, executions and well metrics | Developers, Curators |
 
 ---
 
