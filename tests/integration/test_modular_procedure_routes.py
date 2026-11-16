@@ -54,6 +54,9 @@ class FakeModularProceduresDB:
                 ModularProcedureSubmissionModel(
                     procedure_tag="proc-2", submission_tag="subm-1", position=0,
                     created_at=10.0, done=False),
+                ModularProcedureSubmissionModel(
+                    procedure_tag="proc-2", submission_tag="subm-2", position=0,
+                    created_at=11.0, done=False),
             ],
         }
         self.submission_procedures = {
@@ -62,7 +65,13 @@ class FakeModularProceduresDB:
                     procedure_tag="proc-2", submission_tag="subm-1", position=0,
                     created_at=10.0, done=False),
             ],
+            "subm-2": [
+                ModularProcedureSubmissionModel(
+                    procedure_tag="proc-2", submission_tag="subm-2", position=0,
+                    created_at=11.0, done=False),
+            ],
         }
+        self.sample_submissions = {"sample-1": "subm-1", "sample-2": "subm-1", "sample-3": "subm-2"}
         self.published = []
         self.linked = []
         self.done = []
@@ -203,12 +212,15 @@ class FakeModularProceduresDB:
                 raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
             if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
                 raise ValueError(f"Traits not found: {metric.trait_tag}")
+        input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
+        done_submissions = sorted({self.sample_submissions[sample_tag] for sample_tag in input_sample_tags
+                                    if sample_tag in self.sample_submissions})
         execution_tag = "exec-1"
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
             input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
             user_tag=user_tag, responsible_user_tag=responsible_user_tag,
-            created_at=4.0, done_submission_tags=["subm-1"],
+            created_at=4.0, done_submission_tags=done_submissions,
             input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
                           "sample_tags": w.sample_tags, "output_positions": w.output_positions}
                          for w in execution.input_wells],
@@ -335,7 +347,7 @@ class TestModularProcedureRoutes:
         resp = client.get("/api/procedures/proc-2/submissions")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body) == 1
+        assert len(body) == 2
         assert body[0]["submission_tag"] == "subm-1"
         assert body[0]["created_at"] == 10.0
         assert body[0]["done"] is False
@@ -407,7 +419,7 @@ class TestModularProcedureExecutionRoutes:
         body = resp.json()
         assert body["tag"] == "exec-1"
         assert body["procedure_tag"] == "proc-2"
-        assert body["done_submission_tags"] == ["subm-1"]
+        assert body["done_submission_tags"] == ["subm-1", "subm-2"]
         assert len(body["input_wells"]) == 2
         assert body["input_wells"][0]["sample_tags"] == ["sample-1", "sample-2"]
         assert body["input_wells"][1]["output_positions"] == ["A1", "B1", "C1"]
@@ -612,3 +624,32 @@ class TestModularProcedureExecutionMetricsRoutes:
             "output_well_metrics": [{"position": "A1", "trait_tag": "missing-trait", "value": 1.0}]})
         assert resp.status_code == 400
         assert "Traits not found" in resp.json()["detail"]
+
+class TestModularProcedureMultipleSubmissions:
+    def test_multiple_submissions_linked_to_one_procedure(self, client):
+        resp = client.get("/api/procedures/proc-2/submissions")
+        assert resp.status_code == 200
+        assert [link["submission_tag"] for link in resp.json()] == ["subm-1", "subm-2"]
+
+    def test_execute_with_samples_from_multiple_submissions(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [
+                {"position": "A1", "sample_tags": ["sample-1", "sample-2"], "output_positions": ["A1"]},
+                {"position": "B1", "sample_tags": ["sample-3"], "output_positions": ["A1"]},
+            ],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        body = resp.json()
+        # both submissions own samples on the input plate -> both are done after the execution
+        assert body["done_submission_tags"] == ["subm-1", "subm-2"]
+
+    def test_execute_marks_only_submissions_with_input_samples_done(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [
+                {"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]},
+            ],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        assert resp.json()["done_submission_tags"] == ["subm-1"]
