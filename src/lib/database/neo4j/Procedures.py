@@ -203,8 +203,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "WITH DISTINCT m "
             "OPTIONAL MATCH (m)-[r2:HAS_PROTOCOL]->() DELETE r2 "
             "WITH DISTINCT m "
+            "MATCH (u:User {tag : $user_tag}) "
             "SET m.title = $title, m.description = $description, m.modified_at = timestamp() "
-            "MERGE (u:User {tag : $user_tag})-[:UPDATED]->(m) "
+            "MERGE (u)-[:UPDATED]->(m) "
             "RETURN m.tag as tag"
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, title=title, description=description,
@@ -236,9 +237,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
                                                   protocol_tags=procedure.protocol_tags)
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
+            "MATCH (u:User {tag : $user_tag}) "
             "SET m.status = 'PUBLISHED', m.content_hash = $content_hash, "
             "m.published_at = timestamp() "
-            "MERGE (u:User {tag : $user_tag})-[:PUBLISHED]->(m) "
+            "MERGE (u)-[:PUBLISHED]->(m) "
             "RETURN m.version as version"
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, content_hash=content_hash,
