@@ -256,6 +256,14 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="r", tag=tag, submission_tag=submission_tag, result_transformer_=Result.value)
         if len(already_linked) > 0 and already_linked[0]:
             raise ValueError("Submission is already linked to this modular procedure.")
+        open_elsewhere = self._driver.execute_query(
+            "MATCH (s:Submission {tag : $submission_tag})-[r:IN_PROCEDURE]->(m:ModularProcedure) "
+            "WHERE m.tag <> $tag AND r.done = false "
+            "RETURN collect(m.tag) as open_procedures",
+            routing_="r", tag=tag, submission_tag=submission_tag, result_transformer_=Result.value)
+        if len(open_elsewhere) > 0 and len(open_elsewhere[0]) > 0:
+            raise ValueError(f"Submission is not done in another modular procedure yet: {', '.join(open_elsewhere[0])}. "
+                             "A submission can only be linked to one modular procedure at a time.")
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
             "MATCH (s:Submission {tag : $submission_tag}) "
@@ -375,10 +383,34 @@ class Neo4JModularProcedures(ModularProceduresABC):
             if len(plate_exists) == 0 or not plate_exists[0]:
                 raise ValueError(f"Plate not found: {plate_tag}")
 
+        responsible_user_tag = execution.responsible_user_tag or user_tag
+        responsible_user_exists = self._driver.execute_query(
+            "WITH EXISTS {(u:User {tag : $user_tag})} as exists RETURN exists",
+            routing_="r", user_tag=responsible_user_tag, result_transformer_=Result.value)
+        if len(responsible_user_exists) == 0 or not responsible_user_exists[0]:
+            raise ValueError(f"Responsible user not found: {responsible_user_tag}")
+
+        metric_positions = [metric.position for metric in execution.output_well_metrics]
         output_positions = {well.position for well in execution.output_wells}
         input_positions = {well.position for well in execution.input_wells}
         if len(output_positions) != len(execution.output_wells) or len(input_positions) != len(execution.input_wells):
             raise ValueError("Duplicate well positions are not allowed.")
+
+        if len(set(metric_positions)) != len(metric_positions):
+            raise ValueError("Duplicate metric positions are not allowed.")
+        metric_trait_tags = sorted({metric.trait_tag for metric in execution.output_well_metrics})
+        trait_attribute_tags = self._driver.execute_query(
+            "UNWIND $trait_tags as trait_tag "
+            "MATCH (t:Trait {tag : trait_tag}) "
+            "RETURN t.tag as trait_tag, t.attribute_tag as attribute_tag",
+            routing_="r", trait_tags=metric_trait_tags, result_transformer_=Result.data)
+        trait_to_attribute = {row["trait_tag"]: row["attribute_tag"] for row in trait_attribute_tags}
+        missing_traits = [trait_tag for trait_tag in metric_trait_tags if trait_tag not in trait_to_attribute]
+        if len(missing_traits) > 0:
+            raise ValueError(f"Traits not found: {', '.join(missing_traits)}")
+        for metric in execution.output_well_metrics:
+            if metric.position not in output_positions:
+                raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
 
         output_well_samples = {position: set() for position in output_positions}
         for well in execution.input_wells:
@@ -431,7 +463,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "MERGE (u)-[:EXECUTED]->(e) ",
             routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
             props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
-                   "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag})
+                   "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
+                   "responsible_user_tag": responsible_user_tag})
 
         for well in execution.input_wells:
             row_index, column_index = self._parse_position(well.position)
@@ -467,6 +500,21 @@ class Neo4JModularProcedures(ModularProceduresABC):
                     "MATCH (c:ConditionApplication {tag : $ca_tag}) "
                     "MERGE (w)-[:HAS_APPLICATION]->(c) ",
                     routing_="w", execution_tag=execution_tag, position=well.position, ca_tag=ca_tag)
+
+        for metric in execution.output_well_metrics:
+            self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'OUTPUT'}) "
+                "MATCH (t:Trait {tag : $trait_tag}) "
+                "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, trait_tag : $trait_tag}) "
+                "SET m.value = $value, m.created_at = timestamp() "
+                "MERGE (w)-[:HAS_METRIC]->(m) "
+                "MERGE (m)-[:INSTANCE_OF]->(t) "
+                "WITH m, t "
+                "MERGE (a:Attribute {tag : t.attribute_tag}) "
+                "MERGE (m)-[:OF_ATTRIBUTE]->(a) ",
+                routing_="w", execution_tag=execution_tag, position=metric.position,
+                trait_tag=metric.trait_tag, value=metric.value)
 
         done_submission_tags = self._driver.execute_query(
             "UNWIND $sample_tags as sample_tag "
@@ -505,9 +553,13 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
             "OPTIONAL MATCH (s:Sample)-[:IN_WELL]->(w) "
             "OPTIONAL MATCH (w)-[:HAS_APPLICATION]->(c:ConditionApplication) "
-            "WITH w, collect(DISTINCT s.tag) as sample_tags, collect(DISTINCT c.tag) as ca_tags "
+            "OPTIONAL MATCH (w)-[:HAS_METRIC]->(m:ExecutionWellMetric)-[:INSTANCE_OF]->(t:Trait) "
+            "WITH w, collect(DISTINCT s.tag) as sample_tags, collect(DISTINCT c.tag) as ca_tags, "
+            "collect(CASE WHEN m IS NULL THEN NULL ELSE "
+            "{trait_tag: t.tag, attribute_tag: t.attribute_tag, value: m.value} END) as metrics "
             "RETURN {position: w.position, row_index: w.row_index, column_index: w.column_index, "
-            "sample_tags: sample_tags, condition_application_tags: ca_tags} as well "
+            "sample_tags: sample_tags, condition_application_tags: ca_tags, "
+            "metrics: [metric IN metrics WHERE metric IS NOT NULL]} as well "
             "ORDER BY w.row_index, w.column_index",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
 
@@ -525,7 +577,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
         head = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
             "RETURN {tag: e.tag, procedure_tag: e.procedure_tag, input_plate_tag: e.input_plate_tag, "
-            "output_plate_tag: e.output_plate_tag, user_tag: e.user_tag, created_at: e.created_at, "
+            "output_plate_tag: e.output_plate_tag, user_tag: e.user_tag, "
+            "responsible_user_tag: e.responsible_user_tag, created_at: e.created_at, "
             "done_submission_tags: e.done_submission_tags} as execution",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
         execution = head[0]["execution"]
@@ -541,3 +594,50 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "MATCH (e:ModularProcedureExecution {procedure_tag : $tag}) "
             "RETURN e.tag as tag ORDER BY e.created_at ASC",
             routing_="r", tag=tag, result_transformer_=Result.value)
+
+    def set_execution_metrics(self, execution_tag: str, well_metrics, user_tag: str) -> "ProcedureExecutionModel":
+        """Sets or updates the measured attribute values (metrics) of the output wells of a
+        procedure execution, e.g. the protein concentration of each well."""
+        execution_exists = self._driver.execute_query(
+            "WITH EXISTS {(e:ModularProcedureExecution {tag : $execution_tag})} as exists RETURN exists",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+        if len(execution_exists) == 0 or not execution_exists[0]:
+            raise KeyError("Procedure execution not found.")
+
+        metric_keys = [(metric.position, metric.trait_tag) for metric in well_metrics]
+        if len(set(metric_keys)) != len(metric_keys):
+            raise ValueError("Duplicate metrics (same well and trait) are not allowed.")
+        positions = sorted({metric.position for metric in well_metrics})
+        existing_positions = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
+            "WHERE w.position IN $positions RETURN collect(w.position) as positions",
+            routing_="r", execution_tag=execution_tag, positions=positions, result_transformer_=Result.value)
+        existing = existing_positions[0] if len(existing_positions) > 0 else []
+        missing = [position for position in positions if position not in existing]
+        if len(missing) > 0:
+            raise ValueError(f"Metrics were given for wells that are not output wells of this execution: {', '.join(missing)}")
+
+        trait_tags = sorted({metric.trait_tag for metric in well_metrics})
+        found_traits = self._driver.execute_query(
+            "UNWIND $trait_tags as trait_tag MATCH (t:Trait {tag : trait_tag}) RETURN collect(t.tag) as traits",
+            routing_="r", trait_tags=trait_tags, result_transformer_=Result.value)
+        found = found_traits[0] if len(found_traits) > 0 else []
+        missing_traits = [trait_tag for trait_tag in trait_tags if trait_tag not in found]
+        if len(missing_traits) > 0:
+            raise ValueError(f"Traits not found: {', '.join(missing_traits)}")
+
+        for metric in well_metrics:
+            self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'OUTPUT'}) "
+                "MATCH (t:Trait {tag : $trait_tag}) "
+                "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, trait_tag : $trait_tag}) "
+                "SET m.value = $value, m.created_at = timestamp() "
+                "MERGE (w)-[:HAS_METRIC]->(m) "
+                "MERGE (m)-[:INSTANCE_OF]->(t) "
+                "WITH m, t "
+                "MERGE (a:Attribute {tag : t.attribute_tag}) "
+                "MERGE (m)-[:OF_ATTRIBUTE]->(a) ",
+                routing_="w", execution_tag=execution_tag, position=metric.position,
+                trait_tag=metric.trait_tag, value=metric.value)
+        return self.get_execution(execution_tag=execution_tag)

@@ -54,6 +54,9 @@ class FakeModularProceduresDB:
                 ModularProcedureSubmissionModel(
                     procedure_tag="proc-2", submission_tag="subm-1", position=0,
                     created_at=10.0, done=False),
+                ModularProcedureSubmissionModel(
+                    procedure_tag="proc-2", submission_tag="subm-2", position=0,
+                    created_at=11.0, done=False),
             ],
         }
         self.submission_procedures = {
@@ -62,7 +65,13 @@ class FakeModularProceduresDB:
                     procedure_tag="proc-2", submission_tag="subm-1", position=0,
                     created_at=10.0, done=False),
             ],
+            "subm-2": [
+                ModularProcedureSubmissionModel(
+                    procedure_tag="proc-2", submission_tag="subm-2", position=0,
+                    created_at=11.0, done=False),
+            ],
         }
+        self.sample_submissions = {"sample-1": "subm-1", "sample-2": "subm-1", "sample-3": "subm-2"}
         self.published = []
         self.linked = []
         self.done = []
@@ -147,6 +156,11 @@ class FakeModularProceduresDB:
             raise ValueError("Modular procedure not found.")
         if submission_tag in [link.submission_tag for link in self.submission_links.get(tag, [])]:
             raise ValueError("Submission is already linked to this modular procedure.")
+        open_elsewhere = [link.procedure_tag for links in self.submission_procedures.values() for link in links
+                          if link.submission_tag == submission_tag and link.procedure_tag != tag and not link.done]
+        if len(open_elsewhere) > 0:
+            raise ValueError(f"Submission is not done in another modular procedure yet: {', '.join(open_elsewhere)}. "
+                             "A submission can only be linked to one modular procedure at a time.")
         self.linked.append((tag, submission_tag))
         return True
 
@@ -156,11 +170,23 @@ class FakeModularProceduresDB:
 
     def mark_done(self, tag, submission_tag, user_tag):
         self.done.append((tag, submission_tag, user_tag))
+        self._set_link_done(tag, submission_tag, True)
         return True
 
     def reopen(self, tag, submission_tag):
         self.reopened.append((tag, submission_tag))
+        self._set_link_done(tag, submission_tag, False)
         return True
+
+    def _set_link_done(self, tag, submission_tag, done):
+        for links in self.submission_procedures.values():
+            for link in links:
+                if link.procedure_tag == tag and link.submission_tag == submission_tag:
+                    link.done = done
+        for links in self.submission_links.values():
+            for link in links:
+                if link.procedure_tag == tag and link.submission_tag == submission_tag:
+                    link.done = done
 
     def get_submissions(self, tag):
         if tag not in self.procedures:
@@ -195,16 +221,30 @@ class FakeModularProceduresDB:
                     raise ValueError(f"Output well {output_position} is not defined.")
         if "missing-sample" in [t for well in execution.input_wells for t in well.sample_tags]:
             raise ValueError("Samples not found: missing-sample")
+        responsible_user_tag = execution.responsible_user_tag or user_tag
+        if responsible_user_tag == "missing-user":
+            raise ValueError("Responsible user not found: missing-user")
+        for metric in execution.output_well_metrics:
+            if metric.position not in {w.position for w in execution.output_wells}:
+                raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
+            if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
+                raise ValueError(f"Traits not found: {metric.trait_tag}")
+        input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
+        done_submissions = sorted({self.sample_submissions[sample_tag] for sample_tag in input_sample_tags
+                                    if sample_tag in self.sample_submissions})
         execution_tag = "exec-1"
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
             input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
-            user_tag=user_tag, created_at=4.0, done_submission_tags=["subm-1"],
+            user_tag=user_tag, responsible_user_tag=responsible_user_tag,
+            created_at=4.0, done_submission_tags=done_submissions,
             input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
                           "sample_tags": w.sample_tags, "output_positions": w.output_positions}
                          for w in execution.input_wells],
             output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
-                           "sample_tags": [], "condition_application_tags": w.condition_application_tags}
+                           "sample_tags": [], "condition_application_tags": w.condition_application_tags,
+                           "metrics": [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                                       for m in execution.output_well_metrics if m.position == w.position]}
                           for w in execution.output_wells])
         return self.executions[execution_tag]
 
@@ -218,6 +258,26 @@ class FakeModularProceduresDB:
             raise KeyError("Modular procedure not found.")
         return [execution_tag for execution_tag, execution in self.executions.items()
                 if execution.procedure_tag == tag]
+
+    def set_execution_metrics(self, execution_tag, well_metrics, user_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        execution = self.executions[execution_tag]
+        output_positions = {w.position for w in execution.output_wells}
+        positions = [m.position for m in well_metrics]
+        if len(set(positions)) != len(positions):
+            raise ValueError("Duplicate metric positions are not allowed.")
+        for position in positions:
+            if position not in output_positions:
+                raise ValueError(f"Metrics were given for wells that are not output wells of this execution: {position}")
+        for metric in well_metrics:
+            if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
+                raise ValueError(f"Traits not found: {metric.trait_tag}")
+        execution.output_wells = [w.model_copy(update={"metrics":
+            list(w.metrics) + [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                               for m in well_metrics if m.position == w.position]})
+            for w in execution.output_wells]
+        return execution
 
 
 class FakeDB:
@@ -296,6 +356,10 @@ class TestModularProcedureRoutes:
         assert resp.status_code == 400
 
     def test_link_submission(self, client):
+        # subm-1 is open in proc-2 -> rejected; after being done there -> allowed
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 400
+        client.post("/api/procedures/proc-2/link/subm-1/done")
         resp = client.post("/api/procedures/proc-1/link/subm-1")
         assert resp.status_code == 200
         assert resp.json() is True
@@ -304,7 +368,7 @@ class TestModularProcedureRoutes:
         resp = client.get("/api/procedures/proc-2/submissions")
         assert resp.status_code == 200
         body = resp.json()
-        assert len(body) == 1
+        assert len(body) == 2
         assert body[0]["submission_tag"] == "subm-1"
         assert body[0]["created_at"] == 10.0
         assert body[0]["done"] is False
@@ -376,7 +440,7 @@ class TestModularProcedureExecutionRoutes:
         body = resp.json()
         assert body["tag"] == "exec-1"
         assert body["procedure_tag"] == "proc-2"
-        assert body["done_submission_tags"] == ["subm-1"]
+        assert body["done_submission_tags"] == ["subm-1", "subm-2"]
         assert len(body["input_wells"]) == 2
         assert body["input_wells"][0]["sample_tags"] == ["sample-1", "sample-2"]
         assert body["input_wells"][1]["output_positions"] == ["A1", "B1", "C1"]
@@ -505,3 +569,129 @@ class TestModularProcedureExecutionOccupancy:
             "input_wells": [{"position": "B1", "sample_tags": ["sample-2"], "output_positions": ["A1"]}],
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         assert second.status_code == 200
+
+class TestModularProcedureExecutionMetricsRoutes:
+    def test_execute_with_responsible_user_and_metrics(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "responsible_user_tag": "ijklmnop",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "output_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5}]})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["responsible_user_tag"] == "ijklmnop"
+        assert body["output_wells"][0]["metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 2.5}]
+
+    def test_execute_responsible_user_defaults_to_executing_user(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        assert resp.json()["responsible_user_tag"] == "abcdefgh"
+
+    def test_execute_with_missing_responsible_user_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "responsible_user_tag": "missing-user",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+
+    def test_execute_with_metrics_for_undefined_well_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "output_well_metrics": [{"position": "Z9", "trait_tag": "trait-ugul", "value": 1.0}]})
+        assert resp.status_code == 400
+
+    def test_set_metrics_after_execution(self, client):
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.post("/api/procedures/executions/exec-1/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.1}])
+        assert resp.status_code == 200
+        assert resp.json()["output_wells"][0]["metrics"][-1] == {"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 3.1}
+
+    def test_set_metrics_for_non_output_well_rejected(self, client):
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.post("/api/procedures/executions/exec-1/metrics",
+            json=[{"position": "B1", "trait_tag": "trait-ugul", "value": 3.1}])
+        assert resp.status_code == 400
+
+    def test_set_metrics_on_missing_execution_404(self, client):
+        resp = client.post("/api/procedures/executions/does-not-exist/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.1}])
+        assert resp.status_code == 404
+
+    def test_standard_user_rejected_on_set_metrics(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/executions/exec-1/metrics",
+                json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.1}])
+            assert resp.status_code == 403
+
+    def test_execute_with_unknown_trait_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "output_well_metrics": [{"position": "A1", "trait_tag": "missing-trait", "value": 1.0}]})
+        assert resp.status_code == 400
+        assert "Traits not found" in resp.json()["detail"]
+
+class TestModularProcedureMultipleSubmissions:
+    def test_multiple_submissions_linked_to_one_procedure(self, client):
+        resp = client.get("/api/procedures/proc-2/submissions")
+        assert resp.status_code == 200
+        assert [link["submission_tag"] for link in resp.json()] == ["subm-1", "subm-2"]
+
+    def test_execute_with_samples_from_multiple_submissions(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [
+                {"position": "A1", "sample_tags": ["sample-1", "sample-2"], "output_positions": ["A1"]},
+                {"position": "B1", "sample_tags": ["sample-3"], "output_positions": ["A1"]},
+            ],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        body = resp.json()
+        # both submissions own samples on the input plate -> both are done after the execution
+        assert body["done_submission_tags"] == ["subm-1", "subm-2"]
+
+    def test_execute_marks_only_submissions_with_input_samples_done(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [
+                {"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]},
+            ],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        assert resp.json()["done_submission_tags"] == ["subm-1"]
+
+class TestSingleOpenModuleConstraint:
+    def test_link_submission_with_open_link_elsewhere_rejected(self, client):
+        # subm-2 is linked to proc-2 and not done there -> must not be linkable to proc-1
+        resp = client.post("/api/procedures/proc-1/link/subm-2")
+        assert resp.status_code == 400
+        assert "one modular procedure at a time" in resp.json()["detail"]
+
+    def test_link_submission_after_done_allowed(self, client):
+        # subm-1 is linked to proc-2; mark it done there -> it can proceed to the next module
+        resp = client.post("/api/procedures/proc-2/link/subm-1/done")
+        assert resp.status_code == 200
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 200
+
+    def test_reopen_makes_link_block_again(self, client):
+        client.post("/api/procedures/proc-2/link/subm-1/done")
+        client.post("/api/procedures/proc-1/link/subm-1")
+        client.delete("/api/procedures/proc-2/link/subm-1/done")
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 400

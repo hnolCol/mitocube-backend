@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 from enum import Enum
 
 
@@ -77,12 +77,32 @@ class ExecutionOutputWellModel(BaseModel):
 
 
 
+class ExecutionWellMetricModel(BaseModel):
+    "A measured value of a single output well: the trait defines the measured quantity (e.g. u g/uL of the concentration attribute)."
+    position : str
+    trait_tag : str
+    value : float
+
+
+
+class ProcedureExecutionWellMetricModel(BaseModel):
+    "A stored well metric of a procedure execution: a value that is an instance of a trait (like condition values)."
+    trait_tag : str
+    attribute_tag : Optional[str] = None
+    value : float
+
+
+
 class InsertProcedureExecutionModel(BaseModel):
-    "The user input to execute a published modular procedure on a set of samples."
+    """The user input to execute a published modular procedure on a set of samples.
+    The responsible user defaults to the executing user; well metrics map measured
+    attributes (e.g. protein concentration) to output wells."""
     input_plate_tag : str
     output_plate_tag : str
+    responsible_user_tag : Optional[str] = None
     input_wells : List[ExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ExecutionOutputWellModel] = Field(default_factory=list)
+    output_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)  # [{position, trait_tag, value}]
 
 
 
@@ -103,6 +123,7 @@ class ProcedureExecutionOutputWellModel(BaseModel):
     column_index : int
     sample_tags : List[str] = Field(default_factory=list)
     condition_application_tags : List[str] = Field(default_factory=list)
+    metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
 
 
 
@@ -113,6 +134,7 @@ class ProcedureExecutionModel(BaseModel):
     input_plate_tag : str
     output_plate_tag : str
     user_tag : str
+    responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
     done_submission_tags : List[str] = Field(default_factory=list)
     input_wells : List[ProcedureExecutionInputWellModel] = Field(default_factory=list)
