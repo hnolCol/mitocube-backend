@@ -156,6 +156,11 @@ class FakeModularProceduresDB:
             raise ValueError("Modular procedure not found.")
         if submission_tag in [link.submission_tag for link in self.submission_links.get(tag, [])]:
             raise ValueError("Submission is already linked to this modular procedure.")
+        open_elsewhere = [link.procedure_tag for links in self.submission_procedures.values() for link in links
+                          if link.submission_tag == submission_tag and link.procedure_tag != tag and not link.done]
+        if len(open_elsewhere) > 0:
+            raise ValueError(f"Submission is not done in another modular procedure yet: {', '.join(open_elsewhere)}. "
+                             "A submission can only be linked to one modular procedure at a time.")
         self.linked.append((tag, submission_tag))
         return True
 
@@ -165,11 +170,23 @@ class FakeModularProceduresDB:
 
     def mark_done(self, tag, submission_tag, user_tag):
         self.done.append((tag, submission_tag, user_tag))
+        self._set_link_done(tag, submission_tag, True)
         return True
 
     def reopen(self, tag, submission_tag):
         self.reopened.append((tag, submission_tag))
+        self._set_link_done(tag, submission_tag, False)
         return True
+
+    def _set_link_done(self, tag, submission_tag, done):
+        for links in self.submission_procedures.values():
+            for link in links:
+                if link.procedure_tag == tag and link.submission_tag == submission_tag:
+                    link.done = done
+        for links in self.submission_links.values():
+            for link in links:
+                if link.procedure_tag == tag and link.submission_tag == submission_tag:
+                    link.done = done
 
     def get_submissions(self, tag):
         if tag not in self.procedures:
@@ -339,6 +356,10 @@ class TestModularProcedureRoutes:
         assert resp.status_code == 400
 
     def test_link_submission(self, client):
+        # subm-1 is open in proc-2 -> rejected; after being done there -> allowed
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 400
+        client.post("/api/procedures/proc-2/link/subm-1/done")
         resp = client.post("/api/procedures/proc-1/link/subm-1")
         assert resp.status_code == 200
         assert resp.json() is True
@@ -653,3 +674,24 @@ class TestModularProcedureMultipleSubmissions:
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         assert resp.status_code == 200
         assert resp.json()["done_submission_tags"] == ["subm-1"]
+
+class TestSingleOpenModuleConstraint:
+    def test_link_submission_with_open_link_elsewhere_rejected(self, client):
+        # subm-2 is linked to proc-2 and not done there -> must not be linkable to proc-1
+        resp = client.post("/api/procedures/proc-1/link/subm-2")
+        assert resp.status_code == 400
+        assert "one modular procedure at a time" in resp.json()["detail"]
+
+    def test_link_submission_after_done_allowed(self, client):
+        # subm-1 is linked to proc-2; mark it done there -> it can proceed to the next module
+        resp = client.post("/api/procedures/proc-2/link/subm-1/done")
+        assert resp.status_code == 200
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 200
+
+    def test_reopen_makes_link_block_again(self, client):
+        client.post("/api/procedures/proc-2/link/subm-1/done")
+        client.post("/api/procedures/proc-1/link/subm-1")
+        client.delete("/api/procedures/proc-2/link/subm-1/done")
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 400

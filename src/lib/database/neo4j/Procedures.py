@@ -256,6 +256,14 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="r", tag=tag, submission_tag=submission_tag, result_transformer_=Result.value)
         if len(already_linked) > 0 and already_linked[0]:
             raise ValueError("Submission is already linked to this modular procedure.")
+        open_elsewhere = self._driver.execute_query(
+            "MATCH (s:Submission {tag : $submission_tag})-[r:IN_PROCEDURE]->(m:ModularProcedure) "
+            "WHERE m.tag <> $tag AND r.done = false "
+            "RETURN collect(m.tag) as open_procedures",
+            routing_="r", tag=tag, submission_tag=submission_tag, result_transformer_=Result.value)
+        if len(open_elsewhere) > 0 and len(open_elsewhere[0]) > 0:
+            raise ValueError(f"Submission is not done in another modular procedure yet: {', '.join(open_elsewhere[0])}. "
+                             "A submission can only be linked to one modular procedure at a time.")
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
             "MATCH (s:Submission {tag : $submission_tag}) "
