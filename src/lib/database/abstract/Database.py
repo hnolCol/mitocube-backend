@@ -60,6 +60,7 @@ from lib.database.abstract.Impressum import ImpressumABC
 from lib.database.abstract.Plates import PlatesABC
 from lib.database.abstract.AttributeRequests import AttributeRequestsABC
 from lib.database.abstract.DepositionRequests import DepositionRequestsABC
+from lib.database.abstract.PATs import PATABC
 
 
 
@@ -139,6 +140,7 @@ class DatabaseABC(ABC):
     plates : PlatesABC = None
     attribute_requests : AttributeRequestsABC = None
     deposition_requests : DepositionRequestsABC = None
+    pats : PATABC = None
 
     def __init__(self):
         """The abstract database class that defines
@@ -339,6 +341,10 @@ class DatabaseABC(ABC):
             raise NotImplementedError("A database class must have the deposition_requests attribute defined.")
         if not isinstance(self.deposition_requests, DepositionRequestsABC):
             raise TypeError("The deposition_requests class must be an instance of the DepositionRequestsABC.")
+        if self.pats is None:
+            raise NotImplementedError("A database class must have the pats attribute defined.")
+        if not isinstance(self.pats, PATABC):
+            raise TypeError("The pats class must be an instance of the PATABC.")
 
     def submission_exists(self, tag : str) -> bool:
         """Checks if the tag is associated with a dataset. 

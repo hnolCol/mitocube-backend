@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file 
 from pydantic import EmailStr, DirectoryPath, HttpUrl, FilePath
 
-from typing import List
+from typing import List, Optional
 
 class General(BaseSettings):
     """Class model for general settings"""
@@ -22,7 +22,7 @@ class General(BaseSettings):
     frontend_build : DirectoryPath
     frontend_build_assets : DirectoryPath
     
-    use_terms_file : FilePath
+    use_terms_file : Optional[FilePath] = None
     require_pi_approval_for_collaboration_requests : bool = False
 
     explore_tag_search_enabled : bool = False

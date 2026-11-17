@@ -335,6 +335,8 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
 
 @router.get("/terms")
 def get_terms_of_use(user : UserModel = Depends(get_user_from_token)):
-    path_to_file = GENERAL_SETTINGS.use_terms_file 
+    path_to_file = GENERAL_SETTINGS.use_terms_file
+    if path_to_file is None:
+        return {}
     use_of_terms = read_json(path_to_file)
     return use_of_terms
