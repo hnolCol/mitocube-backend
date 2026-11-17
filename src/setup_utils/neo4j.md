@@ -601,6 +601,14 @@ cypher-shell
 STOP DATABASE neo4j;
 
 sudo docker exec -it neo4j-server neo4j-admin database dump neo4j --to-path=/data
+sudo docker exec -it neo4j-server neo4j-admin database dump neo4j ---to-path=/home/cloud/neo4j/backup --overwrite=true
+mkdir -p ~/neo4j/backup/2026-04-13
+sudo docker run --rm \
+    -v ~/neo4j/data:/data \
+    -v ~/neo4j/backup/2026-11-11:/backup \
+    --entrypoint neo4j-admin \
+    neo4j:5.26.26 \
+    database dump neo4j --to-path=/backup
 
 
 :use system

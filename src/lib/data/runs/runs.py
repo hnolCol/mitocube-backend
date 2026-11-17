@@ -415,7 +415,7 @@ class RunListCreator:
             scrambled_across_plates=self._scramble_across_plates,
             n_runs=len(runs),
             n_plates=n_plates,
-            dataset_label=self._dataset_label,
+            submission_tag=self._dataset_label,
             user_tag=self._user.tag,
             )
 

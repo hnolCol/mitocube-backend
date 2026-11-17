@@ -84,7 +84,7 @@ class RunListModel(BaseModel):
     tag : Optional[str] = None
     created_at : float = Field(...,default_factory=get_time_stamp)
     user_tag : Optional[str] = None #user that created the run list 
-    dataset_label : str 
+    submission_tag : str 
     n_runs : int 
     n_plates : int
     fractionated : bool = False
