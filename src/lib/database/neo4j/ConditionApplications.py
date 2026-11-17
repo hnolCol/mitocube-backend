@@ -129,6 +129,20 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else None
 
+    def get_proteins(self, tag : str) -> List[str]:
+        """
+        Return the protein tags affected by this condition application via its condition values
+        (e.g. knockdown, overexpression or immunoprecipitation targets).
+        """
+        if not self.exists(tag):
+            return []
+        query = (
+            "MATCH (ca:ConditionApplication {tag : $ca_tag})-[:HAS_VALUE*1..]->(cv:ConditionValue)-[:EFFECTS]->(p:Protein) "
+            "RETURN DISTINCT p.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", ca_tag=tag, result_transformer_=Result.value)
+        return r if r else []
+
 
     def extract_ca_item(self, item : ConditionApplicationTreeModel, add_separator = False) -> str:
         """Extracts the text representation of a condition application item recursively.

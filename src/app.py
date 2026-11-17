@@ -25,7 +25,7 @@ from services.external.pubmed import get_pubmed_ids_by_query, get_pubmed_publica
 
 from routers.dataset import correlation as submission_correlation # volcano
 from routers.submission import submission, comments, count, ca, metatext, quantifications, researchaim, ranking
-from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap, compare
+from routers.submission.analysis import pca, volcano, annotations as submission_annotations, heatmap, compare, qc
 from routers.submission import permissions as submissions_permissions
 from routers.submission import export as submission_export 
 from routers.submission import durations as submission_durations
@@ -171,6 +171,7 @@ router_sources = [policy_permissions,
                   metatexts,
                   openai,
                   pca,
+                  qc,
                   submission_annotations,
                   heatmap,
                   diseases,
