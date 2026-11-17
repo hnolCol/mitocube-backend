@@ -77,6 +77,67 @@ def get_consortiums_by_user(user_tag : str, user : UserModel = Depends(is_user_a
 
 
 
+@router.get("/terms/pending", summary="Returns the consortiums where the current user heads an eligible group without terms agreement.")
+def get_my_pending_terms_agreements(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
+    """
+    Returns the consortiums where the current user leads (as head/PI) an eligible research group
+    that has not yet agreed to the consortium terms. Until the head agrees, the users of the
+    group can neither share into nor see the submissions of the consortium.
+    """
+    return db.consortiums.find_pending_terms_for_head(user_tag = user.tag)
+
+
+@router.get("/user/pending-terms", summary="Returns the consortiums the current user is a member of where the terms are not agreed yet.")
+def get_my_consortiums_with_pending_terms(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the tags of the consortiums the current user is a direct member of where the head (PI)
+    of none of the users research groups agreed to the terms yet. Frontends use this to warn
+    affected members.
+    """
+    return db.consortiums.find_consortiums_with_pending_terms_for_user(user_tag = user.tag)
+
+
+@router.post("/{consortium_tag}/terms/{group_tag}",
+             summary="Agrees to the consortium terms for a research group. Requires the head (PI) of the group or a curator.")
+def agree_consortium_terms(consortium_tag : str, group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Records that the research group participates in the consortium: the head (PI) agrees to the
+    consortium terms. Only after this agreement the users of the group can share submissions
+    with the consortium and see its shared submissions.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if group_tag not in db.consortiums.get_groups(tag = consortium_tag):
+        raise HTTPException(status_code=404, detail=f"Research group with tag {group_tag} is not an eligible group of the consortium.")
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = group_tag):
+        raise HTTPException(status_code=403, detail="Only the head (PI) of the research group or a curator can agree to the consortium terms.")
+    return db.consortiums.agree_terms(consortium_tag = consortium_tag, group_tag = group_tag, user_tag = user.tag)
+
+
+@router.delete("/{consortium_tag}/terms/{group_tag}",
+               summary="Revokes the research groups agreement to the consortium terms. Requires the head (PI) of the group or a curator.")
+def revoke_consortium_terms(consortium_tag : str, group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Revokes the research groups agreement to the consortium terms. The users of the group can
+    then neither share submissions with the consortium nor see its shared submissions.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = group_tag):
+        raise HTTPException(status_code=403, detail="Only the head (PI) of the research group or a curator can revoke the consortium terms.")
+    ok = db.consortiums.revoke_terms(consortium_tag = consortium_tag, group_tag = group_tag)
+    if not ok:
+        raise HTTPException(status_code=404, detail="No terms agreement found for this research group and consortium.")
+    return True
+
+
+@router.get("/{consortium_tag}/terms", summary="Returns the eligible research groups that agreed to the consortium terms.")
+def get_consortium_terms_groups(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the tags of the eligible research groups whose head (PI) agreed to the consortium terms.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    return db.consortiums.get_terms_group_tags(consortium_tag = consortium_tag)
+
+
 @router.get("/requests/pending", summary="Returns the pending share requests the current user (as research group head) can approve.")
 def get_my_pending_share_requests(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     """"
@@ -335,6 +396,9 @@ def share_submission_with_consortium(consortium_tag : str, submission_tag : str,
     creator_tag = db.submissions.get_creator(tag = submission_tag)
     if user.tag != creator_tag and user.role < UserRolesEnum.CURATOR:
         raise HTTPException(status_code=403, detail="Only the owner of the submission can share it with a consortium.")
+    if user.role < UserRolesEnum.CURATOR and not db.consortiums.user_has_terms(consortium_tag = consortium_tag, user_tag = user.tag):
+        raise HTTPException(status_code=403, detail="The head (PI) of your research group has not yet agreed to the consortium terms. "
+                                                    "Until then you cannot share submissions with this consortium.")
     immediate = user.role >= UserRolesEnum.CURATOR or db.research_groups.is_head(user_tag = user.tag)
     return db.consortiums.share_submission(consortium_tag = consortium_tag, submission_tag = submission_tag,
                                            user_tag = user.tag, approved = immediate)

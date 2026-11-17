@@ -2495,8 +2495,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             for submission_tag in submission_tags:
                 tags.add(submission_tag) 
         ##add submission tags that are shared with a consortium the user is a direct member of
+        ##and whose terms were agreed by the head (PI) of one of the users research groups
         if self._consortiums is not None:
-            consortium_tags = self._consortiums.find_by_user(user_tag = current_user_tag, limit = None)
+            consortium_tags = self._consortiums.find_by_user_with_terms(user_tag = current_user_tag, limit = None)
             for consortium_tag in consortium_tags:
                 for submission_tag in self._consortiums.get_submission_tags(tag = consortium_tag):
                     tags.add(submission_tag)       
@@ -2535,7 +2536,9 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             "RETURN "
             "  EXISTS { (u)-[:CREATED|COLLABORATES]->(submission) } "
             "  OR EXISTS { (u)-[:MEMBER_OF]->(:ResearchGroup)<-[:MEMBER_OF]-(:User)-[:CREATED]->(submission) } "
-            "  OR EXISTS { (u)-[:MEMBER_OF]->(:Consortium)<-[share:SHARED_WITH]-(submission) WHERE share.status = 'approved' } "
+            "  OR EXISTS { MATCH (u)-[:MEMBER_OF]->(c:Consortium)<-[share:SHARED_WITH]-(submission) "
+            "              WHERE share.status = 'approved' "
+            "              AND EXISTS { MATCH (u)-[:MEMBER_OF]->(:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) } } "
             "  OR EXISTS { MATCH (submission)-[r:IN_STATE]->(s:State {tag: $published_state}) "
             "              WHERE NOT EXISTS { (submission)-[r2:IN_STATE]->(:State) WHERE r2.created_at > r.created_at } } "
             "AS has_access "

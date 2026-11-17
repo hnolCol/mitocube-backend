@@ -51,6 +51,34 @@ class ConsortiumABC(ABC):
         """Returns the tags of all consortiums the user is a direct member of"""
 
     @abstractmethod
+    def find_by_user_with_terms(self, user_tag : str, limit : int = 40) -> List[str]:
+        """Returns the tags of all consortiums the user is a member of and whose terms were agreed by the users groups"""
+
+    @abstractmethod
+    def get_terms_group_tags(self, consortium_tag : str) -> List[str]:
+        """Returns the tags of the eligible research groups that agreed to the consortium terms"""
+
+    @abstractmethod
+    def agree_terms(self, consortium_tag : str, group_tag : str, user_tag : str) -> bool:
+        """Records the research groups agreement to the consortium terms"""
+
+    @abstractmethod
+    def revoke_terms(self, consortium_tag : str, group_tag : str) -> bool:
+        """Revokes the research groups agreement to the consortium terms"""
+
+    @abstractmethod
+    def user_has_terms(self, consortium_tag : str, user_tag : str) -> bool:
+        """Checks if one of the users research groups agreed to the consortium terms"""
+
+    @abstractmethod
+    def find_pending_terms_for_head(self, user_tag : str) -> List[Dict]:
+        """Returns the consortiums where the user heads an eligible group without terms agreement"""
+
+    @abstractmethod
+    def find_consortiums_with_pending_terms_for_user(self, user_tag : str) -> List[str]:
+        """Returns the consortiums the user is a member of where none of their groups agreed to the terms"""
+
+    @abstractmethod
     def insert_groups(self, tag : str, group_tags : List[str], user_tag : str = None):
         """Adds research groups to the consortium as eligible groups and joins their heads (PIs) as members"""
 

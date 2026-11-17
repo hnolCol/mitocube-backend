@@ -15,6 +15,8 @@ from tests.conftest import *  # noqa: F401,F403 - sets the test env vars
 
 import pytest
 
+from config.enums.users.roles import UserRolesEnum
+
 
 @pytest.fixture(autouse=True)
 def no_scope_cache(monkeypatch):
@@ -163,6 +165,71 @@ class TestMembershipRequests:
         driver = ScriptedDriver(responses=[("RETURN u.tag AS user_tag", records)])
         db = make_db(driver)
         assert db.get_pending_membership_requests() == records
+
+
+class TestConsortiumTerms:
+    def test_agree_terms_creates_terms_relation(self):
+        driver = ScriptedDriver()
+        db = make_db(driver)
+        assert db.agree_terms("cons-1", "rg-1", user_tag="pi-1") is True
+        agree = [q for q in driver.queries if "CONSORTIUM_TERMS" in q and "MERGE" in q]
+        assert len(agree) == 1
+        assert "t.agreed_by = $user_tag" in agree[0]
+
+    def test_revoke_terms_deletes_terms_relation(self):
+        driver = ScriptedDriver()
+        db = make_db(driver)
+        assert db.revoke_terms("cons-1", "rg-1") is True
+        assert any("CONSORTIUM_TERMS" in q and "DELETE t" in q for q in driver.queries)
+
+    def test_user_has_terms_checks_group_agreement(self):
+        driver = ScriptedDriver(responses=[("RETURN EXISTS {", [True])])
+        db = make_db(driver)
+        assert db.user_has_terms("cons-1", "u-1") is True
+        check = [q for q in driver.queries if "CONSORTIUM_TERMS" in q]
+        assert len(check) == 1
+        assert "(u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c)" in check[0]
+
+    def test_find_by_user_with_terms_excludes_unagreed_consortiums(self):
+        driver = ScriptedDriver(responses=[("RETURN DISTINCT c.tag", [["cons-1", 123]])])
+        db = make_db(driver)
+        assert db.find_by_user_with_terms(user_tag="u-1", limit=None) == ["cons-1"]
+        query = [q for q in driver.queries if "CONSORTIUM_TERMS" in q][0]
+        assert "WHERE EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) }" in query
+
+    def test_find_pending_terms_for_head_returns_records(self):
+        records = [{"group_tag": "rg-1", "consortium_tag": "cons-1"}]
+        driver = ScriptedDriver(responses=[("RETURN rg.tag AS group_tag", records)])
+        db = make_db(driver)
+        assert db.find_pending_terms_for_head("pi-1") == records
+
+    def test_find_consortiums_with_pending_terms_for_user_returns_tags(self):
+        driver = ScriptedDriver(responses=[("RETURN DISTINCT c.tag", ["cons-1"])])
+        db = make_db(driver)
+        assert db.find_consortiums_with_pending_terms_for_user("u-1") == ["cons-1"]
+
+    def test_remove_groups_also_deletes_terms_relation(self):
+        driver = ScriptedDriver(responses=[("RETURN DISTINCT d.tag", [])])
+        db = make_db(driver)
+        db.remove_groups(tag="cons-1", group_tags=["rg-1"])
+        assert any("CONSORTIUM_TERMS" in q and "DELETE t" in q for q in driver.queries)
+
+
+class TestSubmissionScopeRequiresTerms:
+    def test_has_user_access_requires_terms_agreement(self):
+        from lib.database.neo4j.Submission import Neo4JSubmissionFilter
+        db = Neo4JSubmissionFilter.__new__(Neo4JSubmissionFilter)
+        captured = {}
+        def fake_execute(query, *args, **kwargs):
+            captured["query"] = query
+            return [True]
+        db._driver = type("FakeDriver", (), {"execute_query": staticmethod(fake_execute)})()
+        db._users = type("FakeUsers", (), {
+            "exists": staticmethod(lambda tag: True),
+            "get_user_by_tag": staticmethod(lambda tag: type("U", (), {"role": UserRolesEnum.STANDARD})()),
+        })()
+        db.has_user_access("u-1", "subm-1")
+        assert "CONSORTIUM_TERMS" in captured["query"]
 
 
 class TestDirectMembershipReads:

@@ -205,3 +205,14 @@ class TestConsortiumWrites:
         db = make_consortium_db()
         db.deny_membership_request("cons-1", "u-1")
         assert recording_scope_cache.invalidated_all == 0
+
+    def test_agree_terms_invalidates_namespace(self, recording_scope_cache):
+        db = make_consortium_db()
+        db.exists = lambda tag: True
+        db.agree_terms("cons-1", "rg-1", user_tag="pi-1")
+        assert recording_scope_cache.invalidated_all == 1
+
+    def test_revoke_terms_invalidates_namespace(self, recording_scope_cache):
+        db = make_consortium_db()
+        db.revoke_terms("cons-1", "rg-1")
+        assert recording_scope_cache.invalidated_all == 1
