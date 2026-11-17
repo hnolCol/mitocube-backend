@@ -45,6 +45,11 @@ class PATABC(ABC):
         -------
         Tuple[PATResponseModel, str]
             The token metadata and the plain token (shown exactly once).
+
+        Raises
+        ------
+        ValueError
+            If the user does not exist or token creation is blocked for the user.
         """
 
     @abstractmethod
@@ -75,6 +80,33 @@ class PATABC(ABC):
         -------
         bool
             True if a token was revoked.
+        """
+
+    @abstractmethod
+    def revoke_by_admin(self, pat_tag : str, revoked_by : str) -> bool:
+        """Revokes any PAT and records which admin revoked it.
+
+        Parameters
+        ----------
+        pat_tag : str
+            The tag of the token to revoke.
+        revoked_by : str
+            The tag of the admin performing the revocation.
+
+        Returns
+        -------
+        bool
+            True if an active token was revoked.
+        """
+
+    @abstractmethod
+    def set_creation_blocked(self, user_tag : str, blocked : bool) -> bool:
+        """Blocks or unblocks PAT creation for the user.
+
+        Returns
+        -------
+        bool
+            True if the user exists and the flag was set.
         """
 
     @abstractmethod

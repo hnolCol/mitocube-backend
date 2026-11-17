@@ -39,6 +39,14 @@ class Neo4JPATs(PATABC):
         return r[0]
 
     def create(self, user_tag : str, name : str, scopes : List[str], expires_at_epochmillis : int) -> Tuple[PATResponseModel, str]:
+        blocked = self._driver.execute_query(
+            "MATCH (u:User {tag : $user_tag}) "
+            "RETURN coalesce(u.pat_creation_blocked, false) AS blocked ",
+            routing_="r", user_tag=user_tag, result_transformer_=Result.value)
+        if len(blocked) == 0:
+            raise ValueError(f"User with tag '{user_tag}' not found.")
+        if blocked[0]:
+            raise ValueError(f"Personal access token creation is blocked for user '{user_tag}'.")
         token = generate_pat_token()
         props = {
             "tag": self._unique_tag(),
@@ -87,6 +95,27 @@ class Neo4JPATs(PATABC):
             "RETURN count(t) AS n "
         )
         r = self._driver.execute_query(query, routing_="w", user_tag=user_tag, pat_tag=pat_tag,
+                                       result_transformer_=Result.value)
+        return r[0] > 0
+
+    def revoke_by_admin(self, pat_tag : str, revoked_by : str) -> bool:
+        query = (
+            "MATCH (t:PAT {tag : $pat_tag}) "
+            "WHERE t.revoked = false "
+            "SET t.revoked = true, t.revoked_by = $revoked_by, t.revoked_at = timestamp() "
+            "RETURN count(t) AS n "
+        )
+        r = self._driver.execute_query(query, routing_="w", pat_tag=pat_tag, revoked_by=revoked_by,
+                                       result_transformer_=Result.value)
+        return r[0] > 0
+
+    def set_creation_blocked(self, user_tag : str, blocked : bool) -> bool:
+        query = (
+            "MATCH (u:User {tag : $user_tag}) "
+            "SET u.pat_creation_blocked = $blocked "
+            "RETURN count(u) AS n "
+        )
+        r = self._driver.execute_query(query, routing_="w", user_tag=user_tag, blocked=blocked,
                                        result_transformer_=Result.value)
         return r[0] > 0
 

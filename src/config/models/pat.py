@@ -21,6 +21,13 @@ class PATResponseModel(BaseModel):
     expires_at : int
     last_used_at : Optional[int] = None
     revoked : bool
+    revoked_by : Optional[str] = None
+    revoked_at : Optional[int] = None
+
+
+class PATCreationBlockModel(BaseModel):
+    """Body for toggling the personal access token creation of a user."""
+    blocked : bool
 
 
 class PATCreatedResponseModel(PATResponseModel):

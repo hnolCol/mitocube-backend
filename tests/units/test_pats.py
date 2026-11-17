@@ -26,12 +26,22 @@ class FakePATs:
     def __init__(self, record=None):
         self.record = record
         self.touched = []
+        self.admin_revocations = []
+        self.creation_blocked = {}
 
     def get_by_hash(self, token_hash):
         return self.record
 
     def touch(self, pat_tag):
         self.touched.append(pat_tag)
+
+    def revoke_by_admin(self, pat_tag, revoked_by):
+        self.admin_revocations.append((pat_tag, revoked_by))
+        return True
+
+    def set_creation_blocked(self, user_tag, blocked):
+        self.creation_blocked[user_tag] = blocked
+        return True
 
 
 class FakeUsers:
@@ -135,3 +145,34 @@ class TestGetCuratorOrQCUploadPAT:
         monkeypatch.setattr(pats_service, "is_user_at_least_curator", lambda user: user)
         user = pats_service.get_curator_or_qc_upload_pat(self.make_request("some.jwt.token"), db=db)
         assert user.tag == "abcdefgh"
+
+
+class TestAdminEndpoints:
+    def test_admin_revoke_records_admin(self):
+        db = FakeDB(None, FakeUser())
+        import routers.authentication.pats as pats_router
+        result = pats_router.revoke_pat_as_admin("pat_abc12345", user=FakeUser(tag="admin1"), db=db)
+        assert result["revoked_by"] == "admin1"
+        assert db.pats.admin_revocations == [("pat_abc12345", "admin1")]
+
+    def test_set_creation_blocked(self):
+        db = FakeDB(None, FakeUser())
+        import routers.authentication.pats as pats_router
+        result = pats_router.set_pat_creation_blocked("abcdefgh", props=pats_router.PATCreationBlockModel(blocked=True),
+                                                      user=FakeUser(tag="admin1"), db=db)
+        assert result["creation_blocked"] is True
+        assert db.pats.creation_blocked["abcdefgh"] is True
+
+    def test_create_maps_blocked_to_403(self):
+        db = FakeDB(None, FakeUser())
+        import routers.authentication.pats as pats_router
+
+        class BlockedStore:
+            def create(self, **kwargs):
+                raise ValueError("Personal access token creation is blocked for user 'abcdefgh'.")
+
+        db.pats = BlockedStore()
+        with pytest.raises(HTTPException) as e:
+            pats_router.create_pat(props=pats_router.PATInsertModel(name="x", scopes=[PATScopeEnum.QC_UPLOAD]),
+                                   user=FakeUser(), db=db)
+        assert e.value.status_code == 403
