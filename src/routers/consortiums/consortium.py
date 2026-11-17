@@ -77,6 +77,67 @@ def get_consortiums_by_user(user_tag : str, user : UserModel = Depends(is_user_a
 
 
 
+@router.get("/terms/pending", summary="Returns the consortiums where the current user heads an eligible group without terms agreement.")
+def get_my_pending_terms_agreements(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
+    """
+    Returns the consortiums where the current user leads (as head/PI) an eligible research group
+    that has not yet agreed to the consortium terms. Until the head agrees, the users of the
+    group can neither share into nor see the submissions of the consortium.
+    """
+    return db.consortiums.find_pending_terms_for_head(user_tag = user.tag)
+
+
+@router.get("/user/pending-terms", summary="Returns the consortiums the current user is a member of where the terms are not agreed yet.")
+def get_my_consortiums_with_pending_terms(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the tags of the consortiums the current user is a direct member of where the head (PI)
+    of none of the users research groups agreed to the terms yet. Frontends use this to warn
+    affected members.
+    """
+    return db.consortiums.find_consortiums_with_pending_terms_for_user(user_tag = user.tag)
+
+
+@router.post("/{consortium_tag}/terms/{group_tag}",
+             summary="Agrees to the consortium terms for a research group. Requires the head (PI) of the group or a curator.")
+def agree_consortium_terms(consortium_tag : str, group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Records that the research group participates in the consortium: the head (PI) agrees to the
+    consortium terms. Only after this agreement the users of the group can share submissions
+    with the consortium and see its shared submissions.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if group_tag not in db.consortiums.get_groups(tag = consortium_tag):
+        raise HTTPException(status_code=404, detail=f"Research group with tag {group_tag} is not an eligible group of the consortium.")
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = group_tag):
+        raise HTTPException(status_code=403, detail="Only the head (PI) of the research group or a curator can agree to the consortium terms.")
+    return db.consortiums.agree_terms(consortium_tag = consortium_tag, group_tag = group_tag, user_tag = user.tag)
+
+
+@router.delete("/{consortium_tag}/terms/{group_tag}",
+               summary="Revokes the research groups agreement to the consortium terms. Requires the head (PI) of the group or a curator.")
+def revoke_consortium_terms(consortium_tag : str, group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Revokes the research groups agreement to the consortium terms. The users of the group can
+    then neither share submissions with the consortium nor see its shared submissions.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = group_tag):
+        raise HTTPException(status_code=403, detail="Only the head (PI) of the research group or a curator can revoke the consortium terms.")
+    ok = db.consortiums.revoke_terms(consortium_tag = consortium_tag, group_tag = group_tag)
+    if not ok:
+        raise HTTPException(status_code=404, detail="No terms agreement found for this research group and consortium.")
+    return True
+
+
+@router.get("/{consortium_tag}/terms", summary="Returns the eligible research groups that agreed to the consortium terms.")
+def get_consortium_terms_groups(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the tags of the eligible research groups whose head (PI) agreed to the consortium terms.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    return db.consortiums.get_terms_group_tags(consortium_tag = consortium_tag)
+
+
 @router.get("/requests/pending", summary="Returns the pending share requests the current user (as research group head) can approve.")
 def get_my_pending_share_requests(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
     """"
@@ -156,32 +217,154 @@ def get_consortium_groups(consortium_tag : str, user : UserModel = Depends(get_u
 @router.get("/{consortium_tag}/users")
 def get_consortium_users(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     """"
-    Returns the user tags of all users that are members of the consortiums research groups.
+    Returns the user tags of all users that are direct members of the consortium.
     """
     _check_consortium_exists(consortium_tag, db)
     return db.consortiums.get_user_tags(tag = consortium_tag)
 
 
+@router.get("/{consortium_tag}/eligible-users", summary="Returns the users of the consortiums eligible research groups.")
+def get_consortium_eligible_users(consortium_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """
+    Returns the user tags of all users that are members of the consortiums eligible research groups.
+    These users can be added as direct members by curators/admins or via PI membership requests.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    return db.consortiums.get_eligible_user_tags(tag = consortium_tag)
+
+
+@router.post("/{consortium_tag}/users", summary="Adds users as direct members of a consortium. Requires at least curator rights.")
+def insert_users_to_consortium(consortium_tag : str, user_tags : List[str], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Adds users as direct members of a consortium. A user can only be added if they are a member
+    of an eligible research group whose head (PI) is a member of the consortium.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    for member_tag in user_tags:
+        if not db.users.exists(member_tag):
+            raise HTTPException(status_code=404, detail=f"User with tag {member_tag} not found")
+    try:
+        db.consortiums.insert_users(tag = consortium_tag, user_tags = user_tags, user_tag = user.tag)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return True
+
+
+@router.delete("/{consortium_tag}/users", summary="Removes direct user memberships from a consortium. Requires at least curator rights.")
+def remove_users_from_consortium(consortium_tag : str, user_tags : List[str], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Removes direct user memberships from a consortium. Removing a head (PI) is blocked while
+    other members depend on them.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    try:
+        db.consortiums.remove_users(tag = consortium_tag, user_tags = user_tags)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return True
+
+
 @router.post("/{consortium_tag}/groups", summary="Adds research groups to a consortium. Requires at least curator rights.")
 def insert_groups_to_consortium(consortium_tag : str, group_tags : List[str], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """"
-    Adds research groups to a consortium. Requires at least curator rights.
+    Adds research groups to a consortium as eligible groups. The heads (PIs) of the groups
+    automatically become direct members of the consortium.
     """
     _check_consortium_exists(consortium_tag, db)
     for group_tag in group_tags:
         if not db.research_groups.exists(tag = group_tag):
             raise HTTPException(status_code=404, detail=f"Research group with tag {group_tag} not found")
-    db.consortiums.insert_groups(tag = consortium_tag, group_tags = group_tags)
+    try:
+        db.consortiums.insert_groups(tag = consortium_tag, group_tags = group_tags, user_tag = user.tag)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return True
 
 
 @router.delete("/{consortium_tag}/groups", summary="Removes research groups from a consortium. Requires at least curator rights.")
 def remove_groups_from_consortium(consortium_tag : str, group_tags : List[str], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     """"
-    Removes research groups from a consortium. Requires at least curator rights.
+    Removes research groups from a consortium. Blocked while members of the group have no other
+    eligible group in the consortium.
     """
     _check_consortium_exists(consortium_tag, db)
-    db.consortiums.remove_groups(tag = consortium_tag, group_tags = group_tags)
+    try:
+        db.consortiums.remove_groups(tag = consortium_tag, group_tags = group_tags)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return True
+
+
+@router.post("/{consortium_tag}/requests/users/{user_tag}",
+             summary="Creates a pending membership request for a user. Requires a head (PI) of one of the users research groups.")
+def create_membership_request(consortium_tag : str, user_tag : str, kind : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Creates a pending membership request (kind 'add' or 'remove') for a user of a research group
+    the requesting user leads (as head/PI). The request must be approved by a curator before it
+    takes effect.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    if kind not in ("add", "remove"):
+        raise HTTPException(status_code=400, detail="kind must be 'add' or 'remove'.")
+    if not db.users.exists(user_tag):
+        raise HTTPException(status_code=404, detail=f"User with tag {user_tag} not found")
+    if user.role < UserRolesEnum.CURATOR:
+        if not db.consortiums.is_head_of_user_in_consortium(head_tag = user.tag, user_tag = user_tag, consortium_tag = consortium_tag):
+            raise HTTPException(status_code=403, detail="Only a head (PI) of one of the users research groups can request consortium membership changes.")
+    member_tags = db.consortiums.get_user_tags(tag = consortium_tag)
+    if kind == "add" and user_tag in member_tags:
+        raise HTTPException(status_code=409, detail="User is already a member of the consortium.")
+    if kind == "remove" and user_tag not in member_tags:
+        raise HTTPException(status_code=409, detail="User is not a member of the consortium.")
+    return db.consortiums.insert_membership_request(consortium_tag = consortium_tag, user_tag = user_tag,
+                                                    kind = kind, requested_by = user.tag)
+
+
+@router.get("/requests/membership/pending", summary="Returns all pending membership requests. Requires at least curator rights.")
+def get_pending_membership_requests(user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
+    """
+    Returns all pending consortium membership requests.
+    """
+    return db.consortiums.get_pending_membership_requests()
+
+
+@router.get("/requests/membership", summary="Returns the pending membership requests that concern the current user (as head/PI).")
+def get_my_pending_membership_requests(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
+    """
+    Returns the pending consortium membership requests that concern users of the research groups
+    the current user leads (as head/PI) or that the current user filed themselves.
+    """
+    return db.consortiums.get_pending_membership_requests_for_head(user_tag = user.tag)
+
+
+@router.post("/requests/{consortium_tag}/membership/{user_tag}/approve",
+             summary="Approves a pending membership request. Requires at least curator rights.")
+def approve_membership_request(consortium_tag : str, user_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Approves a pending consortium membership request. An 'add' request adds the user as a direct
+    member, a 'remove' request removes their membership.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    try:
+        ok = db.consortiums.approve_membership_request(consortium_tag = consortium_tag, user_tag = user_tag,
+                                                        decided_by = user.tag)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if not ok:
+        raise HTTPException(status_code=404, detail="No pending membership request found for this user and consortium.")
+    return True
+
+
+@router.post("/requests/{consortium_tag}/membership/{user_tag}/deny",
+             summary="Denies a pending membership request. Requires at least curator rights.")
+def deny_membership_request(consortium_tag : str, user_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """
+    Denies a pending consortium membership request. The pending relation is removed.
+    """
+    _check_consortium_exists(consortium_tag, db)
+    ok = db.consortiums.deny_membership_request(consortium_tag = consortium_tag, user_tag = user_tag)
+    if not ok:
+        raise HTTPException(status_code=404, detail="No pending membership request found for this user and consortium.")
     return True
 
 
@@ -213,6 +396,9 @@ def share_submission_with_consortium(consortium_tag : str, submission_tag : str,
     creator_tag = db.submissions.get_creator(tag = submission_tag)
     if user.tag != creator_tag and user.role < UserRolesEnum.CURATOR:
         raise HTTPException(status_code=403, detail="Only the owner of the submission can share it with a consortium.")
+    if user.role < UserRolesEnum.CURATOR and not db.consortiums.user_has_terms(consortium_tag = consortium_tag, user_tag = user.tag):
+        raise HTTPException(status_code=403, detail="The head (PI) of your research group has not yet agreed to the consortium terms. "
+                                                    "Until then you cannot share submissions with this consortium.")
     immediate = user.role >= UserRolesEnum.CURATOR or db.research_groups.is_head(user_tag = user.tag)
     return db.consortiums.share_submission(consortium_tag = consortium_tag, submission_tag = submission_tag,
                                            user_tag = user.tag, approved = immediate)
