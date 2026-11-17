@@ -29,6 +29,10 @@ class General(BaseSettings):
 
     ticket_attachment_max_size_mb : int = 10
 
+    """Expose the OpenAPI schema and ReDoc endpoint at /api/doc. Only enable
+    in development; production deployments should keep this disabled."""
+    docs_enabled : bool = False
+
     """If True, the submissions explore endpoint additionally accepts ca_tags and
     user_tags filter parameters and the explore search allows searching by
     condition applications and users. If False, tag parameters are rejected."""

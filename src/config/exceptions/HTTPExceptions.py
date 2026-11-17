@@ -1,11 +1,6 @@
 from fastapi.exceptions import HTTPException
 from fastapi import status
 
-share_token_pw_incorrect = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate the share token password.",
-        headers={"WWW-Authenticate": "Bearer"})
-
 credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials. User not found or password incorrect.",

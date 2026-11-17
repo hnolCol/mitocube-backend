@@ -7,8 +7,6 @@ sys.path.insert(0, str(SRC_DIR))
 
 TEST_ENV = {
     "jwt_key": "test-jwt-key-not-for-production",
-    "jwt_share_key": "test-share-key-not-for-production",
-    "share_token_pw": "test-share-pw",
     "MFA_ENCRYPTION_KEY": "MuelleVfjEo1BUsHRtKSsAhF-8VkRY-tCTsNFgaAngs=",
     "frontend_build": str(SRC_DIR),
     "frontend_build_assets": str(SRC_DIR),

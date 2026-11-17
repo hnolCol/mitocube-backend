@@ -4,7 +4,7 @@ from typing import Annotated
 
 from pydantic_settings import BaseSettings
 from config.settings.env import get_env_file 
-from pydantic import SecretStr, Field, BeforeValidator, AliasChoices
+from pydantic import SecretStr, Field, BeforeValidator
 
 def _duration_from_hours(value):
     if isinstance(value, str) and value.strip().isdigit():
@@ -36,36 +36,9 @@ class UserToken(BaseSettings):
         
 
 
-class ShareToken(BaseSettings):
-    """
-    Share tokens are used to push performance data
-    or datasets to the application.
-    The BaseSettings define the security settings. 
-    """
-    expires_after_hours : HoursDuration = Field(default=timedelta(days=120), validation_alias=AliasChoices("SHARE_EXPIRES_AFTER_HOURS", "share_expires_after_hours")) #4 months 
-    jwt_share_key : SecretStr = Field(
-        ...,
-        description="JWT share key - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --jwt"
-    )
-    share_token_pw : SecretStr = Field(
-        ...,
-        description="Share token password - REQUIRED, no default for security. Generate with: python -m config.secrets.generator --password"
-    )
-    jwt_algorithm : str = "HS256"
-
-    class Config:
-        env_file = get_env_file()
-        extra = "ignore"
-        case_sensitive = False
-
-
 @lru_cache()
 def get_user_token_settings():
     return UserToken()
-
-@lru_cache()
-def get_share_token_settings():
-    return ShareToken()
 
 
 class MFASettings(BaseSettings):

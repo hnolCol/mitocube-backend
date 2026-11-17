@@ -14,10 +14,6 @@ class TokenVerificationCode(BaseModel):
     """Validation Code for Specific UserModel Token"""
     verification_code : str #= Field(...,default_factory=lambda : get_random_string(N = 12))
 
-class ShareTokenPassword(BaseModel):
-    """"""
-    pw : str
-
 class TokenResponse(BaseModel):
     """Response Model for a valid login."""
     success : bool 

@@ -11,14 +11,13 @@ from typing import List
 from datetime import datetime, timedelta
 
 from config.settings.encryption import Encryption
-from config.settings.token import get_user_token_settings, get_share_token_settings
+from config.settings.token import get_user_token_settings
 from config.exceptions.HTTPExceptions import credentials_exception, verification_code_missing
 from services.date import get_current_datetime
 
 #load encryption settings
 encryption_settings = Encryption()
 user_token_settings = get_user_token_settings()
-SHARE_TOKEN_SETTINGS = get_share_token_settings()
 pwd_context = CryptContext(
         schemes=[encryption_settings.hash_algorithm], 
         deprecated="auto")
@@ -26,8 +25,6 @@ pwd_context = CryptContext(
 oauth2_scheme_validate = OAuth2PasswordBearer(tokenUrl="api/auth/token/verify", auto_error=False)
 #scheme to create token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="", auto_error=False)
-#scheme to create share token
-oauth2_scheme_share = OAuth2PasswordBearer(tokenUrl="api/auth/token/share", auto_error=False)
 #oauth2_scheme_user = OAuth2PasswordBearer(tokenUrl="api/user", auto_error=False)
 
 
@@ -86,7 +83,6 @@ def verify_password(plain_password : str, password_hash : str) -> bool:
 def create_access_token(data: dict, 
                         key_subset: List[str] = None, 
                         add_dict: dict = None,
-                        share_token: bool = False,
                         expires_delta: timedelta = None) -> str:
     """
     Encodes data (dict) in a jwt token using the jwt secret key.
@@ -100,8 +96,6 @@ def create_access_token(data: dict,
     add_dict : dict, default None 
         Data that should be added to the actual data. 
         Convenient to avoid merging of dicts before. 
-    share_token : bool, default False
-        If the access_token should is a share token and not a simple login token. 
     expires_delta : timedelta, default None
         Overrides the default token lifetime (user_token_settings.expires_after_hours).
         Use for shorter-lived tokens, e.g. pending MFA verification.
@@ -127,41 +121,12 @@ def create_access_token(data: dict,
             to_encode[k] = v
 
     current_time = get_current_datetime()
-
-    if share_token:
-        return create_share_token(to_encode, current_time)
-    else:
-        expire = current_time + (expires_delta or user_token_settings.expires_after_hours)
-        to_encode["exp"] = expire
-
-        return jwt.encode(to_encode,
-                        user_token_settings.jwt_key.get_secret_value(), 
-                        algorithm=user_token_settings.jwt_algorithm)
-
-def create_share_token(to_encode : dict, current_time : datetime) -> str:
-    """Create a share token.
-
-    Parameters
-    ----------
-    to_encode : dict
-        The data to include in the token. Please note that the key 'exp' is reserved and
-        will be overwritten to provide an expiration date of the token. 
-    current_time : datetime
-        The current time. The timedelta in the share_token_settings is added
-        until the token is valid. 
-
-    Returns
-    -------
-    str
-        Encoded token. 
-    """
-     
-    expire = current_time + SHARE_TOKEN_SETTINGS.expires_after_hours
-
+    expire = current_time + (expires_delta or user_token_settings.expires_after_hours)
     to_encode["exp"] = expire
+
     return jwt.encode(to_encode,
-                    SHARE_TOKEN_SETTINGS.jwt_share_key.get_secret_value(), 
-                    algorithm=SHARE_TOKEN_SETTINGS.jwt_algorithm)
+                    user_token_settings.jwt_key.get_secret_value(), 
+                    algorithm=user_token_settings.jwt_algorithm)
 
 def get_decoded_token(token : str = Depends(oauth2_scheme)):
     "Decodes token from HTTP request"
@@ -169,10 +134,6 @@ def get_decoded_token(token : str = Depends(oauth2_scheme)):
 
 def get_decoded_token_for_verification(token = Depends(oauth2_scheme_validate)):
     "Decodes token from HTTP request"
-    return decode_token(token)
-
-def get_decoded_share_token(token : str = Depends(oauth2_scheme_share)):
-    """Decodes token from HTTP request for sharing qc data"""
     return decode_token(token)
 
 def decode_token(token : str) -> dict:
@@ -223,22 +184,5 @@ def check_for_verification_code_in_token(decoded_token = Depends(get_decoded_tok
     if "verification_code" not in decoded_token:
         raise verification_code_missing
     return decoded_token
-
-
-
-def check_share_token_password(plainPassword : str) -> bool:
-    """Checks if the share token password is correct.
-
-    Parameters
-    ----------
-    plainPassword : str
-        The password in as a plain string. Usually the input from a post request. 
-
-    Returns
-    -------
-    bool
-        If the password matches the share_token_pw from the settings. 
-    """
-    return SHARE_TOKEN_SETTINGS.share_token_pw.get_secret_value() == plainPassword
    
     

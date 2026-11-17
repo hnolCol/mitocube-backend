@@ -4,6 +4,7 @@ from lib.database.abstract.Database import DatabaseABC
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 import pyotp
+import secrets
 
 from config.models.user import UserModel
 from config.models.token.token import TokenVerificationCode, TokenResponse, TokenValidResponse
@@ -14,7 +15,7 @@ from services.date import get_time_stamp
 from services.mail import send_email_in_background
 from services.random_generators import get_random_string
 from services.users import get_user_from_login, get_user_from_token, check_pending_mfa_token
-from services.encryption import create_access_token, check_for_verification_code_in_token #, check_share_token_password
+from services.encryption import create_access_token, check_for_verification_code_in_token
 from config.exceptions.HTTPExceptions import verification_code_incorrect, user_blocked, mfa_locked_out
 from lib.mfa.mfa import mfa_runtime
 from config.settings.token import get_mfa_settings
@@ -136,7 +137,7 @@ def verify_token_by_code(verification: TokenVerificationCode,
     else:
         # First login — emailed code, proves email ownership only.
         stored_code = mfa_runtime.get_challenge_code(user_tag)
-        code_valid = stored_code is not None and verification.verification_code == stored_code
+        code_valid = stored_code is not None and secrets.compare_digest(verification.verification_code, stored_code)
 
     if not code_valid:
         count = mfa_runtime.register_failure(user_tag)
@@ -204,19 +205,4 @@ def verify_token_by_code(verification : TokenVerificationCode,
     return TokenResponse(success=True, token=jwt_token, verified=True,
                           role=user.role, firstname=user.firstname,
                           lastname=user.lastname, tag=user.tag)
-### Share Token
-
-# @router.post("/share", 
-#              summary="Share tokens can be used to push qc runs to the app without login in every time. Creating a share token requires admin rights and the application specific password.")
-# def create_share_token(inputPassword: ShareTokenPassword, user : UserModel = Depends(is_user_admin)):
-#     """
-#     Share tokens require user admin rights as well as a password which is defined in the env file.
-#     """
-#     if check_share_token_password(inputPassword.pw):
-#         jwt_token = create_access_token(user.model_dump(), key_subset=["id"], add_dict={"created_at" : get_time_stamp()}, share_token=True)
-#         return TokenResponse(success=True,token= jwt_token,verified=False, role=0)
-#     raise share_token_pw_incorrect
-
-
-
 

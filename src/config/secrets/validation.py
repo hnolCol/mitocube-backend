@@ -60,7 +60,7 @@ def _get_secret_value(secret_name: str) -> str | None:
 
     Lookup is case-insensitive to mirror pydantic-settings
     ``case_sensitive = False`` behaviour: a .env entry like
-    ``jwt_share_key=...`` must satisfy ``JWT_SHARE_KEY``.
+
     """
     value = os.environ.get(secret_name)
     if value is not None:
@@ -83,7 +83,6 @@ class SecretValidator:
     # Minimum lengths for different secret types
     MIN_LENGTHS = {
         "JWT_KEY": 5,
-        "JWT_SHARE_KEY": 5,
         "PASSWORD": 5,
         "API_KEY": 5,
     }
@@ -137,11 +136,9 @@ class SecretValidator:
 # Format: {environment_variable_name: validator_function}
 REQUIRED_SECRETS: Dict[str, Callable[[str], bool]] = {
     "JWT_KEY": SecretValidator.validate_jwt_key,
-    "JWT_SHARE_KEY": SecretValidator.validate_jwt_key,
     "NEO4J_PASSWORD": SecretValidator.validate_password,
     "MONGO_PASSWORD": SecretValidator.validate_password,
     "MAIL_PASSWORD": SecretValidator.validate_password,
-    "SHARE_TOKEN_PW": SecretValidator.validate_password,
 }
 
 # Optional secrets with validators (warn if invalid, but don't fail)
