@@ -808,7 +808,7 @@ class Neo4JSamples(SamplesABC):
             values = remove_outliers_iqr(pd.Series(values), k = 1.5)
             qm = QuantileModel(tag = row["tag"], min = np.min(values), q25 = np.percentile(values, 25), m = np.median(values), q75 = np.percentile(values, 75), max = np.max(values), N = len(values))
             distributions[row["tag"]] = qm
-            insert_rows.append({"sample_tag" : row["tag"], "qd_tag" : row["qd_tag"], "distribution" : qm})
+            insert_rows.append({"sample_tag" : row["tag"], "qd_tag" : row["qd_tag"], "distribution" : qm.model_dump()})
 
         if len(insert_rows) > 0:
             insert_query = (
