@@ -1390,7 +1390,7 @@ class Neo4JSubmissions(SubmissionsABC):
                 "MATCH (u:User {tag: $user_tag}) "
                 "MATCH (inst:Trait {tag: $instrument_tag}) "
                 "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
-                "   dataset_label: $dataset_label, n_runs: $n_runs, n_plates: $n_plates, "
+                "   submission_tag: $submission_tag, n_runs: $n_runs, n_plates: $n_plates, "
                 "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
                 "   fractionated: $fractionated, n_fractions: $n_fractions, "
                 "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
@@ -1411,7 +1411,6 @@ class Neo4JSubmissions(SubmissionsABC):
                 "user_tag": user_tag,
                 "rl_tag": rl_tag,
                 "instrument_tag": runlist.instrument_tag,
-                "dataset_label": runlist.dataset_label,
                 "n_runs": runlist.n_runs,
                 "n_plates": runlist.n_plates,
                 "scrambled": runlist.scrambled,
@@ -1428,7 +1427,7 @@ class Neo4JSubmissions(SubmissionsABC):
                 "WITH submission "
                 "MATCH (u:User {tag: $user_tag}) "
                 "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
-                "   dataset_label: $dataset_label, n_runs: $n_runs, n_plates: $n_plates, "
+                "   submission_tag: $submission_tag, n_runs: $n_runs, n_plates: $n_plates, "
                 "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
                 "   fractionated: $fractionated, n_fractions: $n_fractions, "
                 "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
@@ -1447,7 +1446,6 @@ class Neo4JSubmissions(SubmissionsABC):
                 "submission_tag": submission_tag,
                 "user_tag": user_tag,
                 "rl_tag": rl_tag,
-                "dataset_label": runlist.dataset_label,
                 "n_runs": runlist.n_runs,
                 "n_plates": runlist.n_plates,
                 "scrambled": runlist.scrambled,
@@ -1517,7 +1515,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
-            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag, "
+            "   submission_tag: coalesce(rl.submission_tag, rl.dataset_label, $tag)} as rl, "
             "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
         )
@@ -1537,7 +1536,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
             "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
-            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag} as rl, "
+            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag, "
+            "   submission_tag: coalesce(rl.submission_tag, rl.dataset_label, $tag)} as rl, "
             "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
             "ORDER BY rl.created_at DESC "

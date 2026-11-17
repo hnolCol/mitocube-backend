@@ -755,7 +755,7 @@ class MigrateData:
                     try:
                         runlist_model = RunListModel(
                             user_tag=old_runlist["user_label"] if "user_label" in old_runlist else self.fallback_user_tag,
-                            dataset_label=old_runlist["dataset_label"],
+                            submission_tag=old_runlist.get("dataset_label", submission_tag),
                             n_runs=old_runlist["n_runs"],
                             n_plates=old_runlist["n_plates"],
                             fractionated=old_runlist["fractionated"],

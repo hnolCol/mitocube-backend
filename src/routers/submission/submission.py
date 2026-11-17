@@ -929,7 +929,7 @@ def create_submission_runlist(
 
     try:
         runlist = RunListCreator(
-            dataset_label=submission_tag,
+            submission_tag=submission_tag,
             sample_list=samples_df,
             user=user,
             **runlist_props.model_dump(exclude={"instrument_tag", "plate_tags"})
