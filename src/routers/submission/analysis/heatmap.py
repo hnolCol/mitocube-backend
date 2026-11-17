@@ -24,7 +24,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 )
 
 @router.get("/{submission_tag}/heatmap")
-def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.001, n_clusters : int = 8, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag : str = None, fdr : float = 0.001, n_clusters : int = 8, sample_tags : str = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
 
     if not db.submissions.quantification_exists(tag = submission_tag, type = "proteins"): raise HTTPException(status_code=404, detail="No quantification data found for this submission.")
@@ -33,10 +33,21 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     if db.submissions.has_genotypes(tag = submission_tag):
         genotypes = db.samples.get_genotypes_by_sample_for_submission(submission_tag=submission_tag, sort_ca_tags=True, return_sample_index=False)  #preload genotypes
         condition_applications = condition_applications.join(genotypes, how="outer")
+
+    if sample_tags is not None:
+        requested_sample_tags = [tag for tag in sample_tags.split(";") if tag]
+        if len(requested_sample_tags) < 2:
+            raise HTTPException(status_code=400, detail="At least two samples must be selected for the heatmap analysis.")
+        unknown_sample_tags = [tag for tag in requested_sample_tags if tag not in condition_applications.index]
+        if unknown_sample_tags:
+            raise HTTPException(status_code=400, detail="Samples not found in this submission: " + ";".join(unknown_sample_tags))
+        condition_applications = condition_applications.loc[requested_sample_tags]
     
     cols = condition_applications.columns.tolist()
     #sort by condition application groups.
     first_seen = condition_applications.groupby(cols, sort=False).ngroup()
+    if first_seen.nunique() < 2:
+        raise HTTPException(status_code=400, detail="The selected samples belong to a single statistical group (one condition application combination, e.g. one genotype). The ANOVA cannot detect differences between groups. Please select samples from at least two groups.")
     condition_applications = (
         condition_applications
         .assign(_grp=first_seen)
