@@ -1509,7 +1509,18 @@ class Neo4JSubmissions(SubmissionsABC):
 
         return rl_tag
 
+    def transform_legacy_runlist_properties(self, submission_tag: str) -> None:
+        """Renames the legacy dataset_label property of RunList nodes to submission_tag."""
+        query = (
+            "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
+            "WHERE rl.submission_tag IS NULL AND rl.dataset_label IS NOT NULL "
+            "SET rl.submission_tag = rl.dataset_label "
+            "REMOVE rl.dataset_label "
+        )
+        self._driver.execute_query(query, routing_="w", tag=submission_tag)
+
     def get_runlist(self, submission_tag: str, rl_tag: str) -> Optional[RunListModel]: 
+        self.transform_legacy_runlist_properties(submission_tag)
         query = (
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
@@ -1531,6 +1542,7 @@ class Neo4JSubmissions(SubmissionsABC):
         return RunListModel(**row["rl"], runs=runs)
 
     def list_runlists(self, submission_tag: str) -> List[RunListModel]: 
+        self.transform_legacy_runlist_properties(submission_tag)
         query = (
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
