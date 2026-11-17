@@ -22,7 +22,7 @@ def _plate(n_wells):
 
 def test_scramble_within_plates_preserves_plate_index():
     runlist = RunListCreator(
-        dataset_label="subm-1234",
+        submission_tag="subm-1234",
         sample_list=_sample_list(),
         free_plate_positions=[_plate(2), _plate(2)],
         user=_StubUser(),
@@ -38,7 +38,7 @@ def test_scramble_within_plates_preserves_plate_index():
 
 def test_scramble_across_plates_preserves_plate_index():
     runlist = RunListCreator(
-        dataset_label="subm-1234",
+        submission_tag="subm-1234",
         sample_list=_sample_list(),
         free_plate_positions=[_plate(2), _plate(2)],
         user=_StubUser(),
