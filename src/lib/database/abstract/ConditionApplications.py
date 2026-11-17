@@ -90,6 +90,10 @@ class ConditionApplicationABC(ABC):
         "Return the trait tag of the condition application. Only the first level trait is returned."  
     
     @abstractmethod
+    def get_proteins(self, tag : str) -> List[str]:
+        "Return the protein tags affected by this condition application (e.g. knockdown, overexpression or immunoprecipitation targets)."
+    
+    @abstractmethod
     def insert(self, condition_application : AttributeTree, extra_data_for_hash : Dict = {}) -> bool:
         """Inserts a new condition application into the database.
 

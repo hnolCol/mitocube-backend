@@ -25,8 +25,8 @@ class RunListCreator:
     Parameters
     ----------
 
-    dataset_label : str 
-        An unique identifier for the data set. 
+    submission_tag : str 
+        An unique identifier for the submission (dataset). 
 
     sample_list : pd.DataFrame
         The sample list in which the sample names are the index of the data frame and the columns contain the samples attributes.
@@ -69,7 +69,7 @@ class RunListCreator:
 
     add_user_initials : bool, default True
         Adds the initials (e.g. first two characters) of the firstname and lastname to each runname to indicate in the raw/run nanme who created (and started) the run. 
-        The resulting run name will be {YYYYMMDD}_{dataset_label}_{user_initials}_....
+        The resulting run name will be {YYYYMMDD}_{submission_tag}_{user_initials}_....
 
     Raises
     ----------
@@ -82,7 +82,7 @@ class RunListCreator:
 
     """
     def __init__(self, 
-                dataset_label : str, 
+                submission_tag : str, 
                 sample_list : pd.DataFrame, 
                 free_plate_positions : List[List[List[bool]]],
                 user : UserModel,
@@ -95,7 +95,7 @@ class RunListCreator:
                 add_user_initials : bool = True
                 ) -> None:
         
-        self._dataset_label = dataset_label 
+        self._submission_tag = submission_tag 
         self._sample_list = sample_list 
         self._aggregated_on = aggregate_on
         self._fractionate = fractionate 
@@ -303,9 +303,9 @@ class RunListCreator:
         aggregated_sample_idcs = f"samples-{'-'.join(sample_idces) if len(sample_idces) < 5 else len(sample_idces)}"
         # if self._add_user_initials:
         #     user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-        #     return f"{today_as_string}_{self._dataset_label}_{user_initials}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
+        #     return f"{today_as_string}_{self._submission_tag}_{user_initials}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
         # else:
-        #     return f"{today_as_string}_{self._dataset_label}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
+        #     return f"{today_as_string}_{self._submission_tag}_{index:0{leading_zeros}d}_{groupName.replace(' ','-')}_{aggregated_sample_idcs}"
 
         return self._base_run_name(f"{index:0{leading_zeros}d}_{str(groupName).replace(' ','-')}_{aggregated_sample_idcs}")
     def _get_fraction_runs(self, run_names : List[str]) -> List[str]:
@@ -327,10 +327,10 @@ class RunListCreator:
         leading_zeros = len(str(self._n_fractions)) if self._n_fractions >= 10 else 2
         # if self._add_user_initials:
         #     user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-        #     return list(chain.from_iterable([[f"{today_as_string}_{self._dataset_label}_{user_initials}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
+        #     return list(chain.from_iterable([[f"{today_as_string}_{self._submission_tag}_{user_initials}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
         #                                         for run_name in run_names]))
         # else:
-        #     return list(chain.from_iterable([[f"{today_as_string}_{self._dataset_label}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
+        #     return list(chain.from_iterable([[f"{today_as_string}_{self._submission_tag}_{run_name.split('_',maxsplit=2)[-1]}_frac-{frac_index:0{leading_zeros}d}" for frac_index in range(1,self._n_fractions+1)] 
         #                                         for run_name in run_names]))
 
         return list(chain.from_iterable(
@@ -342,8 +342,8 @@ class RunListCreator:
         today_as_string = datetime.today().strftime('%Y%m%d')
         if self._add_user_initials:
             user_initials = f"{self._user.firstname[:2]}{self._user.lastname[:2]}"
-            return f"{today_as_string}_{self._dataset_label}_{user_initials}_{suffix}"
-        return f"{today_as_string}_{self._dataset_label}_{suffix}"
+            return f"{today_as_string}_{self._submission_tag}_{user_initials}_{suffix}"
+        return f"{today_as_string}_{self._submission_tag}_{suffix}"
 
     def _sample_suffixes(self) -> List[str]:
         "'<index>_<label>' per sample, index = position in sample list (ordered by sample_index)."
@@ -415,7 +415,7 @@ class RunListCreator:
             scrambled_across_plates=self._scramble_across_plates,
             n_runs=len(runs),
             n_plates=n_plates,
-            submission_tag=self._dataset_label,
+            submission_tag=self._submission_tag,
             user_tag=self._user.tag,
             )
 

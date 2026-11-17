@@ -785,11 +785,11 @@ class Neo4JSamples(SamplesABC):
             "MATCH (sample:Sample {tag : tag})-[q:QUANTIFIED]->(f "
         )
         if quantification_type == "protein_groups":
-            values_query += ":ProteinGroup "
+            values_query += ":ProteinGroup) "
             if annotation_tag is not None:
                 values_query += "WHERE EXISTS {(f)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
         elif quantification_type == "precursors":
-            values_query += ":Precursor "
+            values_query += ":Precursor) "
         else:
             raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
         values_query += "RETURN tag, q.value AS value "
@@ -808,7 +808,7 @@ class Neo4JSamples(SamplesABC):
             values = remove_outliers_iqr(pd.Series(values), k = 1.5)
             qm = QuantileModel(tag = row["tag"], min = np.min(values), q25 = np.percentile(values, 25), m = np.median(values), q75 = np.percentile(values, 75), max = np.max(values), N = len(values))
             distributions[row["tag"]] = qm
-            insert_rows.append({"sample_tag" : row["tag"], "qd_tag" : row["qd_tag"], "distribution" : qm})
+            insert_rows.append({"sample_tag" : row["tag"], "qd_tag" : row["qd_tag"], "distribution" : qm.model_dump()})
 
         if len(insert_rows) > 0:
             insert_query = (
