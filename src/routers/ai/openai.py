@@ -1,14 +1,10 @@
-import time
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from unittest import result
-from httpcore import request
-from typing_extensions import runtime 
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from config.models.user import UserModel
-from config.models.token.token import TokenVerificationCode, TokenResponse, ShareTokenPassword, TokenValidResponse
+from config.models.token.token import TokenVerificationCode, TokenResponse, TokenValidResponse
 from config.settings.general import get_general_settings
 from config.settings.email import get_email_settings
 from config.settings.openai import get_open_ai_settings 
@@ -56,18 +52,13 @@ async def generate_cypher_query(prompt: str, session_id: str = None, user: UserM
         session_id = f"open_ai_chat_user_{user.tag}_{get_random_string()}"
     
     config = {"configurable": {"thread_id": session_id}}
-    print(ai_agent_runtime.agent)
     try:
         result = await ai_agent_runtime.agent.ainvoke(
             {"messages": [{"role": "user", "content": prompt + f" The current user tag is {user.tag}"}]},
             config=config,
         )
     except Exception as e:
-        print(repr(e))
-        print(getattr(e, "response", None) and e.response.text)
-        print(getattr(e, "body", None))
-        
-
+        raise HTTPException(status_code=500, detail=f"AI agent request failed: {type(e).__name__}")
 
     messages = result["messages"]
     last_ai_message = next(
@@ -75,18 +66,6 @@ async def generate_cypher_query(prompt: str, session_id: str = None, user: UserM
     )
     reply = last_ai_message.content if last_ai_message else ""
 
-    tool_calls = [
-        call["name"]
-        for m in messages
-        if isinstance(m, AIMessage)
-        for call in (m.tool_calls or [])
-    ]
-    print("TOOL CALLS: ", tool_calls)
-    print(result)
-    print("Agent initialized and test message processed. ")
-    
-    print(reply)
-    
     return {"response" : reply, "session_id": session_id, "session_messages": [{"role" : "user", "content": prompt}, {"role" : "assistant", "content": reply}]}
     
     

@@ -129,11 +129,6 @@ def main():
         help="Generate JWT key"
     )
     parser.add_argument(
-        "--jwt-share", 
-        action="store_true", 
-        help="Generate JWT share key"
-    )
-    parser.add_argument(
         "--password", 
         action="store_true", 
         help="Generate password"
@@ -168,14 +163,10 @@ def main():
     if args.all or args.jwt:
         secrets_output["JWT_KEY"] = generate_jwt_key()
     
-    if args.all or args.jwt_share:
-        secrets_output["JWT_SHARE_KEY"] = generate_jwt_key()
-    
     if args.all or args.password:
         secrets_output["NEO4J_PASSWORD"] = generate_password(args.length)
         secrets_output["MONGO_PASSWORD"] = generate_password(args.length)
         secrets_output["MAIL_PASSWORD"] = generate_password(args.length)
-        secrets_output["SHARE_TOKEN_PW"] = generate_password(args.length)
     
     if args.all or args.api_key:
         secrets_output["OPENAI_API_KEY"] = generate_api_key()
@@ -184,11 +175,9 @@ def main():
         # Default: generate all
         secrets_output = {
             "JWT_KEY": generate_jwt_key(),
-            "JWT_SHARE_KEY": generate_jwt_key(),
             "NEO4J_PASSWORD": generate_password(args.length),
             "MONGO_PASSWORD": generate_password(args.length),
             "MAIL_PASSWORD": generate_password(args.length),
-            "SHARE_TOKEN_PW": generate_password(args.length),
             "OPENAI_API_KEY": generate_api_key(),
         }
     

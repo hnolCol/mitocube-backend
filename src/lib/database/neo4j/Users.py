@@ -70,8 +70,8 @@ class Neo4JUser(UserABC):
         """
         if len(password) == 0:
             raise ValueError("Password must not be empty.")
-        if len(password) < 6:
-            raise ValueError("Password must be at least 6 characters long.")
+        if len(password) < 10:
+            raise ValueError("Password must be at least 10 characters long.")
         return create_password_hash(password)
     
     def _user_with_research_group_tags(self, props : Dict) -> UserModel:

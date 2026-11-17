@@ -37,11 +37,11 @@ STORAGE_ATTRIBUTES = [
 ]
 
 
-def _trait_text(attribute_tag : str) -> str:
+def _trait_text(param_name : str) -> str:
     "Cypher pattern comprehension returning the trait text of the plate's condition application for an attribute."
     return (
         "[(p)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
-        f"WHERE (ca)-[:OF_ATTRIBUTE]->(:Attribute {{tag : '{attribute_tag}'}}) | t.text][0]"
+        f"WHERE (ca)-[:OF_ATTRIBUTE]->(:Attribute {{tag : ${param_name}}}) | t.text][0]"
     )
 
 
@@ -70,10 +70,10 @@ class Neo4JPlates(PlatesABC):
         "   n_used_wells: COUNT {(p)<-[:ON_PLATE]-(:Run)}, "
         "   n_runlists: COUNT { MATCH (p)<-[:ON_PLATE]-(:Run)<-[:HAS_RUN]-(rl:RunList) RETURN DISTINCT rl }, "
         "   n_submissions: COUNT { MATCH (p)<-[:ON_PLATE]-(:Run)<-[:HAS_RUN]-(:RunList)<-[:HAS_RUNLIST]-(s:Submission) RETURN DISTINCT s }, "
-        f"   format: coalesce(p.format, {_trait_text(PLATE_ATTRIBUTES['format'])}), "
-        f"   cold_storage: {_trait_text(PLATE_ATTRIBUTES['cold_storage'])}, "
-        f"   plate_type: {_trait_text(PLATE_ATTRIBUTES['plate_type'])}, "
-        f"   vendor: {_trait_text(PLATE_ATTRIBUTES['vendor'])}"
+        f"   format: coalesce(p.format, {_trait_text('format_attribute_tag')}), "
+        f"   cold_storage: {_trait_text('cold_storage_attribute_tag')}, "
+        f"   plate_type: {_trait_text('plate_type_attribute_tag')}, "
+        f"   vendor: {_trait_text('vendor_attribute_tag')}"
         "} AS plate "
     )
 
@@ -253,14 +253,22 @@ class Neo4JPlates(PlatesABC):
         self._driver.execute_query(query, routing_="w", tag=tag, ca_tags=ca_tags)
         return tag
 
+    def _plate_return_params(self) -> dict:
+        return {
+            "format_attribute_tag": PLATE_ATTRIBUTES["format"],
+            "cold_storage_attribute_tag": PLATE_ATTRIBUTES["cold_storage"],
+            "plate_type_attribute_tag": PLATE_ATTRIBUTES["plate_type"],
+            "vendor_attribute_tag": PLATE_ATTRIBUTES["vendor"],
+        }
+
     def get(self, tag : str) -> Optional[PlateModel]:
         query = "MATCH (p:Plate {tag : $tag}) " + self._PLATE_RETURN
-        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value, **self._plate_return_params())
         return PlateModel(**r[0]) if len(r) > 0 else None
 
     def list(self) -> List[PlateModel]:
         query = "MATCH (p:Plate) " + self._PLATE_RETURN + "ORDER BY plate.created_at DESC "
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, **self._plate_return_params())
         return [PlateModel(**p) for p in r]
 
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:

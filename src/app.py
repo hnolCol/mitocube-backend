@@ -208,7 +208,8 @@ app = FastAPI(
     version=GENERAL_SETTINGS.version,
     description=GENERAL_SETTINGS.description,
     lifespan=lifespan,
-    redoc_url="/api/doc")
+    redoc_url="/api/doc" if GENERAL_SETTINGS.docs_enabled else None,
+    openapi_url="/api/openapi.json" if GENERAL_SETTINGS.docs_enabled else None)
 
 app.add_middleware(
     CORSMiddleware,

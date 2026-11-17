@@ -6,14 +6,12 @@ from jose import jwt
 from services.encryption import (
     create_access_token,
     create_password_hash,
-    create_share_token,
     decode_token,
     verify_password,
     create_hierarchical_hash,
 )
 
 TEST_JWT_KEY = "test-jwt-key-not-for-production"
-TEST_SHARE_KEY = "test-share-key-not-for-production"
 
 
 def make_user_token(payload=None):
@@ -82,11 +80,6 @@ class TestCreateAccessToken:
         decoded = decode_token(token)
         assert "exp" in decoded
 
-    def test_share_token_uses_share_key(self, token_settings):
-        from datetime import datetime
-        token = create_access_token({"tag": "abcdefgh"}, share_token=True)
-        decoded = jwt.decode(token, TEST_SHARE_KEY, algorithms=["HS256"])
-        assert decoded["tag"] == "abcdefgh"
 
 
 class TestDecodeToken:

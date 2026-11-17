@@ -11,11 +11,9 @@ from config.secrets import validation  # noqa: E402
 
 REQUIRED = {
     "JWT_KEY": "test-jwt-key-not-for-production",
-    "JWT_SHARE_KEY": "test-share-key-not-for-production",
     "NEO4J_PASSWORD": "TestPassword123",
     "MONGO_PASSWORD": "TestPassword123",
     "MAIL_PASSWORD": "TestPassword123",
-    "SHARE_TOKEN_PW": "TestPassword123",
 }
 
 
@@ -52,8 +50,8 @@ def test_required_secrets_found_in_env_file_any_casing(monkeypatch, tmp_path):
 
 def test_missing_secret_reports_exact_name(monkeypatch):
     for key, value in REQUIRED.items():
-        if key != "JWT_SHARE_KEY":
+        if key != "JWT_KEY":
             monkeypatch.setenv(key, value)
     assert validation.validate_required_secrets() == [
-        "Missing required secret: JWT_SHARE_KEY"
+        "Missing required secret: JWT_KEY"
     ]
