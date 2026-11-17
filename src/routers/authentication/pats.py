@@ -15,7 +15,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 )
 
 
-@router.post("/", response_description="Creates a personal access token. The plain token is only shown once.",
+@router.post("", response_description="Creates a personal access token. The plain token is only shown once.",
              response_model=PATCreatedResponseModel)
 def create_pat(props : PATInsertModel, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> PATCreatedResponseModel:
     """Creates a personal access token (PAT) for the logged in user.
@@ -34,7 +34,7 @@ def create_pat(props : PATInsertModel, user : UserModel = Depends(get_user_from_
     return PATCreatedResponseModel(**pat.model_dump(), token=token)
 
 
-@router.get("/", response_description="Returns all personal access tokens of the logged in user.",
+@router.get("", response_description="Returns all personal access tokens of the logged in user.",
             response_model=List[PATResponseModel])
 def list_pats(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[PATResponseModel]:
     """Returns the metadata of all personal access tokens of the logged in user."""
