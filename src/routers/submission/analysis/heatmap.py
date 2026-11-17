@@ -46,6 +46,8 @@ def get_heatmap(submission_tag : str, attribute_tag : str = None, annotation_tag
     cols = condition_applications.columns.tolist()
     #sort by condition application groups.
     first_seen = condition_applications.groupby(cols, sort=False).ngroup()
+    if first_seen.nunique() < 2:
+        raise HTTPException(status_code=400, detail="The selected samples belong to a single statistical group (one condition application combination, e.g. one genotype). The ANOVA cannot detect differences between groups. Please select samples from at least two groups.")
     condition_applications = (
         condition_applications
         .assign(_grp=first_seen)
