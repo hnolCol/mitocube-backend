@@ -243,16 +243,37 @@ def check_if_user_is_active(user_tag : str, user : UserModel = Depends(get_user_
     
     
 @router.post("/{user_tag}/useterms", summary="Accept useterms. Can only be done by the user itself.")
-def accept_use_terms(user_tag : str, accept : bool, user : UserModel = Depends(get_user_from_token)):
-    """_summary_
+def accept_use_terms(user_tag : str, accept : bool, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
+    """Records the user's acceptance (or rejection) of the terms of use.
+
+    Access to the rest of the API is blocked until the terms of use are
+    accepted, as long as terms of use are in force. This endpoint stays
+    reachable without acceptance.
 
     Parameters
     ----------
-    user_label : str
-        _description_
+    user_tag : str
+        The tag of the user. Must match the logged in user.
     accept : bool
-        _description_
+        If the terms of use are accepted.
     user : UserModel, optional
-        _description_, by default Depends(get_user_from_token)
+        The logged in user, by default Depends(get_user_from_token)
+    db : DatabaseABC, optional
+        The database, by default Depends(get_db)
+
+    Returns
+    -------
+    dict
+        Success flag and the acceptance state.
+
+    Raises
+    ------
+    HTTPException
+        If the user tag does not match the logged in user (403) or the
+        update fails (404).
     """
-    #TODO add functionality to UserDB.
+    if user_tag != user.tag:
+        raise HTTPException(status_code=403, detail="Terms of use can only be accepted by the user itself.")
+    if not db.users.update(tag=user_tag, user_props={"agreed_to_terms": accept}):
+        raise user_not_found
+    return {"success": True, "user_tag": user_tag, "agreed_to_terms": accept}

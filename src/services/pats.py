@@ -13,6 +13,7 @@ from lib.database.abstract.PATs import PAT_TOKEN_PREFIX, hash_pat_token
 from lib.database.Database import get_db
 from lib.mfa.mfa import mfa_runtime
 from services.date import get_current_datetime
+from services.terms import raise_if_terms_not_accepted
 from services.users import check_user_allowed, get_user_from_token, is_user_at_least_curator
 
 
@@ -39,6 +40,7 @@ def authenticate_pat(token : str, db : DatabaseABC) -> Tuple[UserModel, PATRespo
         raise credentials_exception
     mfa_runtime.reset_login_failures(rate_key)
     user = check_user_allowed(True, db.users.get_user_by_tag(tag=record["user_tag"]))
+    raise_if_terms_not_accepted(user)
     pat = PATResponseModel(**record["pat"])
     db.pats.touch(pat.tag)
     return user, pat
