@@ -6,7 +6,7 @@ import pytest
 SRC_DIR = Path(__file__).resolve().parents[2] / "src"
 sys.path.insert(0, str(SRC_DIR))
 
-from lib.database.neo4j.OpenAI import Neo4JOpenAI  # noqa: E402
+from lib.database.neo4j.query_guard import validate_read_only_query  # noqa: E402
 
 
 class TestValidateReadOnly:
@@ -16,7 +16,7 @@ class TestValidateReadOnly:
         "MATCH (u:User) RETURN u.tag, u.email",
     ])
     def test_read_queries_pass(self, query):
-        Neo4JOpenAI._validate_read_only(query)
+        validate_read_only_query(query)
 
     @pytest.mark.parametrize("query", [
         "MATCH (u:User {tag : 'abc'}) SET u.role = 0 RETURN u",
@@ -32,7 +32,7 @@ class TestValidateReadOnly:
     ])
     def test_write_and_call_queries_rejected(self, query):
         with pytest.raises(ValueError):
-            Neo4JOpenAI._validate_read_only(query)
+            validate_read_only_query(query)
 
     @pytest.mark.parametrize("query", [
         "MATCH (u:User) RETURN u.password",
@@ -42,4 +42,4 @@ class TestValidateReadOnly:
     ])
     def test_password_access_rejected(self, query):
         with pytest.raises(ValueError):
-            Neo4JOpenAI._validate_read_only(query)
+            validate_read_only_query(query)
