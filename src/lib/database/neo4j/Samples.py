@@ -785,11 +785,11 @@ class Neo4JSamples(SamplesABC):
             "MATCH (sample:Sample {tag : tag})-[q:QUANTIFIED]->(f "
         )
         if quantification_type == "protein_groups":
-            values_query += ":ProteinGroup "
+            values_query += ":ProteinGroup) "
             if annotation_tag is not None:
                 values_query += "WHERE EXISTS {(f)-[:HAS_PROTEINS]->(p:Protein)<-[:ANNOTATES]-(a:Annotation {tag : $annotation_tag})} "
         elif quantification_type == "precursors":
-            values_query += ":Precursor "
+            values_query += ":Precursor) "
         else:
             raise ValueError("Invalid quantification type. Must be one of 'protein_groups' or 'precursors'.")
         values_query += "RETURN tag, q.value AS value "
