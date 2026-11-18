@@ -38,7 +38,8 @@ class TestGroupCuratorMaintenancePermissions:
         root = pathlib.Path(__file__).resolve().parents[2]
         for rel in ["routers/researchgroups/researchgroup.py", "routers/consortiums/consortium.py"]:
             content = (root / "src" / rel).read_text()
-            assert "GROUP_CURATOR" not in content, rel
+            assert "user.role >= UserRolesEnum.GROUP_CURATOR" not in content, rel
+            assert "is_user_at_least_group_curator" not in content, rel
 
 
 class TestGroupCuratorUserCreation:
