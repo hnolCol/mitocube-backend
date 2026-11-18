@@ -58,25 +58,52 @@ class TestTermsExist:
         assert terms_service.terms_of_use_exist() is False
 
 
+class FakePolicy:
+    def __init__(self, statuses):
+        self.statuses = statuses
+        self.user_tag = None
+
+    def get_status(self, user_tag):
+        self.user_tag = user_tag
+        return self.statuses
+
+
+class FakeDB:
+    def __init__(self, statuses):
+        self.policy = FakePolicy(statuses)
+
+
+class FakeStatus:
+    def __init__(self, must_agree):
+        self.must_agree = must_agree
+
+
 class TestRaiseIfTermsNotAccepted:
-    def terms_file(self, tmp_path):
-        p = tmp_path / "terms.json"
-        p.write_text('{"title": "Data Policy", "data_policy_sections": [{"header": "h", "text": "t"}]}')
-        return p
+    def test_agreed_user_passes(self):
+        terms_service.raise_if_terms_not_accepted(FakeUser(agreed_to_terms=True), FakeDB([FakeStatus(must_agree=False)]))
 
-    def test_accepted_user_passes(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(terms_service, "get_general_settings", lambda: FakeSettings(self.terms_file(tmp_path)))
-        terms_service.raise_if_terms_not_accepted(FakeUser(agreed_to_terms=True))
-
-    def test_unaccepted_user_gets_403(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(terms_service, "get_general_settings", lambda: FakeSettings(self.terms_file(tmp_path)))
+    def test_unaccepted_user_gets_403(self):
+        user = FakeUser(agreed_to_terms=False)
         with pytest.raises(HTTPException) as e:
-            terms_service.raise_if_terms_not_accepted(FakeUser(agreed_to_terms=False))
+            terms_service.raise_if_terms_not_accepted(user, FakeDB([FakeStatus(must_agree=True)]))
         assert e.value.status_code == 403
 
-    def test_without_terms_everyone_passes(self, monkeypatch):
-        monkeypatch.setattr(terms_service, "get_general_settings", lambda: FakeSettings(None))
+    def test_pending_agreement_is_checked_for_the_calling_user(self):
+        db = FakeDB([FakeStatus(must_agree=True)])
+        user = FakeUser(agreed_to_terms=False)
+        with pytest.raises(HTTPException):
+            terms_service.raise_if_terms_not_accepted(user, db)
+        assert db.policy.user_tag == user.tag
+
+    def test_without_required_policy_everyone_passes(self):
+        terms_service.raise_if_terms_not_accepted(FakeUser(agreed_to_terms=False), FakeDB([FakeStatus(must_agree=False)]))
+
+    def test_without_db_everyone_passes(self):
         terms_service.raise_if_terms_not_accepted(FakeUser(agreed_to_terms=False))
+
+    def test_without_terms_document_everyone_passes(self, monkeypatch):
+        monkeypatch.setattr(terms_service, "get_general_settings", lambda: FakeSettings(None))
+        terms_service.raise_if_terms_not_accepted(FakeUser(agreed_to_terms=False), FakeDB([FakeStatus(must_agree=False)]))
 
 
 class TestExemptPaths:
@@ -84,6 +111,10 @@ class TestExemptPaths:
         "/api/info/terms",
         "/api/auth/token/valid",
         "/api/auth/user/abcdefgh/useterms",
+        "/api/policy",
+        "/api/policy/status",
+        "/api/policy/abcdefgh",
+        "/api/policy/abcdefgh/agree",
     ])
     def test_exempt_paths(self, path):
         assert terms_service.is_terms_exempt_path(path) is True
