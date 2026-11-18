@@ -87,6 +87,7 @@ class FakeModularProceduresDB:
         self.finished = []
         self.set_states = []
         self.adopted_condition_applications = []
+        self.state_history = {}
         self.executions = {}
 
     def exists(self, tag):
@@ -260,7 +261,8 @@ class FakeModularProceduresDB:
             if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
                 raise ValueError(f"Traits not found: {metric.trait_tag}")
         input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
-        execution_tag = "exec-1"
+        self.execution_counter = getattr(self, "execution_counter", 0) + 1
+        execution_tag = f"exec-{self.execution_counter}"
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
             input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
@@ -274,7 +276,10 @@ class FakeModularProceduresDB:
                                        for m in (execution.input_well_metrics or []) if m.position == w.position]}
                          for w in execution.input_wells],
             output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
-                           "sample_tags": [], "condition_application_tags": w.condition_application_tags,
+                           "sample_tags": sorted({sample_tag for input_well in execution.input_wells
+                                                   for sample_tag in input_well.sample_tags
+                                                   if w.position in input_well.output_positions}),
+                           "condition_application_tags": w.condition_application_tags,
                            "metrics": [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
                                        for m in execution.output_well_metrics if m.position == w.position]}
                           for w in execution.output_wells])
@@ -286,14 +291,16 @@ class FakeModularProceduresDB:
         if outcome not in ("SUCCEEDED", "FAILED", "ABORTED"):
             raise ValueError("Outcome must be SUCCEEDED, FAILED or ABORTED.")
         execution = self.executions[execution_tag]
-        if execution.status != "RUNNING":
-            raise ValueError("This procedure execution is already finished.")
+        if outcome == execution.status:
+            raise ValueError(f"This procedure execution is already in state {execution.status}.")
+        previous_state = execution.status
         input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
         done_submissions = sorted({self.sample_submissions[sample_tag] for sample_tag in input_sample_tags
                                     if sample_tag in self.sample_submissions})
-        for submission_tag in done_submissions:
-            self._set_link_done(execution.procedure_tag, submission_tag, True)
-            self.finished.append((execution_tag, submission_tag, user_tag))
+        if previous_state == "RUNNING":
+            for submission_tag in done_submissions:
+                self._set_link_done(execution.procedure_tag, submission_tag, True)
+                self.finished.append((execution_tag, submission_tag, user_tag))
         if outcome == "SUCCEEDED":
             self.adopted_condition_applications.extend(
                 (submission_tag, ca_tag)
@@ -302,12 +309,40 @@ class FakeModularProceduresDB:
             self.set_states.extend((submission_tag, self.procedures[execution.procedure_tag].success_submission_state)
                                    for submission_tag in done_submissions
                                    if self.procedures[execution.procedure_tag].success_submission_state is not None)
+        self.state_history.setdefault(execution_tag, []).append({"state": outcome, "created_at": 5.0, "user_tag": user_tag})
         execution.status = outcome
         execution.finished_at = 5.0
         execution.finished_by = user_tag
         execution.finish_comment = comment
         execution.done_submission_tags = done_submissions
         return execution
+
+    def get_execution_states(self, execution_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        history = self.state_history.get(execution_tag, []) + [{"state": "RUNNING", "created_at": 4.0, "user_tag": self.executions[execution_tag].user_tag}]
+        return [{"state": entry["state"], "created_at": entry["created_at"], "user_tag": entry["user_tag"]}
+                for entry in sorted(history, key=lambda entry: entry["created_at"], reverse=True)]
+
+    def find_execution_tags(self, status=None, limit=None):
+        tags = [tag for tag, execution in self.executions.items()
+                if status is None or execution.status == status]
+        tags.sort(key=lambda tag: self.executions[tag].created_at or 0, reverse=True)
+        return tags if limit is None else tags[:limit]
+
+    def find_execution_tags_by_submissions(self, submission_tags):
+        submission_tags = set(submission_tags)
+        tags = []
+        for tag, execution in self.executions.items():
+            sample_tags = {sample for well in execution.input_wells for sample in well.sample_tags} | \
+                          {sample for well in execution.output_wells for sample in well.sample_tags}
+            if any(self.sample_submissions.get(sample) in submission_tags for sample in sample_tags):
+                tags.append(tag)
+        return tags
+
+    def get_sample_submission_map(self, sample_tags):
+        return {sample_tag: [self.sample_submissions[sample_tag]]
+                for sample_tag in sample_tags if sample_tag in self.sample_submissions}
 
     def get_execution(self, execution_tag):
         if execution_tag not in self.executions:
@@ -343,20 +378,31 @@ class FakeModularProceduresDB:
         return execution
 
 
+class FakeSubmissionsDB:
+    def __init__(self, procedures):
+        self._procedures = procedures
+        self.scopes = {}
+
+    def get_user_submission_scope_tags(self, user_tag):
+        return self.scopes.get(user_tag)
+
+
 class FakeDB:
     def __init__(self):
         self.modular_procedures = FakeModularProceduresDB()
         self.attributes = FakeAttributesDB()
+        self.submissions = FakeSubmissionsDB(self.modular_procedures)
 
 
-def _make_client(user):
+def _make_client(user, fake_db=None):
+    import contextlib
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from routers.procedures.procedures import router as procedures_router
 
     app = FastAPI()
     app.include_router(procedures_router)
-    fake_db = FakeDB()
+    fake_db = fake_db if fake_db is not None else FakeDB()
     app.dependency_overrides[get_db] = lambda: fake_db
     app.dependency_overrides[get_user_from_token] = lambda: user
     return TestClient(app)
@@ -797,9 +843,32 @@ class TestModularProcedureExecutionFinishRoutes:
     def test_finish_twice_rejected(self, client):
         self._execute(client)
         client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
-        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "ABORTED"})
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
         assert resp.status_code == 400
-        assert "already finished" in resp.json()["detail"]
+        assert "already in state" in resp.json()["detail"]
+
+    def test_state_change_correction_allowed(self, client):
+        self._execute(client)
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "FAILED"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "FAILED"
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "SUCCEEDED"
+
+    def test_execution_states_history(self, client):
+        self._execute(client)
+        client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+        resp = client.get("/api/procedures/executions/exec-1/states")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert [entry["state"] for entry in body] == ["SUCCEEDED", "RUNNING"]
+        assert body[0]["user_tag"] == "abcdefgh"
+        assert body[1]["user_tag"] == "abcdefgh"
+
+    def test_execution_states_missing_execution_404(self, client):
+        resp = client.get("/api/procedures/executions/does-not-exist/states")
+        assert resp.status_code == 404
 
     def test_finish_invalid_outcome_rejected(self, client):
         self._execute(client)
@@ -825,6 +894,92 @@ class TestModularProcedureExecutionFinishRoutes:
         body = resp.json()
         assert body["input_wells"][0]["metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 1.5}]
         assert body["input_well_metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 1.5}]
+
+
+class TestModularProcedureExecutionOverviewRoutes:
+    def _execute_two_submissions(self, client, tag="exec-1"):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [
+                {"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]},
+                {"position": "B1", "sample_tags": ["sample-3"], "output_positions": ["B1"]},
+            ],
+            "output_wells": [
+                {"position": "A1", "condition_application_tags": ["ca-heat"]},
+                {"position": "B1", "condition_application_tags": []},
+            ],
+            "output_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5, "side": "A"}],
+            "input_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 1.0, "side": "INPUT"}]})
+        assert resp.status_code == 200
+        assert resp.json()["tag"] == tag
+
+    def _shared_db(self, client):
+        return client.app.dependency_overrides[get_db]()
+
+    def _scoped_client(self, shared_db, scope):
+        user = make_user(role=UserRolesEnum.STANDARD)
+        client = _make_client(user, fake_db=shared_db)
+        shared_db.submissions.scopes[user.tag] = scope
+        return client
+
+    def test_curator_sees_all_executions(self, client):
+        shared_db = self._shared_db(client)
+        self._execute_two_submissions(client)
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-3",
+            "input_wells": [{"position": "D1", "sample_tags": ["sample-2"], "output_positions": ["D1"]}],
+            "output_wells": [{"position": "D1", "condition_application_tags": []}]})
+        resp = client.get("/api/procedures/executions/q")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body) == 2
+        by_tag = {summary["tag"]: summary for summary in body}
+        assert by_tag["exec-1"]["n_input_wells"] == 2
+        assert by_tag["exec-2"]["n_input_wells"] == 1
+        assert by_tag["exec-1"]["status"] == "RUNNING"
+
+    def test_standard_user_sees_only_own_submission_executions(self, client):
+        shared_db = self._shared_db(client)
+        self._execute_two_submissions(client)
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-3",
+            "input_wells": [{"position": "D1", "sample_tags": ["sample-3"], "output_positions": ["D1"]}],
+            "output_wells": [{"position": "D1", "condition_application_tags": []}]})
+        scoped = self._scoped_client(shared_db, ["subm-1"])
+        resp = scoped.get("/api/procedures/executions/q")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert [summary["tag"] for summary in body] == ["exec-1"]
+
+    def test_standard_user_details_are_masked(self, client):
+        shared_db = self._shared_db(client)
+        self._execute_two_submissions(client)
+        scoped = self._scoped_client(shared_db, ["subm-1"])
+        resp = scoped.get("/api/procedures/executions/exec-1")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert [well["position"] for well in body["input_wells"]] == ["A1"]
+        assert [well["position"] for well in body["output_wells"]] == ["A1"]
+        assert body["input_wells"][0]["sample_tags"] == ["sample-1"]
+        assert body["input_wells"][0]["metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 1.0}]
+        assert body["input_well_metrics"] == []
+
+    def test_standard_user_shared_well_hides_foreign_values(self, client):
+        shared_db = self._shared_db(client)
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1", "sample-3"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": ["ca-heat"]}],
+            "output_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5}],
+            "input_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 1.0, "side": "INPUT"}]})
+        assert resp.status_code == 200
+        scoped = self._scoped_client(shared_db, ["subm-1"])
+        body = scoped.get("/api/procedures/executions/exec-1").json()
+        assert body["input_wells"][0]["sample_tags"] == ["sample-1"]
+        assert body["input_wells"][0]["metrics"] == []
+        assert body["output_wells"][0]["metrics"] == []
+        assert body["output_wells"][0]["condition_application_tags"] == []
+        assert body["input_well_metrics"] == []
 
 
 class TestSingleOpenModuleConstraint:

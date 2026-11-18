@@ -135,13 +135,15 @@ class ModularProceduresABC(ABC):
 
     @abstractmethod
     def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None):
-        """Confirms a running procedure execution with its outcome (SUCCEEDED,
-        FAILED or ABORTED). Regardless of the outcome the submissions owning
-        the placed samples are marked done in the procedure (freed for the
-        next module); only on SUCCEEDED the procedure's optional success
-        submission state is set and its condition applications are adopted by
-        the submissions. Raises a KeyError if the execution does not exist and
-        a ValueError if it is already finished or the outcome is invalid."""
+        """Transitions a procedure execution to the given state (SUCCEEDED, FAILED
+        or ABORTED); every state is recorded in the IN_STATE history (like
+        submission states). Leaving RUNNING frees the submissions owning the
+        placed samples (freed for the next module); a transition to SUCCEEDED
+        applies the success effects (condition application adoption, optional
+        success submission state). Finished executions can be corrected later
+        (e.g. FAILED to SUCCEEDED); changing to the current state is rejected.
+        Raises a KeyError if the execution does not exist and a ValueError if
+        the outcome is invalid."""
 
     @abstractmethod
     def get_execution(self, execution_tag: str):
@@ -165,6 +167,26 @@ class ModularProceduresABC(ABC):
     def get_versions(self, tag: str) -> List[str]:
         """Returns the tags of all versions in the lineage of the given procedure,
         oldest first. Raises a KeyError if the tag is not found."""
+
+    @abstractmethod
+    def get_execution_states(self, execution_tag: str) -> List:
+        """Returns the state history of a procedure execution, newest state first.
+        Raises a KeyError if the execution does not exist."""
+
+    @abstractmethod
+    def find_execution_tags(self, status: str = None, limit: int = None) -> List[str]:
+        """Returns the tags of all procedure executions, newest first, optionally
+        filtered by their current state."""
+
+    @abstractmethod
+    def find_execution_tags_by_submissions(self, submission_tags: List[str]) -> List[str]:
+        """Returns the tags of the procedure executions that placed samples of the
+        given submissions."""
+
+    @abstractmethod
+    def get_sample_submission_map(self, sample_tags: List[str]) -> dict:
+        """Returns a map of the given sample tags to the tags of the submissions
+        owning them."""
 
     @abstractmethod
     def set_execution_metrics(self, execution_tag: str, well_metrics, user_tag: str):

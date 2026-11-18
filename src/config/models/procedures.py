@@ -113,6 +113,31 @@ class ModularProcedureSubmissionModel(BaseModel):
 
 
 
+class ExecutionStateModel(BaseModel):
+    "A state of a procedure execution in its state history: the state itself, when it was set and by whom."
+    state : str
+    created_at : Optional[float] = None
+    user_tag : Optional[str] = None
+
+
+class ExecutionSummaryModel(BaseModel):
+    "Summary of a procedure execution for the overview listing: the header data and well counts."
+    tag : str
+    procedure_tag : str
+    input_plate_tag : str
+    output_plate_tag : str
+    user_tag : str
+    responsible_user_tag : Optional[str] = None
+    created_at : Optional[float] = None
+    status : ProcedureExecutionStatusEnum = Field(default=ProcedureExecutionStatusEnum.RUNNING)
+    finished_at : Optional[float] = None
+    finished_by : Optional[str] = None
+    finish_comment : Optional[str] = None
+    done_submission_tags : List[str] = Field(default_factory=list)
+    n_input_wells : int = 0
+    n_output_wells : int = 0
+
+
 class ExecutionInputWellModel(BaseModel):
     "An input plate well of a procedure execution with its samples and the output wells it is transferred to."
     position : str

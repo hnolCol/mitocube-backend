@@ -6,6 +6,8 @@ from typing import List
 from config.models.user import UserModel
 from services.attribute_hierarchy import validate_attribute_trees
 from config.models.procedures import (
+    ExecutionStateModel,
+    ExecutionSummaryModel,
     ExecutionWellMetricModel,
     FinishProcedureExecutionModel,
     InsertModularProcedureModel,
@@ -30,6 +32,63 @@ def _plate_constraints(procedure) -> dict:
     }
 
 
+def _scoped_submission_tags(user, db) -> "list | None":
+    """Returns the submission tags the user may see, or None if the user is unrestricted
+    (curator role or higher: curators see everything, group curators see their group's
+    submissions via the scope computed by the submissions database)."""
+    from config.enums.users.roles import UserRolesEnum
+    if user.role >= UserRolesEnum.CURATOR:
+        return None
+    return db.submissions.get_user_submission_scope_tags(user_tag=user.tag)
+
+
+def _mask_execution_for_scope(execution, scoped_submissions, db):
+    """Masks a procedure execution for a restricted user (standard users and group curators:
+    their submission scope was computed by the submissions database).
+    Wells the user has no sample in are dropped; wells shared with other users' samples only
+    expose the user's own samples and no metrics or condition applications; fully own wells
+    show all their details. done_submission_tags is limited to the accessible submissions."""
+    from config.enums.users.roles import UserRolesEnum
+    from config.models.procedures import ProcedureExecutionModel
+    if scoped_submissions is None:
+        return execution
+    scoped = set(scoped_submissions)
+    visible = False
+
+    def accessible_tags(sample_tags, sample_map):
+        return {submission for tag in sample_tags for submission in sample_map.get(tag, [])}
+
+    def filter_wells(wells, sample_map):
+        filtered = []
+        for well in wells:
+            own_samples = [tag for tag in well.sample_tags
+                          if accessible_tags([tag], sample_map) & scoped]
+            if len(own_samples) == 0:
+                continue
+            others_present = len(well.sample_tags) > len(own_samples)
+            update = {"sample_tags": own_samples}
+            if others_present:
+                update["metrics"] = []
+                if hasattr(well, "condition_application_tags"):
+                    update["condition_application_tags"] = []
+            filtered.append(well.model_copy(update=update))
+        return filtered
+
+    all_samples = {tag for well in execution.input_wells for tag in well.sample_tags} | \
+                  {tag for well in execution.output_wells for tag in well.sample_tags}
+    sample_map = db.modular_procedures.get_sample_submission_map(sorted(all_samples))
+    input_wells = filter_wells(execution.input_wells, sample_map)
+    output_wells = filter_wells(execution.output_wells, sample_map)
+    if len(input_wells) == 0 and len(output_wells) == 0:
+        return None
+    return execution.model_copy(update={
+        "input_wells": input_wells,
+        "output_wells": output_wells,
+        "input_well_metrics": [],
+        "done_submission_tags": [tag for tag in execution.done_submission_tags if tag in scoped],
+    })
+
+
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/procedures",
@@ -43,13 +102,68 @@ def get_modular_procedures(search_string : str = None, status : str = None, limi
     return db.modular_procedures.find(search_string=search_string, status=status, limit=limit, latest_only=latest_only)
 
 
-@router.get("/executions/{execution_tag}", response_model=ProcedureExecutionModel)
-def get_modular_procedure_execution(execution_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
-    "Returns the procedure execution identified by the given tag."
+@router.get("/executions/q", response_model=List[ExecutionSummaryModel])
+def query_procedure_executions(search_submission_tag : str = None, status : str = None, limit : int = 200, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ExecutionSummaryModel]:
+    """Returns the procedure executions as summaries (header data and well counts) for the
+    overview, newest first, optionally filtered by a submission tag and the current state.
+    The user's submission scope is respected: curators and admins see everything, group
+    curators their group's executions and other users only the executions of their own
+    submissions (creators); executions holding other users' data are not released."""
+    scoped = _scoped_submission_tags(user, db)
+    if scoped is not None:
+        if search_submission_tag is not None and search_submission_tag not in scoped:
+            return []
+        filter_tags = [search_submission_tag] if search_submission_tag is not None else list(scoped)
+        visible_tags = set(db.modular_procedures.find_execution_tags_by_submissions(submission_tags=filter_tags))
+        if len(visible_tags) == 0:
+            return []
+    else:
+        visible_tags = None
+    tags = db.modular_procedures.find_execution_tags(status=status, limit=None)
+    if visible_tags is not None:
+        tags = [tag for tag in tags if tag in visible_tags]
+    tags = tags[:limit] if limit is not None else tags
+    summaries = []
+    for execution_tag in tags:
+        try:
+            execution = db.modular_procedures.get_execution(execution_tag=execution_tag)
+        except KeyError:
+            continue
+        summaries.append(ExecutionSummaryModel(
+            tag=execution.tag, procedure_tag=execution.procedure_tag,
+            input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
+            user_tag=execution.user_tag, responsible_user_tag=execution.responsible_user_tag,
+            created_at=execution.created_at, status=execution.status,
+            finished_at=execution.finished_at, finished_by=execution.finished_by,
+            finish_comment=execution.finish_comment,
+            done_submission_tags=execution.done_submission_tags,
+            n_input_wells=len(execution.input_wells), n_output_wells=len(execution.output_wells)))
+    return summaries
+
+
+@router.get("/executions/{execution_tag}/states", response_model=List[ExecutionStateModel])
+def get_procedure_execution_states(execution_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ExecutionStateModel]:
+    "Returns the state history of a procedure execution (state, created_at and the user who made the change), newest first."
     try:
-        return db.modular_procedures.get_execution(execution_tag=execution_tag)
+        return db.modular_procedures.get_execution_states(execution_tag=execution_tag)
     except KeyError:
         raise HTTPException(status_code=404, detail="Procedure execution not found.")
+
+
+@router.get("/executions/{execution_tag}", response_model=ProcedureExecutionModel)
+def get_modular_procedure_execution(execution_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Returns the procedure execution identified by the given tag with all plate details.
+    Restricted users only see the wells (samples, input values and metrics) of their own
+    submissions: wells without accessible samples are omitted, shared wells expose neither
+    metrics nor condition applications of the other users' samples."""
+    try:
+        execution = db.modular_procedures.get_execution(execution_tag=execution_tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    masked = _mask_execution_for_scope(execution, _scoped_submission_tags(user, db), db)
+    if masked is None:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    return masked
 
 
 @router.post("/executions/{execution_tag}/metrics", response_model=ProcedureExecutionModel)
@@ -210,10 +324,12 @@ def execute_modular_procedure(procedure_tag : str, execution : InsertProcedureEx
 
 @router.post("/executions/{execution_tag}/finish", response_model=ProcedureExecutionModel)
 def finish_modular_procedure_execution(execution_tag : str, confirmation : FinishProcedureExecutionModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
-    """Confirms a running procedure execution with its outcome (SUCCEEDED, FAILED or ABORTED).
-    Regardless of the outcome the linked submissions are freed for the next module; only a
-    successful confirmation sets the procedure's optional submission state and makes the
-    submissions adopt the condition applications of the module. The user must be at least curator."""
+    """Transitions a procedure execution to the given state (SUCCEEDED, FAILED or ABORTED):
+    the change is recorded in the execution's state history together with the user who made
+    it. Leaving RUNNING frees the linked submissions for the next module; a transition to
+    SUCCEEDED sets the procedure's optional submission state and makes the submissions adopt
+    the condition applications of the module. Already finished executions can be corrected
+    (e.g. FAILED to SUCCEEDED). Only curators and admins may change the state."""
     try:
         return db.modular_procedures.finish_execution(execution_tag=execution_tag, outcome=confirmation.outcome,
                                                       user_tag=user.tag, comment=confirmation.comment)

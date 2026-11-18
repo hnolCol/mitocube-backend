@@ -13,6 +13,8 @@ from config.models.procedures import (
     PublishModularProcedureModel,
 )
 
+EXECUTION_STATE_TAGS = ["RUNNING", "SUCCEEDED", "FAILED", "ABORTED"]
+
 
 
 class Neo4JModularProcedures(ModularProceduresABC):
@@ -505,6 +507,66 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError(f"The {side} plate of this procedure must be of type {required_type}, "
                              f"but the plate is {plate.get('plate_type')}.")
 
+    def _set_execution_state(self, execution_tag: str, state: str, user_tag: str) -> None:
+        """Appends a state to the execution's state history: creates an IN_STATE relationship to
+        the ProcessingState node with created_at and user_tag, and keeps the status property
+        (the current state) in sync."""
+        if state not in EXECUTION_STATE_TAGS:
+            raise ValueError(f"Unknown procedure execution state: {state}")
+        self._driver.execute_query(
+            "MERGE (ps:ProcessingState {tag : $state}) "
+            "WITH ps MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "CREATE (e)-[r:IN_STATE]->(ps) "
+            "SET r.created_at = $created_at, r.user_tag = $user_tag, e.status = $state ",
+            routing_="w", state=state, execution_tag=execution_tag,
+            created_at=time.time(), user_tag=user_tag)
+
+    def get_execution_states(self, execution_tag: str) -> List:
+        """Returns the state history of a procedure execution, newest state first:"""
+        from config.models.procedures import ExecutionStateModel
+        execution_exists = self._driver.execute_query(
+            "WITH EXISTS {(e:ModularProcedureExecution {tag : $execution_tag})} as exists RETURN exists",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+        if len(execution_exists) == 0 or not execution_exists[0]:
+            raise KeyError("Procedure execution not found.")
+        rows = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[r:IN_STATE]->(ps:ProcessingState) "
+            "RETURN {state: ps.tag, created_at: r.created_at, user_tag: r.user_tag} as state "
+            "ORDER BY r.created_at DESC",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
+        return [ExecutionStateModel(**row["state"]) for row in rows]
+
+    def get_current_execution_state(self, execution) -> str:
+        """Returns the current state of the execution: the newest IN_STATE state, falling back
+        to the status property for executions created before the state history existed."""
+        current = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[r:IN_STATE]->(ps:ProcessingState) "
+            "RETURN ps.tag as state ORDER BY r.created_at DESC LIMIT 1",
+            routing_="r", execution_tag=execution.tag, result_transformer_=Result.value)
+        return current[0] if len(current) > 0 and current[0] is not None else (execution.status or "RUNNING")
+
+    def get_sample_submission_map(self, sample_tags: List[str]) -> "dict":
+        """Returns a map of the given sample tags to the tags of the submissions owning them."""
+        if not sample_tags:
+            return {}
+        rows = self._driver.execute_query(
+            "MATCH (s:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
+            "WHERE sample.tag IN $sample_tags "
+            "RETURN sample.tag as sample_tag, collect(DISTINCT s.tag) as submission_tags",
+            routing_="r", sample_tags=list(sample_tags), result_transformer_=Result.data)
+        return {row["sample_tag"]: row["submission_tags"] for row in rows}
+
+    def find_execution_tags_by_submissions(self, submission_tags: List[str]) -> List[str]:
+        """Returns the tags of the procedure executions that placed samples of the given submissions."""
+        if not submission_tags:
+            return []
+        return self._driver.execute_query(
+            "MATCH (s:Submission)-[:HAS_SAMPLE]->(:Sample)-[:IN_WELL]->(w:ExecutionWell) "
+            "WHERE s.tag IN $submission_tags "
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w) "
+            "RETURN DISTINCT e.tag as tag ORDER BY tag",
+            routing_="r", submission_tags=list(submission_tags), result_transformer_=Result.value)
+
     def execute(self, tag: str, execution, user_tag: str) -> "ProcedureExecutionModel":
         """Starts a published modular procedure execution on a set of samples. The execution is created in the
         RUNNING state; the submissions are only freed when the execution is confirmed via finish_execution."""
@@ -617,6 +679,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
                    "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
                    "responsible_user_tag": responsible_user_tag, "status": "RUNNING"})
+        self._set_execution_state(execution_tag=execution_tag, state="RUNNING", user_tag=user_tag)
 
         for well in execution.input_wells:
             row_index, column_index = self._parse_position(well.position)
@@ -672,18 +735,30 @@ class Neo4JModularProcedures(ModularProceduresABC):
         return self.get_execution(execution_tag=execution_tag)
 
     def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None) -> "ProcedureExecutionModel":
-        """Confirms a running procedure execution with its outcome (SUCCEEDED, FAILED or ABORTED).
-        Regardless of the outcome the submissions owning the placed samples are marked done in the
-        procedure (they stay where they are physically, but are freed for the next module). Only on
-        SUCCEEDED the procedure's optional success submission state is set and the condition
-        applications (procedure level and per output well) are adopted by the submissions."""
+        """Transitions a procedure execution to the given state (SUCCEEDED, FAILED or ABORTED).
+        Leaving the RUNNING state always frees the submissions owning the placed samples in the
+        procedure (they stay where they are physically, but are freed for the next module). A
+        transition to SUCCEEDED applies the success effects; finished executions can be corrected
+        later (e.g. FAILED to SUCCEEDED) — every state is recorded in the IN_STATE history."""
         from config.models.procedures import ProcedureExecutionModel
         if outcome not in ("SUCCEEDED", "FAILED", "ABORTED"):
             raise ValueError("Outcome must be SUCCEEDED, FAILED or ABORTED.")
         execution = self.get_execution(execution_tag=execution_tag)
-        if execution.status == "SUCCEEDED" or execution.status == "FAILED" or execution.status == "ABORTED":
-            raise ValueError("This procedure execution is already finished.")
+        current_state = self.get_current_execution_state(execution)
+        if outcome == "RUNNING" or outcome == current_state:
+            raise ValueError(f"This procedure execution is already in state {current_state}.")
         procedure = self.get(tag=execution.procedure_tag)
+
+        if current_state != "RUNNING":
+            self._set_execution_state(execution_tag=execution_tag, state=outcome, user_tag=user_tag)
+            self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+                "SET e.finished_at = $finished_at, e.finished_by = $user_tag, e.finish_comment = $comment",
+                routing_="w", execution_tag=execution_tag,
+                finished_at=time.time(), user_tag=user_tag, comment=comment)
+            if outcome == "SUCCEEDED":
+                self._apply_success(execution_tag=execution_tag, procedure=procedure, user_tag=user_tag)
+            return self.get_execution(execution_tag=execution_tag)
 
         done_submission_tags = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
@@ -697,40 +772,58 @@ class Neo4JModularProcedures(ModularProceduresABC):
         done_submissions = done_submission_tags[0] if len(done_submission_tags) > 0 else []
 
         if outcome == "SUCCEEDED" and len(done_submissions) > 0:
-            self._driver.execute_query(
-                "MATCH (m:ModularProcedure {tag : $procedure_tag})-[:HAS_CONDITION_APPLICATION]->(c:ConditionApplication) "
-                "MATCH (sub:Submission) WHERE sub.tag IN $submission_tags "
-                "MERGE (sub)-[r:HAS_APPLICATION]->(c) "
-                "SET r.created_at = timestamp() ",
-                routing_="w", procedure_tag=procedure.tag, submission_tags=done_submissions)
-            self._driver.execute_query(
-                "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
-                "(w:ExecutionWell {execution_tag : $execution_tag, side : 'OUTPUT'}) "
-                "MATCH (w)-[:HAS_APPLICATION]->(c:ConditionApplication) "
-                "MATCH (s:Sample)-[:IN_WELL]->(w)<-[:HAS_SAMPLE]-(sub:Submission) "
-                "WHERE sub.tag IN $submission_tags "
-                "MERGE (sub)-[r:HAS_APPLICATION]->(c) "
-                "SET r.created_at = timestamp() ",
-                routing_="w", execution_tag=execution_tag, submission_tags=done_submissions)
-            if procedure.success_submission_state is not None:
-                from config.enums.states import SubmissionStatesEnums
-                new_state = SubmissionStatesEnums[procedure.success_submission_state]
-                self._driver.execute_query(
-                    "MATCH (sub:Submission) WHERE sub.tag IN $submission_tags "
-                    "MATCH (state:State {tag : $new_state}) "
-                    "CREATE (sub)-[r:IN_STATE]->(state) "
-                    "SET r.created_at = timestamp(), r.user_tag = $user_tag ",
-                    routing_="w", submission_tags=done_submissions,
-                    new_state=new_state.value, user_tag=user_tag)
+            self._apply_success(execution_tag=execution_tag, procedure=procedure, user_tag=user_tag,
+                                submission_tags=done_submissions)
 
+        self._set_execution_state(execution_tag=execution_tag, state=outcome, user_tag=user_tag)
         self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
-            "SET e.status = $outcome, e.finished_at = $finished_at, e.finished_by = $user_tag, "
+            "SET e.finished_at = $finished_at, e.finished_by = $user_tag, "
             "e.finish_comment = $comment, e.done_submission_tags = $done_submissions",
-            routing_="w", execution_tag=execution_tag, outcome=outcome,
+            routing_="w", execution_tag=execution_tag,
             finished_at=time.time(), user_tag=user_tag, comment=comment, done_submissions=done_submissions)
 
         return self.get_execution(execution_tag=execution_tag)
+
+    def _apply_success(self, execution_tag: str, procedure, user_tag: str, submission_tags: List[str] = None) -> None:
+        """Applies the success effects to the submissions owning the placed samples: they adopt the
+        condition applications (procedure level and per output well) and get the optional success
+        submission state. No-op if the execution placed no samples."""
+        if submission_tags is None:
+            submission_tags = self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+                "(w:ExecutionWell {execution_tag : $execution_tag, side : 'INPUT'}) "
+                "MATCH (s:Sample)-[:IN_WELL]->(w)<-[:HAS_SAMPLE]-(sub:Submission) "
+                "RETURN collect(DISTINCT sub.tag) as submissions",
+                routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+            submission_tags = submission_tags[0] if len(submission_tags) > 0 else []
+        if len(submission_tags) == 0:
+            return
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $procedure_tag})-[:HAS_CONDITION_APPLICATION]->(c:ConditionApplication) "
+            "MATCH (sub:Submission) WHERE sub.tag IN $submission_tags "
+            "MERGE (sub)-[r:HAS_APPLICATION]->(c) "
+            "SET r.created_at = timestamp() ",
+            routing_="w", procedure_tag=procedure.tag, submission_tags=submission_tags)
+        self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+            "(w:ExecutionWell {execution_tag : $execution_tag, side : 'OUTPUT'}) "
+            "MATCH (w)-[:HAS_APPLICATION]->(c:ConditionApplication) "
+            "MATCH (s:Sample)-[:IN_WELL]->(w)<-[:HAS_SAMPLE]-(sub:Submission) "
+            "WHERE sub.tag IN $submission_tags "
+            "MERGE (sub)-[r:HAS_APPLICATION]->(c) "
+            "SET r.created_at = timestamp() ",
+            routing_="w", execution_tag=execution_tag, submission_tags=submission_tags)
+        if procedure.success_submission_state is not None:
+            from config.enums.states import SubmissionStatesEnums
+            new_state = SubmissionStatesEnums[procedure.success_submission_state]
+            self._driver.execute_query(
+                "MATCH (sub:Submission) WHERE sub.tag IN $submission_tags "
+                "MATCH (state:State {tag : $new_state}) "
+                "CREATE (sub)-[r:IN_STATE]->(state) "
+                "SET r.created_at = timestamp(), r.user_tag = $user_tag ",
+                routing_="w", submission_tags=submission_tags,
+                new_state=new_state.value, user_tag=user_tag)
 
     def get_execution(self, execution_tag: str) -> "ProcedureExecutionModel":
         "Returns the procedure execution by its tag."
@@ -791,6 +884,19 @@ class Neo4JModularProcedures(ModularProceduresABC):
         execution["input_wells"] = [ProcedureExecutionInputWellModel(**well) for well in input_wells]
         execution["output_wells"] = [ProcedureExecutionOutputWellModel(**well) for well in output_wells]
         return ProcedureExecutionModel(**execution)
+
+    def find_execution_tags(self, status: str = None, limit: int = None) -> List[str]:
+        """Returns the tags of all procedure executions, newest first, optionally filtered by
+        their current state."""
+        params = {"limit": limit}
+        query = "MATCH (e:ModularProcedureExecution) "
+        if status is not None:
+            query += ("WHERE coalesce(e.status, 'RUNNING') = $status ")
+            params["status"] = status
+        query += "RETURN e.tag as tag ORDER BY e.created_at DESC"
+        if limit is not None:
+            query += " LIMIT $limit"
+        return self._driver.execute_query(query, routing_="r", parameters_=params, result_transformer_=Result.value)
 
     def get_executions(self, tag: str) -> List[str]:
         "Returns the tags of the executions of the given procedure."

@@ -83,7 +83,9 @@ Notes:
 | `GET` | `/api/procedures/submissions/{submission_tag}` | all | Modules of a submission, ordered by link position (the module history). |
 | `POST` | `/api/procedures/{tag}/execute` | curator+ | Start an execution of a **published** procedure (see below). |
 | `GET` | `/api/procedures/{tag}/executions` | all | Execution tags of a procedure. |
-| `GET` | `/api/procedures/executions/{execution_tag}` | all | One execution with input wells, output wells, samples, CAs, metrics and status. |
+| `GET` | `/api/procedures/executions/q` | all | Summaries of the executions visible to the user (submission scope respected): `search_submission_tag`, `status`, `limit`. |
+| `GET` | `/api/procedures/executions/{execution_tag}` | all | One execution with input wells, output wells, samples, CAs, metrics and status (restricted users only see their own submissions' data). |
+| `GET` | `/api/procedures/executions/{execution_tag}/states` | all | The state history of the execution: state, created_at and the user who changed it, newest first. |
 | `POST` | `/api/procedures/executions/{execution_tag}/metrics` | curator+ | Set or update well metrics (see below). |
 | `POST` | `/api/procedures/executions/{execution_tag}/finish` | curator+ | Confirm a running execution with an outcome (SUCCEEDED/FAILED/ABORTED): frees the linked submissions; on success optionally sets the submission state and adopts the condition applications. |
 
@@ -162,7 +164,40 @@ but the submissions are freed for the next module. Only `SUCCEEDED` additionally
   via `HAS_APPLICATION`.
 
 The execution node records `status`, `finished_at`, `finished_by` and `finish_comment`.
-Finishing an already finished execution is rejected with 400.
+Changing to the current state is rejected with 400; finished executions can be corrected
+(e.g. FAILED → SUCCEEDED: the success effects are then applied and the submissions had already
+been freed when the execution first left RUNNING).
+
+### Execution states (history)
+
+Like submissions, executions keep a full **state history**: every state is a separate
+`(:ProcessingState {tag})` node (RUNNING, SUCCEEDED, FAILED, ABORTED) linked via
+
+```
+(:ModularProcedureExecution)-[:IN_STATE {created_at, user_tag}]->(:ProcessingState)
+```
+
+`execute` creates the RUNNING state; `finish` appends the new state — the user who made the
+change and the timestamp are recorded on the relationship. `GET /executions/{tag}/states`
+returns the history (state, `created_at`, `user_tag`), newest first.
+
+### Execution overview and data visibility
+
+`GET /api/procedures/executions/q?search_submission_tag=&status=&limit=` lists execution
+**summaries** (header data and well counts) for the overview dashboard, newest first, and
+respects the **submission scope** of the requesting user:
+
+- **curators and admins** (role ≥ curator): all executions.
+- **group curators**: the executions of their research group's (and consortium-shared and own)
+  submissions — the same scope the submissions database computes for them.
+- **other users**: only executions placing samples of their own accessible submissions
+  (creators); searching for a foreign submission returns nothing.
+
+The same rules apply to `GET /executions/{tag}` (the full plate details): restricted users
+only see wells holding their own samples — wells with only foreign samples are omitted,
+shared wells expose only the own sample tags and neither their metrics (input values and
+output data) nor their condition applications. Changing the state is reserved for curators
+and admins (`403` otherwise).
 
 ## Well metrics
 
