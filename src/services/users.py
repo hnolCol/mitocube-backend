@@ -4,6 +4,7 @@ from pydantic import EmailStr
 from typing import List, Tuple
 
 from services.encryption import verify_password, get_decoded_token
+from services.terms import is_terms_exempt_path, raise_if_terms_not_accepted
 from config.exceptions.HTTPExceptions import (
     user_form_data_incorrect,
     credentials_exception,
@@ -136,19 +137,24 @@ def check_token_verified(token : str =  Depends(get_decoded_token)) -> str:
     raise token_not_valid_exception
 
 
-def get_user_from_token(token = Depends(check_token_verified), db : DatabaseABC = Depends(get_db)) -> UserModel:
+def get_user_from_token(token = Depends(check_token_verified), db : DatabaseABC = Depends(get_db), request : Request = None) -> UserModel:
     """Extracts the user from a token. The user is looked up in the Mongo
     user cache first (short TTL) and only fetched from Neo4j on a cache miss.
-    Secrets (password, mfa_secret) are never cached."""
+    Secrets (password, mfa_secret) are never cached.
+
+    If terms of use are in force, the user must have accepted them to access
+    the API. Reading the terms, accepting them and checking the login state
+    stay reachable without acceptance."""
     if "tag" not in token : raise token_not_valid_exception
     user = get_cached_user(token["tag"])
-    if user is not None:
-        return check_user_allowed(user is not None, user)
-    user_in_db = db.users.get_user_by_tag(tag = token["tag"])
-
-    user  = check_user_allowed(user_in_db is not None,user_in_db)
-    if user is not None:
-        cache_user(user)
+    if user is None:
+        user_in_db = db.users.get_user_by_tag(tag = token["tag"])
+        user  = check_user_allowed(user_in_db is not None,user_in_db)
+        if user is not None:
+            cache_user(user)
+    user = check_user_allowed(user is not None, user)
+    if request is None or not is_terms_exempt_path(request.url.path):
+        raise_if_terms_not_accepted(user)
     return user 
 
 

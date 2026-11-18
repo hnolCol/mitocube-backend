@@ -50,6 +50,7 @@ from lib.database.neo4j.Procedures import Neo4JModularProcedures
 from lib.database.neo4j.Policy import Neo4JPolicy
 from lib.database.neo4j.Impressum import Neo4JImpressum
 from lib.database.neo4j.Plates import Neo4JPlates
+from lib.database.neo4j.PATs import Neo4JPATs
 import pandas as pd 
 class MCNeo4JDatabase(DatabaseABC):
     
@@ -117,6 +118,7 @@ class MCNeo4JDatabase(DatabaseABC):
         self.openai = Neo4JOpenAI(driver = self.connection.driver)
         self.protocols = Neo4JProtocols(driver = self.connection.driver)
         self.modular_procedures = Neo4JModularProcedures(driver = self.connection.driver, condition_applications = self.condition_applications)
+        self.pats = Neo4JPATs(driver = self.connection.driver)
         #checks if all is correctly defined 
         self.__create_fulltext_search()
         super(MCNeo4JDatabase, self).__init__()

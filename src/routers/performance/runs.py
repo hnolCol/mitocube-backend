@@ -4,6 +4,7 @@ from lib.database.abstract.Database import DatabaseABC
 from fastapi import APIRouter, Depends, HTTPException
 from config.models.performance import QCRunInsertModel, QCRunResponseModel, QCPrecursorInsertModel, QCPrecursorResponseModel
 from config.models.user import UserModel
+from services.pats import get_curator_or_qc_upload_pat
 from services.users import is_user_at_least_curator, get_user_from_token
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -87,8 +88,8 @@ def get_performance_run(run_tag : str, user : UserModel = Depends(is_user_at_lea
     return runs[0]
 
 
-@router.post("/runs/insert", summary="Inserts a QC run. Requires at least curator rights.")
-def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+@router.post("/runs/insert", summary="Inserts a QC run. Requires at least curator rights or a personal access token with the qc.upload scope.")
+def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(get_curator_or_qc_upload_pat), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Inserts a QC run into the database. The run is linked to the instrument it was
     acquired on and to the QC standard that was used to generate it.
@@ -114,8 +115,8 @@ def insert_performance_run(run : QCRunInsertModel, user : UserModel = Depends(is
     return db.qc.insert(performance_run = run)
 
 
-@router.post("/runs/{run_tag}/precursors", summary="Adds quantified QCPrecursors to a QC run. Requires at least curator rights.")
-def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+@router.post("/runs/{run_tag}/precursors", summary="Adds quantified QCPrecursors to a QC run. Requires at least curator rights or a personal access token with the qc.upload scope.")
+def add_qc_precursors(run_tag : str, precursors : List[QCPrecursorInsertModel], user : UserModel = Depends(get_curator_or_qc_upload_pat), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Adds the quantified QCPrecursors to a QC run. The precursors are linked to the run via
     a [:QUANTIFIED] relationship that carries the value, score and retention time

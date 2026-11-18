@@ -72,7 +72,7 @@ frontend_build_assets="/absolute/path/to/mitocube-frontend/dist/assets"
 network_dir="/absolute/path/to/mitocube-backend/resources/network"
 CONTROL_PROTEOME_FILE="/absolute/path/to/mitocube-backend/resources/features/controls/data.txt"
 instrument_states="/absolute/path/to/mitocube-backend/resources/maintenance/instrumentstates.txt"
-use_terms_file="/absolute/path/to/mitocube-backend/resources/terms/usage.json"
+use_terms_file="/absolute/path/to/mitocube-backend/resources/terms/usage.json"  # optional: leave unset if no terms of use are in force
 
 Token=""
 
@@ -80,7 +80,9 @@ MFA_ENCRYPTION_KEY=""
 
 ```
 
-Note: frontend_build, frontend_build_assets, mail_template_dir, network_dir, CONTROL_PROTEOME_FILE, instrument_states, and use_terms_file are all validated as paths that must already exist on disk - the app throws a validation error on startup otherwise.
+Note: frontend_build, frontend_build_assets, mail_template_dir, network_dir, CONTROL_PROTEOME_FILE, and instrument_states are all validated as paths that must already exist on disk - the app throws a validation error on startup otherwise.
+
+If `use_terms_file` points to a terms document, users must accept the terms of use before they can access the API (`POST /api/auth/user/{tag}/useterms`). If the setting is unset or the file has no terms content, the check is skipped entirely.
 
 Confirm required files/folders exist:
 ```bash

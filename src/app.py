@@ -30,6 +30,7 @@ from routers.submission import permissions as submissions_permissions
 from routers.submission import export as submission_export 
 from routers.submission import durations as submission_durations
 from routers.authentication import token, user
+from routers.authentication import pats as user_pats
 from routers.info import info
 from routers.features import features
 from routers.features.protein_groups import protein_groups
@@ -127,6 +128,7 @@ router_sources = [policy_permissions,
                   user_views,
                   token, 
                   user, 
+                  user_pats, 
                   features, 
                   info,
                   heatmap, 
