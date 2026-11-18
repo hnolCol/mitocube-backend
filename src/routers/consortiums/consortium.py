@@ -114,11 +114,13 @@ def agree_consortium_terms(consortium_tag : str, group_tag : str, user : UserMod
 
 
 @router.delete("/{consortium_tag}/terms/{group_tag}",
-               summary="Revokes the research groups agreement to the consortium terms. Requires the head (PI) of the group or a curator.")
+               summary="Revokes the research groups agreement to the consortium terms and revokes all shares of the groups submissions with the consortium. Requires the head (PI) of the group or a curator.")
 def revoke_consortium_terms(consortium_tag : str, group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:
     """
     Revokes the research groups agreement to the consortium terms. The users of the group can
-    then neither share submissions with the consortium nor see its shared submissions.
+    then neither share submissions with the consortium nor see its shared submissions. All
+    shares of the groups submissions with the consortium (pending share requests and approved
+    shares) are revoked as well, so the consortium loses access to them.
     """
     _check_consortium_exists(consortium_tag, db)
     if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = group_tag):

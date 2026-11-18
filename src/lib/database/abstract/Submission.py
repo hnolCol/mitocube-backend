@@ -661,6 +661,14 @@ class SubmissionsABC(ABC):
         "Sets or extends the collaborators of a submission."
         
 
+    @abstractmethod
+    def get_collaborator_tags(self, tag: str) -> List[str]:
+        "Returns the user tags of the collaborators of the submission."
+
+    @abstractmethod
+    def remove_collaborator(self, tag: str, user_tag: str) -> bool:
+        "Removes the collaboration access (COLLABORATES) of the given user for the submission. Returns False when the user was not a collaborator."
+
 class SubmissionFilterABC(ABC):
     
     

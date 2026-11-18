@@ -212,3 +212,22 @@ def is_creator_of_submission_or_curator(submission_tag : str, user : UserModel =
         if user.role == UserRolesEnum.GROUP_CURATOR and db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
             return user
     raise user_role_too_low
+
+def is_collaboration_manager_of_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> UserModel:
+    """Checks that the user is the creator of the submission, the head (PI) of the creators
+    research group or at least a curator, i.e. allowed to remove collaboration access from
+    the submission. Raises an exception otherwise."""
+    if not db.submissions.exists(tag = submission_tag):
+        raise submission_tag_not_found
+    creator_tag = db.submissions.get_creator(tag = submission_tag)
+    if user.tag == creator_tag:
+        return user
+    if user.role >= UserRolesEnum.CURATOR:
+        return user
+    if creator_tag is not None:
+        head_group_tags = db.research_groups.get_headed_group_tags(user_tag = user.tag)
+        if len(head_group_tags) > 0:
+            creator_group_tags = db.research_groups.find(user_tags = [creator_tag], limit = None)
+            if any(group_tag in head_group_tags for group_tag in creator_group_tags):
+                return user
+    raise user_role_too_low

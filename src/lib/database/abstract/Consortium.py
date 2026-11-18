@@ -48,7 +48,8 @@ class ConsortiumABC(ABC):
 
     @abstractmethod
     def find_by_user(self, user_tag : str, limit : int = 40) -> List[str]:
-        """Returns the tags of all consortiums the user is a direct member of"""
+        """Returns the tags of all consortiums the user is a member of, either directly or
+        as a member of one of the consortiums eligible research groups"""
 
     @abstractmethod
     def find_by_user_with_terms(self, user_tag : str, limit : int = 40) -> List[str]:

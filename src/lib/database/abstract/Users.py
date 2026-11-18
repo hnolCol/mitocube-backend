@@ -96,6 +96,11 @@ class UserABC(ABC):
         """
 
     @abstractmethod
+    def ensure_role_at_least(self, tag : str, role : int) -> bool:
+        """Raises the user's role to the given role if the current role is lower.
+        Existing higher roles are never lowered."""
+    
+    @abstractmethod
     def count(self) -> int:
         """The number of users in the database.
         Blocked users are not counted. 

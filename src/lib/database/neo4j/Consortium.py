@@ -141,9 +141,13 @@ class Neo4JConsortium(ConsortiumABC):
         return r
 
     def find_by_user(self, user_tag : str, limit : int = 40) -> List[str]:
-        """Returns the tags of all consortiums the user is a direct member of"""
+        """Returns the tags of all consortiums the user is a member of, either directly or
+        as a member of one of the consortiums eligible research groups"""
         query = (
-            "MATCH (u:User {tag : $user_tag})-[:MEMBER_OF]->(c:Consortium) "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MATCH (c:Consortium) "
+            "WHERE (u)-[:MEMBER_OF]->(c) "
+            "   OR EXISTS { MATCH (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(c) } "
             "RETURN DISTINCT c.tag, c.created_at ORDER BY c.created_at DESC "
         )
         if limit is not None:
@@ -152,13 +156,16 @@ class Neo4JConsortium(ConsortiumABC):
         return [tag for tag, _ in r]
 
     def find_by_user_with_terms(self, user_tag : str, limit : int = 40) -> List[str]:
-        """Returns the tags of all consortiums the user is a direct member of and where the
-        head (PI) of at least one of the users research groups agreed to the consortium terms.
-        Consortiums without an agreement of the users groups are excluded: their submissions
-        are neither visible nor shareable for the user."""
+        """Returns the tags of all consortiums the user is a member of (directly or via one of
+        their research groups) where the head (PI) of at least one of the users research groups
+        agreed to the consortium terms. Consortiums without an agreement of the users groups are
+        excluded: their submissions are neither visible nor shareable for the user."""
         query = (
-            "MATCH (u:User {tag : $user_tag})-[:MEMBER_OF]->(c:Consortium) "
-            "WHERE EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) } "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MATCH (c:Consortium) "
+            "WHERE ((u)-[:MEMBER_OF]->(c) "
+            "   OR EXISTS { MATCH (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(c) }) "
+            "AND EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) } "
             "RETURN DISTINCT c.tag, c.created_at ORDER BY c.created_at DESC "
         )
         if limit is not None:
@@ -198,17 +205,33 @@ class Neo4JConsortium(ConsortiumABC):
 
     def revoke_terms(self, consortium_tag : str, group_tag : str) -> bool:
         """Revokes the research groups agreement to the consortium terms. The users of the
-        group can then neither share into nor see the submissions of the consortium."""
+        group can then neither share into nor see the submissions of the consortium. All
+        shares of the groups submissions with the consortium (pending share requests and
+        approved shares) are revoked as well.
+
+        Returns False when the group has no terms agreement with the consortium."""
+        exists_query = (
+            "MATCH (:ResearchGroup {tag : $group_tag})-[t:CONSORTIUM_TERMS]->(:Consortium {tag : $consortium_tag}) "
+            "RETURN count(t) AS terms "
+        )
+        r = self._driver.execute_query(exists_query, routing_="r", consortium_tag = consortium_tag,
+                                       group_tag = group_tag, result_transformer_=Result.value)
+        if len(r) == 0 or r[0] == 0:
+            return False
+
         query = (
             "MATCH (rg:ResearchGroup {tag : $group_tag})-[t:CONSORTIUM_TERMS]->(c:Consortium {tag : $consortium_tag}) "
-            "DELETE t "
-            "RETURN count(t) "
+            "WITH rg, c, t "
+            "OPTIONAL MATCH (member:User)-[:MEMBER_OF]->(rg) "
+            "OPTIONAL MATCH (member)-[:CREATED]->(s:Submission)-[sh:SHARED_WITH]->(c) "
+            "DELETE sh, t "
+            "RETURN count(t) AS deleted_terms, count(sh) AS revoked_shares "
         )
         r = self._driver.execute_query(query, routing_="w", consortium_tag = consortium_tag,
-                                       group_tag = group_tag, result_transformer_=Result.value)
+                                       group_tag = group_tag, result_transformer_=Result.data)
         invalidate_all_cached_scopes()  # the revocation affects the scope of all group users
-        return r[0] > 0
-
+        return len(r) > 0 and r[0].get("deleted_terms", 0) > 0
+    
     def user_has_terms(self, consortium_tag : str, user_tag : str) -> bool:
         """Checks if the head (PI) of at least one of the users research groups agreed to the
         consortium terms"""
@@ -232,11 +255,15 @@ class Neo4JConsortium(ConsortiumABC):
         return list(r) if r else []
 
     def find_consortiums_with_pending_terms_for_user(self, user_tag : str) -> List[str]:
-        """Returns the tags of the consortiums the user is a direct member of where the head (PI)
-        of none of the users research groups agreed to the terms yet"""
+        """Returns the tags of the consortiums the user is a member of (directly or via one of
+        their research groups) where the head (PI) of none of the users research groups agreed
+        to the terms yet"""
         query = (
-            "MATCH (u:User {tag : $user_tag})-[:MEMBER_OF]->(c:Consortium) "
-            "WHERE NOT EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) } "
+            "MATCH (u:User {tag : $user_tag}) "
+            "MATCH (c:Consortium) "
+            "WHERE ((u)-[:MEMBER_OF]->(c) "
+            "   OR EXISTS { MATCH (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(c) }) "
+            "AND NOT EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) } "
             "RETURN DISTINCT c.tag ORDER BY c.tag "
         )
         r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, result_transformer_=Result.value)

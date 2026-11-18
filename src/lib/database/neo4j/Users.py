@@ -279,6 +279,42 @@ class Neo4JUser(UserABC):
         invalidate_cached_user(tag)
         return True
     
+    def ensure_role_at_least(self, tag : str, role : int) -> bool:
+        """Raises the user's role to the given role if the current role is lower.
+        Existing higher roles (e.g. curator, admin) are never lowered.
+
+        Parameters
+        ----------
+        tag : str
+            The user's tag.
+        role : int
+            The minimum role the user should have.
+
+        Returns
+        -------
+        bool
+            True if the user's role was raised, False if it was already
+            at least the given role.
+        """
+        query = (
+            "MATCH (u:User {tag : $tag}) "
+            "WHERE coalesce(u.role, 0) < $role "
+            "SET u.role = $role "
+            "RETURN u.role "
+        )
+        try:
+            r = self._driver.execute_query(query,
+                                        routing_="w",
+                                        tag = tag,
+                                        role = int(role),
+                                        result_transformer_=Result.value)
+        except Exception as e:
+            print("Query ensure_role_at_least resulted in an error " + str(e))
+            return False
+        if len(r) > 0:
+            invalidate_cached_user(tag)
+        return len(r) > 0
+    
     def count(self, exclude_inactive : bool = True) -> int:
         ""
         query = "MATCH (u:User) "

@@ -1656,6 +1656,27 @@ class Neo4JSubmissions(SubmissionsABC):
         for collaborator_tag in collaborator_tags:
             invalidate_cached_scope(collaborator_tag)
         return len(r) > 0
+    
+    def get_collaborator_tags(self, tag: str) -> List[str]:
+        "Returns the user tags of the collaborators of the submission."
+        query = (
+            "MATCH (u:User)-[:COLLABORATES]->(s:Submission {tag : $tag}) "
+            "RETURN u.tag ORDER BY u.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
+        return r
+
+    def remove_collaborator(self, tag: str, user_tag: str) -> bool:
+        "Removes the collaboration access (COLLABORATES) of the given user for the submission. Returns False when the user was not a collaborator."
+        query = (
+            "MATCH (s:Submission {tag : $tag}) "
+            "MATCH (u:User {tag : $user_tag})-[collab:COLLABORATES]->(s) "
+            "DELETE collab "
+            "RETURN count(collab) AS removed "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, result_transformer_=Result.data)
+        invalidate_cached_scope(user_tag)
+        return len(r) > 0 and r[0].get("removed", 0) > 0
 
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver, users : UserABC, research_groups : ResearchGroupABC, consortiums : ConsortiumABC = None) -> None:
