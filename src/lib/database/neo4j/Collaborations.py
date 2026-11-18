@@ -306,7 +306,7 @@ class Neo4JCollaborations(CollaborationsABC):
         query = (
             "MATCH (cr:CollaborationRequest)-[:FOR_SUBMISSION]->(s:Submission {tag : $submission_tag}) "
             "RETURN cr.tag AS tag, s.tag AS submission_tag, cr.requested_by AS requested_by, "
-            "cr.created_at AS created_at, cr.requested_for_user_tag AS requested_for_user_with, "
+            "cr.created_at AS created_at, cr.requested_for_user_tag AS requested_for_user_tag, "
             "cr.requested_for_group_tag AS requested_for_group_tag, cr.message AS message, cr.status AS status "
         )
         r = self._driver.execute_query(query, submission_tag = submission_tag, result_transformer_=Result.data)
@@ -357,6 +357,7 @@ class Neo4JCollaborations(CollaborationsABC):
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
+            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, false) } "
             "WITH s, "
             "[ca_tag IN $ca_tags WHERE COUNT { (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag}) } > 0] AS matched_ca_tags, "
             "[user_tag IN $user_tags WHERE COUNT { (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) } > 0] AS matched_user_tags "

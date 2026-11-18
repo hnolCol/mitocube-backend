@@ -13,7 +13,7 @@ class ResearchGroupABC(ABC):
         " "
     @abstractmethod
     def exists(self, tag : str) -> bool:
-        "" 
+        """ Checks if a research group with the given tag exists in the database."""
     @abstractmethod
     def get(self, tag : str) -> ResearchGroupModel:
         ""
@@ -36,12 +36,14 @@ class ResearchGroupABC(ABC):
         
     @abstractmethod    
     def insert(self, research_group):
-        "" 
+        """
+        Inserts a new research group into the database.
+        """
         
         
     @abstractmethod
     def delete(self, tag : str) -> bool:
-        "" 
+        ""
         
         
     @abstractmethod
@@ -58,7 +60,29 @@ class ResearchGroupABC(ABC):
 
     @abstractmethod
     def is_head(self, user_tag : str, group_tag : str = None) -> bool:
-        "Checks if the user is a head (PI) of the given research group. If no group tag is given, checks if the user is a head of any research group."
+        """Checks if the user is a head (PI) of the given research group (or of any group if no group tag is given)"""
+
+    @abstractmethod
+    def get_headed_group_tags(self, user_tag : str) -> List[str]:
+        """Returns the tags of the research groups the user is a head (PI) of"""
+
+    @abstractmethod
+    def get_shared_submissions_overview(self, user_tag : str) -> List[Dict]:
+        """Returns the sharing overview for the head (PI): per submission of the user and their
+        headed groups, the owner, the shared consortiums (approved and pending) and the
+        collaborating users"""
+
+    @abstractmethod
+    def get_explore_disabled(self, tag : str) -> bool:
+        "Returns whether the head (PI) of the research group disabled the explore visibility of the groups submissions"
+
+    @abstractmethod
+    def set_explore_disabled(self, tag : str, disabled : bool) -> bool:
+        "Sets whether the head (PI) of the research group disabled the explore visibility of the groups submissions. When disabling, all collaboration access (COLLABORATES) of the groups submissions is revoked"
+
+    @abstractmethod
+    def get_explore_disabled_group_tags(self) -> List[str]:
+        "Returns the tags of all research groups whose head (PI) disabled the explore visibility"
 
     @abstractmethod
     def set_head(self, group_tag : str, user_tag : str):

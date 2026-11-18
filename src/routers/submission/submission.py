@@ -33,7 +33,7 @@ from config.models.submissions.runs import RunListRequestPropsModel, RunListResp
 
 
 
-from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin, is_creator_of_submission_or_curator, is_curator_or_scoped_group_curator
+from services.users import get_user_from_token, is_user_at_least_curator, is_user_admin, is_creator_of_submission_or_curator, is_collaboration_manager_of_submission, is_curator_or_scoped_group_curator
 from services.submission import check_submission_access
 
 
@@ -420,6 +420,22 @@ def add_collaborators(submission_tag: str, collaborators: str, replace: bool = T
     ok = db.submissions.set_collaborators(tag=submission_tag, collaborator_tags=collaborator_tags, replace=replace)
     if not ok:
         raise HTTPException(status_code=500, detail="There was an error when updating the collaborators.")
+    return True
+
+@router.get("/submissions/{submission_tag}/collaborators", summary="Returns the user tags of the collaborators of the submission.")
+def get_collaborators(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """Returns the user tags of the collaborators of the submission."""
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    return db.submissions.get_collaborator_tags(tag = submission_tag)
+
+@router.delete("/submissions/{submission_tag}/collaborators/{user_tag}", summary="Removes the collaboration access of the given user for the submission. Requires the creator of the submission, the head (PI) of the creators research group or a curator.")
+def remove_collaborator(submission_tag : str, user_tag : str, user : UserModel = Depends(is_collaboration_manager_of_submission), db : DatabaseABC = Depends(get_db)) -> bool:
+    """Removes the collaboration access (COLLABORATES) of the given user for the submission."""
+    if not db.users.exists(tag = user_tag):
+        raise user_not_found
+    ok = db.submissions.remove_collaborator(tag = submission_tag, user_tag = user_tag)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"User with tag {user_tag} is not a collaborator of the submission.")
     return True
 
 @router.get("/submissions/{submission_tag}/owner")

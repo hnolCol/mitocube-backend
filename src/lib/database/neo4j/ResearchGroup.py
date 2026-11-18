@@ -1,11 +1,10 @@
-from typing import List, Tuple, Literal
+from typing import List, Tuple, Literal, Dict              
 from neo4j import Driver, Result
 import pandas as pd 
 from services.encryption import create_hierarchical_hash
 from lib.database.abstract.ResearchGroup import ResearchGroupABC
 from config.models.researchgroup import ResearchGroupInput, ResearchGroupModel
-from lib.cache.scope_cache import invalidate_cached_scope
-
+from lib.cache.scope_cache import invalidate_cached_scope, invalidate_all_cached_scopes
 
 class Neo4JResearchGroup(ResearchGroupABC):
     
@@ -269,6 +268,38 @@ class Neo4JResearchGroup(ResearchGroupABC):
             )
             r = self._driver.execute_query(query, user_tag = user_tag, result_transformer_=Result.value)
         return r[0]
+    
+    def get_headed_group_tags(self, user_tag : str) -> List[str]:
+        """Returns the tags of the research groups the user is a head (PI) of"""
+        query = (
+            "MATCH (u:User {tag : $user_tag})-[:HEAD_OF]->(rg:ResearchGroup) "
+            "RETURN rg.tag ORDER BY rg.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, result_transformer_=Result.value)
+        return r
+
+    def get_shared_submissions_overview(self, user_tag : str) -> List[Dict]:
+        """Returns the sharing overview for the head (PI): one entry per submission created by
+        the user or by a member of a group they head, with the submission and owner tags, the
+        consortiums the submission is shared with (approved and pending) and the collaborating
+        users (via approved collaboration requests, excluding the owner)."""
+        query = (
+            "MATCH (owner:User)-[:CREATED]->(s:Submission) "
+            "WHERE owner.tag = $user_tag "
+            "   OR EXISTS { MATCH (owner)-[:MEMBER_OF]->(:ResearchGroup)<-[:HEAD_OF]-(:User {tag : $user_tag}) } "
+            "OPTIONAL MATCH (s)-[sh:SHARED_WITH]->(c:Consortium) "
+            "WITH s, owner, "
+            "     [x IN collect(DISTINCT CASE WHEN sh.status = 'approved' THEN c.tag END) WHERE x IS NOT NULL] AS consortium_tags, "
+            "     [x IN collect(DISTINCT CASE WHEN sh.status = 'pending' THEN c.tag END) WHERE x IS NOT NULL] AS pending_consortium_tags "
+            "OPTIONAL MATCH (collaborator:User)-[:COLLABORATES]->(s) "
+            "WITH s, owner, consortium_tags, pending_consortium_tags, collect(DISTINCT collaborator.tag) AS all_collaborators "
+            "RETURN s.tag AS submission_tag, owner.tag AS owner_tag, consortium_tags, "
+            "       pending_consortium_tags, "
+            "       [x IN all_collaborators WHERE x <> owner.tag] AS collaborator_tags "
+            "ORDER BY s.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, result_transformer_=Result.data)
+        return r
 
     def set_head(self, group_tag : str, user_tag : str):
         """Makes the user a head (PI) of the research group. The user must be a member of the research group."""
@@ -294,6 +325,54 @@ class Neo4JResearchGroup(ResearchGroupABC):
             "DELETE r"
         )
         self._driver.execute_query(query, routing_="w", group_tag = group_tag, user_tag = user_tag)
+    
+    def get_explore_disabled(self, tag : str) -> bool:
+        """Returns whether the head (PI) of the research group disabled the explore
+        visibility of the groups submissions. Defaults to False."""
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag}) "
+            "RETURN coalesce(rg.explore_disabled, false) "
+        )
+        r = self._driver.execute_query(query, tag = tag, routing_ = "r", result_transformer_ = Result.value)
+        if len(r) == 0: return False
+        return bool(r[0])
+
+    def set_explore_disabled(self, tag : str, disabled : bool) -> bool:
+        """Sets whether the head (PI) of the research group disabled the explore
+        visibility of the groups submissions. Requires the head (PI) of the group or a curator (router enforced).
+        When disabling, all collaboration access (COLLABORATES) of the groups submissions is revoked and
+        pending collaboration requests for them are deleted, mirroring disagreeing to consortium terms
+        revoking the consortium shares."""
+        if not self.exists(tag): raise ValueError(f"Research group with tag {tag} does not exist.")
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag}) "
+            "SET rg.explore_disabled = $disabled "
+            "RETURN rg.tag "
+        )
+        r = self._driver.execute_query(query, tag = tag, disabled = bool(disabled), routing_ = "w", result_transformer_ = Result.value)
+        if disabled and len(r) > 0:
+            revoke_query = (
+                "MATCH (rg:ResearchGroup {tag : $tag})<-[:MEMBER_OF]-(:User)-[:CREATED]->(s:Submission) "
+                "OPTIONAL MATCH (u:User)-[collab:COLLABORATES]->(s) "
+                "DELETE collab "
+                "WITH DISTINCT s "
+                "OPTIONAL MATCH (cr:CollaborationRequest)-[:FOR_SUBMISSION]->(s) "
+                "WHERE cr.status = 'pending' "
+                "DELETE cr "
+                "RETURN true "
+            )
+            self._driver.execute_query(revoke_query, routing_ = "w", tag = tag)
+            invalidate_all_cached_scopes()
+        return len(r) > 0
+
+    def get_explore_disabled_group_tags(self) -> List[str]:
+        "Returns the tags of all research groups whose head (PI) disabled the explore visibility"
+        query = (
+            "MATCH (rg:ResearchGroup) "
+            "WHERE coalesce(rg.explore_disabled, false) "
+            "RETURN rg.tag ORDER BY rg.tag "
+        )
+        return self._driver.execute_query(query, routing_ = "r", result_transformer_ = Result.value)
 
     def set_subgroup(self, parent_tag : str, child_tag : str):
         "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."
