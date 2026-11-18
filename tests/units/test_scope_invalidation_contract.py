@@ -82,6 +82,10 @@ class ConsortiumFakeDriver:
         query = args[0] if args else kwargs.get("query") or ""
         if isinstance(query, str) and "RETURN DISTINCT d.tag" in query:
             return []
+        if isinstance(query, str) and "RETURN count(t) AS terms" in query:
+            return [1]
+        if isinstance(query, str) and "RETURN count(t) AS deleted_terms" in query:
+            return [{"deleted_terms": 1, "revoked_shares": 0}]
         return [True]
 
 

@@ -177,10 +177,19 @@ class TestConsortiumTerms:
         assert "t.agreed_by = $user_tag" in agree[0]
 
     def test_revoke_terms_deletes_terms_relation(self):
-        driver = ScriptedDriver()
+        driver = ScriptedDriver(responses=[
+            ("RETURN count(t) AS terms", [1]),
+            ("RETURN count(t) AS deleted_terms", [{"deleted_terms": 1, "revoked_shares": 0}]),
+        ])
         db = make_db(driver)
         assert db.revoke_terms("cons-1", "rg-1") is True
-        assert any("CONSORTIUM_TERMS" in q and "DELETE t" in q for q in driver.queries)
+        assert any("CONSORTIUM_TERMS" in q and "DELETE sh, t" in q for q in driver.queries)
+
+    def test_revoke_terms_returns_false_without_agreement(self):
+        driver = ScriptedDriver(responses=[("RETURN count(t) AS terms", [0])])
+        db = make_db(driver)
+        assert db.revoke_terms("cons-1", "rg-1") is False
+        assert not any("DELETE sh, t" in q for q in driver.queries)
 
     def test_user_has_terms_checks_group_agreement(self):
         driver = ScriptedDriver(responses=[("RETURN EXISTS {", [True])])
@@ -195,7 +204,9 @@ class TestConsortiumTerms:
         db = make_db(driver)
         assert db.find_by_user_with_terms(user_tag="u-1", limit=None) == ["cons-1"]
         query = [q for q in driver.queries if "CONSORTIUM_TERMS" in q][0]
-        assert "WHERE EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) }" in query
+        assert "(u)-[:MEMBER_OF]->(c)" in query
+        assert "OR EXISTS { MATCH (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(c) }" in query
+        assert "AND EXISTS { MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c) }" in query
 
     def test_find_pending_terms_for_head_returns_records(self):
         records = [{"group_tag": "rg-1", "consortium_tag": "cons-1"}]
@@ -243,15 +254,14 @@ class TestDirectMembershipReads:
             for q in driver.queries
         )
 
-    def test_find_by_user_uses_direct_membership(self):
+    def test_find_by_user_includes_direct_and_group_membership(self):
         driver = ScriptedDriver(responses=[("RETURN DISTINCT c.tag", [["cons-1", 123]])])
         db = make_db(driver)
         assert db.find_by_user(user_tag="u-1", limit=None) == ["cons-1"]
-        assert any(
-            "(u:User {tag : $user_tag})-[:MEMBER_OF]->(c:Consortium)" in q
-            and "ResearchGroup" not in q
-            for q in driver.queries
-        )
+        query = driver.queries[0]
+        assert "(u:User {tag : $user_tag})" in query
+        assert "(u)-[:MEMBER_OF]->(c)" in query
+        assert "EXISTS { MATCH (u)-[:MEMBER_OF]->(:ResearchGroup)-[:MEMBER_OF]->(c) }" in query
 
     def test_get_eligible_user_tags_traverses_groups(self):
         driver = ScriptedDriver(responses=[("RETURN DISTINCT u.tag", ["u-1"])])
