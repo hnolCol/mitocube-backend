@@ -11,7 +11,7 @@ from services.random_generators import get_random_string
 
 
 # attribute tags of the storage group used for plates
-PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "plate_type": "att_plate_type", "vendor": "att_vendor"}
+PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "plate_type": "att_plate_type", "vendor": "att_vendor", "plate_color" : "att_plate_color"}
 
 # attributes + traits the plates need; created on startup if missing (existing ones are never changed)
 STORAGE_GROUP_TAG = "storage"
@@ -33,6 +33,16 @@ STORAGE_ATTRIBUTES = [
     ]},
     {"tag": "att_vendor", "text": "Vendor", "traits": [
         {"value": "thermo_fisher", "text": "Thermo Fisher Scientific", "description": "Thermo Fisher Scientific"},
+    ]},
+    {"tag": "att_plate_color", "text": "Plate Color", "traits": [
+        {"value": "black", "text": "Black", "description": "Black plate"},
+        {"value": "blue", "text": "Blue", "description": "Blue plate"},
+        {"value": "green", "text": "Green", "description": "Green plate"},
+        {"value": "yellow", "text": "Yellow", "description": "Yellow plate"},
+        {"value": "purple", "text": "Purple", "description": "Purple plate"},
+        {"value": "red", "text": "Red", "description": "Red plate"},
+        {"value": "clear", "text": "Clear", "description": "Clear plate"},
+        {"value": "white", "text": "White", "description": "White plate"},
     ]},
 ]
 
@@ -73,6 +83,7 @@ class Neo4JPlates(PlatesABC):
         f"   format: coalesce(p.format, {_trait_text('format_attribute_tag')}), "
         f"   cold_storage: {_trait_text('cold_storage_attribute_tag')}, "
         f"   plate_type: {_trait_text('plate_type_attribute_tag')}, "
+        f"   plate_color: {_trait_text('plate_color_attribute_tag')}, "
         f"   vendor: {_trait_text('vendor_attribute_tag')}"
         "} AS plate "
     )
