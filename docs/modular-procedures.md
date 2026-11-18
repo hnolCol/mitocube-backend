@@ -21,7 +21,7 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 | **Modular procedure** | A workflow module (like an SOP): title, description, condition applications (instruments, protocols, treatments via the attribute/trait system) and linked protocols. Drafts are editable; **publishing** freezes the content with a SHA-256 hash. |
 | **Version** | Published procedures are immutable, but a new **draft version** can be created from a published one (`POST /{tag}/versions`). Versions of one procedure share a `lineage_tag` and are chained via `PREVIOUS_VERSION`. Submissions stay linked to the exact version they were assigned to. |
 | **Link** | `(Submission)-[:IN_PROCEDURE {position, created_at, done, done_at, done_by}]->(Procedure)`. A submission can be linked to several procedures over its lifetime (the module history), but **only one open (not done) module at a time**. |
-| **Execution** | A concrete run of a published procedure: input plate wells (with samples) are mapped to output plate wells; pooling and splitting are supported. Executing marks the submissions owning the input samples as **done**. |
+| **Execution** | A concrete run of a published procedure: input plate wells (with samples) are mapped to output plate wells; pooling and splitting are supported. An execution starts in the **RUNNING** state and is closed by an explicit confirmation (`finish`: SUCCEEDED / FAILED / ABORTED) that frees the submissions owning the placed samples for the next module. |
 | **Well metric** | A measured value of an output well, e.g. the protein concentration. Metrics follow the condition-application pattern: each value is a node that is an **instance of a trait** (the trait defines the measured quantity, e.g. *µg/µL* of the *Concentration* attribute). |
 
 ## Data model
@@ -30,13 +30,17 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 (:ModularProcedure {tag, title, description, status: DRAFT|PUBLISHED, version, lineage_tag,
                     content_hash, created_at, published_at, user_tag})
     -[:HAS_CONDITION_APPLICATION]-> (:ConditionApplication)
+    -[:ACCEPTS_INPUT_ATTRIBUTE]->   (:Attribute)
+    -[:EXPECTS_OUTPUT_ATTRIBUTE]-> (:Attribute)
     -[:HAS_PROTOCOL]->               (:Protocol)
     <-[:PREVIOUS_VERSION]-           (:ModularProcedure)          # newer version
     <-[:IN_PROCEDURE {position, created_at, done, done_at, done_by}]- (:Submission)
     <-[:WAS_EXECUTED]-               (:ModularProcedureExecution)
 
 (:ModularProcedureExecution {tag, procedure_tag, input_plate_tag, output_plate_tag,
-                             user_tag, responsible_user_tag, created_at, done_submission_tags})
+                             user_tag, responsible_user_tag, created_at,
+                             status: RUNNING|SUCCEEDED|FAILED|ABORTED,
+                             finished_at, finished_by, finish_comment, done_submission_tags})
     -[:HAS_WELL]-> (:ExecutionWell {execution_tag, position, row_index, column_index,
                                     side: INPUT|OUTPUT, output_positions})
     -[:EXECUTED]- (:User), (:User)-[:EXECUTED]-> (execution)
@@ -77,10 +81,11 @@ Notes:
 | `DELETE` | `/api/procedures/{tag}/link/{submission_tag}/done` | curator+ | Reopen (revert done). |
 | `GET` | `/api/procedures/{tag}/submissions` | all | Submissions linked to a procedure. |
 | `GET` | `/api/procedures/submissions/{submission_tag}` | all | Modules of a submission, ordered by link position (the module history). |
-| `POST` | `/api/procedures/{tag}/execute` | curator+ | Execute a **published** procedure (see below). |
+| `POST` | `/api/procedures/{tag}/execute` | curator+ | Start an execution of a **published** procedure (see below). |
 | `GET` | `/api/procedures/{tag}/executions` | all | Execution tags of a procedure. |
-| `GET` | `/api/procedures/executions/{execution_tag}` | all | One execution with input wells, output wells, samples, CAs and metrics. |
-| `POST` | `/api/procedures/executions/{execution_tag}/metrics` | curator+ | Set or update output well metrics (see below). |
+| `GET` | `/api/procedures/executions/{execution_tag}` | all | One execution with input wells, output wells, samples, CAs, metrics and status. |
+| `POST` | `/api/procedures/executions/{execution_tag}/metrics` | curator+ | Set or update well metrics (see below). |
+| `POST` | `/api/procedures/executions/{execution_tag}/finish` | curator+ | Confirm a running execution with an outcome (SUCCEEDED/FAILED/ABORTED): frees the linked submissions; on success optionally sets the submission state and adopts the condition applications. |
 
 ## Executing a procedure
 
@@ -113,12 +118,51 @@ A1, B1 and C1 — one sample appears in several output wells).
 Validation: the procedure must be published; plates, samples, users and traits must exist;
 well positions must be unique and parseable (`A1` style); input wells must contain samples;
 every transfer target must be a defined output well; **output wells already used by another
-execution on the same plate are rejected**.
+execution on the same plate are rejected**; the input and output plates must match the
+**plate layout constraints** the procedure defines (see below); the responsible user must
+be a **curator** (it defaults to the executing user); metrics must reference declared
+attributes of the procedure.
 
-Side effects: all submissions owning the placed samples are marked **done** in the
-procedure (`done`, `done_at`, `done_by` on the `IN_PROCEDURE` relationship) and recorded in
-`done_submission_tags`. Because of the single-open-module rule this is exactly what frees
-the submissions for the next module.
+The execution is created in the **RUNNING** state: the submissions are **not** freed yet.
+
+### Procedure setup (SOP definition)
+
+A procedure defines more than title/description/condition applications/protocols — it is a
+tightly defined SOP. The setup (insert/update) additionally accepts:
+
+| Field | Meaning |
+|---|---|
+| `input_plate_format` / `input_plate_type` | Required container format (e.g. `8x12` for a 96 well plate) and/or plate type (e.g. a PCR strip) of the **input** plate. `null` = unconstrained. Executions are rejected (400) if the chosen plate does not match. |
+| `output_plate_format` / `output_plate_type` | Same for the **output** plate. |
+| `input_attribute_tags` | Attributes whose values may be entered per **input** well before the run (`allow_input` semantics), e.g. *Concentration*. |
+| `output_attribute_tags` | Attributes for which data are expected on the output wells of a successful run. |
+| `success_submission_state` | Optional submission state (`SubmissionStatesEnums` name, e.g. `PROCESSED`) that is set automatically for the linked **submissions** when an execution is confirmed successful. `null` = the state is not changed. |
+
+Attributes are stored via `(:ModularProcedure)-[:ACCEPTS_INPUT_ATTRIBUTE]->(:Attribute)` and
+`-[:EXPECTS_OUTPUT_ATTRIBUTE]->(:Attribute)`; plate constraints and the success state are
+procedure properties and part of the content hash.
+
+Input well values: `input_well_metrics` (`{position, trait_tag, value, side: "INPUT"}`) records
+the numeric per-well values of the declared input attributes at execution time (e.g. the
+concentration of each sample before harmonization). `output_well_metrics` defaults to
+`side: "OUTPUT"` and keeps its previous meaning.
+
+### Finishing an execution (confirmation)
+
+`POST /api/procedures/executions/{execution_tag}/finish` with `{"outcome": "SUCCEEDED" |
+"FAILED" | "ABORTED", "comment": "..."}` closes a **running** execution. Regardless of the
+outcome the submissions owning the placed samples are marked **done** in the procedure
+(`done`, `done_at`, `done_by` on `IN_PROCEDURE`, recorded in `done_submission_tags`): the
+samples physically stay where the execution placed them (the `IN_WELL` links are kept),
+but the submissions are freed for the next module. Only `SUCCEEDED` additionally:
+
+- sets the optional `success_submission_state` on each linked submission, and
+- makes the submissions **adopt** the condition applications of the module (both the
+  procedure-level ones and the ones applied to the output wells their samples ended up in)
+  via `HAS_APPLICATION`.
+
+The execution node records `status`, `finished_at`, `finished_by` and `finish_comment`.
+Finishing an already finished execution is rejected with 400.
 
 ## Well metrics
 
@@ -132,9 +176,11 @@ WHERE t.tag = $trait AND m.value < $threshold
 RETURN w.execution_tag, w.position, m.value
 ```
 
-Metrics can be supplied at execution time (`output_well_metrics`) or set/updated afterwards
-via `POST /executions/{tag}/metrics` with a list of `{position, trait_tag, value}` entries.
-Duplicate `(position, trait)` pairs are rejected; traits are validated to exist.
+Metrics can be supplied at execution time (`output_well_metrics`, `input_well_metrics`) or
+set/updated afterwards via `POST /executions/{tag}/metrics` with a list of
+`{position, trait_tag, value, side}` entries. Duplicate `(position, trait, side)` pairs are
+rejected; traits are validated to exist.
+
 
 ## Single open module rule
 

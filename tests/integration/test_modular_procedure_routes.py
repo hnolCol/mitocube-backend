@@ -53,7 +53,8 @@ class FakeModularProceduresDB:
                 tag="proc-2", title="SP3 Digestion", description="Digest it.",
                 status="PUBLISHED", version=1, lineage_tag="proc-2", content_hash="abc123", user_tag="abcdefgh",
                 created_at=2.0, published_at=3.0,
-                condition_application_tags=[], protocol_tags=["protocol-2"]),
+                condition_application_tags=["ca-1"], protocol_tags=["protocol-2"],
+                success_submission_state="PROCESSED"),
         }
         self.submission_links = {
             "proc-2": [
@@ -83,6 +84,9 @@ class FakeModularProceduresDB:
         self.done = []
         self.reopened = []
         self.unlinked = []
+        self.finished = []
+        self.set_states = []
+        self.adopted_condition_applications = []
         self.executions = {}
 
     def exists(self, tag):
@@ -129,7 +133,8 @@ class FakeModularProceduresDB:
                 if p.lineage_tag == procedure.lineage_tag]
 
     def insert(self, title, description, user_tag, condition_application_tags=None,
-               condition_application_trees=None, protocol_tags=None):
+               condition_application_trees=None, protocol_tags=None, plate_constraints=None,
+               input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None):
         condition_application_tags = list(condition_application_tags or [])
         for tree in (condition_application_trees or []):
             # simulate the condition application insert: hash-tagged, idempotent
@@ -142,11 +147,19 @@ class FakeModularProceduresDB:
         self.procedures[tag] = ModularProcedureBaseModel(
             tag=tag, title=title, description=description, status="DRAFT", version=1,
             user_tag=user_tag, condition_application_tags=condition_application_tags or [],
-            protocol_tags=protocol_tags or [])
+            protocol_tags=protocol_tags or [],
+            input_plate_format=(plate_constraints or {}).get("input_plate_format"),
+            input_plate_type=(plate_constraints or {}).get("input_plate_type"),
+            output_plate_format=(plate_constraints or {}).get("output_plate_format"),
+            output_plate_type=(plate_constraints or {}).get("output_plate_type"),
+            input_attribute_tags=list(input_attribute_tags or []),
+            output_attribute_tags=list(output_attribute_tags or []),
+            success_submission_state=success_submission_state)
         return tag
 
     def update(self, tag, title, description, user_tag, condition_application_tags=None,
-               condition_application_trees=None, protocol_tags=None):
+               condition_application_trees=None, protocol_tags=None, plate_constraints=None,
+               input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None):
         if tag not in self.procedures:
             raise ValueError("Modular procedure not found.")
         if self.procedures[tag].status == "PUBLISHED":
@@ -238,22 +251,27 @@ class FakeModularProceduresDB:
         responsible_user_tag = execution.responsible_user_tag or user_tag
         if responsible_user_tag == "missing-user":
             raise ValueError("Responsible user not found: missing-user")
-        for metric in execution.output_well_metrics:
-            if metric.position not in {w.position for w in execution.output_wells}:
-                raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
+        all_metrics = list(execution.output_well_metrics) + list(execution.input_well_metrics or [])
+        for metric in all_metrics:
+            side_wells = execution.output_wells if metric.side == "OUTPUT" else execution.input_wells
+            side_name = "output" if metric.side == "OUTPUT" else "input"
+            if metric.position not in {w.position for w in side_wells}:
+                raise ValueError(f"Metrics were given for a non-defined {side_name} well: {metric.position}")
             if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
                 raise ValueError(f"Traits not found: {metric.trait_tag}")
         input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
-        done_submissions = sorted({self.sample_submissions[sample_tag] for sample_tag in input_sample_tags
-                                    if sample_tag in self.sample_submissions})
         execution_tag = "exec-1"
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
             input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
             user_tag=user_tag, responsible_user_tag=responsible_user_tag,
-            created_at=4.0, done_submission_tags=done_submissions,
+            created_at=4.0, status="RUNNING", done_submission_tags=[],
+            input_well_metrics=[{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                                for m in (execution.input_well_metrics or [])],
             input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
-                          "sample_tags": w.sample_tags, "output_positions": w.output_positions}
+                          "sample_tags": w.sample_tags, "output_positions": w.output_positions,
+                          "metrics": [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                                       for m in (execution.input_well_metrics or []) if m.position == w.position]}
                          for w in execution.input_wells],
             output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
                            "sample_tags": [], "condition_application_tags": w.condition_application_tags,
@@ -261,6 +279,35 @@ class FakeModularProceduresDB:
                                        for m in execution.output_well_metrics if m.position == w.position]}
                           for w in execution.output_wells])
         return self.executions[execution_tag]
+
+    def finish_execution(self, execution_tag, outcome, user_tag, comment=None):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        if outcome not in ("SUCCEEDED", "FAILED", "ABORTED"):
+            raise ValueError("Outcome must be SUCCEEDED, FAILED or ABORTED.")
+        execution = self.executions[execution_tag]
+        if execution.status != "RUNNING":
+            raise ValueError("This procedure execution is already finished.")
+        input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
+        done_submissions = sorted({self.sample_submissions[sample_tag] for sample_tag in input_sample_tags
+                                    if sample_tag in self.sample_submissions})
+        for submission_tag in done_submissions:
+            self._set_link_done(execution.procedure_tag, submission_tag, True)
+            self.finished.append((execution_tag, submission_tag, user_tag))
+        if outcome == "SUCCEEDED":
+            self.adopted_condition_applications.extend(
+                (submission_tag, ca_tag)
+                for submission_tag in done_submissions
+                for ca_tag in self.procedures[execution.procedure_tag].condition_application_tags)
+            self.set_states.extend((submission_tag, self.procedures[execution.procedure_tag].success_submission_state)
+                                   for submission_tag in done_submissions
+                                   if self.procedures[execution.procedure_tag].success_submission_state is not None)
+        execution.status = outcome
+        execution.finished_at = 5.0
+        execution.finished_by = user_tag
+        execution.finish_comment = comment
+        execution.done_submission_tags = done_submissions
+        return execution
 
     def get_execution(self, execution_tag):
         if execution_tag not in self.executions:
@@ -277,20 +324,22 @@ class FakeModularProceduresDB:
         if execution_tag not in self.executions:
             raise KeyError("Procedure execution not found.")
         execution = self.executions[execution_tag]
-        output_positions = {w.position for w in execution.output_wells}
-        positions = [m.position for m in well_metrics]
-        if len(set(positions)) != len(positions):
+        metric_keys = [(m.position, m.trait_tag, m.side) for m in well_metrics]
+        if len(set(metric_keys)) != len(metric_keys):
             raise ValueError("Duplicate metric positions are not allowed.")
-        for position in positions:
-            if position not in output_positions:
-                raise ValueError(f"Metrics were given for wells that are not output wells of this execution: {position}")
         for metric in well_metrics:
+            side_wells = execution.output_wells if metric.side == "OUTPUT" else execution.input_wells
+            if metric.position not in {w.position for w in side_wells}:
+                raise ValueError(f"Metrics were given for wells that are not {metric.side.lower()} wells of this execution: {metric.position}")
             if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
                 raise ValueError(f"Traits not found: {metric.trait_tag}")
-        execution.output_wells = [w.model_copy(update={"metrics":
-            list(w.metrics) + [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
-                               for m in well_metrics if m.position == w.position]})
-            for w in execution.output_wells]
+        def _apply(wells, side):
+            return [w.model_copy(update={"metrics":
+                list(w.metrics) + [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
+                                   for m in well_metrics if m.position == w.position and m.side == side]})
+                for w in wells]
+        execution.output_wells = _apply(execution.output_wells, "OUTPUT")
+        execution.input_wells = _apply(execution.input_wells, "INPUT")
         return execution
 
 
@@ -455,7 +504,10 @@ class TestModularProcedureExecutionRoutes:
         body = resp.json()
         assert body["tag"] == "exec-1"
         assert body["procedure_tag"] == "proc-2"
-        assert body["done_submission_tags"] == ["subm-1", "subm-2"]
+        # the execution starts RUNNING: the submissions are only freed on confirmation
+        assert body["status"] == "RUNNING"
+        assert body["done_submission_tags"] == []
+        assert body["finished_at"] is None
         assert len(body["input_wells"]) == 2
         assert body["input_wells"][0]["sample_tags"] == ["sample-1", "sample-2"]
         assert body["input_wells"][1]["output_positions"] == ["A1", "B1", "C1"]
@@ -677,8 +729,12 @@ class TestModularProcedureMultipleSubmissions:
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         assert resp.status_code == 200
         body = resp.json()
-        # both submissions own samples on the input plate -> both are done after the execution
-        assert body["done_submission_tags"] == ["subm-1", "subm-2"]
+        # both submissions own samples on the input plate -> both are freed once the execution is confirmed
+        assert body["done_submission_tags"] == []
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+        assert resp.status_code == 200
+        assert resp.json()["done_submission_tags"] == ["subm-1", "subm-2"]
+        assert resp.json()["status"] == "SUCCEEDED"
 
     def test_execute_marks_only_submissions_with_input_samples_done(self, client):
         resp = client.post("/api/procedures/proc-2/execute", json={
@@ -688,7 +744,88 @@ class TestModularProcedureMultipleSubmissions:
             ],
             "output_wells": [{"position": "A1", "condition_application_tags": []}]})
         assert resp.status_code == 200
+        assert resp.json()["done_submission_tags"] == []
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "ABORTED"})
+        assert resp.status_code == 200
         assert resp.json()["done_submission_tags"] == ["subm-1"]
+        assert resp.json()["status"] == "ABORTED"
+
+class TestModularProcedureExecutionFinishRoutes:
+    def _execute(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "RUNNING"
+
+    def _db(self, client):
+        return client.app.dependency_overrides[get_db]().modular_procedures
+
+    def test_finish_success_frees_submissions_and_adopts_condition_applications(self, client):
+        self._execute(client)
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "SUCCEEDED"
+        assert body["finished_by"] == "abcdefgh"
+        assert body["done_submission_tags"] == ["subm-1"]
+        db = self._db(client)
+        assert ("subm-1", "ca-1") in db.adopted_condition_applications
+        assert ("subm-1", "PROCESSED") in db.set_states
+
+    def test_finish_failed_frees_submissions_but_adopts_nothing(self, client):
+        self._execute(client)
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "FAILED", "comment": "robot error"})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "FAILED"
+        assert body["finish_comment"] == "robot error"
+        assert body["done_submission_tags"] == ["subm-1"]
+        db = self._db(client)
+        assert db.set_states == []
+        assert db.adopted_condition_applications == []
+
+    def test_finish_frees_submission_for_next_module(self, client):
+        self._execute(client)
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 400
+        client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+        resp = client.post("/api/procedures/proc-1/link/subm-1")
+        assert resp.status_code == 200
+
+    def test_finish_twice_rejected(self, client):
+        self._execute(client)
+        client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "ABORTED"})
+        assert resp.status_code == 400
+        assert "already finished" in resp.json()["detail"]
+
+    def test_finish_invalid_outcome_rejected(self, client):
+        self._execute(client)
+        resp = client.post("/api/procedures/executions/exec-1/finish", json={"outcome": "RUNNING"})
+        assert resp.status_code == 422
+
+    def test_finish_missing_execution_404(self, client):
+        resp = client.post("/api/procedures/executions/does-not-exist/finish", json={"outcome": "SUCCEEDED"})
+        assert resp.status_code == 404
+
+    def test_standard_user_rejected_on_finish(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/executions/exec-1/finish", json={"outcome": "SUCCEEDED"})
+            assert resp.status_code == 403
+
+    def test_execute_with_input_well_metrics(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}],
+            "input_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 1.5, "side": "INPUT"}]})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["input_wells"][0]["metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 1.5}]
+        assert body["input_well_metrics"] == [{"trait_tag": "trait-ugul", "attribute_tag": "att_concentration", "value": 1.5}]
+
 
 class TestSingleOpenModuleConstraint:
     def test_link_submission_with_open_link_elsewhere_rejected(self, client):

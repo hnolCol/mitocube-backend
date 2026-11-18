@@ -7,6 +7,7 @@ from config.models.user import UserModel
 from services.attribute_hierarchy import validate_attribute_trees
 from config.models.procedures import (
     ExecutionWellMetricModel,
+    FinishProcedureExecutionModel,
     InsertModularProcedureModel,
     InsertProcedureExecutionModel,
     ModularProcedureBaseModel,
@@ -16,6 +17,17 @@ from config.models.procedures import (
     UpdateModularProcedureModel,
 )
 from services.users import get_user_from_token, is_user_at_least_curator
+
+
+
+def _plate_constraints(procedure) -> dict:
+    "Extracts the plate layout constraints defined in the procedure setup."
+    return {
+        "input_plate_format": procedure.input_plate_format,
+        "input_plate_type": procedure.input_plate_type,
+        "output_plate_format": procedure.output_plate_format,
+        "output_plate_type": procedure.output_plate_type,
+    }
 
 
 
@@ -92,7 +104,11 @@ def insert_modular_procedure(procedure : InsertModularProcedureModel, user : Use
         tag = db.modular_procedures.insert(title=procedure.title, description=procedure.description, user_tag=user.tag,
                                           condition_application_tags=procedure.condition_application_tags,
                                           condition_application_trees=procedure.condition_application_trees,
-                                          protocol_tags=procedure.protocol_tags)
+                                          protocol_tags=procedure.protocol_tags,
+                                          plate_constraints=_plate_constraints(procedure),
+                                          input_attribute_tags=procedure.input_attribute_tags,
+                                          output_attribute_tags=procedure.output_attribute_tags,
+                                          success_submission_state=procedure.success_submission_state)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return db.modular_procedures.get(tag=tag)
@@ -114,7 +130,11 @@ def update_modular_procedure(procedure_tag : str, updated_procedure : UpdateModu
         db.modular_procedures.update(tag=procedure_tag, title=updated_procedure.title, description=updated_procedure.description,
                                      user_tag=user.tag, condition_application_tags=updated_procedure.condition_application_tags,
                                      condition_application_trees=updated_procedure.condition_application_trees,
-                                     protocol_tags=updated_procedure.protocol_tags)
+                                     protocol_tags=updated_procedure.protocol_tags,
+                                     plate_constraints=_plate_constraints(updated_procedure),
+                                     input_attribute_tags=updated_procedure.input_attribute_tags,
+                                     output_attribute_tags=updated_procedure.output_attribute_tags,
+                                     success_submission_state=updated_procedure.success_submission_state)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return db.modular_procedures.get(tag=procedure_tag)
@@ -187,6 +207,21 @@ def execute_modular_procedure(procedure_tag : str, execution : InsertProcedureEx
         raise HTTPException(status_code=404, detail="Modular procedure not found.")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/executions/{execution_tag}/finish", response_model=ProcedureExecutionModel)
+def finish_modular_procedure_execution(execution_tag : str, confirmation : FinishProcedureExecutionModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Confirms a running procedure execution with its outcome (SUCCEEDED, FAILED or ABORTED).
+    Regardless of the outcome the linked submissions are freed for the next module; only a
+    successful confirmation sets the procedure's optional submission state and makes the
+    submissions adopt the condition applications of the module. The user must be at least curator."""
+    try:
+        return db.modular_procedures.finish_execution(execution_tag=execution_tag, outcome=confirmation.outcome,
+                                                      user_tag=user.tag, comment=confirmation.comment)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @router.get("/{procedure_tag}/versions", response_model=List[str])
 def get_modular_procedure_versions(procedure_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:

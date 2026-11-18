@@ -29,10 +29,18 @@ class ModularProceduresABC(ABC):
     def insert(self, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
                condition_application_trees: List = None,
-               protocol_tags: List[str] = None) -> str:
+               protocol_tags: List[str] = None,
+               plate_constraints: dict = None,
+               input_attribute_tags: List[str] = None,
+               output_attribute_tags: List[str] = None,
+               success_submission_state: str = None) -> str:
         """Adds a new draft modular procedure. Condition applications can be reused by
         tag or newly defined as hierarchical attribute/trait trees (like when inserting
         a submission); trees are resolved to condition application tags on insert.
+        plate_constraints optionally fixes the required input/output plate format and
+        type; input/output attribute tags declare the per-well attributes of the
+        procedure; success_submission_state optionally names a submission state that
+        is set automatically for the linked submissions on a successful execution.
         Returns the tag of the created procedure.
         Raises a ValueError if a procedure with the same tag already exists."""
 
@@ -52,7 +60,11 @@ class ModularProceduresABC(ABC):
     def update(self, tag: str, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
                condition_application_trees: List = None,
-               protocol_tags: List[str] = None) -> bool:
+               protocol_tags: List[str] = None,
+               plate_constraints: dict = None,
+               input_attribute_tags: List[str] = None,
+               output_attribute_tags: List[str] = None,
+               success_submission_state: str = None) -> bool:
         """Updates a draft modular procedure. Condition application trees are resolved
         to tags like on insert.
         Raises a ValueError if the procedure does not exist or is published
@@ -113,12 +125,23 @@ class ModularProceduresABC(ABC):
 
     @abstractmethod
     def execute(self, tag: str, execution, user_tag: str):
-        """Executes a published modular procedure on a set of samples.
+        """Starts a published modular procedure execution on a set of samples.
         Maps input plate wells to output plate wells (pooling and splitting
-        supported) and marks the submissions owning the input samples as done
-        in the procedure.
+        supported). The execution is created in the RUNNING state; the linked
+        submissions are only freed by finish_execution.
         Raises a ValueError if the procedure does not exist, is not published,
-        a plate or sample does not exist or the transfer map is inconsistent."""
+        a plate or sample does not exist, the plates do not match the plate
+        layout constraints of the procedure or the transfer map is inconsistent."""
+
+    @abstractmethod
+    def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None):
+        """Confirms a running procedure execution with its outcome (SUCCEEDED,
+        FAILED or ABORTED). Regardless of the outcome the submissions owning
+        the placed samples are marked done in the procedure (freed for the
+        next module); only on SUCCEEDED the procedure's optional success
+        submission state is set and its condition applications are adopted by
+        the submissions. Raises a KeyError if the execution does not exist and
+        a ValueError if it is already finished or the outcome is invalid."""
 
     @abstractmethod
     def get_execution(self, execution_tag: str):
