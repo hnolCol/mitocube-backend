@@ -10,7 +10,6 @@ TEST_ENV = {
     "MFA_ENCRYPTION_KEY": "MuelleVfjEo1BUsHRtKSsAhF-8VkRY-tCTsNFgaAngs=",
     "frontend_build": str(SRC_DIR),
     "frontend_build_assets": str(SRC_DIR),
-    "use_terms_file": str(SRC_DIR / "app.py"),
     "db_handler": "neo4j",
     "control_proteome_file": str(SRC_DIR.parent / "resources" / "attributes" / "attributes.json"),
     "db_pw": "test-db-pw",
