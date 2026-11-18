@@ -7,9 +7,9 @@ from config.models.user import UserModel
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 from services.pats import get_pat_expires_at_epochmillis
-from services.users import get_user_from_token, is_user_admin
+from services.users import is_user_at_least_curator, is_user_admin
 
-router = APIRouter(dependencies=[Depends(get_user_from_token)],
+router = APIRouter(dependencies=[Depends(is_user_at_least_curator)],
     prefix="/api/auth/pats",
     tags=["Token", "Personal Access Tokens"]
 )
@@ -17,7 +17,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 @router.post("", response_description="Creates a personal access token. The plain token is only shown once.",
              response_model=PATCreatedResponseModel)
-def create_pat(props : PATInsertModel, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> PATCreatedResponseModel:
+def create_pat(props : PATInsertModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> PATCreatedResponseModel:
     """Creates a personal access token (PAT) for the logged in user.
 
     The token is shown exactly once in the response and should be stored in
@@ -36,13 +36,13 @@ def create_pat(props : PATInsertModel, user : UserModel = Depends(get_user_from_
 
 @router.get("", response_description="Returns all personal access tokens of the logged in user.",
             response_model=List[PATResponseModel])
-def list_pats(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[PATResponseModel]:
+def list_pats(user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> List[PATResponseModel]:
     """Returns the metadata of all personal access tokens of the logged in user."""
     return db.pats.list(user_tag=user.tag)
 
 
 @router.delete("/{pat_tag}", response_description="Revokes one of the personal access tokens of the logged in user.")
-def revoke_pat(pat_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> dict:
+def revoke_pat(pat_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> dict:
     """Revokes the personal access token with the given tag.
 
     The token must belong to the logged in user. Revoked tokens immediately

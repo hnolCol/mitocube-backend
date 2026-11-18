@@ -111,6 +111,24 @@ class TestAuthenticatePAT:
         assert e.value.status_code == 429
 
 
+class TestAuthenticatePATAuthz:
+    def test_standard_role_owner_rejected_at_auth(self, no_rate_limit):
+        record = make_record([PATScopeEnum.QC_UPLOAD.value])
+        db = FakeDB(record, FakeUser(role=UserRolesEnum.STANDARD))
+        with pytest.raises(HTTPException) as e:
+            pats_service.authenticate_pat(generate_pat_token(), db)
+        assert e.value.status_code == 403
+
+    def test_router_endpoints_require_curator(self):
+        import routers.authentication.pats as pats_router
+        import services.users as users_service
+        for dependency in pats_router.router.dependencies:
+            assert dependency.dependency is users_service.is_user_at_least_curator
+        assert pats_router.create_pat.__defaults__[0].dependency is users_service.is_user_at_least_curator
+        assert pats_router.list_pats.__defaults__[0].dependency is users_service.is_user_at_least_curator
+        assert pats_router.revoke_pat.__defaults__[0].dependency is users_service.is_user_at_least_curator
+
+
 class TestGetCuratorOrQCUploadPAT:
     def make_request(self, token=None):
         class R:

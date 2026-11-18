@@ -40,6 +40,9 @@ def authenticate_pat(token : str, db : DatabaseABC) -> Tuple[UserModel, PATRespo
         raise credentials_exception
     mfa_runtime.reset_login_failures(rate_key)
     user = check_user_allowed(True, db.users.get_user_by_tag(tag=record["user_tag"]))
+    if user.role < UserRolesEnum.CURATOR:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Personal access tokens are restricted to curators and admins.")
     raise_if_terms_not_accepted(user)
     pat = PATResponseModel(**record["pat"])
     db.pats.touch(pat.tag)
