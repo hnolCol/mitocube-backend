@@ -395,7 +395,6 @@ class FakeDB:
 
 
 def _make_client(user, fake_db=None):
-    import contextlib
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from routers.procedures.procedures import router as procedures_router
@@ -908,7 +907,7 @@ class TestModularProcedureExecutionOverviewRoutes:
                 {"position": "A1", "condition_application_tags": ["ca-heat"]},
                 {"position": "B1", "condition_application_tags": []},
             ],
-            "output_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5, "side": "A"}],
+            "output_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5}],
             "input_well_metrics": [{"position": "A1", "trait_tag": "trait-ugul", "value": 1.0, "side": "INPUT"}]})
         assert resp.status_code == 200
         assert resp.json()["tag"] == tag
