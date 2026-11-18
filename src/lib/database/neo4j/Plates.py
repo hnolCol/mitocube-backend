@@ -194,6 +194,7 @@ class Neo4JPlates(PlatesABC):
             cold_storage=options("cold_storage"),
             plate_type=options("plate_type"),
             vendor=options("vendor"),
+            plate_color=options("plate_color"),
         )
 
     def insert(self, plate : PlateInsertModel, user_tag : str) -> str:
@@ -218,6 +219,7 @@ class Neo4JPlates(PlatesABC):
             (PLATE_ATTRIBUTES["cold_storage"], plate.cold_storage_trait_tag),
             (PLATE_ATTRIBUTES["plate_type"], plate.plate_type_trait_tag),
             (PLATE_ATTRIBUTES["vendor"], plate.vendor_trait_tag),
+            (PLATE_ATTRIBUTES["plate_color"], plate.plate_color_trait_tag),
         ]
         selected = [(a, t) for a, t in selected if t]
         for attribute_tag, trait_tag in selected:

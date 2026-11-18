@@ -18,6 +18,8 @@ class PlateInsertModel(BaseModel):
         Trait of the plate type attribute (e.g. PCR plate (skirted)).
     vendor_trait_tag : str, optional
         Trait of the vendor attribute (e.g. Eppendorf).
+    plate_color_trait_tag : str, optional
+        Trait of the plate color attribute (e.g. Black).
     location : str, optional
         Free text, e.g. 'Rack 3, Shelf 2'.
     description : str, optional
@@ -28,6 +30,7 @@ class PlateInsertModel(BaseModel):
     cold_storage_trait_tag : Optional[str] = None
     plate_type_trait_tag : Optional[str] = None
     vendor_trait_tag : Optional[str] = None
+    plate_color_trait_tag : Optional[str] = None
     location : Optional[str] = None
     description : Optional[str] = None
 
@@ -51,6 +54,7 @@ class PlateModel(BaseModel):
     cold_storage : Optional[str] = None
     plate_type : Optional[str] = None
     vendor : Optional[str] = None
+    plate_color : Optional[str] = None
 
 
 class PlateOptionModel(BaseModel):
@@ -128,3 +132,4 @@ class PlateOptionsModel(BaseModel):
     cold_storage : list[PlateOptionModel] = []
     plate_type : list[PlateOptionModel] = []
     vendor : list[PlateOptionModel] = []
+    plate_color : list[PlateOptionModel] = []
