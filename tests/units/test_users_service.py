@@ -100,11 +100,17 @@ class FakeSubmissionFilterDB:
         return submission_tag in self.accessible_tags
 
 
+class FakePolicyDB:
+    def get_status(self, user_tag):
+        return []
+
+
 class FakeDB:
     def __init__(self, users=None, submissions=None, accessible_tags=None):
         self.users = users or FakeUserDB()
         self.submissions = submissions or FakeSubmissionDB()
         self.submission_filter = FakeSubmissionFilterDB(accessible_tags=accessible_tags)
+        self.policy = FakePolicyDB()
 
 
 def make_user(**overrides):

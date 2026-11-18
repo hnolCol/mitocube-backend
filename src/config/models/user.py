@@ -42,7 +42,6 @@ class UserModel(BasicUserWithEmail):
     """BaseModel for a user"""
     
     updated_at : float = None
-    agreed_to_terms : Optional[bool] = None
     expires_after : float = None
     password : SecretStr = None
     allow_login : bool = True 
@@ -73,7 +72,6 @@ class UserInsertModel(BaseModel):
     institute : Optional[str] = None  
     research_group_tags : List[str] = Field(..., min_length=1)  
     email : EmailStr 
-    agreed_to_terms : Optional[bool] = False
     expires_after : float = None
     password : SecretStr 
     allow_login : bool = True 
@@ -92,7 +90,6 @@ class UserCreateModel(BaseModel):
     email : EmailStr 
     role : UserRolesEnum = UserRolesEnum.STANDARD
     allow_login : bool = True 
-    agreed_to_terms : Optional[bool] = False
     #salt : str = None
 
 

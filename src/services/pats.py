@@ -43,7 +43,7 @@ def authenticate_pat(token : str, db : DatabaseABC) -> Tuple[UserModel, PATRespo
     if user.role < UserRolesEnum.CURATOR:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Personal access tokens are restricted to curators and admins.")
-    raise_if_terms_not_accepted(user)
+    raise_if_terms_not_accepted(user, db)
     pat = PATResponseModel(**record["pat"])
     db.pats.touch(pat.tag)
     return user, pat

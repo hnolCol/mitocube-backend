@@ -154,7 +154,7 @@ def get_user_from_token(token = Depends(check_token_verified), db : DatabaseABC 
             cache_user(user)
     user = check_user_allowed(user is not None, user)
     if request is None or not is_terms_exempt_path(request.url.path):
-        raise_if_terms_not_accepted(user)
+        raise_if_terms_not_accepted(user, db)
     return user 
 
 

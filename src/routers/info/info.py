@@ -6,7 +6,7 @@ from collections import OrderedDict
 import json 
 
 from services.users import is_user_admin, get_user_from_token
-from services.json import read_json 
+
 
 from config.models.user import UserModel
 from config.models.info.info import InfoResponse
@@ -332,11 +332,3 @@ def get_keyfigures(user : UserModel = Depends(get_user_from_token), db : Databas
                                         compute_fn = lambda : _get_keyfigures(user, db),
                                         cache_time = timedelta(hours = 24))
     return keyfigureData
-
-@router.get("/terms")
-def get_terms_of_use(user : UserModel = Depends(get_user_from_token)):
-    path_to_file = GENERAL_SETTINGS.use_terms_file
-    if path_to_file is None:
-        return {}
-    use_of_terms = read_json(path_to_file)
-    return use_of_terms

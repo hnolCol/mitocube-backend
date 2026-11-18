@@ -52,10 +52,16 @@ class FakeUsers:
         return self.user
 
 
+class FakePolicyDB:
+    def get_status(self, user_tag):
+        return []
+
+
 class FakeDB:
     def __init__(self, record, user):
         self.pats = FakePATs(record)
         self.users = FakeUsers(user)
+        self.policy = FakePolicyDB()
 
 
 def make_record(scopes, pat_tag="pat_abc12345", user_tag="abcdefgh"):
