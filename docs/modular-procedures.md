@@ -22,13 +22,16 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 | **Version** | Published procedures are immutable, but a new **draft version** can be created from a published one (`POST /{tag}/versions`). Versions of one procedure share a `lineage_tag` and are chained via `PREVIOUS_VERSION`. Submissions stay linked to the exact version they were assigned to. |
 | **Link** | `(Submission)-[:IN_PROCEDURE {position, created_at, done, done_at, done_by}]->(Procedure)`. A submission can be linked to several procedures over its lifetime (the module history), but **only one open (not done) module at a time**. |
 | **Execution** | A concrete run of a published procedure: input plate wells (with samples) are mapped to output plate wells; pooling and splitting are supported. An execution starts in the **RUNNING** state and is closed by an explicit confirmation (`finish`: SUCCEEDED / FAILED / ABORTED) that frees the submissions owning the placed samples for the next module. |
-| **Well metric** | A measured value of an output well, e.g. the protein concentration. Metrics follow the condition-application pattern: each value is a node that is an **instance of a trait** (the trait defines the measured quantity, e.g. *µg/µL* of the *Concentration* attribute). |
+| **Well metric** | A measured value of a well, e.g. the protein concentration. Metrics follow the condition-application pattern: each value is a node that is an **instance of a trait** (the trait defines the measured quantity, e.g. *µg/µL* of the *Concentration* attribute). Input wells hold the values entered before the run, output wells the data measured after it. |
 
 ## Data model
 
 ```
 (:ModularProcedure {tag, title, description, status: DRAFT|PUBLISHED, version, lineage_tag,
-                    content_hash, created_at, published_at, user_tag})
+                    content_hash, created_at, published_at, user_tag,
+                    input_plate_format, input_plate_type,           # optional plate layout constraints
+                    output_plate_format, output_plate_type,
+                    success_submission_state})                      # optional, e.g. PROCESSED
     -[:HAS_CONDITION_APPLICATION]-> (:ConditionApplication)
     -[:ACCEPTS_INPUT_ATTRIBUTE]->   (:Attribute)
     -[:EXPECTS_OUTPUT_ATTRIBUTE]-> (:Attribute)
@@ -40,14 +43,17 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 (:ModularProcedureExecution {tag, procedure_tag, input_plate_tag, output_plate_tag,
                              user_tag, responsible_user_tag, created_at,
                              status: RUNNING|SUCCEEDED|FAILED|ABORTED,
-                             finished_at, finished_by, finish_comment, done_submission_tags})
+                             wells_blocked, finished_at, finished_by, finish_comment,
+                             done_submission_tags})
     -[:HAS_WELL]-> (:ExecutionWell {execution_tag, position, row_index, column_index,
                                     side: INPUT|OUTPUT, output_positions})
     -[:EXECUTED]- (:User), (:User)-[:EXECUTED]-> (execution)
+    -[:IN_STATE {created_at, user_tag}]-> (:ProcessingState {tag: RUNNING|SUCCEEDED|FAILED|ABORTED})
+                                           # appended per change -> the full state history
 
 (:Sample)-[:IN_WELL]->        (:ExecutionWell)          # many-to-many: pooling and splitting
 (:ExecutionWell)-[:HAS_APPLICATION]-> (:ConditionApplication)   # output wells only
-(:ExecutionWell)-[:HAS_METRIC]-> (:ExecutionWellMetric {value, created_at})
+(:ExecutionWell)-[:HAS_METRIC]-> (:ExecutionWellMetric {value, side: INPUT|OUTPUT, created_at})
 (:ExecutionWellMetric)-[:INSTANCE_OF]-> (:Trait)        # e.g. the µg/µL trait
 (:ExecutionWellMetric)-[:OF_ATTRIBUTE]-> (:Attribute)   # e.g. Concentration
 ```
@@ -58,10 +64,14 @@ Notes:
   this input well was transferred to. The samples of an output well are derived from this
   map, so a sample can legitimately appear in several output wells (splitting) and a pooled
   output well contains the samples of all input wells mapped into it.
-- Execution and procedure tags are **content hashes** (procedure tag: title + description +
-  condition applications + version; execution tag: the full transfer map). Identical
-  entities are rejected instead of duplicated.
-- The responsible user of an execution defaults to the executing user and is validated to exist.
+- Procedure tags are **content hashes** (title + description + condition applications +
+  version); execution tags hash the transfer map **plus the creation time**, so re-running the
+  same transfer map (e.g. after a failed run) creates a new execution instead of colliding.
+  The occupancy rule — not the hash — protects wells from concurrent use.
+- The responsible user of an execution defaults to the executing user and must be a **curator**.
+- Both sides of an execution carry metrics: INPUT wells hold the values entered before the
+  run (e.g. the measured concentrations before harmonization), OUTPUT wells the data measured
+  after the run. Metrics must reference traits of the procedure's declared attributes.
 
 ## Endpoints
 
@@ -87,7 +97,7 @@ Notes:
 | `GET` | `/api/procedures/executions/{execution_tag}` | all | One execution with input wells, output wells, samples, CAs, metrics and status (restricted users only see their own submissions' data). |
 | `GET` | `/api/procedures/executions/{execution_tag}/states` | all | The state history of the execution: state, created_at and the user who changed it, newest first. |
 | `POST` | `/api/procedures/executions/{execution_tag}/metrics` | curator+ | Set or update well metrics (see below). |
-| `POST` | `/api/procedures/executions/{execution_tag}/finish` | curator+ | Confirm a running execution with an outcome (SUCCEEDED/FAILED/ABORTED): frees the linked submissions; on success optionally sets the submission state and adopts the condition applications. |
+| `POST` | `/api/procedures/executions/{execution_tag}/finish` | curator+ | Confirm a running execution with an outcome (SUCCEEDED/FAILED/ABORTED) or correct a finished one; `block_output_wells` chooses whether the output wells stay blocked (defaults to the outcome). Changing to the current state is rejected. |
 
 ## Executing a procedure
 
@@ -115,7 +125,8 @@ Notes:
 
 The example shows both mapping modes: **pooling** (A1 and B1 both map into output A1 —
 differently treated samples are pooled into a single well) and **splitting** (B1 maps into
-A1, B1 and C1 — one sample appears in several output wells).
+A1, B1 and C1 — one sample appears in several output wells). The execution is created in the
+**RUNNING** state: the submissions are **not** freed until the run is confirmed.
 
 Validation: the procedure must be published; plates, samples, users and traits must exist;
 well positions must be unique and parseable (`A1` style); input wells must contain samples;
@@ -137,9 +148,6 @@ submission its **current location**: the wells of its most recent procedure exec
 and output side, with the plate tags), so the submission overview can always show where the
 samples physically are — including executions that failed (the samples stay on the plate).
 Restricted users cannot query foreign submissions (404).
-
-
-The execution is created in the **RUNNING** state: the submissions are **not** freed yet.
 
 ### Procedure setup (SOP definition)
 
@@ -218,8 +226,8 @@ and admins (`403` otherwise).
 
 ## Well metrics
 
-Metrics are measured attribute values per output well, stored the same way condition values
-are: a node per value, `INSTANCE_OF` a trait (the quantity, e.g. *µg/µL*) and `OF_ATTRIBUTE`
+Metrics are measured attribute values per well, stored the same way condition values are:
+a node per value, `INSTANCE_OF` a trait (the quantity, e.g. *µg/µL*) and `OF_ATTRIBUTE`
 the attribute (e.g. *Concentration*). This makes them first-class graph citizens:
 
 ```
