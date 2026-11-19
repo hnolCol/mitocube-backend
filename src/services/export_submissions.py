@@ -200,6 +200,92 @@ def format_runlists(submission_tag: str, db) -> str:
          "Fractions", "Scrambled", "Created by"], rows))
 
 
+def format_modular_procedures(submission_tag: str, db) -> str:
+    """The workflow modules of the submission and the executions that physically processed
+    its samples: per module the link with assignment and completion, per execution the state
+    history (who changed it when) and the plate details of this submission's own samples."""
+    mp = db.modular_procedures
+    links = mp.get_submission_procedures(submission_tag=submission_tag)
+    if not links:
+        return ""
+
+    blocks = []
+    module_rows = []
+    for link in links:
+        try:
+            procedure = mp.get(tag=link.procedure_tag)
+        except KeyError:
+            continue
+        module_rows.append([
+            procedure.title or link.procedure_tag, f"v{procedure.version}",
+            _ts(link.created_at),
+            "done" if link.done else "open",
+            _ts(link.done_at) if link.done else "",
+            _user_name(db, link.done_by) if link.done else "",
+        ])
+    module_rows.sort(key=lambda row: row[2])
+    blocks.append(_section("Workflow Modules", _table(
+        ["Module", "Version", "Assigned", "Status", "Done", "Done by"], module_rows)))
+
+    def _own_samples(sample_tags, sample_map):
+        return [tag for tag in sample_tags if submission_tag in sample_map.get(tag, [])]
+
+    def _metrics_text(metrics):
+        return " / ".join(f"{m.trait_tag}: {m.value}" for m in metrics)
+
+    for execution_tag in mp.find_execution_tags_by_submissions(submission_tags=[submission_tag]):
+        try:
+            execution = mp.get_execution(execution_tag=execution_tag)
+            states = mp.get_execution_states(execution_tag=execution_tag)
+        except KeyError:
+            continue
+        try:
+            procedure = mp.get(tag=execution.procedure_tag)
+            procedure_title = procedure.title or execution.procedure_tag
+        except KeyError:
+            procedure_title = execution.procedure_tag
+
+        all_samples = sorted({sample for well in execution.input_wells for sample in well.sample_tags} |
+                             {sample for well in execution.output_wells for sample in well.sample_tags})
+        sample_map = mp.get_sample_submission_map(all_samples)
+
+        input_rows, output_rows = [], []
+        for well in execution.input_wells:
+            own_samples = _own_samples(well.sample_tags, sample_map)
+            if not own_samples:
+                continue
+            input_rows.append([well.position, own_samples,
+                               well.output_positions, _metrics_text(well.metrics)])
+        for well in execution.output_wells:
+            own_samples = _own_samples(well.sample_tags, sample_map)
+            if not own_samples:
+                continue
+            output_rows.append([well.position, own_samples,
+                               well.condition_application_tags, _metrics_text(well.metrics)])
+
+        lines = [
+            f"### Execution `{execution_tag}` — {procedure_title}", "",
+            f"- **Input plate:** {execution.input_plate_tag}  ",
+            f"- **Output plate:** {execution.output_plate_tag}  ",
+            f"- **Responsible:** {_user_name(db, execution.responsible_user_tag or execution.user_tag)}  ",
+            f"- **State:** {execution.status}  ",
+            f"- **Created:** {_ts(execution.created_at)}  ",
+        ]
+        if states:
+            lines += ["", "#### State History",
+                      _table(["Date", "State", "Changed by"],
+                             [[_ts(s.created_at), s.state, _user_name(db, s.user_tag)] for s in states])]
+        if input_rows:
+            lines += ["", "#### Input Wells",
+                      _table(["Well", "Samples", "Transferred to", "Input values"], input_rows)]
+        if output_rows:
+            lines += ["", "#### Output Wells",
+                      _table(["Well", "Samples", "Condition applications", "Measured values"], output_rows)]
+        blocks.append("\n".join(lines) + "\n")
+
+    return "\n".join(block for block in blocks if block)
+
+
 def format_state_history(submission_tag: str, db) -> str:
     history = db.submissions.get_state_history(tag=submission_tag)
     rows = [
@@ -222,6 +308,7 @@ def export_submission_to_markdown(
     include_samples: bool = True,
     include_metatext: bool = True,
     include_timeline: bool = True,
+    include_modular_procedures: bool = True,
     include_protocol_text: bool = True  
 ) -> str:
     """
@@ -245,6 +332,10 @@ def export_submission_to_markdown(
         Whether to include the research aim and other metatexts, by default True
     include_timeline : bool, optional
         Whether to include the timeline of events, by default True
+    include_modular_procedures : bool, optional
+        Whether to include the workflow modules and the procedure executions of the
+        submission's samples (plate mappings, per-well values and state histories),
+        by default True
     include_protocol_text : bool, optional
         Whether to include the full text of protocols, by default True
 
@@ -273,6 +364,8 @@ def export_submission_to_markdown(
         parts.append(format_protocols(submission_tag, db, include_text=include_protocol_text))
     if include_runlist:
         parts.append(format_runlists(submission_tag, db))
+    if include_modular_procedures:
+        parts.append(format_modular_procedures(submission_tag, db))
     if include_timeline:
         parts.append(format_state_history(submission_tag, db))
 
