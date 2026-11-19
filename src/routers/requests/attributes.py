@@ -19,6 +19,7 @@ from config.settings.email import get_email_settings
 from config.settings.general import get_general_settings
 from lib.database.abstract.Database import DatabaseABC
 from lib.database.Database import get_db
+from services.tags import normalize_tag_text
 from services.mail import send_email_in_background
 from services.messages import send_message_in_background
 from services.users import get_user_from_token, is_user_at_least_curator
@@ -39,7 +40,7 @@ def _get_curator_emails(db: DatabaseABC) -> List[str]:
 
 
 def _attribute_tag(text: str) -> str:
-    return "att_" + text.replace(" ", "_").lower().encode("utf-8", "ignore").decode("utf-8")
+    return "att_" + normalize_tag_text(text)
 
 
 def _split_comment(comment: Optional[str]) -> tuple:
