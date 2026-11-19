@@ -134,7 +134,8 @@ class ModularProceduresABC(ABC):
         layout constraints of the procedure or the transfer map is inconsistent."""
 
     @abstractmethod
-    def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None):
+    def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None,
+                         block_output_wells: bool = None):
         """Transitions a procedure execution to the given state (SUCCEEDED, FAILED
         or ABORTED); every state is recorded in the IN_STATE history (like
         submission states). Leaving RUNNING frees the submissions owning the

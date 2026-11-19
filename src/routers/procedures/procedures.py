@@ -347,7 +347,8 @@ def finish_modular_procedure_execution(execution_tag : str, confirmation : Finis
     (e.g. FAILED to SUCCEEDED). Only curators and admins may change the state."""
     try:
         return db.modular_procedures.finish_execution(execution_tag=execution_tag, outcome=confirmation.outcome,
-                                                      user_tag=user.tag, comment=confirmation.comment)
+                                                      user_tag=user.tag, comment=confirmation.comment,
+                                                      block_output_wells=confirmation.block_output_wells)
     except KeyError:
         raise HTTPException(status_code=404, detail="Procedure execution not found.")
     except ValueError as e:

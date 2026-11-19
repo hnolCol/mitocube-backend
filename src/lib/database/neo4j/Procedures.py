@@ -700,7 +700,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
         occupied_output_wells = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
             "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
-            "AND coalesce(e.status, 'RUNNING') IN ['RUNNING', 'SUCCEEDED'] "
+            "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
+            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
             "RETURN collect(DISTINCT w.position) as occupied",
             routing_="r", output_plate_tag=execution.output_plate_tag,
             positions=sorted(output_positions), result_transformer_=Result.value)
@@ -740,7 +741,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
             props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
                    "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
-                   "responsible_user_tag": responsible_user_tag, "status": "RUNNING"})
+                   "responsible_user_tag": responsible_user_tag, "status": "RUNNING",
+                   "wells_blocked": True})
         self._set_execution_state(execution_tag=execution_tag, state="RUNNING", user_tag=user_tag)
 
         for well in execution.input_wells:
@@ -796,12 +798,17 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
         return self.get_execution(execution_tag=execution_tag)
 
-    def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None) -> "ProcedureExecutionModel":
+    def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None,
+                         block_output_wells: bool = None) -> "ProcedureExecutionModel":
         """Transitions a procedure execution to the given state (SUCCEEDED, FAILED or ABORTED).
         Leaving the RUNNING state always frees the submissions owning the placed samples in the
         procedure (they stay where they are physically, but are freed for the next module). A
         transition to SUCCEEDED applies the success effects; finished executions can be corrected
-        later (e.g. FAILED to SUCCEEDED) — every state is recorded in the IN_STATE history."""
+        later (e.g. FAILED to SUCCEEDED) — every state is recorded in the IN_STATE history.
+        block_output_wells overrides whether the output wells stay blocked after the change (e.g.
+        an aborted robot run with dirty wells must stay blocked); omitted it defaults to the
+        outcome (SUCCEEDED blocks, FAILED/ABORTED release the wells for a re-run)."""
+        wells_blocked = block_output_wells if block_output_wells is not None else (outcome == "SUCCEEDED")
         from config.models.procedures import ProcedureExecutionModel
         if outcome not in ("SUCCEEDED", "FAILED", "ABORTED"):
             raise ValueError("Outcome must be SUCCEEDED, FAILED or ABORTED.")
@@ -815,8 +822,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             self._set_execution_state(execution_tag=execution_tag, state=outcome, user_tag=user_tag)
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
-                "SET e.finished_at = $finished_at, e.finished_by = $user_tag, e.finish_comment = $comment",
-                routing_="w", execution_tag=execution_tag,
+                "SET e.finished_at = $finished_at, e.finished_by = $user_tag, e.finish_comment = $comment, "
+                "e.wells_blocked = $wells_blocked",
+                routing_="w", execution_tag=execution_tag, wells_blocked=wells_blocked,
                 finished_at=time.time(), user_tag=user_tag, comment=comment)
             if outcome == "SUCCEEDED":
                 self._apply_success(execution_tag=execution_tag, procedure=procedure, user_tag=user_tag)
@@ -841,8 +849,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
         self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
             "SET e.finished_at = $finished_at, e.finished_by = $user_tag, "
-            "e.finish_comment = $comment, e.done_submission_tags = $done_submissions",
-            routing_="w", execution_tag=execution_tag,
+            "e.finish_comment = $comment, e.done_submission_tags = $done_submissions, "
+            "e.wells_blocked = $wells_blocked",
+            routing_="w", execution_tag=execution_tag, wells_blocked=wells_blocked,
             finished_at=time.time(), user_tag=user_tag, comment=comment, done_submissions=done_submissions)
 
         return self.get_execution(execution_tag=execution_tag)
@@ -942,7 +951,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN {tag: e.tag, procedure_tag: e.procedure_tag, input_plate_tag: e.input_plate_tag, "
             "output_plate_tag: e.output_plate_tag, user_tag: e.user_tag, "
             "responsible_user_tag: e.responsible_user_tag, created_at: e.created_at, "
-            "status: e.status, finished_at: e.finished_at, finished_by: e.finished_by, "
+            "status: e.status, wells_blocked: coalesce(e.wells_blocked, true), "
+            "finished_at: e.finished_at, finished_by: e.finished_by, "
             "finish_comment: e.finish_comment, done_submission_tags: e.done_submission_tags} as execution",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
         execution = head[0]["execution"]

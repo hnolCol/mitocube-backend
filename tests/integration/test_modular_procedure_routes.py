@@ -226,10 +226,12 @@ class FakeModularProceduresDB:
 
     def execute(self, tag, execution, user_tag):
         # only running or succeeded executions occupy their output wells
+        blocks = (lambda exec_model: exec_model.status == "RUNNING"
+                  or getattr(exec_model, "wells_blocked", exec_model.status == "SUCCEEDED"))
         occupied = [well.position for exec_model in self.executions.values()
                     for well in exec_model.output_wells
                     if exec_model.output_plate_tag == execution.output_plate_tag
-                    and exec_model.status not in ("FAILED", "ABORTED")]
+                    and blocks(exec_model)]
         conflicts = sorted(set(occupied) & {w.position for w in execution.output_wells})
         if len(conflicts) > 0:
             raise ValueError(f"Output wells already used by another execution: {', '.join(conflicts)}")
@@ -287,7 +289,7 @@ class FakeModularProceduresDB:
                           for w in execution.output_wells])
         return self.executions[execution_tag]
 
-    def finish_execution(self, execution_tag, outcome, user_tag, comment=None):
+    def finish_execution(self, execution_tag, outcome, user_tag, comment=None, block_output_wells=None):
         if execution_tag not in self.executions:
             raise KeyError("Procedure execution not found.")
         if outcome not in ("SUCCEEDED", "FAILED", "ABORTED"):
@@ -313,6 +315,7 @@ class FakeModularProceduresDB:
                                    if self.procedures[execution.procedure_tag].success_submission_state is not None)
         self.state_history.setdefault(execution_tag, []).append({"state": outcome, "created_at": 5.0, "user_tag": user_tag})
         execution.status = outcome
+        execution.wells_blocked = block_output_wells if block_output_wells is not None else (outcome == "SUCCEEDED")
         execution.finished_at = 5.0
         execution.finished_by = user_tag
         execution.finish_comment = comment
@@ -1026,8 +1029,31 @@ class TestModularProcedureExecutionRerunAndLocations:
 
     def test_output_wells_free_after_abort(self, client):
         first = self._execute(client)
-        client.post(f"/api/procedures/executions/{first}/finish", json={"outcome": "ABORTED"})
+        resp = client.post(f"/api/procedures/executions/{first}/finish", json={"outcome": "ABORTED"})
+        assert resp.json()["wells_blocked"] is False
         # the same wells can be used again: the aborted run does not block them
+        second = self._execute(client)
+        assert second != first
+
+    def test_output_wells_stay_blocked_if_selected_on_abort(self, client):
+        """An aborted liquid handler run leaves the pipetted wells dirty: the user can
+        keep them blocked so they are never re-used."""
+        first = self._execute(client)
+        resp = client.post(f"/api/procedures/executions/{first}/finish",
+            json={"outcome": "ABORTED", "block_output_wells": True})
+        assert resp.json()["wells_blocked"] is True
+        second = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "B1", "sample_tags": ["sample-2"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert second.status_code == 400
+        assert "already used" in second.json()["detail"]
+
+    def test_output_wells_can_be_unblocked_on_success(self, client):
+        first = self._execute(client)
+        resp = client.post(f"/api/procedures/executions/{first}/finish",
+            json={"outcome": "SUCCEEDED", "block_output_wells": False})
+        assert resp.json()["wells_blocked"] is False
         second = self._execute(client)
         assert second != first
 

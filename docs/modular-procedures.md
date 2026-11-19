@@ -120,8 +120,10 @@ A1, B1 and C1 — one sample appears in several output wells).
 Validation: the procedure must be published; plates, samples, users and traits must exist;
 well positions must be unique and parseable (`A1` style); input wells must contain samples;
 every transfer target must be a defined output well; **output wells used by a RUNNING or
-SUCCEEDED execution on the same plate are rejected** — wells of failed or aborted runs are
-free again so a re-run can never be blocked; the input and output plates must match the
+SUCCEEDED execution on the same plate are rejected — as are executions whose confirmer kept
+them blocked (`block_output_wells: true`, e.g. an aborted liquid handler run with dirty
+wells); wells of failed or aborted runs are free again by default so a re-run is never
+blocked**; the input and output plates must match the
 **plate layout constraints** the procedure defines (see below, and the constraint texts must
 exist as plate format / plate type trait texts when the procedure is defined); the responsible
 user must be a **curator** (it defaults to the executing user); metrics must reference declared
@@ -175,7 +177,10 @@ but the submissions are freed for the next module. Only `SUCCEEDED` additionally
   procedure-level ones and the ones applied to the output wells their samples ended up in)
   via `HAS_APPLICATION`.
 
-The execution node records `status`, `finished_at`, `finished_by` and `finish_comment`.
+The execution node records `status`, `wells_blocked` (whether the output wells still block
+re-use: true while RUNNING; on confirmation it defaults to the outcome — SUCCEEDED blocks,
+FAILED/ABORTED release — unless `block_output_wells` was sent explicitly), `finished_at`,
+`finished_by` and `finish_comment`.
 Changing to the current state is rejected with 400; finished executions can be corrected
 (e.g. FAILED → SUCCEEDED: the success effects are then applied and the submissions had already
 been freed when the execution first left RUNNING).

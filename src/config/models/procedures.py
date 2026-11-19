@@ -148,6 +148,7 @@ class ExecutionSummaryModel(BaseModel):
     responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
     status : ProcedureExecutionStatusEnum = Field(default=ProcedureExecutionStatusEnum.RUNNING)
+    wells_blocked : bool = True
     finished_at : Optional[float] = None
     finished_by : Optional[str] = None
     finish_comment : Optional[str] = None
@@ -209,6 +210,10 @@ class FinishProcedureExecutionModel(BaseModel):
     of the condition applications by the submissions."""
     outcome : ProcedureExecutionOutcomeEnum
     comment : Optional[str] = None
+    block_output_wells : Optional[bool] = None
+    """Overrides whether the output wells stay blocked after this change (e.g. an aborted robot run
+    with dirty wells must stay blocked); omitted it defaults to the outcome (SUCCEEDED blocks,
+    FAILED/ABORTED release the wells for a re-run)."""
 
 
 
@@ -244,6 +249,9 @@ class ProcedureExecutionModel(BaseModel):
     responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
     status : ProcedureExecutionStatusEnum = Field(default=ProcedureExecutionStatusEnum.RUNNING)
+    wells_blocked : bool = True
+    """Whether the output wells of this execution block re-use: true while running; on confirmation it
+    follows the outcome unless the confirming user chose otherwise."""
     finished_at : Optional[float] = None
     finished_by : Optional[str] = None
     finish_comment : Optional[str] = None
