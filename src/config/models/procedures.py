@@ -120,6 +120,24 @@ class ExecutionStateModel(BaseModel):
     user_tag : Optional[str] = None
 
 
+class SampleLocationWellModel(BaseModel):
+    "A well of a procedure execution holding the sample, on the input or output plate."
+    plate_tag : str
+    position : str
+    side : str
+
+
+class SampleLocationModel(BaseModel):
+    """The current location of a sample: the wells of its most recent procedure execution
+    (a sample stays where the last execution placed it, even if that execution failed)."""
+    sample_tag : str
+    procedure_tag : str
+    execution_tag : str
+    execution_status : str = "RUNNING"
+    created_at : Optional[float] = None
+    wells : List[SampleLocationWellModel] = Field(default_factory=list)
+
+
 class ExecutionSummaryModel(BaseModel):
     "Summary of a procedure execution for the overview listing: the header data and well counts."
     tag : str

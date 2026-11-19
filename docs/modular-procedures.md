@@ -119,11 +119,23 @@ A1, B1 and C1 — one sample appears in several output wells).
 
 Validation: the procedure must be published; plates, samples, users and traits must exist;
 well positions must be unique and parseable (`A1` style); input wells must contain samples;
-every transfer target must be a defined output well; **output wells already used by another
-execution on the same plate are rejected**; the input and output plates must match the
-**plate layout constraints** the procedure defines (see below); the responsible user must
-be a **curator** (it defaults to the executing user); metrics must reference declared
-attributes of the procedure.
+every transfer target must be a defined output well; **output wells used by a RUNNING or
+SUCCEEDED execution on the same plate are rejected** — wells of failed or aborted runs are
+free again so a re-run can never be blocked; the input and output plates must match the
+**plate layout constraints** the procedure defines (see below, and the constraint texts must
+exist as plate format / plate type trait texts when the procedure is defined); the responsible
+user must be a **curator** (it defaults to the executing user); metrics must reference declared
+attributes of the procedure. The execution tag includes the creation time, so the same transfer
+map can be re-run after a failed or aborted execution instead of colliding with the old one.
+
+### Sample locations
+
+`GET /api/procedures/submissions/{submission_tag}/wells` returns for every sample of a
+submission its **current location**: the wells of its most recent procedure execution (input
+and output side, with the plate tags), so the submission overview can always show where the
+samples physically are — including executions that failed (the samples stay on the plate).
+Restricted users cannot query foreign submissions (404).
+
 
 The execution is created in the **RUNNING** state: the submissions are **not** freed yet.
 

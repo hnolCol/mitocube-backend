@@ -8,6 +8,7 @@ from services.attribute_hierarchy import validate_attribute_trees
 from config.models.procedures import (
     ExecutionStateModel,
     ExecutionSummaryModel,
+    SampleLocationModel,
     ExecutionWellMetricModel,
     FinishProcedureExecutionModel,
     InsertModularProcedureModel,
@@ -139,6 +140,20 @@ def query_procedure_executions(search_submission_tag : str = None, status : str 
             done_submission_tags=execution.done_submission_tags,
             n_input_wells=len(execution.input_wells), n_output_wells=len(execution.output_wells)))
     return summaries
+
+
+@router.get("/submissions/{submission_tag}/wells", response_model=List[SampleLocationModel])
+def get_submission_sample_locations(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[SampleLocationModel]:
+    """Returns the current plate locations of the samples of a submission: for every sample the
+    wells of its most recent procedure execution (input and output plate). The user's submission
+    scope is respected; restricted users cannot query foreign submissions."""
+    scoped = _scoped_submission_tags(user, db)
+    if scoped is not None and submission_tag not in scoped:
+        raise HTTPException(status_code=404, detail="Submission not found.")
+    try:
+        return db.modular_procedures.get_submission_sample_locations(submission_tag=submission_tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Submission not found.")
 
 
 @router.get("/executions/{execution_tag}/states", response_model=List[ExecutionStateModel])

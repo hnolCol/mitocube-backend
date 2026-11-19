@@ -5,7 +5,9 @@ import time
 from neo4j import Driver, Result
 from typing import List, Optional
 
+from lib.cache.scope_cache import invalidate_all_cached_scopes
 from lib.database.abstract.Procedures import ModularProceduresABC
+from lib.database.neo4j.Plates import PLATE_ATTRIBUTES
 from services.encryption import create_hierarchical_hash
 from config.models.procedures import (
     ModularProcedureBaseModel,
@@ -104,6 +106,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         protocol_tags = protocol_tags or []
         plate_constraints = plate_constraints or {}
         self._validate_success_submission_state(success_submission_state)
+        self._validate_plate_constraint_texts(plate_constraints)
         tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
         if self.exists(tag=tag):
             raise ValueError("Tag is already in the database.")
@@ -289,6 +292,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         protocol_tags = protocol_tags or []
         plate_constraints = plate_constraints or {}
         self._validate_success_submission_state(success_submission_state)
+        self._validate_plate_constraint_texts(plate_constraints)
 
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
@@ -485,6 +489,26 @@ class Neo4JModularProcedures(ModularProceduresABC):
             row = row * 26 + (ord(character) - ord("A") + 1)
         return row - 1, int(match.group(2)) - 1
 
+    def _validate_plate_constraint_texts(self, plate_constraints: dict) -> None:
+        """Validates that the format and type texts of the plate constraints exist as trait texts
+        of the plate format / plate type attributes, so typos are rejected when the procedure is
+        defined instead of silently blocking every execution."""
+        format_texts = self._driver.execute_query(
+            "MATCH (t:Trait {attribute_tag : $attribute_tag}) RETURN collect(t.text) as texts",
+            routing_="r", attribute_tag=PLATE_ATTRIBUTES["format"], result_transformer_=Result.value)
+        type_texts = self._driver.execute_query(
+            "MATCH (t:Trait {attribute_tag : $attribute_tag}) RETURN collect(t.text) as texts",
+            routing_="r", attribute_tag=PLATE_ATTRIBUTES["plate_type"], result_transformer_=Result.value)
+        known_formats = format_texts[0] if len(format_texts) > 0 else []
+        known_types = type_texts[0] if len(type_texts) > 0 else []
+        for side in ("input", "output"):
+            required_format = (plate_constraints or {}).get(f"{side}_plate_format")
+            required_type = (plate_constraints or {}).get(f"{side}_plate_type")
+            if required_format is not None and required_format not in known_formats:
+                raise ValueError(f"Unknown plate format: {required_format}. Known formats: {', '.join(known_formats)}.")
+            if required_type is not None and required_type not in known_types:
+                raise ValueError(f"Unknown plate type: {required_type}. Known types: {', '.join(known_types)}.")
+
     def _validate_plate_constraints(self, procedure, plate_tag: str, side: str) -> None:
         """Validates that the given plate matches the plate layout constraints the procedure defines
         for the given side (input or output). Unconstrained sides always pass."""
@@ -544,6 +568,42 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN ps.tag as state ORDER BY r.created_at DESC LIMIT 1",
             routing_="r", execution_tag=execution.tag, result_transformer_=Result.value)
         return current[0] if len(current) > 0 and current[0] is not None else (execution.status or "RUNNING")
+
+    def get_submission_sample_locations(self, submission_tag: str) -> List:
+        """Returns the current plate locations of the samples of a submission: for every sample
+        the wells of its most recent procedure execution (input and output side, with the plate
+        tags), newest execution first. Samples that were never placed show no entry.
+        Raises a KeyError if the submission does not exist."""
+        from config.models.procedures import SampleLocationModel
+        submission_exists = self._driver.execute_query(
+            "WITH EXISTS {(s:Submission {tag : $submission_tag})} as exists RETURN exists",
+            routing_="r", submission_tag=submission_tag, result_transformer_=Result.value)
+        if len(submission_exists) == 0 or not submission_exists[0]:
+            raise KeyError("Submission not found.")
+        rows = self._driver.execute_query(
+            "MATCH (sub:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample)-[:IN_WELL]->(w:ExecutionWell) "
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w) "
+            "RETURN {sample_tag: sample.tag, procedure_tag: e.procedure_tag, execution_tag: e.tag, "
+            "status: coalesce(e.status, 'RUNNING'), created_at: e.created_at, "
+            "position: w.position, side: w.side, "
+            "plate_tag: CASE w.side WHEN 'INPUT' THEN e.input_plate_tag ELSE e.output_plate_tag END} as location ",
+            routing_="r", submission_tag=submission_tag, result_transformer_=Result.data)
+        placed = {}
+        for row in rows:
+            location = row["location"]
+            placed.setdefault(location["sample_tag"], []).append(location)
+        locations = []
+        for sample_tag, entries in placed.items():
+            latest_created_at = max(entry["created_at"] or 0 for entry in entries)
+            latest = [entry for entry in entries if (entry["created_at"] or 0) == latest_created_at]
+            head = latest[0]
+            locations.append(SampleLocationModel(
+                sample_tag=sample_tag, procedure_tag=head["procedure_tag"],
+                execution_tag=head["execution_tag"], execution_status=head["status"],
+                created_at=head["created_at"],
+                wells=[{"plate_tag": entry["plate_tag"], "position": entry["position"], "side": entry["side"]}
+                       for entry in latest]))
+        return sorted(locations, key=lambda location: location.sample_tag)
 
     def get_sample_submission_map(self, sample_tags: List[str]) -> "dict":
         """Returns a map of the given sample tags to the tags of the submissions owning them."""
@@ -635,9 +695,12 @@ class Neo4JModularProcedures(ModularProceduresABC):
                     raise ValueError(f"Output well {output_position} is not defined.")
                 output_well_samples[output_position].update(well.sample_tags)
 
+        # only executions that are still running or that succeeded occupy their output wells:
+        # a failed or aborted run does not block redoing the same wells
         occupied_output_wells = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
             "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
+            "AND coalesce(e.status, 'RUNNING') IN ['RUNNING', 'SUCCEEDED'] "
             "RETURN collect(DISTINCT w.position) as occupied",
             routing_="r", output_plate_tag=execution.output_plate_tag,
             positions=sorted(output_positions), result_transformer_=Result.value)
@@ -662,12 +725,11 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_wells": [{"position": w.position,
                               "condition_application_tags": sorted(w.condition_application_tags)} for w in execution.output_wells],
         }
-        execution_tag = hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
-        execution_exists = self._driver.execute_query(
-            "WITH EXISTS {(e:ModularProcedureExecution {tag : $execution_tag})} as exists RETURN exists",
-            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
-        if len(execution_exists) > 0 and execution_exists[0]:
-            raise ValueError("An identical procedure execution already exists.")
+        # the creation time is part of the hash so the same transfer map can legitimately be
+        # re-run (e.g. after a failed or aborted execution); the occupancy rule above is what
+        # actually protects wells from being overwritten concurrently
+        execution_tag = hashlib.sha256(json.dumps(
+            {**content, "created_at": time.time()}, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
 
         self._driver.execute_query(
             "MATCH (m:ModularProcedure {tag : $procedure_tag}) MATCH (u:User {tag : $user_tag}) "
@@ -824,6 +886,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 "SET r.created_at = timestamp(), r.user_tag = $user_tag ",
                 routing_="w", submission_tags=submission_tags,
                 new_state=new_state.value, user_tag=user_tag)
+            # like Submission.update_state: a state change can affect the submission scope of
+            # every user (e.g. a success state of PUBLISHED), so the scope cache must be cleared
+            invalidate_all_cached_scopes()
 
     def get_execution(self, execution_tag: str) -> "ProcedureExecutionModel":
         "Returns the procedure execution by its tag."

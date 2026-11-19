@@ -225,9 +225,11 @@ class FakeModularProceduresDB:
         return self.submission_procedures.get(submission_tag, [])
 
     def execute(self, tag, execution, user_tag):
+        # only running or succeeded executions occupy their output wells
         occupied = [well.position for exec_model in self.executions.values()
                     for well in exec_model.output_wells
-                    if exec_model.output_plate_tag == execution.output_plate_tag]
+                    if exec_model.output_plate_tag == execution.output_plate_tag
+                    and exec_model.status not in ("FAILED", "ABORTED")]
         conflicts = sorted(set(occupied) & {w.position for w in execution.output_wells})
         if len(conflicts) > 0:
             raise ValueError(f"Output wells already used by another execution: {', '.join(conflicts)}")
@@ -343,6 +345,38 @@ class FakeModularProceduresDB:
     def get_sample_submission_map(self, sample_tags):
         return {sample_tag: [self.sample_submissions[sample_tag]]
                 for sample_tag in sample_tags if sample_tag in self.sample_submissions}
+
+    def get_submission_sample_locations(self, submission_tag):
+        if submission_tag not in {"subm-1", "subm-2"}:
+            raise KeyError("Submission not found.")
+        sample_tags = [tag for tag, sub in self.sample_submissions.items() if sub == submission_tag]
+        locations = []
+        for sample_tag in sample_tags:
+            entries = []
+            for tag, execution in self.executions.items():
+                for well in execution.input_wells:
+                    if sample_tag in well.sample_tags:
+                        entries.append({"procedure_tag": execution.procedure_tag, "execution_tag": tag,
+                                         "status": execution.status or "RUNNING", "created_at": execution.created_at,
+                                         "position": well.position, "side": "INPUT",
+                                         "plate_tag": execution.input_plate_tag})
+                for well in execution.output_wells:
+                    if sample_tag in well.sample_tags:
+                        entries.append({"procedure_tag": execution.procedure_tag, "execution_tag": tag,
+                                         "status": execution.status or "RUNNING", "created_at": execution.created_at,
+                                         "position": well.position, "side": "OUTPUT",
+                                         "plate_tag": execution.output_plate_tag})
+            if len(entries) == 0:
+                continue
+            latest_created_at = max(entry["created_at"] or 0 for entry in entries)
+            latest = [entry for entry in entries if (entry["created_at"] or 0) == latest_created_at]
+            head = latest[0]
+            locations.append({"sample_tag": sample_tag, "procedure_tag": head["procedure_tag"],
+                              "execution_tag": head["execution_tag"], "execution_status": head["status"],
+                              "created_at": head["created_at"],
+                              "wells": [{"plate_tag": entry["plate_tag"], "position": entry["position"], "side": entry["side"]}
+                                        for entry in latest]})
+        return locations
 
     def get_execution(self, execution_tag):
         if execution_tag not in self.executions:
@@ -979,6 +1013,58 @@ class TestModularProcedureExecutionOverviewRoutes:
         assert body["output_wells"][0]["metrics"] == []
         assert body["output_wells"][0]["condition_application_tags"] == []
         assert body["input_well_metrics"] == []
+
+
+class TestModularProcedureExecutionRerunAndLocations:
+    def _execute(self, client, sample="sample-1", input_position="A1", output_position="A1"):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": input_position, "sample_tags": [sample], "output_positions": [output_position]}],
+            "output_wells": [{"position": output_position, "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        return resp.json()["tag"]
+
+    def test_output_wells_free_after_abort(self, client):
+        first = self._execute(client)
+        client.post(f"/api/procedures/executions/{first}/finish", json={"outcome": "ABORTED"})
+        # the same wells can be used again: the aborted run does not block them
+        second = self._execute(client)
+        assert second != first
+
+    def test_output_wells_blocked_while_running(self, client):
+        self._execute(client)
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "B1", "sample_tags": ["sample-2"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+        assert "already used" in resp.json()["detail"]
+
+    def test_submission_sample_locations(self, client):
+        self._execute(client)
+        resp = client.get("/api/procedures/submissions/subm-1/wells")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body) == 1
+        location = body[0]
+        assert location["sample_tag"] == "sample-1"
+        assert location["execution_status"] == "RUNNING"
+        assert {well["side"] for well in location["wells"]} == {"INPUT", "OUTPUT"}
+        input_well = [well for well in location["wells"] if well["side"] == "INPUT"][0]
+        assert input_well["plate_tag"] == "plate-1" and input_well["position"] == "A1"
+        output_well = [well for well in location["wells"] if well["side"] == "OUTPUT"][0]
+        assert output_well["plate_tag"] == "plate-2" and output_well["position"] == "A1"
+
+    def test_submission_sample_locations_hidden_for_restricted_users(self, client):
+        shared_db = client.app.dependency_overrides[get_db]()
+        self._execute(client)
+        user = make_user(role=UserRolesEnum.STANDARD)
+        with _make_client(user, fake_db=shared_db) as scoped:
+            shared_db.submissions.scopes[user.tag] = ["subm-2"]
+            resp = scoped.get("/api/procedures/submissions/subm-1/wells")
+            assert resp.status_code == 404
+        resp = client.get("/api/procedures/submissions/does-not-exist/wells")
+        assert resp.status_code == 404
 
 
 class TestSingleOpenModuleConstraint:

@@ -184,6 +184,13 @@ class ModularProceduresABC(ABC):
         given submissions."""
 
     @abstractmethod
+    def get_submission_sample_locations(self, submission_tag: str) -> List:
+        """Returns the current plate locations of the samples of a submission: for
+        every sample the wells of its most recent procedure execution (input and
+        output side, with the plate tags). Samples that were never placed show no
+        entry. Raises a KeyError if the submission does not exist."""
+
+    @abstractmethod
     def get_sample_submission_map(self, sample_tags: List[str]) -> dict:
         """Returns a map of the given sample tags to the tags of the submissions
         owning them."""
