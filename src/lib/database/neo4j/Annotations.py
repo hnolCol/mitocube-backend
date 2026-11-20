@@ -1042,7 +1042,7 @@ class Neo4JAnnotations(AnnotationsABC):
             for row in r
         }
 
-    def get_annotation_overlap_counts(self, universe_proteins: List[str], target_proteins: List[str], group_tag: Optional[str] = None) -> pd.DataFrame:
+    def get_annotation_overlap_counts(self, universe_proteins: List[str], target_proteins: List[str], group_tag: Optional[str] = None, min_target_count: int = 0) -> pd.DataFrame:
         if group_tag is not None:
             match = "MATCH (ag:AnnotationGroup {tag: $group_tag})-[:HAS_ANNOTATION]->(a:Annotation)-[:ANNOTATES]->(p:Protein) "
         else:
@@ -1050,20 +1050,51 @@ class Neo4JAnnotations(AnnotationsABC):
         query = (
             match
             + "WHERE p.tag IN $universe "
-            "RETURN a.tag AS annotation_tag, a.text AS text, "
+            "WITH a.tag AS annotation_tag, a.text AS text, "
             "count(DISTINCT p) AS universe_count, "
-            "count(DISTINCT CASE WHEN p.tag IN $target THEN p ELSE null END) AS target_count"
+            "count(DISTINCT CASE WHEN p.tag IN $target THEN p ELSE null END) AS target_count "
+            "WHERE target_count >= $min_target_count "
+            "RETURN annotation_tag, text, universe_count, target_count"
         )
         r = self._driver.execute_query(
             query,
             universe=universe_proteins,
             target=target_proteins,
             group_tag=group_tag,
+            min_target_count=min_target_count,
             routing_="r",
             result_transformer_=Result.to_df,
         )
         if r.empty:
             return pd.DataFrame(columns=["annotation_tag", "text", "universe_count", "target_count"])
+        return r
+
+    def get_annotation_member_values(self, universe_proteins: List[str], protein_values: Dict[str, float], min_size: int = 3, group_tag: Optional[str] = None) -> pd.DataFrame:
+        if group_tag is not None:
+            group_match = "MATCH (ag:AnnotationGroup {tag: $group_tag})-[:HAS_ANNOTATION]->(a:Annotation) "
+        else:
+            group_match = "MATCH (a:Annotation) "
+        # two-step: first count members per annotation (cheap), then collect only the
+        # values of annotations passing min_size - avoids materializing tag lists
+        query = (
+            group_match
+            + "MATCH (a)-[:ANNOTATES]->(p:Protein) WHERE p.tag IN $universe "
+            "WITH a, count(DISTINCT p) AS n_members WHERE n_members >= $min_size "
+            "MATCH (a)-[:ANNOTATES]->(p2:Protein) WHERE p2.tag IN $universe "
+            "WITH a, p2, $values[p2.tag] AS v WHERE v IS NOT NULL "
+            "RETURN a.tag AS annotation_tag, a.text AS text, collect(v) AS member_values"
+        )
+        r = self._driver.execute_query(
+            query,
+            universe=universe_proteins,
+            values=protein_values,
+            min_size=min_size,
+            group_tag=group_tag,
+            routing_="r",
+            result_transformer_=Result.to_df,
+        )
+        if r.empty:
+            return pd.DataFrame(columns=["annotation_tag", "text", "member_values"])
         return r
 
     def get_annotation_protein_map(self, universe_proteins: List[str], group_tag: Optional[str] = None) -> pd.DataFrame:

@@ -16,6 +16,14 @@ from routers.annotations import annotations as annotations_router
 from services.annotations.enrichment import compute_annotation_enrichment, enrichment_records
 
 
+@pytest.fixture(autouse=True)
+def bypass_cache(monkeypatch):
+    """Bypass the Mongo-backed runtime cache so every test computes fresh."""
+    def fake_get_or_compute(cache_key, compute_fn, cache_time, **kwargs):
+        return compute_fn()
+    monkeypatch.setattr(annotations_router.db_cache_runtime, "get_or_compute", fake_get_or_compute)
+
+
 def make_user(tag="testuser"):
     return UserModel(tag=tag, firstname="Test", lastname="User",
                      email=f"{tag}@uni-koeln.de", created_at=0.0)
@@ -135,7 +143,7 @@ class FakeAnnotations:
         self._overlap = overlap
         self.calls = []
 
-    def get_annotation_overlap_counts(self, universe_proteins, target_proteins, group_tag=None):
+    def get_annotation_overlap_counts(self, universe_proteins, target_proteins, group_tag=None, min_target_count=0):
         self.calls.append({"universe": list(universe_proteins), "target": list(target_proteins), "group_tag": group_tag})
         return self._overlap
 

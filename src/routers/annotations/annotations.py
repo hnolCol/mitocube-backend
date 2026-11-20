@@ -14,9 +14,13 @@ from services.submission import check_submission_access, check_submission_tags_a
 from services.encryption import create_hierarchical_hash
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
-from services.annotations.enrichment import compute_annotation_enrichment, compute_annotation_shift, enrichment_records
+from services.annotations.enrichment import compute_annotation_enrichment, compute_annotation_shift_from_member_values, enrichment_records
+from lib.cache.cache import db_cache_runtime
+from datetime import timedelta
 import numpy as np
 import pandas as pd
+
+ANNOTATION_ANALYSIS_CACHE_TIME = timedelta(hours=1)
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/annotations",
@@ -328,17 +332,39 @@ def annotation_enrichment_analysis(
         universe_proteins=universe,
         target_proteins=target_in_universe,
         group_tag=group_tag,
+        min_target_count=min_overlap,
     )
 
     overlap_counts = _filter_annotations_by_search_string(overlap_counts, search_string)
 
-    result = compute_annotation_enrichment(
-        overlap_counts=overlap_counts,
-        target_size=len(target_in_universe),
-        universe_size=len(universe),
-        min_overlap=min_overlap,
+    cache_key = db_cache_runtime.make_cache_key(
+        key_data={
+            "kind": "enrichment",
+            "user_tag": user.tag,
+            "submission_tags": submission_tags,
+            "proteome_tag": proteome_tag,
+            "group_tag": group_tag,
+            "search_string": search_string,
+            "min_overlap": min_overlap,
+            "limit": limit,
+            "universe_size": len(universe),
+            "target_size": len(target_in_universe),
+        },
+        namespace="annotation_analysis",
     )
-    return enrichment_records(result, limit=limit)
+    return db_cache_runtime.get_or_compute(
+        cache_key=cache_key,
+        compute_fn=lambda: enrichment_records(
+            compute_annotation_enrichment(
+                overlap_counts=overlap_counts,
+                target_size=len(target_in_universe),
+                universe_size=len(universe),
+                min_overlap=min_overlap,
+            ),
+            limit=limit,
+        ),
+        cache_time=ANNOTATION_ANALYSIS_CACHE_TIME,
+    )
 
 
 @router.post("/analysis/shift", response_model=List[Dict])
@@ -372,15 +398,38 @@ def annotation_shift_analysis(
     if len(protein_values) == 0:
         raise HTTPException(status_code=400, detail="No protein values are part of the background universe.")
 
-    annotation_members = db.annotations.get_annotation_protein_map(
+    member_values = db.annotations.get_annotation_member_values(
         universe_proteins=sorted(universe_set),
+        protein_values=protein_values,
+        min_size=request.min_size,
         group_tag=request.group_tag,
     )
-    annotation_members = _filter_annotations_by_search_string(annotation_members, request.search_string)
+    member_values = _filter_annotations_by_search_string(member_values, request.search_string)
 
-    result = compute_annotation_shift(
-        protein_values=protein_values,
-        annotation_members=annotation_members,
-        min_size=request.min_size,
+    cache_key = db_cache_runtime.make_cache_key(
+        key_data={
+            "kind": "shift",
+            "user_tag": user.tag,
+            "submission_tags": request.submission_tags,
+            "proteome_tag": request.proteome_tag,
+            "group_tag": request.group_tag,
+            "search_string": request.search_string,
+            "min_size": request.min_size,
+            "limit": request.limit,
+            "universe_size": len(universe),
+            "n_values": len(protein_values),
+        },
+        namespace="annotation_analysis",
     )
-    return enrichment_records(result, limit=request.limit)
+    return db_cache_runtime.get_or_compute(
+        cache_key=cache_key,
+        compute_fn=lambda: enrichment_records(
+            compute_annotation_shift_from_member_values(
+                protein_values=protein_values,
+                member_values=member_values,
+                min_size=request.min_size,
+            ),
+            limit=request.limit,
+        ),
+        cache_time=ANNOTATION_ANALYSIS_CACHE_TIME,
+    )
