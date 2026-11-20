@@ -11,9 +11,12 @@ SUBMISSION_STATE_CHOICES = [state.name for state in SubmissionStatesEnums]
 
 
 class ModularProcedureStatusEnum(str, Enum):
-    "Lifecycle status of a modular procedure."
+    """Lifecycle status of a modular procedure: drafts are editable, publishing freezes the
+    content with a SHA-256 hash, retiring keeps the published procedure (and the reproducibility
+    of its executions) forever but indicates it can no longer be assigned or executed."""
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
+    RETIRED = "RETIRED"
 
 
 class ProcedureExecutionStatusEnum(str, Enum):

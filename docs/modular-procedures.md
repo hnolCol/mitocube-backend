@@ -18,7 +18,7 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 
 | Concept | Meaning |
 |---|---|
-| **Modular procedure** | A workflow module (like an SOP): title, description, condition applications (instruments, protocols, treatments via the attribute/trait system) and linked protocols. Drafts are editable; **publishing** freezes the content with a SHA-256 hash. |
+| **Modular procedure** | A workflow module (like an SOP): title, description, condition applications (instruments, protocols, treatments via the attribute/trait system) and linked protocols. Drafts are editable; **publishing** freezes the content with a SHA-256 hash; **retiring** ends the life cycle without deleting: because published procedures (and the executions referencing them) must stay reproducible, they are never deleted — a retired procedure keeps its content and hash forever, is greyed out in the UI and can no longer be assigned or executed, but existing links keep their module history and can still be completed. |
 | **Version** | Published procedures are immutable, but a new **draft version** can be created from a published one (`POST /{tag}/versions`). Versions of one procedure share a `lineage_tag` and are chained via `PREVIOUS_VERSION`. Submissions stay linked to the exact version they were assigned to. |
 | **Link** | `(Submission)-[:IN_PROCEDURE {position, created_at, done, done_at, done_by}]->(Procedure)`. A submission can be linked to several procedures over its lifetime (the module history), but **only one open (not done) module at a time**. |
 | **Execution** | A concrete run of a published procedure: input plate wells (with samples) are mapped to output plate wells; pooling and splitting are supported. An execution starts in the **RUNNING** state and is closed by an explicit confirmation (`finish`: SUCCEEDED / FAILED / ABORTED) that frees the submissions owning the placed samples for the next module. |
@@ -27,7 +27,7 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 ## Data model
 
 ```
-(:ModularProcedure {tag, title, description, status: DRAFT|PUBLISHED, version, lineage_tag,
+(:ModularProcedure {tag, title, description, status: DRAFT|PUBLISHED|RETIRED, version, lineage_tag,
                     content_hash, created_at, published_at, user_tag,
                     input_plate_format, input_plate_type,           # optional plate layout constraints
                     output_plate_format, output_plate_type,
@@ -82,9 +82,10 @@ Notes:
 | `GET` | `/api/procedures/{tag}` | all | One procedure with CAs, protocols and status. |
 | `PATCH` | `/api/procedures/{tag}` | curator+ | Edit a **draft** (published procedures are immutable). |
 | `POST` | `/api/procedures/{tag}/publish` | curator+ | Publish: set the content hash, lock the procedure. |
+| `POST` | `/api/procedures/{tag}/retire` | curator+ | Retire a **published** procedure: content and hash stay forever, but it can no longer be assigned or executed (greyed out in the UI). |
 | `POST` | `/api/procedures/{tag}/versions` | curator+ | Create a new draft version from a **published** procedure (copies content, CAs, protocols). |
 | `GET` | `/api/procedures/{tag}/versions` | all | All versions of the lineage, oldest first. |
-| `DELETE` | `/api/procedures/{tag}` | curator+ | Delete a draft. |
+| `DELETE` | `/api/procedures/{tag}` | – | Not implemented — procedures are never deleted (see the retired state below). |
 | `POST` | `/api/procedures/{tag}/link/{submission_tag}` | curator+ | Assign a submission. Rejected if the submission has an open link to another procedure. |
 | `DELETE` | `/api/procedures/{tag}/link/{submission_tag}` | curator+ | Unlink a submission. |
 | `POST` | `/api/procedures/{tag}/link/{submission_tag}/done` | curator+ | Mark the submission done in this module. |

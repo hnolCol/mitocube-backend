@@ -367,10 +367,32 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError("Modular procedure not found.")
         return PublishModularProcedureModel(tag=tag, version=r[0], content_hash=content_hash)
 
+    def retire(self, tag: str, user_tag: str) -> "ModularProcedureBaseModel":
+        """Retires a published modular procedure: the content (and its SHA-256 hash) stay exactly
+        as they are and procedures are never deleted — the procedure keeps running the module
+        history of its submissions and its executions stay reproducible — but the procedure is
+        marked retired: greyed out in the UI and no longer assignable or executable. Existing
+        links are untouched (their submissions can still be marked done)."""
+        procedure = self.get(tag=tag)
+        if procedure.status == "RETIRED":
+            raise ValueError("This modular procedure is already retired.")
+        if procedure.status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be retired.")
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $tag}) MATCH (u:User {tag : $user_tag}) "
+            "SET m.status = 'RETIRED', m.retired_at = timestamp() "
+            "MERGE (u)-[:RETIRED]->(m) ",
+            routing_="w", tag=tag, user_tag=user_tag)
+        return self.get(tag=tag)
+
     def link(self, tag: str, submission_tag: str, user_tag: str) -> bool:
-        "Assigns a submission to the procedure, appended at the end of the submission's procedure order."
+        """Assigns a submission to the procedure, appended at the end of the submission's procedure
+        order. Retired procedures can no longer be assigned; already linked submissions keep their
+        module history and can still be marked done."""
         if not self.exists(tag=tag):
             raise ValueError("Modular procedure not found.")
+        if self.get(tag=tag).status == "RETIRED":
+            raise ValueError("This modular procedure is retired and can no longer be assigned to submissions.")
         already_linked = self._driver.execute_query(
             "WITH EXISTS {(s:Submission {tag : $submission_tag})-[:IN_PROCEDURE]->(m:ModularProcedure {tag : $tag})} as exists RETURN exists",
             routing_="r", tag=tag, submission_tag=submission_tag, result_transformer_=Result.value)

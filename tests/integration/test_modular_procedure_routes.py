@@ -128,6 +128,17 @@ class FakeModularProceduresDB:
             protocol_tags=parent.protocol_tags)
         return self.procedures[new_tag]
 
+    def retire(self, tag, user_tag):
+        if tag not in self.procedures:
+            raise KeyError("Modular procedure not found.")
+        procedure = self.procedures[tag]
+        if procedure.status == "RETIRED":
+            raise ValueError("This modular procedure is already retired.")
+        if procedure.status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be retired.")
+        self.procedures[tag] = procedure.model_copy(update={"status": "RETIRED"})
+        return self.procedures[tag]
+
     def get_versions(self, tag):
         procedure = self.get(tag)
         return [t for t, p in sorted(self.procedures.items(), key=lambda kv: kv[1].version)
@@ -182,6 +193,8 @@ class FakeModularProceduresDB:
     def link(self, tag, submission_tag, user_tag):
         if tag not in self.procedures:
             raise ValueError("Modular procedure not found.")
+        if self.procedures[tag].status == "RETIRED":
+            raise ValueError("This modular procedure is retired and can no longer be assigned to submissions.")
         if submission_tag in [link.submission_tag for link in self.submission_links.get(tag, [])]:
             raise ValueError("Submission is already linked to this modular procedure.")
         open_elsewhere = [link.procedure_tag for links in self.submission_procedures.values() for link in links
@@ -536,6 +549,61 @@ class TestModularProcedureRoutes:
         resp = client.delete("/api/procedures/proc-2/link/subm-1/done")
         assert resp.status_code == 200
         assert resp.json() is True
+
+
+class TestModularProcedureRetirement:
+    """Published procedures are content-hash immutable and never deleted; retiring is the way to
+    end their life cycle: the content and hash stay, the procedure is greyed out and unusable."""
+
+    def test_standard_user_rejected_on_retire(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/proc-2/retire")
+            assert resp.status_code == 403
+
+    def test_retire_draft_rejected(self, client):
+        resp = client.post("/api/procedures/proc-1/retire")
+        assert resp.status_code == 400
+        assert "Only published modular procedures can be retired" in resp.json()["detail"]
+
+    def test_retire_published_and_twice_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/retire")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "RETIRED"
+        # the frozen content stays exactly as it was
+        assert resp.json()["content_hash"]
+        resp = client.post("/api/procedures/proc-2/retire")
+        assert resp.status_code == 400
+        assert "already retired" in resp.json()["detail"]
+
+    def test_retired_procedure_cannot_be_linked_or_executed(self, client):
+        client.post("/api/procedures/proc-2/retire")
+        resp = client.post("/api/procedures/proc-2/link/subm-2")
+        assert resp.status_code == 400
+        assert "retired" in resp.json()["detail"]
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+
+    def test_existing_link_can_still_be_marked_done(self, client):
+        # subm-1 is pre-linked to proc-2 in the test fixture (and open)
+        client.post("/api/procedures/proc-2/retire")
+        resp = client.post("/api/procedures/proc-2/link/subm-1/done")
+        assert resp.status_code == 200
+        resp = client.delete("/api/procedures/proc-2/link/subm-1/done")
+        assert resp.status_code == 200
+
+    def test_new_version_blocked_for_retired(self, client):
+        client.post("/api/procedures/proc-2/retire")
+        resp = client.post("/api/procedures/proc-2/versions")
+        assert resp.status_code == 400
+
+    def test_retired_procedures_visible_in_queries(self, client):
+        client.post("/api/procedures/proc-2/retire")
+        resp = client.get("/api/procedures/q?status=RETIRED")
+        assert resp.status_code == 200
+        assert "proc-2" in resp.json()
 
 
 class TestModularProcedurePermissions:

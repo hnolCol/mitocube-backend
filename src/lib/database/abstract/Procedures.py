@@ -78,6 +78,14 @@ class ModularProceduresABC(ABC):
         published."""
 
     @abstractmethod
+    def retire(self, tag: str, user_tag: str):
+        """Retires a published modular procedure: the content and its SHA-256 hash are kept
+        forever (procedures are never deleted, so their executions stay reproducible) but the
+        procedure can no longer be assigned or executed — the UI shows it in a greyed out
+        style. Existing links keep their module history and can still be completed.
+        Raises a ValueError if the procedure does not exist, is a draft or is already retired."""
+
+    @abstractmethod
     def link(self, tag: str, submission_tag: str, user_tag: str) -> bool:
         """Assigns a submission to the procedure. The link is appended at the
         end of the submission's procedure order.

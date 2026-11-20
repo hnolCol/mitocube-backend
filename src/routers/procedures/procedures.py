@@ -280,6 +280,20 @@ def publish_modular_procedure(procedure_tag : str, user : UserModel = Depends(is
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/{procedure_tag}/retire", response_model=ModularProcedureBaseModel)
+def retire_modular_procedure(procedure_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ModularProcedureBaseModel:
+    """Retires a published modular procedure: because published procedures are content-hash
+    immutable and never deleted (their executions must stay reproducible), retiring marks a
+    procedure as no longer usable — greyed out in the UI, not assignable and not executable —
+    while keeping its content, hash and history. The user must be at least curator."""
+    try:
+        return db.modular_procedures.retire(tag=procedure_tag, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Modular procedure not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/{procedure_tag}/link/{submission_tag}", response_model=bool)
 def link_modular_procedure_to_submission(procedure_tag : str, submission_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Assigns the given submission to the specified modular procedure. The user must be at least curator."
