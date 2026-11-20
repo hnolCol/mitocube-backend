@@ -95,3 +95,10 @@ class ResearchGroupABC(ABC):
     @abstractmethod
     def set_subgroup(self, parent_tag : str, child_tag : str):
         "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."
+
+    @abstractmethod
+    def get_sharing_overview(self) -> List[Dict]:
+        """Returns the platform-wide sharing overview for admins and curators: one entry per
+        submission shared in any way, with the submission and owner tags, the owners research
+        groups, the approved and pending consortium shares, the collaborating users (explore
+        view shares) and the pending collaboration requests"""

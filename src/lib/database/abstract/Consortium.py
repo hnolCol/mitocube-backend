@@ -151,3 +151,19 @@ class ConsortiumABC(ABC):
     @abstractmethod
     def get_pending_consortium_tags(self, submission_tag : str) -> List[str]:
         """Returns the tags of consortiums with a pending share request for the submission"""
+    
+    @abstractmethod
+    def find_joinable_consortiums_for_user(self, user_tag : str) -> List[str]:
+        """Returns the consortiums whose terms were agreed by one of the users groups while the user is not a direct member yet"""
+
+
+    @abstractmethod
+    def get_pending_membership_requests_relevant_to(self, user_tag : str, group_tags : List[str]) -> List[Dict]:
+        """Returns the pending membership requests that concern members of the given research
+        groups (the groups a head (PI) leads or a group curator curates), plus the requests
+        the given user filed themselves or that concern themselves"""
+
+    @abstractmethod
+    def get_group_sharing_overview(self) -> List[Dict]:
+        """Returns the consortium sharing overview for admins and curators: one entry per consortium
+        with the member research groups and whether each group agreed to the consortium terms"""
