@@ -14,6 +14,7 @@ already intersected with that universe. Enrichment is tested one-sided
 (Fisher exact, alternative="greater") and p-values are corrected with
 Benjamini-Hochberg FDR.
 """
+from collections import Counter
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -171,31 +172,85 @@ def compute_annotation_shift(
         out = [v for k, v in values.items() if k not in member_set]
         in_vals = np.array([values[p] for p in members], dtype=float)
         out_vals = np.array(out, dtype=float)
-        if len(in_vals) < min_size or len(out_vals) < min_size:
-            continue
-        try:
-            u_stat, p = mannwhitneyu(in_vals, out_vals, alternative="two-sided")
-        except ValueError:
-            continue
-        mean_in = float(in_vals.mean())
-        mean_out = float(out_vals.mean())
-        rows.append({
-            "annotation_tag": row["annotation_tag"],
-            "text": row["text"] if "text" in annotation_members.columns else row["annotation_tag"],
-            "n_in": len(in_vals),
-            "n_out": len(out_vals),
-            "mean_in": mean_in,
-            "mean_out": mean_out,
-            "shift": mean_in - mean_out,
-            "direction": "up" if mean_in >= mean_out else "down",
-            "u_statistic": float(u_stat),
-            "p_value": float(p),
-        })
+        rows.append(_shift_row(row["annotation_tag"], row.get("text", row["annotation_tag"]), in_vals, out_vals, min_size))
 
+    return _finalize_shift_rows(rows)
+
+
+def _shift_row(annotation_tag, text, in_vals, out_vals, min_size):
+    """Builds one shift record from member/non-member value arrays (None if too few)."""
+    in_vals = np.asarray(in_vals, dtype=float)
+    out_vals = np.asarray(out_vals, dtype=float)
+    if len(in_vals) < min_size or len(out_vals) < min_size:
+        return None
+    try:
+        u_stat, p = mannwhitneyu(in_vals, out_vals, alternative="two-sided")
+    except ValueError:
+        return None
+    mean_in = float(in_vals.mean())
+    mean_out = float(out_vals.mean())
+    return {
+        "annotation_tag": annotation_tag,
+        "text": text,
+        "n_in": len(in_vals),
+        "n_out": len(out_vals),
+        "mean_in": mean_in,
+        "mean_out": mean_out,
+        "shift": mean_in - mean_out,
+        "direction": "up" if mean_in >= mean_out else "down",
+        "u_statistic": float(u_stat),
+        "p_value": float(p),
+    }
+
+
+def _finalize_shift_rows(rows):
+    rows = [r for r in rows if r is not None]
     if not rows:
-        return result
+        return pd.DataFrame(columns=SHIFT_COLUMNS)
     result = pd.DataFrame(rows)
     p_values = result["p_value"].to_numpy(dtype=float)
     result["fdr"] = false_discovery_control(p_values) if len(result) > 1 else p_values.copy()
     result = result.sort_values("p_value").reset_index(drop=True)
     return result
+
+
+def compute_annotation_shift_from_member_values(
+    protein_values: Dict[str, float],
+    member_values: pd.DataFrame,
+    min_size: int = 3,
+) -> pd.DataFrame:
+    """1D shift test variant where the database already collected the member values
+    per annotation (avoids materializing protein tag lists for every annotation).
+
+    Parameters
+    ----------
+    protein_values : Dict[str, float]
+        The 1D value per protein tag (finite values only).
+    member_values : pd.DataFrame
+        Columns ``annotation_tag``, ``text`` and ``member_values`` (list of floats:
+        the values of the annotation's member proteins that have a value).
+    min_size : int, optional
+        Minimum number of member and non-member values, by default 3.
+
+    Returns
+    -------
+    pd.DataFrame
+        Same columns as ``compute_annotation_shift``. ``n_out`` = number of universe
+        proteins with a value minus the annotation's members (so it differs per
+        annotation, since each annotation removes its own members from the background).
+    """
+    if member_values is None or member_values.empty:
+        return pd.DataFrame(columns=SHIFT_COLUMNS)
+    values = {k: float(v) for k, v in protein_values.items() if np.isfinite(v)}
+    if len(values) < 2 * min_size:
+        return pd.DataFrame(columns=SHIFT_COLUMNS)
+    # background = all values minus the annotation's member values (multiset difference)
+    values_counter = Counter(values.values())
+
+    rows = []
+    for _, row in member_values.iterrows():
+        in_vals = np.asarray(row["member_values"], dtype=float)
+        out_counter = values_counter - Counter(in_vals.tolist())
+        out_vals = np.array([v for v, c in out_counter.items() for _ in range(c)], dtype=float)
+        rows.append(_shift_row(row["annotation_tag"], row.get("text", row["annotation_tag"]), in_vals, out_vals, min_size))
+    return _finalize_shift_rows(rows)
