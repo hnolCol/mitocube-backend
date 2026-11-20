@@ -33,10 +33,30 @@ def _get_collaboration_request(request_tag : str, db : DatabaseABC) -> Collabora
     return request
 
 
+def _is_cross_group_request(request : CollaborationRequestModel, db : DatabaseABC) -> bool:
+    """Checks if the requesting user is a member of a different research group
+    than the owner (creator) of the submission."""
+    creator_tag = db.submissions.get_creator(tag = request.submission_tag)
+    if creator_tag is None or request.requested_by == creator_tag:
+        return False
+    creator_groups = set(db.research_groups.find(user_tags = [creator_tag], limit = None) or [])
+    requester_groups = set(db.research_groups.find(user_tags = [request.requested_by], limit = None) or [])
+    return len(creator_groups & requester_groups) == 0
+
+
 def _can_approve(user : UserModel, request : CollaborationRequestModel, db : DatabaseABC) -> bool:
-    """The owner of the submission, a head (PI) of the owners research group,
-    a head (PI) of the requesting users research group (if the PI approval
-    setting is enabled) and curators can approve/deny collaboration requests."""
+    """Decides who can approve/deny a pending collaboration request.
+
+    Requests from another research group (the requesting user shares no research
+    group with the owner) are solely decided by the head (PI) of the owners
+    research group - not by curators or admins, the PI has the final say.
+
+    For requests from the owners own research group the previous rights apply:
+    the owner of the submission, a head (PI) of the owners research group, any
+    other research group head (if the PI approval setting is enabled) and
+    curators can approve/deny."""
+    if _is_cross_group_request(request = request, db = db):
+        return db.consortiums.is_head_of_submission_owner(user_tag = user.tag, submission_tag = request.submission_tag)
     if user.role >= UserRolesEnum.CURATOR:
         return True
     creator_tag = db.submissions.get_creator(tag = request.submission_tag)
@@ -165,10 +185,17 @@ def get_my_collaboration_requests(user : UserModel = Depends(get_user_from_token
             summary="Returns the pending collaboration requests the current user can approve.")
 def get_pending_collaboration_requests(user : UserModel = Depends(get_user_from_token),
                                        db : DatabaseABC = Depends(get_db)) -> List[CollaborationRequestModel]:
-    """Returns the pending collaboration requests of the submissions owned by the
+    """
+    Returns the pending collaboration requests of the submissions owned by the
     current user and of the members of the research groups they lead (as head/PI).
-    The requests are visible next to the consortium share requests."""
-    return db.collaborations.get_pending_collaboration_requests_for_head(user_tag = user.tag)
+    Only the requests the current user can actually decide are returned: requests
+    from another research group are solely decided by the head (PI) of the owners
+    research group, so they stay hidden for admins, curators and the heads of the
+    requesting users groups. The requests are visible next to the consortium
+    share requests.
+    """
+    requests = db.collaborations.get_pending_collaboration_requests_for_head(user_tag = user.tag)
+    return [request for request in requests if _can_approve(user = user, request = request, db = db)]
 
 
 @router.get("/requests/submissions/{submission_tag}", response_model=List[CollaborationRequestModel],

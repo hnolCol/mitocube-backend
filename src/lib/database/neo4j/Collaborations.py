@@ -357,7 +357,7 @@ class Neo4JCollaborations(CollaborationsABC):
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
-            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, false) } "
+            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, true) } "
             "WITH s, "
             "[ca_tag IN $ca_tags WHERE COUNT { (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag}) } > 0] AS matched_ca_tags, "
             "[user_tag IN $user_tags WHERE COUNT { (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) } > 0] AS matched_user_tags "
