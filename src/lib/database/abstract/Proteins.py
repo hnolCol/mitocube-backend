@@ -157,3 +157,19 @@ class ProteinsABC(ABC):
             True if the protein was successfully removed from favorites, False otherwise.
         """
         pass
+
+    @abstractmethod
+    def get_protein_tags_by_proteome(self, proteome_tag: str) -> List[str]:
+        """Returns the tags of all proteins of the given proteome.
+
+        Parameters
+        ----------
+        proteome_tag : str
+            The proteome tag.
+
+        Returns
+        -------
+        List[str]
+            The protein tags of the proteome.
+        """
+        pass
