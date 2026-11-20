@@ -395,3 +395,22 @@ class AnnotationsABC(ABC):
             annotation inside the universe), target_count (proteins of the
             annotation inside the target list).
         """
+
+    @abstractmethod
+    def get_annotation_protein_map(self, universe_proteins: List[str], group_tag: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get the member proteins of each annotation restricted to a universe.
+
+        Parameters
+        ----------
+        universe_proteins : List[str]
+            The proteins defining the background universe.
+        group_tag : Optional[str], optional
+            If given, only annotations of this annotation group are returned.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: annotation_tag, text, protein_tags (list of protein tags
+            of the annotation inside the universe).
+        """

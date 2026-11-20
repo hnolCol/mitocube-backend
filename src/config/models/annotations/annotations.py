@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, List
+from typing import Dict, Optional, List
 from pydantic import BaseModel, Field, field_validator
 from services.random_generators import get_random_string
 from datetime import datetime
@@ -69,4 +69,20 @@ class AnnotationsModel(BaseModel):
         from_attributes = True
 
 
-    
+class AnnotationShiftRequestModel(BaseModel):
+    """
+    Request model for the 1D shift analysis (systematic shifted annotations).
+
+    ``protein_values`` maps each protein tag to a 1D value (e.g. the log2FC of a
+    volcano plot). The background universe is defined by ``submission_tags``
+    (union of the proteins quantified in these submissions) or ``proteome_tag``
+    (all proteins of the proteome) - exactly one of them must be provided.
+    """
+
+    protein_values: Dict[str, float]
+    submission_tags: Optional[List[str]] = None
+    proteome_tag: Optional[str] = None
+    group_tag: Optional[str] = None
+    search_string: Optional[str] = None
+    min_size: int = 3
+    limit: Optional[int] = None
