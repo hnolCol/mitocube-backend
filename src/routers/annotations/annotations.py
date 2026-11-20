@@ -5,7 +5,7 @@ from scipy.stats import fisher_exact
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
 
-from config.models.annotations.annotations import ( AnnotationGroupsInsertModel, AnnotationGroupsModel, AnnotationsModel)
+from config.models.annotations.annotations import ( AnnotationGroupsInsertModel, AnnotationGroupsModel, AnnotationsModel, AnnotationShiftRequestModel )
 from lib.database.neo4j.Annotations import ( Neo4JAnnotationGroups,  Neo4JAnnotations)
 
 from config.models.user import UserModel
@@ -14,7 +14,9 @@ from services.submission import check_submission_access, check_submission_tags_a
 from services.encryption import create_hierarchical_hash
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
+from services.annotations.enrichment import compute_annotation_enrichment, compute_annotation_shift, enrichment_records
 import numpy as np
+import pandas as pd
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
     prefix="/api/annotations",
@@ -252,3 +254,133 @@ def fisher_annotation_analysis(
     
     results.sort(key=lambda x: x["p_value"])
     return results
+
+
+def _resolve_universe(db: DatabaseABC, user: UserModel, submission_tags: Optional[str], proteome_tag: Optional[str]) -> List[str]:
+    """Resolves the background universe for the annotation analysis endpoints.
+
+    Either a semicolon-separated list of submission tags (union of the proteins
+    quantified in these submissions, access-checked per submission) or a single
+    proteome tag (all proteins of the proteome) must be provided.
+    """
+    if submission_tags is not None and proteome_tag is not None:
+        raise HTTPException(status_code=400, detail="Provide either submission_tags or proteome_tag, not both.")
+    if submission_tags is not None:
+        tags = APIParamString(param=submission_tags).param or []
+        if len(tags) == 0:
+            raise HTTPException(status_code=400, detail="submission_tags is empty.")
+        check_submission_tags_access(submission_tags=tags, user=user, db=db)
+        universe = set()
+        for tag in tags:
+            universe.update(db.submissions.get_proteins_in_submission(tag))
+        universe = sorted(universe)
+    elif proteome_tag is not None:
+        universe = db.proteins.get_protein_tags_by_proteome(proteome_tag)
+    else:
+        raise HTTPException(status_code=400, detail="Either submission_tags or proteome_tag must be provided to define the background universe.")
+    if len(universe) == 0:
+        raise HTTPException(status_code=404, detail="No proteins found in the background universe.")
+    return universe
+
+
+def _filter_annotations_by_search_string(df: pd.DataFrame, search_string: Optional[str]) -> pd.DataFrame:
+    if search_string is not None and len(search_string) > 0 and not df.empty:
+        needle = search_string.lower()
+        mask = df["annotation_tag"].str.lower().str.contains(needle) | df["text"].fillna("").str.lower().str.contains(needle)
+        return df[mask]
+    return df
+
+
+@router.get("/analysis/enrichment", response_model=List[Dict])
+def annotation_enrichment_analysis(
+    target_proteins: str = Query(..., description="Semicolon-separated protein tags defining the target list to test for enrichment."),
+    submission_tags: Optional[str] = Query(None, description="Semicolon-separated submission tags. The background universe is the union of the proteins quantified in these submissions. The user needs access to all of them."),
+    proteome_tag: Optional[str] = Query(None, description="Proteome tag. The background universe is all proteins of this proteome. Provide either submission_tags or proteome_tag, not both."),
+    group_tag: Optional[str] = Query(None, description="Restrict the tested annotations to this annotation group."),
+    search_string: Optional[str] = Query(None, description="Only test annotations whose text or tag contains this string (case-insensitive)."),
+    min_overlap: int = Query(1, ge=1, description="Minimum number of target proteins annotated for an annotation to be tested."),
+    limit: Optional[int] = Query(None, ge=1, description="Maximum number of results (after sorting by p-value)."),
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> List[Dict]:
+    """Enrichment analysis of annotations for a defined target protein list.
+
+    For every annotation (optionally restricted to a group / search string) a
+    one-sided Fisher exact test (alternative="greater") on the 2x2 table of
+    target list vs. background universe is computed, and p-values are corrected
+    with Benjamini-Hochberg FDR. The universe is either the union of the
+    proteins quantified in the given submissions (submission-wide volcano
+    plots) or all proteins of a proteome (cross-submission comparisons of the
+    same proteome).
+    """
+    target = APIParamString(param=target_proteins).param or []
+    if len(target) == 0:
+        raise HTTPException(status_code=400, detail="No target proteins provided.")
+
+    universe = _resolve_universe(db=db, user=user, submission_tags=submission_tags, proteome_tag=proteome_tag)
+
+    universe_set = set(universe)
+    target_in_universe = [t for t in dict.fromkeys(target) if t in universe_set]
+    if len(target_in_universe) == 0:
+        raise HTTPException(status_code=400, detail="No target proteins are part of the background universe.")
+
+    overlap_counts = db.annotations.get_annotation_overlap_counts(
+        universe_proteins=universe,
+        target_proteins=target_in_universe,
+        group_tag=group_tag,
+    )
+
+    overlap_counts = _filter_annotations_by_search_string(overlap_counts, search_string)
+
+    result = compute_annotation_enrichment(
+        overlap_counts=overlap_counts,
+        target_size=len(target_in_universe),
+        universe_size=len(universe),
+        min_overlap=min_overlap,
+    )
+    return enrichment_records(result, limit=limit)
+
+
+@router.post("/analysis/shift", response_model=List[Dict])
+def annotation_shift_analysis(
+    request: AnnotationShiftRequestModel,
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> List[Dict]:
+    """1D shift analysis ("systematic shifted annotations") of a per-protein value.
+
+    For every annotation (optionally restricted to a group / search string) a
+    two-sided Mann-Whitney U test compares the 1D values (e.g. log2FC of a
+    volcano plot) of the annotation's member proteins against the values of
+    all other proteins in the background universe. P-values are corrected with
+    Benjamini-Hochberg FDR. ``direction`` ("up"/"down") is the sign of the mean
+    difference of member vs. non-member values.
+    """
+    universe = _resolve_universe(
+        db=db,
+        user=user,
+        submission_tags=";".join(request.submission_tags) if request.submission_tags else None,
+        proteome_tag=request.proteome_tag,
+    )
+    universe_set = set(universe)
+
+    protein_values = {
+        tag: float(value)
+        for tag, value in request.protein_values.items()
+        if tag in universe_set and np.isfinite(value)
+    }
+    if len(protein_values) == 0:
+        raise HTTPException(status_code=400, detail="No protein values are part of the background universe.")
+
+    annotation_members = db.annotations.get_annotation_protein_map(
+        universe_proteins=sorted(universe_set),
+        group_tag=request.group_tag,
+    )
+    annotation_members = _filter_annotations_by_search_string(annotation_members, request.search_string)
+
+    result = compute_annotation_shift(
+        protein_values=protein_values,
+        annotation_members=annotation_members,
+        min_size=request.min_size,
+    )
+    return enrichment_records(result, limit=request.limit)

@@ -225,3 +225,11 @@ class Neo4JProteins(ProteinsABC):
         )
         r = self._driver.execute_query(query, protein_tag=protein_tag, user_tag=user_tag, routing_="w", result_transformer_=Result.value)
         return r[0] > 0 if len(r) > 0 else False
+
+    def get_protein_tags_by_proteome(self, proteome_tag: str) -> List[str]:
+        query = (
+            "MATCH (p:Protein {proteome_tag: $proteome_tag}) "
+            "RETURN p.tag"
+        )
+        r = self._driver.execute_query(query, proteome_tag=proteome_tag, routing_="r", result_transformer_=Result.value)
+        return r

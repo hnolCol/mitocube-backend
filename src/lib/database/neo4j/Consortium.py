@@ -182,6 +182,21 @@ class Neo4JConsortium(ConsortiumABC):
         )
         r = self._driver.execute_query(query, routing_="r", consortium_tag = consortium_tag, result_transformer_=Result.value)
         return r
+    
+    def get_group_sharing_overview(self) -> List[Dict]:
+        """Returns the consortium sharing overview for admins and curators: one entry per
+        consortium with the member research groups and whether each group agreed to the
+        consortium terms"""
+        query = (
+            "MATCH (c:Consortium) "
+            "OPTIONAL MATCH (rg:ResearchGroup)-[:MEMBER_OF]->(c) "
+            "WITH c, "
+            "     [g IN collect({group_tag: rg.tag, terms_agreed: EXISTS { (rg)-[:CONSORTIUM_TERMS]->(c) }}) WHERE g.group_tag IS NOT NULL] AS groups "
+            "RETURN c.tag AS consortium_tag, groups "
+            "ORDER BY c.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data)
+        return r
 
     def agree_terms(self, consortium_tag : str, group_tag : str, user_tag : str) -> bool:
         """Records that the head (PI) of the research group agreed to the consortium terms.
@@ -327,14 +342,11 @@ class Neo4JConsortium(ConsortiumABC):
         invalidate_all_cached_scopes()  # memberships affect the scope of all consortium members
 
     def _is_eligible_member(self, consortium_tag : str, user_tag : str) -> bool:
-        """Checks if the user is a member of an eligible research group of the consortium
-        whose head (PI) is a member of the consortium"""
+        """Checks if the user is a member of an eligible research group of the consortium"""
         query = (
             "MATCH (u:User {tag : $user_tag}), (c:Consortium {tag : $consortium_tag}) "
             "RETURN EXISTS { "
             "  MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:MEMBER_OF]->(c) "
-            "  MATCH (h:User)-[:HEAD_OF]->(rg) "
-            "  MATCH (h)-[:MEMBER_OF]->(c) "
             "  RETURN true "
             "} "
         )
@@ -344,13 +356,29 @@ class Neo4JConsortium(ConsortiumABC):
 
     def insert_users(self, tag : str, user_tags : List[str], user_tag : str = None):
         """Adds users as direct members of the consortium. A user can only be added if they are a
-        member of an eligible research group whose head (PI) is a member of the consortium."""
+        member of an eligible research group. The heads (PIs) of the affected groups are joined
+        as members automatically if they are not members yet (e.g. when they were made head
+        after the group joined the consortium)."""
         if not self.exists(tag): raise ValueError(f"Consortium with tag {tag} does not exist.")
 
         for member_tag in user_tags:
             if not self._is_eligible_member(consortium_tag = tag, user_tag = member_tag):
                 raise ValueError(f"User {member_tag} cannot be added to the consortium: "
                                  f"they are not a member of an eligible research group whose head (PI) is in the consortium.")
+
+        # repair: ensure the heads (PIs) of the affected groups are direct members, the same
+        # invariant insert_groups establishes when a research group joins the consortium
+        head_query = (
+            "MATCH (c:Consortium {tag : $tag}) "
+            "UNWIND $user_tags as member_tag "
+            "MATCH (u:User {tag : member_tag})-[:MEMBER_OF]->(rg:ResearchGroup)-[:MEMBER_OF]->(c) "
+            "WITH DISTINCT c, rg "
+            "MATCH (head:User)-[:HEAD_OF]->(rg) "
+            "MERGE (head)-[hm:MEMBER_OF]->(c) "
+            "ON CREATE "
+            "SET hm.created_at = timestamp(), hm.origin = 'head', hm.added_by = $user_tag "
+        )
+        self._driver.execute_query(head_query, routing_="w", tag = tag, user_tags = user_tags, user_tag = user_tag)
 
         query = (
             "MATCH (c:Consortium {tag : $tag}) "
@@ -361,6 +389,15 @@ class Neo4JConsortium(ConsortiumABC):
             "SET m.created_at = timestamp(), m.origin = 'manual', m.added_by = $user_tag "
         )
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags, user_tag = user_tag)
+        stale_add_query = (
+            "MATCH (c:Consortium {tag : $tag}) "
+            "UNWIND $user_tags as member_tag "
+            "MATCH (u:User {tag : member_tag})-[:MEMBER_OF]->(c) "
+            "MATCH (u)-[r:MEMBERSHIP_REQUEST]->(c) "
+            "WHERE r.status = 'pending' AND r.kind = 'add' "
+            "DELETE r "
+        )
+        self._driver.execute_query(stale_add_query, routing_="w", tag = tag, user_tags = user_tags)
         invalidate_all_cached_scopes()  # memberships affect the scope of all consortium members
 
     def remove_users(self, tag : str, user_tags : List[str]):
@@ -390,6 +427,14 @@ class Neo4JConsortium(ConsortiumABC):
             "DELETE m"
         )
         self._driver.execute_query(query, routing_="w", tag = tag, user_tags = user_tags)
+        stale_remove_query = (
+            "MATCH (c:Consortium {tag : $tag}) "
+            "UNWIND $user_tags as member_tag "
+            "MATCH (u:User {tag : member_tag})-[r:MEMBERSHIP_REQUEST]->(c) "
+            "WHERE r.status = 'pending' AND r.kind = 'remove' "
+            "DELETE r "
+        )
+        self._driver.execute_query(stale_remove_query, routing_="w", tag = tag, user_tags = user_tags)
         invalidate_all_cached_scopes()  # memberships affect the scope of all consortium members
 
     def is_head_of_user_in_consortium(self, head_tag : str, user_tag : str, consortium_tag : str) -> bool:
@@ -426,10 +471,15 @@ class Neo4JConsortium(ConsortiumABC):
         return r[0] > 0
 
     def get_pending_membership_requests(self, consortium_tag : str = None) -> List[Dict]:
-        """Returns all pending membership requests, optionally restricted to one consortium"""
+        """Returns all pending membership requests, optionally restricted to one consortium.
+        Stale requests that contradict the actual membership are not returned: pending 'add'
+        requests of users that are already direct members and pending 'remove' requests of
+        users that are not members anymore."""
         query = (
             "MATCH (u:User)-[r:MEMBERSHIP_REQUEST]->(c:Consortium) "
             "WHERE r.status = 'pending' "
+            "AND ( (r.kind = 'add' AND NOT EXISTS { MATCH (u)-[:MEMBER_OF]->(c) }) "
+            "  OR (r.kind = 'remove' AND EXISTS { MATCH (u)-[:MEMBER_OF]->(c) }) ) "
         )
         if consortium_tag is not None:
             query += "AND c.tag = $consortium_tag "
@@ -448,6 +498,8 @@ class Neo4JConsortium(ConsortiumABC):
             "WITH pi, group_member_tags + [pi.tag] AS relevant_tags "
             "MATCH (u:User)-[r:MEMBERSHIP_REQUEST]->(c:Consortium) "
             "WHERE r.status = 'pending' AND (u.tag IN relevant_tags OR r.requested_by = pi.tag) "
+            "AND ( (r.kind = 'add' AND NOT EXISTS { MATCH (u)-[:MEMBER_OF]->(c) }) "
+            "  OR (r.kind = 'remove' AND EXISTS { MATCH (u)-[:MEMBER_OF]->(c) }) ) "
             "RETURN u.tag AS user_tag, c.tag AS consortium_tag, r.kind AS kind, "
             "r.requested_by AS requested_by, r.created_at AS created_at ORDER BY r.created_at DESC "
         )
@@ -622,3 +674,38 @@ class Neo4JConsortium(ConsortiumABC):
             "RETURN c.tag "
         )
         return self._driver.execute_query(query, routing_="r", submission_tag = submission_tag, result_transformer_=Result.value)
+    
+    def find_joinable_consortiums_for_user(self, user_tag : str) -> List[str]:
+        """Returns the tags of the consortiums the current user can request to join: the head
+        (PI) of at least one of the users research groups agreed to the consortium terms while
+        the user is not a direct member of the consortium yet"""
+        query = (
+            "MATCH (u:User {tag : $user_tag}) "
+            "MATCH (u)-[:MEMBER_OF]->(rg:ResearchGroup)-[:CONSORTIUM_TERMS]->(c:Consortium) "
+            "WHERE NOT (u)-[:MEMBER_OF]->(c) "
+            "RETURN DISTINCT c.tag ORDER BY c.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag, result_transformer_=Result.value)
+        return list(r) if r else []
+    
+    def get_pending_membership_requests_relevant_to(self, user_tag : str, group_tags : List[str]) -> List[Dict]:
+        """Returns the pending membership requests that concern members of the given research
+        groups (the groups a head (PI) leads or a group curator curates), plus the requests
+        the given user filed themselves or that concern themselves"""
+        query = (
+            "MATCH (u:User)-[r:MEMBERSHIP_REQUEST]->(c:Consortium) "
+            "WHERE r.status = 'pending' "
+            "AND ( "
+            "  u.tag = $user_tag "
+            "  OR r.requested_by = $user_tag "
+            "  OR EXISTS { MATCH (g:ResearchGroup) WHERE g.tag IN $group_tags MATCH (g)<-[:MEMBER_OF]-(u) } "
+            ") "
+            "AND ( (r.kind = 'add' AND NOT EXISTS { MATCH (u)-[:MEMBER_OF]->(c) }) "
+            "  OR (r.kind = 'remove' AND EXISTS { MATCH (u)-[:MEMBER_OF]->(c) }) ) "
+            "RETURN u.tag AS user_tag, c.tag AS consortium_tag, r.kind AS kind, "
+            "r.requested_by AS requested_by, r.created_at AS created_at ORDER BY r.created_at DESC "
+        )
+        r = self._driver.execute_query(query, routing_="r", user_tag = user_tag,
+                                       group_tags = group_tags if group_tags is not None else [],
+                                       result_transformer_=Result.data)
+        return list(r) if r else []

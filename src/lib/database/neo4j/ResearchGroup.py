@@ -327,14 +327,14 @@ class Neo4JResearchGroup(ResearchGroupABC):
         self._driver.execute_query(query, routing_="w", group_tag = group_tag, user_tag = user_tag)
     
     def get_explore_disabled(self, tag : str) -> bool:
-        """Returns whether the head (PI) of the research group disabled the explore
-        visibility of the groups submissions. Defaults to False."""
+        """Returns whether the explore visibility of the groups submissions is disabled.
+        Disabled is the default, e.g. for new research groups"""
         query = (
             "MATCH (rg:ResearchGroup {tag : $tag}) "
-            "RETURN coalesce(rg.explore_disabled, false) "
+            "RETURN coalesce(rg.explore_disabled, true) "
         )
         r = self._driver.execute_query(query, tag = tag, routing_ = "r", result_transformer_ = Result.value)
-        if len(r) == 0: return False
+        if len(r) == 0: return True
         return bool(r[0])
 
     def set_explore_disabled(self, tag : str, disabled : bool) -> bool:
@@ -366,10 +366,10 @@ class Neo4JResearchGroup(ResearchGroupABC):
         return len(r) > 0
 
     def get_explore_disabled_group_tags(self) -> List[str]:
-        "Returns the tags of all research groups whose head (PI) disabled the explore visibility"
+        "Returns the tags of all research groups whose explore visibility is disabled (the default for new groups)"
         query = (
             "MATCH (rg:ResearchGroup) "
-            "WHERE coalesce(rg.explore_disabled, false) "
+            "WHERE coalesce(rg.explore_disabled, true) "
             "RETURN rg.tag ORDER BY rg.tag "
         )
         return self._driver.execute_query(query, routing_ = "r", result_transformer_ = Result.value)
@@ -398,3 +398,35 @@ class Neo4JResearchGroup(ResearchGroupABC):
         )
         
         self._driver.execute_query(query, routing_="w", parent_tag = parent_tag, child_tag = child_tag)
+
+
+
+    def get_sharing_overview(self) -> List[Dict]:
+        """Returns the platform-wide sharing overview for admins and curators: one entry per
+        submission shared in any way, with the submission and owner tags, the owners research
+        groups, the approved and pending consortium shares, the collaborating users (explore
+        view shares) and the pending collaboration requests"""
+        query = (
+            "MATCH (owner:User)-[:CREATED]->(s:Submission) "
+            "OPTIONAL MATCH (s)-[sh:SHARED_WITH]->(c:Consortium) "
+            "OPTIONAL MATCH (owner)-[:MEMBER_OF]->(og:ResearchGroup) "
+            "WITH s, owner, "
+            "     [x IN collect(DISTINCT CASE WHEN sh.status = 'approved' THEN c.tag END) WHERE x IS NOT NULL] AS consortium_tags, "
+            "     [x IN collect(DISTINCT CASE WHEN sh.status = 'pending' THEN c.tag END) WHERE x IS NOT NULL] AS pending_consortium_tags, "
+            "     [x IN collect(DISTINCT og.tag) WHERE x IS NOT NULL] AS owner_group_tags "
+            "OPTIONAL MATCH (collaborator:User)-[:COLLABORATES]->(s) "
+            "WITH s, owner, consortium_tags, pending_consortium_tags, owner_group_tags, "
+            "     [x IN collect(DISTINCT CASE WHEN collaborator.tag IS NOT NULL AND collaborator.tag <> owner.tag THEN collaborator.tag END) WHERE x IS NOT NULL] AS collaborator_tags "
+            "OPTIONAL MATCH (cr:CollaborationRequest)-[:FOR_SUBMISSION]->(s) "
+            "WHERE cr.status = 'pending' "
+            "WITH s, owner, consortium_tags, pending_consortium_tags, owner_group_tags, collaborator_tags, "
+            "     collect(DISTINCT {requested_by: cr.requested_by, requested_for_user_tag: cr.requested_for_user_tag, requested_for_group_tag: cr.requested_for_group_tag, created_at: cr.created_at}) AS requests "
+            "WITH s, owner, consortium_tags, pending_consortium_tags, owner_group_tags, collaborator_tags, "
+            "     [r IN requests WHERE r.requested_by IS NOT NULL] AS pending_collaboration_requests "
+            "WHERE size(consortium_tags) > 0 OR size(pending_consortium_tags) > 0 OR size(collaborator_tags) > 0 OR size(pending_collaboration_requests) > 0 "
+            "RETURN s.tag AS submission_tag, owner.tag AS owner_tag, owner_group_tags, consortium_tags, "
+            "       pending_consortium_tags, collaborator_tags, pending_collaboration_requests "
+            "ORDER BY s.tag "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.data)
+        return r

@@ -155,6 +155,21 @@ def get_my_shared_submissions_overview(user : UserModel = Depends(get_user_from_
     """
     return db.research_groups.get_shared_submissions_overview(user_tag = user.tag)
 
+@router.get("/sharing/overview", response_model=Dict,
+            summary="Returns the platform-wide submission sharing overview: consortium shares, explore view collaborations and explore-disabled research groups. Requires at least curator rights.")
+def get_sharing_overview(user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> Dict:
+    """
+    Returns the sharing report for admins and curators: one entry per submission shared in any
+    way (consortium share approved or pending, explore view collaboration or pending
+    collaboration request) with the owner, the owners research groups, the share targets and
+    the tags of all research groups whose explore visibility is disabled.
+    """
+    return {
+        "consortium_groups": db.consortiums.get_group_sharing_overview(),
+        "submissions": db.research_groups.get_sharing_overview(),
+        "explore_disabled_groups": db.research_groups.get_explore_disabled_group_tags()
+    }
+
 @router.get("/user/explore-disabled", response_model=bool,
             summary="Returns whether the head (PI) of any of the current users research groups disabled the explore visibility.")
 def get_my_explore_disabled(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> bool:

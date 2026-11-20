@@ -1139,10 +1139,19 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else False
     
     def get_proteins_in_submission(self, tag: str) -> List[str]:
-        """Returns a list of all protein tags that are quantified in the submission."""
+        """Returns a list of all protein tags that are quantified in the submission.
+
+        Covers both quantification levels: direct sample->Protein QUANTIFIED
+        edges and sample->ProteinGroup QUANTIFIED edges (whose proteins are
+        resolved via HAS_PROTEINS). Without the ProteinGroup branch the result
+        is empty for submissions quantified at protein group level.
+        """
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:Protein) "
-            "RETURN DISTINCT p.tag "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(p:Protein) "
+            "RETURN DISTINCT p.tag AS tag "
+            "UNION "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
+            "RETURN DISTINCT p.tag AS tag "
         )
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
@@ -2715,7 +2724,8 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
     
     def _build_v2_where(self, scope_tags, search_string, state, trait_tags, attribute_tag,
                         ca_tags, protein_tags, ca_search_string, user_tags, user_role,
-                        genotype_tag, consortium_tags, research_group_tags, include_sample_ca, ca_match_all):
+                        genotype_tag, consortium_tags, research_group_tags, include_sample_ca, ca_match_all,
+                        min_state=None):
         """Builds the WHERE conditions and query parameters shared by find_v2 and count_v2.
         scope_tags is the requesting users submission scope (None = unrestricted, e.g. curator)."""
         where = []
@@ -2745,15 +2755,21 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             where.append(f"(({token_clauses}) OR {ca_exists})")
             params.update(token_params)
 
-        # ---- state: latest IN_STATE relationship must point to one of the states ----
-        if state is not None:
+        # ---- state: latest IN_STATE relationship must point to one of the states / at least min_state ----
+        if state is not None or min_state is not None:
+            state_conditions = []
+            if state is not None:
+                state_conditions.append("latest.s IN $states")
+                params["states"] = state
+            if min_state is not None:
+                state_conditions.append("latest.s >= $min_state")
+                params["min_state"] = min_state
             where.append(
                 "EXISTS { MATCH (submission)-[sr:IN_STATE]->(st:State) "
                 "WITH submission, sr, st ORDER BY sr.created_at DESC "
                 "WITH submission, collect({c_at: sr.created_at, s: st.tag})[0] AS latest "
-                "WHERE latest.s IN $states }"
+                f"WHERE {' AND '.join(state_conditions)} }}"
             )
-            params["states"] = state
 
         # ---- genotype tags: all requested genotypes must be present in the submissions samples ----
         if genotype_tag is not None:
@@ -2861,6 +2877,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             current_user_tag : str,
             search_string : str = None,
             state : List[int] = None,
+            min_state : int = None,
             trait_tags : List[str] = None,
             attribute_tag : List[str]= None,
             ca_tags: List[str] = None,
@@ -2883,6 +2900,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             scope_tags = scope_tags,
             search_string = search_string,
             state = state,
+            min_state = min_state,
             trait_tags = trait_tags,
             attribute_tag = attribute_tag,
             ca_tags = ca_tags,
@@ -2909,6 +2927,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             current_user_tag : str,
             search_string : str = None,
             state : List[int] = None,
+            min_state : int = None,
             trait_tags : List[str] = None,
             attribute_tag : List[str]= None,
             ca_tags: List[str] = None,
@@ -2935,6 +2954,7 @@ class Neo4JSubmissionFilter(SubmissionFilterABC):
             scope_tags = scope_tags,
             search_string = search_string,
             state = state,
+            min_state = min_state,
             trait_tags = trait_tags,
             attribute_tag = attribute_tag,
             ca_tags = ca_tags,

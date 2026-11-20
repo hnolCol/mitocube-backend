@@ -8,6 +8,8 @@ from config.models.collaborations import (
     CollaborationRequestInput,
     CollaborationRequestModel,
     SubmissionExploreModel,
+    SubmissionExploreConditionApplicationItemModel,
+    SubmissionExploreConditionApplicationModel,
 )
 from services.random_generators import get_random_string
 from lib.cache.scope_cache import invalidate_cached_scope
@@ -357,7 +359,7 @@ class Neo4JCollaborations(CollaborationsABC):
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
-            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, false) } "
+            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, true) } "
             "WITH s, "
             "[ca_tag IN $ca_tags WHERE COUNT { (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag}) } > 0] AS matched_ca_tags, "
             "[user_tag IN $user_tags WHERE COUNT { (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) } > 0] AS matched_user_tags "
@@ -419,3 +421,28 @@ class Neo4JCollaborations(CollaborationsABC):
                 matched_user_tags = row.get("matched_user_tags") or None,
             ))
         return results
+
+    def explore_condition_applications(self, limit : int = 1000) -> List[SubmissionExploreConditionApplicationModel]:
+        """Returns the top-level condition applications (attribute tag/text,
+        trait tag/text, value) of all explore-visible submissions, grouped per
+        submission. Uses the same explore_disabled filter as explore: submissions
+        of research groups that disabled the explore view are never returned."""
+        query = (
+            "MATCH (s:Submission) "
+            "WHERE s.title IS NOT NULL "
+            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, false) } "
+            "MATCH (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(ca:ConditionApplication) "
+            "OPTIONAL MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
+            "OPTIONAL MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
+            "WITH s, a, t, ca ORDER BY a.priority DESC, t.tag, ca.tag "
+            "WITH s, collect(DISTINCT {condition_application_tag : ca.tag, attribute_tag : a.tag, attribute_text : a.text, trait_tag : t.tag, trait_text : t.text, value : ca.value}) AS cas "
+            "RETURN s.tag AS submission_tag, cas LIMIT $limit "
+        )
+        rows = self._driver.execute_query(query, limit = limit, result_transformer_=Result.data)
+        return [
+            SubmissionExploreConditionApplicationModel(
+                submission_tag = row["submission_tag"],
+                condition_applications = [SubmissionExploreConditionApplicationItemModel(**ca) for ca in row["cas"] if ca.get("condition_application_tag") is not None]
+            )
+            for row in rows
+        ]

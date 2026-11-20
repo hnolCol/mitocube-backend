@@ -130,6 +130,7 @@ def get_similar_submissions(tag : str,
 
 @router.get("/submissions/q")
 def get_submission_by_query(state : str|int = None,
+                            min_state : int = None,
                             search_string : str = None,
                             trait_tags : str = None, 
                             attribute_tag : str = None, 
@@ -159,6 +160,9 @@ def get_submission_by_query(state : str|int = None,
     ----------
     state : str | int, optional
         _description_, by default None
+    min_state : int, optional
+        If given, only submissions whose latest state is greater than or equal to this state
+        are returned (e.g. min_state=5 returns ACTIVE and PUBLISHED submissions), by default None
     query : Annotated[str  |  None, Query, optional
         _description_, by default 1)]=None
     feature_key : str, optional
@@ -202,7 +206,8 @@ def get_submission_by_query(state : str|int = None,
     tags = db.submission_filter.find_v2(
             current_user_tag=user.tag,
             search_string = search_string,
-            state = APIParamInt(param = state).param, 
+            state = APIParamInt(param = state).param,
+            min_state = min_state,
             attribute_tag=APIParamString(param=attribute_tag).param,
             trait_tags=APIParamString(param=trait_tags).param,
             ca_tags=APIParamString(param=ca_tags).param,
@@ -1050,6 +1055,7 @@ def check_submission(
 @router.get("/submissions/q/count")
 def get_submission_query_count(
     state : str|int = None,
+    min_state : int = None,
     search_string : str = None,
     trait_tags : str = None, 
     ca_tags : str = None,
@@ -1079,7 +1085,8 @@ def get_submission_query_count(
     query_count = db.submission_filter.count_v2(
         current_user_tag=user.tag,
         search_string = search_string,
-        state = APIParamInt(param = state).param, 
+        state = APIParamInt(param = state).param,
+        min_state = min_state,
         attribute_tag = APIParamString(param=attribute_tag).param,
         trait_tags = APIParamString(param=trait_tags).param,
         ca_tags = APIParamString(param=ca_tags).param,
