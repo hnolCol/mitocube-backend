@@ -53,6 +53,7 @@ def export_submission_md(
     include_samples: bool = True,
     include_metatext: bool = True,
     include_timeline: bool = True,
+    include_modular_procedures: bool = True,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db)
 ) -> PlainTextResponse:
@@ -68,6 +69,7 @@ def export_submission_md(
     - Samples (incl. genotypes)
     - Protocols
     - Run lists
+    - Workflow modules and their executions (plate mappings, per-well values, state histories)
     - State history and timeline events
 
     Parameters
@@ -88,6 +90,9 @@ def export_submission_md(
         Whether to include the research aim and other metatexts, by default True
     include_timeline : bool, optional
         Whether to include the state history and timeline events, by default True
+    include_modular_procedures : bool, optional
+        Whether to include the workflow modules (facility SOP chain) and the procedure
+        executions of the submission's samples, by default True
     user : UserModel, optional
         The user making the request, by default Depends(get_user_from_token)
 
@@ -115,6 +120,7 @@ def export_submission_md(
         include_samples=include_samples,
         include_metatext=include_metatext,
         include_timeline=include_timeline,
+        include_modular_procedures=include_modular_procedures,
     )
     return PlainTextResponse(markdown_content, media_type="text/markdown; charset=utf-8")
 
@@ -130,6 +136,7 @@ def download_submission_md_file(
     include_samples: bool = True,
     include_metatext: bool = True,
     include_timeline: bool = True,
+    include_modular_procedures: bool = True,
     user: UserModel = Depends(get_user_from_token),
     db: DatabaseABC = Depends(get_db),
 ) -> Response:
@@ -183,6 +190,7 @@ def download_submission_md_file(
         include_samples=include_samples,
         include_metatext=include_metatext,
         include_timeline=include_timeline,
+        include_modular_procedures=include_modular_procedures,
     )
 
     filename = f"submission_{submission_tag}.md"
