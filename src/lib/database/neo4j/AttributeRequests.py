@@ -6,6 +6,7 @@ from neo4j import Driver, Result
 from lib.database.abstract.AttributeRequests import AttributeRequestsABC
 from config.models.requests import AttributeRequestModel, AttributeRequestInsertModel
 from config.models.attributes import InsertTraitModel
+from services.tags import normalize_tag_text
 
 
 class Neo4JAttributeRequests(AttributeRequestsABC):
@@ -28,7 +29,7 @@ class Neo4JAttributeRequests(AttributeRequestsABC):
         self.attributes = attributes
 
     def _normalize(self, text: str) -> str:
-        return text.replace(" ", "_").lower().encode("utf-8", "ignore").decode("utf-8")
+        return normalize_tag_text(text)
 
     def _attribute_tag(self, text: str) -> str:
         return "att_" + self._normalize(text)

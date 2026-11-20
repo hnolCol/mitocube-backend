@@ -10,6 +10,7 @@ from config.enums.states import SubmissionStatesEnums
 
 from services.users import get_user_from_token, is_user_at_least_group_curator
 from services.submission import check_submission_access
+from services.tags import normalize_tag_text
 
 
 from config.models.attributes import AttributeModel, AttributeResponseModel, AttributeValueModel, AttributeTreeNode, AttributeTraitResponseModel, AttributeTraitTagResponseModel, TraitResponseModel, AttributeInsertModel
@@ -27,7 +28,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 @router.post("")
 def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Inserts a new attribute into the database. Returns True if successful, False otherwise."
-    attribute_tag = "att_" + attribute.text.replace(" ","_").lower().encode('utf-8', 'ignore').decode('utf-8')
+    attribute_tag = "att_" + normalize_tag_text(attribute.text)
     if db.attributes.exists(tag = attribute_tag):
         raise HTTPException(status_code=500, detail = "An attribute with the same tag exists already. Alter the text and check if the attribute is not already present before proceeding.")
     if len(attribute_tag) > 35:
@@ -49,10 +50,13 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
     if ok:
         for t in attribute.traits:
             #tag is created in here
+            value = normalize_tag_text(t.text)
+            if value == "":
+                raise HTTPException(status_code=500, detail = f"The trait text '{t.text}' does not yield a valid trait tag. Please use a more descriptive text.")
             trait = InsertTraitModel(
                 attribute_tag=attribute_tag,
                 text = t.text, 
-                value = t.text.replace(" ","_").lower().encode('utf-8', 'ignore').decode('utf-8'),
+                value = value,
                 description=t.description,
                 priority=t.priority
             )
@@ -370,11 +374,17 @@ def add_trait_to_attribute( attribute_tag: str, trait: InsertTraitModel, user: U
     "Adds a trait to an attribute."
     
     trait = InsertTraitModel( attribute_tag=attribute_tag,
-                              value=trait.value,
+                              value=normalize_tag_text(trait.value),
                               text=trait.text,
                               description=trait.description,
                               priority=trait.priority,
                             )
+
+    if trait.value == "":
+        raise HTTPException(
+            status_code=400,
+            detail="The trait value yields an empty trait tag. Please use letters/words (e.g. 'perc' instead of '%').",
+        )
 
     if db.attributes.exists(tag=attribute_tag, trait=trait.tag):
         raise HTTPException(
