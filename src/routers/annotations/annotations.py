@@ -14,6 +14,7 @@ from services.submission import check_submission_access, check_submission_tags_a
 from services.encryption import create_hierarchical_hash
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
+from services.annotations.enrichment import compute_annotation_enrichment, enrichment_records
 import numpy as np
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -252,3 +253,74 @@ def fisher_annotation_analysis(
     
     results.sort(key=lambda x: x["p_value"])
     return results
+
+
+@router.get("/analysis/enrichment", response_model=List[Dict])
+def annotation_enrichment_analysis(
+    target_proteins: str = Query(..., description="Semicolon-separated protein tags defining the target list to test for enrichment."),
+    submission_tags: Optional[str] = Query(None, description="Semicolon-separated submission tags. The background universe is the union of the proteins quantified in these submissions. The user needs access to all of them."),
+    proteome_tag: Optional[str] = Query(None, description="Proteome tag. The background universe is all proteins of this proteome. Provide either submission_tags or proteome_tag, not both."),
+    group_tag: Optional[str] = Query(None, description="Restrict the tested annotations to this annotation group."),
+    search_string: Optional[str] = Query(None, description="Only test annotations whose text or tag contains this string (case-insensitive)."),
+    min_overlap: int = Query(1, ge=1, description="Minimum number of target proteins annotated for an annotation to be tested."),
+    limit: Optional[int] = Query(None, ge=1, description="Maximum number of results (after sorting by p-value)."),
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> List[Dict]:
+    """Enrichment analysis of annotations for a defined target protein list.
+
+    For every annotation (optionally restricted to a group / search string) a
+    one-sided Fisher exact test (alternative="greater") on the 2x2 table of
+    target list vs. background universe is computed, and p-values are corrected
+    with Benjamini-Hochberg FDR. The universe is either the union of the
+    proteins quantified in the given submissions (submission-wide volcano
+    plots) or all proteins of a proteome (cross-submission comparisons of the
+    same proteome).
+    """
+    target = APIParamString(param=target_proteins).param or []
+    if len(target) == 0:
+        raise HTTPException(status_code=400, detail="No target proteins provided.")
+
+    if submission_tags is not None and proteome_tag is not None:
+        raise HTTPException(status_code=400, detail="Provide either submission_tags or proteome_tag, not both.")
+
+    if submission_tags is not None:
+        tags = APIParamString(param=submission_tags).param or []
+        if len(tags) == 0:
+            raise HTTPException(status_code=400, detail="submission_tags is empty.")
+        check_submission_tags_access(submission_tags=tags, user=user, db=db)
+        universe = set()
+        for tag in tags:
+            universe.update(db.submissions.get_proteins_in_submission(tag))
+        universe = sorted(universe)
+    elif proteome_tag is not None:
+        universe = db.proteins.get_protein_tags_by_proteome(proteome_tag)
+    else:
+        raise HTTPException(status_code=400, detail="Either submission_tags or proteome_tag must be provided to define the background universe.")
+
+    if len(universe) == 0:
+        raise HTTPException(status_code=404, detail="No proteins found in the background universe.")
+
+    universe_set = set(universe)
+    target_in_universe = [t for t in dict.fromkeys(target) if t in universe_set]
+    if len(target_in_universe) == 0:
+        raise HTTPException(status_code=400, detail="No target proteins are part of the background universe.")
+
+    overlap_counts = db.annotations.get_annotation_overlap_counts(
+        universe_proteins=universe,
+        target_proteins=target_in_universe,
+        group_tag=group_tag,
+    )
+
+    if search_string is not None and len(search_string) > 0 and not overlap_counts.empty:
+        needle = search_string.lower()
+        mask = overlap_counts["annotation_tag"].str.lower().str.contains(needle) | overlap_counts["text"].fillna("").str.lower().str.contains(needle)
+        overlap_counts = overlap_counts[mask]
+
+    result = compute_annotation_enrichment(
+        overlap_counts=overlap_counts,
+        target_size=len(target_in_universe),
+        universe_size=len(universe),
+        min_overlap=min_overlap,
+    )
+    return enrichment_records(result, limit=limit)

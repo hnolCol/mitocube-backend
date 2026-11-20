@@ -373,3 +373,25 @@ class AnnotationsABC(ABC):
         Get all proteins for each annotation in a group, filtered by submission.
         Returns: {annotation_tag: [list of protein_tags]}
         """
+
+    @abstractmethod
+    def get_annotation_overlap_counts(self, universe_proteins: List[str], target_proteins: List[str], group_tag: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get per-annotation overlap counts with a universe and a target protein list.
+
+        Parameters
+        ----------
+        universe_proteins : List[str]
+            The proteins defining the background universe.
+        target_proteins : List[str]
+            The target protein list (should be a subset of the universe).
+        group_tag : Optional[str], optional
+            If given, only annotations of this annotation group are counted.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: annotation_tag, text, universe_count (proteins of the
+            annotation inside the universe), target_count (proteins of the
+            annotation inside the target list).
+        """

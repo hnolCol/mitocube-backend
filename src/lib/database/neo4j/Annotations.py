@@ -1041,3 +1041,27 @@ class Neo4JAnnotations(AnnotationsABC):
             row["annotation_tag"]: row["protein_tags"]
             for row in r
         }
+
+    def get_annotation_overlap_counts(self, universe_proteins: List[str], target_proteins: List[str], group_tag: Optional[str] = None) -> pd.DataFrame:
+        if group_tag is not None:
+            match = "MATCH (ag:AnnotationGroup {tag: $group_tag})-[:HAS_ANNOTATION]->(a:Annotation)-[:ANNOTATES]->(p:Protein) "
+        else:
+            match = "MATCH (a:Annotation)-[:ANNOTATES]->(p:Protein) "
+        query = (
+            match
+            + "WHERE p.tag IN $universe "
+            "RETURN a.tag AS annotation_tag, a.text AS text, "
+            "count(DISTINCT p) AS universe_count, "
+            "count(DISTINCT CASE WHEN p.tag IN $target THEN p ELSE null END) AS target_count"
+        )
+        r = self._driver.execute_query(
+            query,
+            universe=universe_proteins,
+            target=target_proteins,
+            group_tag=group_tag,
+            routing_="r",
+            result_transformer_=Result.to_df,
+        )
+        if r.empty:
+            return pd.DataFrame(columns=["annotation_tag", "text", "universe_count", "target_count"])
+        return r
