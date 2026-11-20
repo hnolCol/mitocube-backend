@@ -33,8 +33,11 @@ class General(BaseSettings):
     docs_enabled : bool = False
 
     """If True, the submissions explore endpoint additionally accepts ca_tags and
-    user_tags filter parameters and the explore search allows searching by
-    condition applications and users. If False, tag parameters are rejected."""
+    user_tags filter parameters, the explore search allows searching by
+    condition applications and users and the aggregated condition applications
+    per explored submission are exposed for the explore view graph. If False,
+    tag parameters and the per-submission condition application aggregate are
+    rejected."""
     
     class Config:
          env_file = get_env_file()
