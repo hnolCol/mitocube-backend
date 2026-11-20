@@ -10,9 +10,11 @@ from config.enums.users.roles import UserRolesEnum
 from config.models.collaborations import (
     CollaborationRequestInput,
     CollaborationRequestModel,
+    SubmissionExploreConditionApplicationModel,
     SubmissionExploreModel,
 )
 from services.messages import send_message_in_background
+from lib.cache.explore_cache import cache_explore_cas, get_cached_explore_cas
 from services.users import get_user_from_token
 
 EMAIL_SETTINGS = get_email_settings()
@@ -134,6 +136,29 @@ def explore_submissions(search_string : Optional[str] = None,
         raise HTTPException(status_code = 403, detail="Searching submissions by condition applications or users is disabled on this instance.")
     return db.collaborations.explore(search_string = search_string, ca_tags = ca_tags,
                                      user_tags = user_tags, limit = limit)
+
+
+@router.get("/submissions/explore/cas", response_model=List[SubmissionExploreConditionApplicationModel],
+            summary="Discovery endpoint: aggregated condition applications per submission for the explore view.")
+def explore_submission_condition_applications(limit : int = 1000,
+                                               user : UserModel = Depends(get_user_from_token),
+                                               db : DatabaseABC = Depends(get_db)) -> List[SubmissionExploreConditionApplicationModel]:
+    """Returns the top-level condition applications (attribute, trait, value)
+    of all explore-visible submissions, grouped by submission. The response
+    contains only ontology-level data and no sample or quantification data.
+    It powers the condition-application graph of the explore view, which
+    groups submissions by condition application attributes on the client.
+    Revealing the condition applications of explored submissions is at least
+    as informative as searching submissions by condition application tags and
+    is therefore gated by the same instance setting as the tag search."""
+    if not get_general_settings().explore_tag_search_enabled:
+        raise HTTPException(status_code = 403, detail="Aggregated condition applications of explored submissions are disabled on this instance (explore tag search disabled).")
+    cached = get_cached_explore_cas(limit)
+    if cached is not None:
+        return cached
+    results = db.collaborations.explore_condition_applications(limit = limit)
+    cache_explore_cas(results, limit)
+    return results
 
 
 @router.post("/requests", response_model=str,
