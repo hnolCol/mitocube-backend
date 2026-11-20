@@ -11,7 +11,7 @@ from services.random_generators import get_random_string
 
 
 # attribute tags of the storage group used for plates
-PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "plate_type": "att_plate_type", "vendor": "att_vendor", "plate_color" : "att_plate_color"}
+PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "container_type": "att_container_type", "vendor": "att_vendor", "plate_color" : "att_container_color"}
 
 # attributes + traits the plates need; created on startup if missing (existing ones are never changed)
 STORAGE_GROUP_TAG = "storage"
@@ -28,13 +28,13 @@ STORAGE_ATTRIBUTES = [
         {"value": "-20", "text": "-20 °C freezer", "description": "Standard freezer (-20 °C)"},
         {"value": "-80", "text": "-80 °C freezer", "description": "Ultra-low temperature freezer (-80 °C)"},
     ]},
-    {"tag": "att_plate_type", "text": "Plate Type", "traits": [
+    {"tag": "att_container_type", "text": "Plate Type", "traits": [
         {"value": "pcr_skirted", "text": "PCR plate (skirted)", "description": "Fully skirted PCR plate, autosampler/robot compatible"},
     ]},
     {"tag": "att_vendor", "text": "Vendor", "traits": [
         {"value": "thermo_fisher", "text": "Thermo Fisher Scientific", "description": "Thermo Fisher Scientific"},
     ]},
-    {"tag": "att_plate_color", "text": "Plate Color", "traits": [
+    {"tag": "att_container_color", "text": "Plate Color", "traits": [
         {"value": "black", "text": "Black", "description": "Black plate"},
         {"value": "blue", "text": "Blue", "description": "Blue plate"},
         {"value": "green", "text": "Green", "description": "Green plate"},
@@ -270,8 +270,9 @@ class Neo4JPlates(PlatesABC):
         return {
             "format_attribute_tag": PLATE_ATTRIBUTES["format"],
             "cold_storage_attribute_tag": PLATE_ATTRIBUTES["cold_storage"],
-            "plate_type_attribute_tag": PLATE_ATTRIBUTES["plate_type"],
+            "plate_type_attribute_tag": PLATE_ATTRIBUTES["container_type"],
             "vendor_attribute_tag": PLATE_ATTRIBUTES["vendor"],
+            "plate_color_attribute_tag": PLATE_ATTRIBUTES["plate_color"]
         }
 
     def get(self, tag : str) -> Optional[PlateModel]:
