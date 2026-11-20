@@ -1139,10 +1139,19 @@ class Neo4JSubmissions(SubmissionsABC):
         return r[0] if len(r) > 0 else False
     
     def get_proteins_in_submission(self, tag: str) -> List[str]:
-        """Returns a list of all protein tags that are quantified in the submission."""
+        """Returns a list of all protein tags that are quantified in the submission.
+
+        Covers both quantification levels: direct sample->Protein QUANTIFIED
+        edges and sample->ProteinGroup QUANTIFIED edges (whose proteins are
+        resolved via HAS_PROTEINS). Without the ProteinGroup branch the result
+        is empty for submissions quantified at protein group level.
+        """
         query = (
-            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[q:QUANTIFIED]->(p:Protein) "
-            "RETURN DISTINCT p.tag "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(p:Protein) "
+            "RETURN DISTINCT p.tag AS tag "
+            "UNION "
+            "MATCH (submission:Submission {tag : $tag})-[:HAS_SAMPLE]->(s:Sample)-[:QUANTIFIED]->(pg:ProteinGroup)-[:HAS_PROTEINS]->(p:Protein) "
+            "RETURN DISTINCT p.tag AS tag "
         )
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
