@@ -42,3 +42,22 @@ class SubmissionExploreModel(BaseModel):
     has_open_collaboration_request : bool = False
     matched_condition_application_tags : Optional[List[str]] = None
     matched_user_tags : Optional[List[str]] = None
+
+
+class SubmissionExploreConditionApplicationItemModel(BaseModel):
+    """Top-level condition application information of an explored submission.
+    Contains only ontology-level data (attribute, trait, value), never any
+    sample or quantification data."""
+    condition_application_tag : str
+    attribute_tag : Optional[str] = None
+    attribute_text : Optional[str] = None
+    trait_tag : Optional[str] = None
+    trait_text : Optional[str] = None
+    value : Optional[str] = None
+
+
+class SubmissionExploreConditionApplicationModel(BaseModel):
+    """All top-level condition applications of one explored submission, as
+    returned by the explore condition application aggregation endpoint."""
+    submission_tag : str
+    condition_applications : List[SubmissionExploreConditionApplicationItemModel] = []
