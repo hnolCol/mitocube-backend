@@ -16,7 +16,7 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 @router.get("/plates/options", response_model=PlateOptionsModel)
 def get_plate_options(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
-    "Returns the selectable formats, cold storages, plate types and vendors for creating a plate."
+    "Returns all attributes of the storage attribute group with their selectable traits for creating a plate."
     return db.plates.get_options()
 
 @router.get("/plates", response_model=List[PlateModel])
