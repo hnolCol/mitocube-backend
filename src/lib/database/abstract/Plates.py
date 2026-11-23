@@ -21,7 +21,7 @@ class PlatesABC(ABC):
 
     @abstractmethod
     def get_options(self) -> PlateOptionsModel:
-        "Returns the selectable traits (format, cold storage, plate type, vendor) for creating a plate."
+        "Returns all attributes of the storage attribute group with their selectable traits for creating a plate."
 
     @abstractmethod
     def insert(self, plate : PlateInsertModel, user_tag : str) -> str:
