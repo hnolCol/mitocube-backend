@@ -1,4 +1,4 @@
-from pydantic import BaseModel, field_validator, field_serializer
+from pydantic import BaseModel, Field, field_validator, field_serializer
 from typing import Optional
 import time 
 class InstrumentStateModel(BaseModel):
@@ -7,6 +7,20 @@ class InstrumentStateModel(BaseModel):
     text : str 
     description : str 
     color : str 
+
+class InstrumentInfoModel(BaseModel):
+    """Free text info (e.g. technician contact, service contract) attached to an instrument.
+    Stored on a dedicated InstrumentInfo node, one per instrument, via (:Trait)-[:HAS_INFO]->(:InstrumentInfo)."""
+    instrument_tag : str
+    text : str = ""
+    created_at : Optional[float] = None
+    created_by : Optional[str] = None
+    modified_at : Optional[float] = None
+    modified_by : Optional[str] = None
+
+class InstrumentInfoUpdateModel(BaseModel):
+    "Payload for updating the info text of an instrument."
+    text : str = Field(..., max_length=10000)
 
 
 

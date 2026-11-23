@@ -1,9 +1,9 @@
 from neo4j import Driver, Result 
-from typing import List, Dict
+from typing import List, Dict, Optional
 import pandas as pd 
 from datetime import datetime
 from services.random_generators import get_random_string
-from config.models.instruments import InstrumentStateModel, InstrumentsStateResponseModel, InstrumentStateHistoryModel
+from config.models.instruments import InstrumentStateModel, InstrumentsStateResponseModel, InstrumentStateHistoryModel, InstrumentInfoModel
 from config.enums.states import SubmissionStatesEnums  
 
 from lib.database.abstract.Instruments import InstrumentsABC
@@ -344,6 +344,50 @@ class Neo4JInstruments(InstrumentsABC):
         
         return instrument_types
 
+
+    _IS_INSTRUMENT = "EXISTS {(:Attribute)-[:HAS_TRAIT]->(t) WHERE (:AttributeGroup {tag : 'instrument'})<-[:PART_OF]-(:Attribute)-[:HAS_TRAIT]->(t)} "
+
+    def _find_instrument(self, instrument_tag : str) -> Optional[dict]:
+        "Returns the instrument Trait node as a dict, or None if it is not an instrument."
+        query = (
+            "MATCH (t:Trait {tag : $instrument_tag}) "
+            "WHERE " + self._IS_INSTRUMENT +
+            "RETURN t.tag AS tag, t.text AS text ORDER BY t.tag LIMIT 1"
+        )
+        r = self._driver.execute_query(query, routing_="r", instrument_tag=instrument_tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+
+    def get_info(self, instrument_tag : str) -> Optional[InstrumentInfoModel]:
+        """Returns the free text info (e.g. technician, service contract) of an instrument,
+        or None if the instrument does not exist."""
+        if self._find_instrument(instrument_tag) is None:
+            return None
+        query = (
+            "MATCH (t:Trait {tag : $instrument_tag}) "
+            "OPTIONAL MATCH (t)-[:HAS_INFO]->(ii:InstrumentInfo) "
+            "RETURN {instrument_tag : t.tag, text : coalesce(ii.text, ''), "
+            "       created_at : ii.created_at, created_by : ii.created_by, "
+            "       modified_at : ii.modified_at, modified_by : ii.modified_by} "
+        )
+        r = self._driver.execute_query(query, routing_="r", instrument_tag=instrument_tag, result_transformer_=Result.value)
+        return InstrumentInfoModel(**r[0])
+
+    def set_info(self, instrument_tag : str, text : str, user_tag : str) -> InstrumentInfoModel:
+        """Creates or updates the info text of the instrument, one InstrumentInfo node per instrument."""
+        if self._find_instrument(instrument_tag) is None:
+            raise ValueError(f"Instrument '{instrument_tag}' not found.")
+        query = (
+            "MATCH (t:Trait {tag : $instrument_tag}) "
+            "MERGE (ii:InstrumentInfo {instrument_tag : $instrument_tag}) "
+            "ON CREATE SET ii.created_at = timestamp(), ii.created_by = $user_tag "
+            "SET ii.text = $text, ii.modified_at = timestamp(), ii.modified_by = $user_tag "
+            "MERGE (t)-[:HAS_INFO]->(ii) "
+            "RETURN {instrument_tag : t.tag, text : ii.text, created_at : ii.created_at, created_by : ii.created_by, "
+            "       modified_at : ii.modified_at, modified_by : ii.modified_by} "
+        )
+        r = self._driver.execute_query(query, routing_="w", instrument_tag=instrument_tag, text=text, user_tag=user_tag,
+                                        result_transformer_=Result.value)
+        return InstrumentInfoModel(**r[0])
 
     def get(self, instrument_type: str = None, tags: List[str] = None) -> List[dict]:
         """Returns instruments with tag and text"""
