@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+from config.models.submissions.runs import RunListInstrumentModel
+
 
 class PlateInsertModel(BaseModel):
     """
@@ -80,8 +82,7 @@ class PlateRunlistModel(BaseModel):
     "A runlist that has at least one run on a plate, with the per-plate usage."
     runlist_tag : str
     created_at : float
-    instrument_tag : Optional[str] = None
-    instrument_text : Optional[str] = None
+    instruments : List[RunListInstrumentModel] = []
     fractionated : bool = False
     scrambled : bool = False
     n_runs_on_plate : int

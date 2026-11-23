@@ -190,7 +190,7 @@ def format_runlists(submission_tag: str, db) -> str:
     runlists = db.submissions.list_runlists(submission_tag=submission_tag)
     rows = [
         [_ts(rl.created_at),
-         db.attributes.get_trait_text(tag=rl.instrument_tag) if rl.instrument_tag else "",
+         " ".join(i.text for i in rl.instruments),
          rl.n_runs, rl.n_plates, rl.fractionated, rl.n_fractions, rl.scrambled,
          _user_name(db, rl.user_tag)]
         for rl in runlists

@@ -39,7 +39,7 @@ class FakePlatesDB:
         }
         self.runlists = {
             "plate-1": [PlateRunlistModel(
-                runlist_tag="rl-1", created_at=100.0, instrument_tag="inst-1", instrument_text="Instrument One",
+                runlist_tag="rl-1", created_at=100.0, instruments=[{"tag": "inst-1", "text": "Instrument One"}],
                 n_runs_on_plate=2, used_positions=["A1", "B2"], user_tag="abcdefgh",
                 user_firstname="Test", user_lastname="User",
                 submission_tag="subm-1", submission_label="subm-1", submission_title="My title")],

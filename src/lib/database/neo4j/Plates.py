@@ -356,9 +356,8 @@ class Neo4JPlates(PlatesABC):
     _RUNLISTS_QUERY = (
         "MATCH (p:Plate {tag : $tag})<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
         "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
-        "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
         "RETURN rl.tag AS runlist_tag, rl.created_at AS created_at, "
-        "   inst.tag AS instrument_tag, inst.text AS instrument_text, "
+        "   [(rl)-[:MEASURED_BY]->(i:Trait) | {tag: i.tag, text: i.text}] AS instruments, "
         "   rl.fractionated AS fractionated, rl.scrambled AS scrambled, "
         "   count(r) AS n_runs_on_plate, collect(DISTINCT o.position) AS used_positions, "
         "   u.tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "
