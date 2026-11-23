@@ -44,6 +44,10 @@ class PlatesABC(ABC):
         "Returns all plates, newest first."
 
     @abstractmethod
+    def list_by_submission(self, submission_tag : str) -> List[PlateModel]:
+        "Returns all plates on which the submission was measured (via any runlist), newest first."
+
+    @abstractmethod
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:
         "Returns (row_index, column_index, position) of all wells on the plate that hold a run."
 
