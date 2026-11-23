@@ -375,7 +375,7 @@ class AnnotationsABC(ABC):
         """
 
     @abstractmethod
-    def get_annotation_overlap_counts(self, universe_proteins: List[str], target_proteins: List[str], group_tag: Optional[str] = None) -> pd.DataFrame:
+    def get_annotation_overlap_counts(self, universe_proteins: List[str], target_proteins: List[str], group_tag: Optional[str] = None, min_target_count: int = 0) -> pd.DataFrame:
         """
         Get per-annotation overlap counts with a universe and a target protein list.
 
@@ -413,4 +413,29 @@ class AnnotationsABC(ABC):
         pd.DataFrame
             Columns: annotation_tag, text, protein_tags (list of protein tags
             of the annotation inside the universe).
+        """
+
+    @abstractmethod
+    def get_annotation_member_values(self, universe_proteins: List[str], protein_values: Dict[str, float], min_size: int = 3, group_tag: Optional[str] = None) -> pd.DataFrame:
+        """
+        Get the 1D values of each annotation's member proteins (restricted to the
+        universe and to proteins present in protein_values). Annotations with fewer
+        than min_size members in the universe are skipped already in the query.
+
+        Parameters
+        ----------
+        universe_proteins : List[str]
+            The proteins defining the background universe.
+        protein_values : Dict[str, float]
+            The 1D value per protein tag; only proteins in the universe with a
+            value here are collected.
+        min_size : int, optional
+            Minimum number of member proteins per annotation, by default 3.
+        group_tag : Optional[str], optional
+            If given, only annotations of this annotation group are returned.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns: annotation_tag, text, member_values (list of floats).
         """
