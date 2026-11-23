@@ -34,11 +34,24 @@ class TestGroupCuratorMaintenancePermissions:
         assert "GROUP_CURATOR" not in content
 
     def test_research_group_and_consortium_creation_stay_above_group_curator(self):
+        """
+        Creating consortia and research groups stays above the group curator. Read access may be
+        scoped to group curators (sharing overview), so only the creation routes are checked here.
+        """
         import pathlib
         root = pathlib.Path(__file__).resolve().parents[2]
-        for rel in ["routers/researchgroups/researchgroup.py", "routers/consortiums/consortium.py"]:
+        creations = {
+            "routers/researchgroups/researchgroup.py": "def add_research_group(",
+            "routers/consortiums/consortium.py": "def add_consortium(",
+        }
+        for rel, marker in creations.items():
             content = (root / "src" / rel).read_text()
-            assert "user.role >= UserRolesEnum.GROUP_CURATOR" not in content, rel
+            start = content.index(marker)
+            signature_end = content.index(") ->", start)
+            signature = content[start:signature_end]
+            assert "Depends(is_user_at_least_curator)" in signature, rel
+            assert "GROUP_CURATOR" not in signature, rel
+            # a group curator gate helper must never be used in these routers
             assert "is_user_at_least_group_curator" not in content, rel
 
 
