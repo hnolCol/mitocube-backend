@@ -1038,6 +1038,12 @@ def check_submission(
         attribute_groups="mandatory", 
         min_state=state
     )
+    # only attributes that are also part of the dataset group are checked for submissions;
+    # other groups (e.g. the storage attributes of the plates) share the mandatory group
+    mandatory_tags = db.attributes.get(
+        tags=mandatory_tags,
+        attribute_groups="dataset"
+    )
     ca_defined_attributes = db.submissions.get_defined_attributes(tag=submission_tag)
     
     
