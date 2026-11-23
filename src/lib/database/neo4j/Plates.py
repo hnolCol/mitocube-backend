@@ -15,8 +15,9 @@ from services.random_generators import get_random_string
 
 # attributes + traits the plates need; created on startup if missing (existing ones are never changed)
 STORAGE_GROUP_TAG = "storage"
+MANDATORY_GROUP_TAG = "mandatory"
 STORAGE_ATTRIBUTES = [
-    {"tag": "att_container_format", "text": "Container Format", "traits": [
+    {"tag": "att_container_format", "text": "Container Format", "mandatory": True, "traits": [
         {"value": "1x8",   "text": "1x8",   "description": "8-tube PCR strip"},
         {"value": "1x12",  "text": "1x12",  "description": "12-tube PCR strip"},
         {"value": "3x5",   "text": "3x5",   "description": "15 wells (PAL)"},
@@ -24,7 +25,7 @@ STORAGE_ATTRIBUTES = [
         {"value": "8x12",  "text": "8x12",  "description": "96-well plate"},
         {"value": "16x24", "text": "16x24", "description": "384-well plate"},
     ]},
-    {"tag": "att_cold_storage", "text": "Cold Storage", "traits": [
+    {"tag": "att_cold_storage", "text": "Cold Storage", "mandatory": True, "traits": [
         {"value": "-20", "text": "-20 °C freezer", "description": "Standard freezer (-20 °C)"},
         {"value": "-80", "text": "-80 °C freezer", "description": "Ultra-low temperature freezer (-80 °C)"},
     ]},
@@ -113,6 +114,11 @@ class Neo4JPlates(PlatesABC):
             "              a.s = attr.s, a.created_at = timestamp() "
             "MERGE (a)-[:PART_OF]->(ag) "
             "WITH a, attr "
+            "FOREACH (_ IN CASE WHEN attr.mandatory THEN [1] ELSE [] END | "
+            "    MERGE (mg:AttributeGroup {tag: $mandatory_group_tag}) "
+            "    ON CREATE SET mg.created_at = timestamp() "
+            "    MERGE (a)-[:PART_OF]->(mg)) "
+            "WITH a, attr "
             "OPTIONAL MATCH (s:State) WHERE toInteger(s.tag) = 0 "
             "FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | MERGE (a)-[:REQUIRES_STATE]->(s)) "
             "WITH a, attr "
@@ -122,7 +128,7 @@ class Neo4JPlates(PlatesABC):
             "              t.priority = 500, t.attribute_tag = attr.tag, t.s = trait.s, t.created_at = timestamp() "
             "MERGE (a)-[:HAS_TRAIT]->(t) "
         )
-        self._driver.execute_query(query, group_tag=STORAGE_GROUP_TAG, attributes=attributes, routing_="w")
+        self._driver.execute_query(query, group_tag=STORAGE_GROUP_TAG, mandatory_group_tag=MANDATORY_GROUP_TAG, attributes=attributes, routing_="w")
 
     def exists(self, tag : str) -> bool:
         query = (
@@ -186,19 +192,22 @@ class Neo4JPlates(PlatesABC):
         The group defines the plates: every attribute added to the group by the admins (also nested
         child attributes like a container material under the container format) is offered in the
         create plate dialog. An attribute whose traits have values of the form '<rows>x<columns>' is
-        flagged as the container format.
+        flagged as the container format. An attribute that is also part of the mandatory attribute
+        group is flagged as mandatory.
         """
         query = (
             "MATCH (a:Attribute)-[:PART_OF]->(:AttributeGroup {tag : $group_tag}) "
             "OPTIONAL MATCH (parent:Attribute)-[:IS_CHILD]->(a) "
+            "OPTIONAL MATCH (a)-[:PART_OF]->(m:AttributeGroup {tag : $mandatory_group_tag}) "
             "OPTIONAL MATCH (a)-[:HAS_TRAIT]->(t:Trait) "
             "WITH a, parent, t ORDER BY t.priority DESC "
             "WITH a, parent, collect(t {.tag, .text, .description, .value}) AS traits "
             "RETURN a.tag AS attribute_tag, a.text AS attribute_text, a.description AS attribute_description, "
-            "       parent.tag AS parent_tag, traits "
+            "       parent.tag AS parent_tag, m IS NOT NULL AS mandatory, traits "
             "ORDER BY a.priority DESC "
         )
-        rows = self._driver.execute_query(query, routing_="r", group_tag=STORAGE_GROUP_TAG, result_transformer_=Result.data)
+        rows = self._driver.execute_query(query, routing_="r", group_tag=STORAGE_GROUP_TAG,
+                                          mandatory_group_tag=MANDATORY_GROUP_TAG, result_transformer_=Result.data)
 
         attributes = []
         for row in rows:
@@ -221,6 +230,7 @@ class Neo4JPlates(PlatesABC):
                 description=row["attribute_description"],
                 parent_tag=row["parent_tag"],
                 is_format=any(t.rows is not None for t in traits),
+                mandatory=row["mandatory"],
                 traits=traits,
             ))
         return PlateOptionsModel(attributes=attributes)
@@ -233,6 +243,22 @@ class Neo4JPlates(PlatesABC):
         if len(selected) == 0:
             raise ValueError("Select the traits of the plate in the storage attribute group.")
         resolved = self._get_selected_traits(selected)
+
+        # attributes that are also part of the mandatory attribute group must have a selected trait;
+        # a mandatory child attribute is only enforced when its parent attribute has a selected trait
+        options = self.get_options()
+        selected_attribute_tags = {attribute_tag for attribute_tag, trait_tag in selected}
+        for attribute in options.attributes:
+            if not attribute.mandatory:
+                continue
+            parent = attribute.parent_tag
+            while parent:
+                if parent not in selected_attribute_tags:
+                    break
+                parent = next((a.parent_tag for a in options.attributes if a.tag == parent), None)
+            else:
+                if attribute.tag not in selected_attribute_tags:
+                    raise ValueError(f"Select a trait for the mandatory attribute '{attribute.text}'.")
 
         # the container format is the selected trait with a '<rows>x<columns>' value
         formats = []

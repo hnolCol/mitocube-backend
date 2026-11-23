@@ -112,6 +112,7 @@ class AttributesABC(ABC):
     def get(self, 
             tags : List[str] = None,
             attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
+            attribute_group_operator : Literal["any", "all"] = "any",
             min_state : SubmissionStatesEnums = None, 
             limit : int = None,
             group_by : Literal["attribute_group","min_state"] = None) -> List[str]|Dict[str, List[str]]:
@@ -125,6 +126,9 @@ class AttributesABC(ABC):
             The attribute tags, by default None (all attributes returned)
         attribute_group : Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user'] 
             Attribute group. If given, only attributes of the specified group is returned.
+        attribute_group_operator : Literal['any', 'all'], optional
+            How multiple attribute groups are combined: 'any' (default) matches attributes of at least
+            one of the groups, 'all' matches only attributes that are part of every given group.
         Returns
         -------
         List[str]

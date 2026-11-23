@@ -64,13 +64,15 @@ class PlateAttributeOptionsModel(BaseModel):
     """
     An attribute of the storage attribute group with its selectable traits. Attributes can be
     nested: an attribute with a parent_tag (e.g. a container material under the container format)
-    is offered when its parent attribute has a selected trait.
+    is offered when its parent attribute has a selected trait. An attribute that is also part of
+    the mandatory attribute group is flagged with mandatory and offered as a required input.
     """
     tag : str
     text : str
     description : Optional[str] = None
     parent_tag : Optional[str] = None
     is_format : bool = False
+    mandatory : bool = False   # attribute is also part of the mandatory attribute group: offered as a required input
     traits : List[PlateOptionModel] = []
 
 
