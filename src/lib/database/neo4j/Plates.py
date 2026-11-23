@@ -193,8 +193,9 @@ class Neo4JPlates(PlatesABC):
             "OPTIONAL MATCH (parent:Attribute)-[:IS_CHILD]->(a) "
             "OPTIONAL MATCH (a)-[:HAS_TRAIT]->(t:Trait) "
             "WITH a, parent, t ORDER BY t.priority DESC "
+            "WITH a, parent, collect(t {.tag, .text, .description, .value}) AS traits "
             "RETURN a.tag AS attribute_tag, a.text AS attribute_text, a.description AS attribute_description, "
-            "       parent.tag AS parent_tag, collect(t {.tag, .text, .description, .value}) AS traits "
+            "       parent.tag AS parent_tag, traits "
             "ORDER BY a.priority DESC "
         )
         rows = self._driver.execute_query(query, routing_="r", group_tag=STORAGE_GROUP_TAG, result_transformer_=Result.data)
