@@ -5,6 +5,7 @@ from config.models.collaborations import (
     CollaborationRequestInput,
     CollaborationRequestModel,
     SubmissionExploreModel,
+    SubmissionExploreConditionApplicationModel,
 )
 
 
@@ -57,6 +58,12 @@ class CollaborationsABC(ABC):
         all submissions that match the search string and have all the given
         condition application and user tags (AND semantics). This is a discovery
         endpoint and must never return sensitive submission data."""
+
+    @abstractmethod
+    def explore_condition_applications(self, limit : int = 1000) -> List[SubmissionExploreConditionApplicationModel]:
+        """Returns the top-level condition applications (attribute, trait,
+        value) of all explore-visible submissions, grouped per submission. This
+        is a discovery endpoint and must never return sensitive submission data."""
 
     @abstractmethod
     def has_approved_collaboration_request(self, submission_tag : str, user_tag : str) -> bool:

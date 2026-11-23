@@ -13,7 +13,15 @@ from scipy.stats import mannwhitneyu
 from config.models.annotations.annotations import AnnotationShiftRequestModel
 from config.models.user import UserModel
 from routers.annotations import annotations as annotations_router
-from services.annotations.enrichment import compute_annotation_shift, enrichment_records
+from services.annotations.enrichment import compute_annotation_shift, compute_annotation_shift_from_member_values, enrichment_records
+
+
+@pytest.fixture(autouse=True)
+def bypass_cache(monkeypatch):
+    """Bypass the Mongo-backed runtime cache so every test computes fresh."""
+    def fake_get_or_compute(cache_key, compute_fn, cache_time, **kwargs):
+        return compute_fn()
+    monkeypatch.setattr(annotations_router.db_cache_runtime, "get_or_compute", fake_get_or_compute)
 
 
 def make_user(tag="testuser"):
@@ -110,13 +118,13 @@ class FakeProteins:
 
 
 class FakeAnnotations:
-    def __init__(self, member_map):
-        self._member_map = member_map
+    def __init__(self, member_values):
+        self._member_values = member_values
         self.calls = []
 
-    def get_annotation_protein_map(self, universe_proteins, group_tag=None):
-        self.calls.append({"universe": list(universe_proteins), "group_tag": group_tag})
-        return self._member_map
+    def get_annotation_member_values(self, universe_proteins, protein_values, min_size=3, group_tag=None):
+        self.calls.append({"universe": list(universe_proteins), "min_size": min_size, "group_tag": group_tag})
+        return self._member_values
 
 
 class FakeDB:
@@ -128,15 +136,16 @@ class FakeDB:
 
 def make_fake_db():
     universe = [f"p{i}" for i in range(50)]
-    member_map = pd.DataFrame({
+    # member values matching the test values below (members p0..p9 have value 2.0)
+    member_values = pd.DataFrame({
         "annotation_tag": ["ann_up", "ann_flat"],
         "text": ["Up term", "Flat term"],
-        "protein_tags": [universe[:10], universe[20:30]],
+        "member_values": [[2.0] * 10, [0.0] * 10],
     })
     return FakeDB(
         submissions=FakeSubmissions({"sub_a": universe}),
         proteins=FakeProteins({"prot_1": universe}),
-        annotations=FakeAnnotations(member_map),
+        annotations=FakeAnnotations(member_values),
     )
 
 
