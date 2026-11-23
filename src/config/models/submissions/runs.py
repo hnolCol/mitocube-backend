@@ -49,9 +49,14 @@ class RunListRequestPropsModel(BaseModel):
     fractionate : bool = False 
     n_fractions : int = 0 
     free_plate_positions : List[List[List[bool]]]
-    instrument_tag : str
+    instrument_tags : List[str] = []
     plate_tags : Optional[List[str]] = None  
 
+
+class RunListInstrumentModel(BaseModel):
+    "An instrument a runlist was measured with (e.g. the LC system coupled to the mass spectrometer)."
+    tag : str
+    text : str
 
 class AnalyticRunModel(BaseModel):
     """
@@ -93,8 +98,7 @@ class RunListModel(BaseModel):
     scrambled_across_plates : bool = False
     runs : List[AnalyticRunModel]
     aggregated_on : Optional[str] = None
-    instrument_tag : Optional[str] = None
-    instrument_text : Optional[str] = None
+    instruments : List[RunListInstrumentModel] = []
     
     # @field_validator('user_tag', mode="after")
     # def check_user(cls, v : List[str]|str, field):
