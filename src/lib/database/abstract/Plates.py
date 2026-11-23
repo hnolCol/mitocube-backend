@@ -21,7 +21,9 @@ class PlatesABC(ABC):
 
     @abstractmethod
     def get_options(self) -> PlateOptionsModel:
-        "Returns all attributes of the storage attribute group with their selectable traits for creating a plate."
+        """Returns all attributes of the storage attribute group with their selectable traits for
+        creating a plate. An attribute that is also part of the mandatory attribute group is
+        flagged with mandatory."""
 
     @abstractmethod
     def insert(self, plate : PlateInsertModel, user_tag : str) -> str:
