@@ -4,7 +4,7 @@ from abc import abstractmethod, ABC
 from typing import List, Dict, Optional, Tuple
 from deprecated import deprecated
 import pandas as pd 
-from config.models.instruments import InstrumentStateHistoryModel, InstrumentsStateResponseModel, InstrumentStateModel
+from config.models.instruments import InstrumentStateHistoryModel, InstrumentsStateResponseModel, InstrumentStateModel, InstrumentInfoModel
 
 class InstrumentStatesABC(ABC):
     
@@ -48,6 +48,21 @@ class InstrumentStatesABC(ABC):
     def get_all(self) -> List[InstrumentStateModel]:
         "Returns all available instrument states."
 class InstrumentsABC(ABC):
+
+    @abstractmethod
+    def get_info(self, instrument_tag : str) -> Optional[InstrumentInfoModel]:
+        """Returns the free text info (e.g. technician, service contract) of an instrument,
+        or None if the instrument does not exist."""
+
+    @abstractmethod
+    def set_info(self, instrument_tag : str, text : str, user_tag : str) -> InstrumentInfoModel:
+        """Creates or updates the free text info of an instrument.
+
+        Raises
+        ------
+        ValueError
+            If the instrument does not exist.
+        """
 
     @abstractmethod 
     def get(self, tags : List[str] = None) -> List:
