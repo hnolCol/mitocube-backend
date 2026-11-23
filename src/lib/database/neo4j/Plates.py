@@ -336,6 +336,15 @@ class Neo4JPlates(PlatesABC):
         r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
         return [PlateModel(**p) for p in r]
 
+    def list_by_submission(self, submission_tag : str) -> List[PlateModel]:
+        "Returns all plates on which the submission was measured (via any runlist), newest first."
+        query = (
+            "MATCH (:Submission {tag : $submission_tag})-[:HAS_RUNLIST]->(:RunList)-[:HAS_RUN]->(:Run)-[:ON_PLATE]->(p:Plate) "
+            "WITH DISTINCT p " + self._PLATE_RETURN + "ORDER BY plate.created_at DESC "
+        )
+        r = self._driver.execute_query(query, routing_="r", submission_tag=submission_tag, result_transformer_=Result.value)
+        return [PlateModel(**p) for p in r]
+
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:
         query = (
             "MATCH (:Plate {tag : $tag})<-[o:ON_PLATE]-(:Run) "

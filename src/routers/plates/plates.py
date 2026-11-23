@@ -30,6 +30,20 @@ def get_plates(user : UserModel = Depends(get_user_from_token), db : DatabaseABC
     return plates
 
 
+@router.get("/plates/by-submission/{submission_tag}", response_model=List[PlateModel])
+def get_plates_by_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[PlateModel]:
+    """
+    Returns all plates on which the submission was measured (via any runlist).
+    Runlist and submission counts are only visible to curators.
+    """
+    plates = db.plates.list_by_submission(submission_tag=submission_tag)
+    if user.role < UserRolesEnum.CURATOR:
+        for plate in plates:
+            plate.n_runlists = 0
+            plate.n_submissions = 0
+    return plates
+
+
 @router.get("/plates/next-name")
 def get_next_plate_name(rows : int, columns : int, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict[str, str]:
     "Suggests the next free plate name for a format, e.g. P-96-004."

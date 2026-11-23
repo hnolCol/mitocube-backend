@@ -80,6 +80,10 @@ class FakePlatesDB:
     def get_submission_layout(self, tag):
         return self.layouts.get(tag)
 
+    def list_by_submission(self, submission_tag):
+        plate_tags = {"plate-1"} if submission_tag == "subm-1" else set()
+        return [self.plates[tag] for tag in plate_tags]
+
 
 class FakeDB:
     def __init__(self):
@@ -106,6 +110,17 @@ def client():
 
 
 class TestPlateRunlistRoutes:
+    def test_plates_by_submission(self, client):
+        resp = client.get("/api/plates/by-submission/subm-1")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert [p["tag"] for p in body] == ["plate-1"]
+
+    def test_plates_by_submission_without_runs_is_empty(self, client):
+        resp = client.get("/api/plates/by-submission/subm-other")
+        assert resp.status_code == 200
+        assert resp.json() == []
+
     def test_runlists_of_used_plate(self, client):
         resp = client.get("/api/plates/plate-1/runlists")
         assert resp.status_code == 200
