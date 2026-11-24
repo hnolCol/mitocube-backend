@@ -42,7 +42,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
                                plate_constraints: dict = None,
                                input_attribute_tags: List[str] = None,
                                output_attribute_tags: List[str] = None,
-                               success_submission_state: str = None) -> str:
+                               success_submission_state: str = None,
+                               pubmed_ids: List[str] = None,
+                               min_output_wells_per_sample: int = 1,
+                               max_output_wells_per_sample: int = None) -> str:
         "Computes the SHA-256 hash over the canonical serialization of the procedure content."
         content = {
             "title": title,
@@ -53,6 +56,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "input_attribute_tags": sorted(input_attribute_tags or []),
             "output_attribute_tags": sorted(output_attribute_tags or []),
             "success_submission_state": success_submission_state,
+            "pubmed_ids": sorted(pubmed_ids or []),
+            "min_output_wells_per_sample": min_output_wells_per_sample,
+            "max_output_wells_per_sample": max_output_wells_per_sample,
         }
         return hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
 
@@ -91,6 +97,16 @@ class Neo4JModularProcedures(ModularProceduresABC):
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
 
+    def _validate_sample_multiplicity(self, min_output_wells_per_sample, max_output_wells_per_sample) -> None:
+        "Validates the per-sample output well bounds of a procedure."
+        if min_output_wells_per_sample is None:
+            min_output_wells_per_sample = 1
+        if not isinstance(min_output_wells_per_sample, int) or min_output_wells_per_sample < 1:
+            raise ValueError("min_output_wells_per_sample must be an integer >= 1.")
+        if max_output_wells_per_sample is not None:
+            if not isinstance(max_output_wells_per_sample, int) or max_output_wells_per_sample < min_output_wells_per_sample:
+                raise ValueError("max_output_wells_per_sample must be an integer >= min_output_wells_per_sample or None.")
+
     def insert(self, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
                condition_application_trees: List = None,
@@ -98,7 +114,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
                plate_constraints: dict = None,
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
-               success_submission_state: str = None) -> str:
+               success_submission_state: str = None,
+               pubmed_ids: List[str] = None,
+               min_output_wells_per_sample: int = 1,
+               max_output_wells_per_sample: int = None) -> str:
         """Inserts a new draft modular procedure. The tag is generated based on the title,
         description, condition applications and version. Condition applications can be reused
         by tag or newly defined as attribute/trait trees (resolved to tags on insert)."""
@@ -107,6 +126,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         plate_constraints = plate_constraints or {}
         self._validate_success_submission_state(success_submission_state)
         self._validate_plate_constraint_texts(plate_constraints)
+        self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
         tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
         if self.exists(tag=tag):
             raise ValueError("Tag is already in the database.")
@@ -131,6 +151,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format": plate_constraints.get("output_plate_format"),
             "output_plate_type": plate_constraints.get("output_plate_type"),
             "success_submission_state": success_submission_state,
+            "pubmed_ids": list(pubmed_ids or []),
+            "min_output_wells_per_sample": min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
+            "max_output_wells_per_sample": max_output_wells_per_sample,
         }
 
         r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, props=props,
@@ -174,7 +197,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format: m.output_plate_format, output_plate_type: m.output_plate_type, "
             "input_attribute_tags: [tag IN input_attribute_tags WHERE tag IS NOT NULL], "
             "output_attribute_tags: [tag IN output_attribute_tags WHERE tag IS NOT NULL], "
-            "success_submission_state: m.success_submission_state} as procedure"
+            "success_submission_state: m.success_submission_state, "
+            "pubmed_ids: coalesce(m.pubmed_ids, []), "
+            "min_output_wells_per_sample: coalesce(m.min_output_wells_per_sample, 1), "
+            "max_output_wells_per_sample: m.max_output_wells_per_sample} as procedure"
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
         if len(r) == 0:
@@ -245,6 +271,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format": parent.output_plate_format,
             "output_plate_type": parent.output_plate_type,
             "success_submission_state": parent.success_submission_state,
+            "pubmed_ids": list(parent.pubmed_ids or []),
+            "min_output_wells_per_sample": parent.min_output_wells_per_sample if parent.min_output_wells_per_sample is not None else 1,
+            "max_output_wells_per_sample": parent.max_output_wells_per_sample,
         }
         r = self._driver.execute_query(query, routing_="w", tag=new_tag, user_tag=user_tag,
                                        parent_tag=tag, props=props, result_transformer_=Result.value)
@@ -304,7 +333,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "SET m.title = $title, m.description = $description, m.modified_at = timestamp(), "
             "m.input_plate_format = $input_plate_format, m.input_plate_type = $input_plate_type, "
             "m.output_plate_format = $output_plate_format, m.output_plate_type = $output_plate_type, "
-            "m.success_submission_state = $success_submission_state "
+            "m.success_submission_state = $success_submission_state, "
+            "m.pubmed_ids = $pubmed_ids, "
+            "m.min_output_wells_per_sample = $min_output_wells_per_sample, "
+            "m.max_output_wells_per_sample = $max_output_wells_per_sample "
             "MERGE (u)-[:UPDATED]->(m) "
             "RETURN m.tag as tag"
         )
@@ -314,6 +346,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format": plate_constraints.get("output_plate_format"),
             "output_plate_type": plate_constraints.get("output_plate_type"),
             "success_submission_state": success_submission_state,
+            "pubmed_ids": list(pubmed_ids or []),
+            "min_output_wells_per_sample": min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
+            "max_output_wells_per_sample": max_output_wells_per_sample,
         }
         r = self._driver.execute_query(query, routing_="w", tag=tag, title=title, description=description,
                                        user_tag=user_tag, **plate_props, result_transformer_=Result.value)
@@ -352,7 +387,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
                                "output_plate_type": procedure.output_plate_type},
             input_attribute_tags=procedure.input_attribute_tags,
             output_attribute_tags=procedure.output_attribute_tags,
-            success_submission_state=procedure.success_submission_state)
+            success_submission_state=procedure.success_submission_state,
+            pubmed_ids=procedure.pubmed_ids,
+            min_output_wells_per_sample=procedure.min_output_wells_per_sample,
+            max_output_wells_per_sample=procedure.max_output_wells_per_sample)
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
             "MATCH (u:User {tag : $user_tag}) "
@@ -709,6 +747,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 raise ValueError(f"Metrics were given for traits that are not declared by the procedure: {', '.join(sorted(undeclared_traits))}")
 
         output_well_samples = {position: set() for position in output_positions}
+        outputs_per_sample = {}
         for well in execution.input_wells:
             if len(well.sample_tags) == 0:
                 raise ValueError(f"Input well {well.position} has no samples.")
@@ -716,6 +755,20 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 if output_position not in output_positions:
                     raise ValueError(f"Output well {output_position} is not defined.")
                 output_well_samples[output_position].update(well.sample_tags)
+                for sample_tag in well.sample_tags:
+                    outputs_per_sample.setdefault(sample_tag, set()).add(output_position)
+
+        # the procedure declares how the run treats the sample numbers: mirroring (1 output well per
+        # sample), a fixed or bounded N-fold duplication (e.g. N fractions) or anything in between
+        min_outputs = procedure.min_output_wells_per_sample if procedure.min_output_wells_per_sample is not None else 1
+        max_outputs = procedure.max_output_wells_per_sample
+        for sample_tag, samples_outputs in sorted(outputs_per_sample.items()):
+            if len(samples_outputs) < min_outputs:
+                raise ValueError(f"Sample {sample_tag} is transferred to {len(samples_outputs)} output wells, but the "
+                                 f"procedure requires at least {min_outputs} output wells per sample.")
+            if max_outputs is not None and len(samples_outputs) > max_outputs:
+                raise ValueError(f"Sample {sample_tag} is transferred to {len(samples_outputs)} output wells, but the "
+                                 f"procedure requires at most {max_outputs} output wells per sample.")
 
         # only executions that are still running or that succeeded occupy their output wells:
         # a failed or aborted run does not block redoing the same wells

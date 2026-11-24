@@ -157,6 +157,9 @@ tightly defined SOP. The setup (insert/update) additionally accepts:
 
 | Field | Meaning |
 |---|---|
+| `pubmed_ids` | PubMed IDs of the publications the module is based on or referenced by; part of the hashed, immutable content. |
+| `min_output_wells_per_sample` | Minimum number of output wells each sample is transferred to per execution: 1 (default) with max unset means no constraint; min = max = 1 declares that the module **mirrors** the sample numbers (executions that split or pool beyond one output well per sample are rejected). |
+| `max_output_wells_per_sample` | Maximum number of output wells per sample; None (default) means unbounded. min = max = N declares an **N-fold duplication** like an N-fraction fractionation (executing requires exactly N output wells per sample); min < max allows a range. |
 | `input_plate_format` / `input_plate_type` | Required container format (e.g. `8x12` for a 96 well plate) and/or plate type (e.g. a PCR strip) of the **input** plate. `null` = unconstrained. Executions are rejected (400) if the chosen plate does not match. |
 | `output_plate_format` / `output_plate_type` | Same for the **output** plate. |
 | `input_attribute_tags` | Attributes whose values may be entered per **input** well before the run (`allow_input` semantics), e.g. *Concentration*. |

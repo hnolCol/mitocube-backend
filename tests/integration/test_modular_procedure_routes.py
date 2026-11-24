@@ -146,7 +146,9 @@ class FakeModularProceduresDB:
 
     def insert(self, title, description, user_tag, condition_application_tags=None,
                condition_application_trees=None, protocol_tags=None, plate_constraints=None,
-               input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None):
+               input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None,
+               pubmed_ids=None, min_output_wells_per_sample=1, max_output_wells_per_sample=None):
+        self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
         condition_application_tags = list(condition_application_tags or [])
         for tree in (condition_application_trees or []):
             # simulate the condition application insert: hash-tagged, idempotent
@@ -166,18 +168,37 @@ class FakeModularProceduresDB:
             output_plate_type=(plate_constraints or {}).get("output_plate_type"),
             input_attribute_tags=list(input_attribute_tags or []),
             output_attribute_tags=list(output_attribute_tags or []),
-            success_submission_state=success_submission_state)
+            success_submission_state=success_submission_state,
+            pubmed_ids=list(pubmed_ids or []),
+            min_output_wells_per_sample=min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
+            max_output_wells_per_sample=max_output_wells_per_sample)
         return tag
+
+    @staticmethod
+    def _validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample):
+        if min_output_wells_per_sample is None:
+            min_output_wells_per_sample = 1
+        if not isinstance(min_output_wells_per_sample, int) or min_output_wells_per_sample < 1:
+            raise ValueError("min_output_wells_per_sample must be an integer >= 1.")
+        if max_output_wells_per_sample is not None and (
+                not isinstance(max_output_wells_per_sample, int)
+                or max_output_wells_per_sample < min_output_wells_per_sample):
+            raise ValueError("max_output_wells_per_sample must be an integer >= min_output_wells_per_sample or None.")
 
     def update(self, tag, title, description, user_tag, condition_application_tags=None,
                condition_application_trees=None, protocol_tags=None, plate_constraints=None,
-               input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None):
+               input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None,
+               pubmed_ids=None, min_output_wells_per_sample=1, max_output_wells_per_sample=None):
         if tag not in self.procedures:
             raise ValueError("Modular procedure not found.")
         if self.procedures[tag].status == "PUBLISHED":
             raise ValueError("Published modular procedures are immutable.")
+        self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
         self.procedures[tag].title = title
         self.procedures[tag].description = description
+        self.procedures[tag].pubmed_ids = list(pubmed_ids or [])
+        self.procedures[tag].min_output_wells_per_sample = min_output_wells_per_sample if min_output_wells_per_sample is not None else 1
+        self.procedures[tag].max_output_wells_per_sample = max_output_wells_per_sample
         return True
 
     def publish(self, tag, user_tag):
@@ -266,6 +287,21 @@ class FakeModularProceduresDB:
                     raise ValueError(f"Output well {output_position} is not defined.")
         if "missing-sample" in [t for well in execution.input_wells for t in well.sample_tags]:
             raise ValueError("Samples not found: missing-sample")
+        procedure = self.procedures[tag]
+        outputs_per_sample = {}
+        for well in execution.input_wells:
+            for output_position in well.output_positions:
+                for sample_tag in well.sample_tags:
+                    outputs_per_sample.setdefault(sample_tag, set()).add(output_position)
+        min_outputs = procedure.min_output_wells_per_sample if procedure.min_output_wells_per_sample is not None else 1
+        max_outputs = procedure.max_output_wells_per_sample
+        for sample_tag, sample_outputs in sorted(outputs_per_sample.items()):
+            if len(sample_outputs) < min_outputs:
+                raise ValueError(f"Sample {sample_tag} is transferred to {len(sample_outputs)} output wells, but the "
+                                 f"procedure requires at least {min_outputs} output wells per sample.")
+            if max_outputs is not None and len(sample_outputs) > max_outputs:
+                raise ValueError(f"Sample {sample_tag} is transferred to {len(sample_outputs)} output wells, but the "
+                                 f"procedure requires at most {max_outputs} output wells per sample.")
         responsible_user_tag = execution.responsible_user_tag or user_tag
         if responsible_user_tag == "missing-user":
             raise ValueError("Responsible user not found: missing-user")
@@ -1181,6 +1217,117 @@ class TestSingleOpenModuleConstraint:
         client.delete("/api/procedures/proc-2/link/subm-1/done")
         resp = client.post("/api/procedures/proc-1/link/subm-1")
         assert resp.status_code == 400
+
+class TestModularProcedureSetupExtras:
+    """PubMed references and the per-sample output well bounds (mirroring vs N-fold duplication)."""
+
+    def test_pubmed_ids_stored_and_returned(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "With references", "description": "",
+            "pubmed_ids": ["12345678", "87654321"]})
+        assert resp.status_code == 200
+        tag = resp.json()["tag"]
+        resp = client.get(f"/api/procedures/{tag}")
+        assert resp.json()["pubmed_ids"] == ["12345678", "87654321"]
+
+    def test_pubmed_ids_editable_on_draft_and_frozen_on_publish(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "Reference editing", "description": "", "pubmed_ids": ["11111111"]})
+        tag = resp.json()["tag"]
+        resp = client.patch(f"/api/procedures/{tag}", json={
+            "title": "Reference editing", "description": "", "pubmed_ids": ["22222222"]})
+        assert resp.status_code == 200
+        assert client.get(f"/api/procedures/{tag}").json()["pubmed_ids"] == ["22222222"]
+        client.post(f"/api/procedures/{tag}/publish")
+        resp = client.patch(f"/api/procedures/{tag}", json={
+            "title": "Reference editing", "description": "", "pubmed_ids": ["33333333"]})
+        assert resp.status_code == 400
+
+    def test_multiplicity_bounds_validated(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "Bounds", "description": "", "min_output_wells_per_sample": 0})
+        assert resp.status_code == 400
+        resp = client.post("/api/procedures/", json={
+            "title": "Bounds", "description": "",
+            "min_output_wells_per_sample": 8, "max_output_wells_per_sample": 4})
+        assert resp.status_code == 400
+
+    def test_declared_mirroring_rejects_duplication(self, client):
+        """A procedure that declares itself mirroring (exactly one output well per sample)
+        rejects executions that split a sample into several output wells; without declared
+        bounds (the default) any transfer map is allowed."""
+        resp = client.post("/api/procedures/", json={
+            "title": "Mirroring", "description": "",
+            "min_output_wells_per_sample": 1, "max_output_wells_per_sample": 1})
+        tag = resp.json()["tag"]
+        client.post(f"/api/procedures/{tag}/publish")
+        # splitting into two output wells is rejected
+        resp = client.post(f"/api/procedures/{tag}/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1", "B1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []},
+                             {"position": "B1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+        assert "at most" in resp.json()["detail"]
+        # mirroring works
+        resp = client.post(f"/api/procedures/{tag}/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+        # undeclared procedures keep allowing any transfer map (backwards compatible)
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-unused",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1", "B1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []},
+                             {"position": "B1", "condition_application_tags": []}]})
+        assert resp.status_code == 200
+
+    def test_n_fold_duplication_fractionation(self, client):
+        """A fractionation module with exactly 8 output wells per sample."""
+        resp = client.post("/api/procedures/", json={
+            "title": "Fractionation", "description": "",
+            "min_output_wells_per_sample": 8, "max_output_wells_per_sample": 8})
+        tag = resp.json()["tag"]
+        client.post(f"/api/procedures/{tag}/publish")
+        # two fractions only -> rejected
+        resp = client.post(f"/api/procedures/{tag}/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1", "B1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []},
+                             {"position": "B1", "condition_application_tags": []}]})
+        assert resp.status_code == 400
+        # 8 fractions -> allowed
+        resp = client.post(f"/api/procedures/{tag}/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"],
+                             "output_positions": [f"{chr(ord('A') + i)}1" for i in range(8)]}],
+            "output_wells": [{"position": f"{chr(ord('A') + i)}1", "condition_application_tags": []}
+                             for i in range(8)]})
+        assert resp.status_code == 200
+
+    def test_bounded_duplication_range(self, client):
+        """min < max allows a variable number of output wells per sample within the range."""
+        resp = client.post("/api/procedures/", json={
+            "title": "Range", "description": "",
+            "min_output_wells_per_sample": 1, "max_output_wells_per_sample": 4})
+        tag = resp.json()["tag"]
+        client.post(f"/api/procedures/{tag}/publish")
+        resp = client.post(f"/api/procedures/{tag}/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"],
+                             "output_positions": ["A1", "B1", "C1", "D1", "E1"]}],
+            "output_wells": [{"position": p, "condition_application_tags": []}
+                             for p in ["A1", "B1", "C1", "D1", "E1"]]})
+        assert resp.status_code == 400
+        assert "at most" in resp.json()["detail"]
+        resp = client.post(f"/api/procedures/{tag}/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1", "B1", "C1"]}],
+            "output_wells": [{"position": p, "condition_application_tags": []}
+                             for p in ["A1", "B1", "C1"]]})
+        assert resp.status_code == 200
+
 
 class TestModularProcedureConditionApplicationTrees:
     def test_insert_with_new_condition_application_tree(self, client):
