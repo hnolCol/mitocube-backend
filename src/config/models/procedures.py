@@ -3,13 +3,36 @@ from typing import List, Optional, Dict
 from enum import Enum
 
 from config.models.attributes import AttributeTree
+from config.enums.states import SubmissionStatesEnums
+
+
+SUBMISSION_STATE_CHOICES = [state.name for state in SubmissionStatesEnums]
 
 
 
 class ModularProcedureStatusEnum(str, Enum):
-    "Lifecycle status of a modular procedure."
+    """Lifecycle status of a modular procedure: drafts are editable, publishing freezes the
+    content with a SHA-256 hash, retiring keeps the published procedure (and the reproducibility
+    of its executions) forever but indicates it can no longer be assigned or executed."""
     DRAFT = "DRAFT"
     PUBLISHED = "PUBLISHED"
+    RETIRED = "RETIRED"
+
+
+class ProcedureExecutionStatusEnum(str, Enum):
+    """Lifecycle status of a procedure execution. Executions start RUNNING and are closed by an explicit
+    confirmation (SUCCEEDED, FAILED or ABORTED) that frees the linked submissions for the next module."""
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    ABORTED = "ABORTED"
+
+
+class ProcedureExecutionOutcomeEnum(str, Enum):
+    "The confirmation outcome of a running procedure execution."
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    ABORTED = "ABORTED"
 
 
 
@@ -26,7 +49,27 @@ class ModularProcedureBaseModel(BaseModel):
     published_at : Optional[float] = None
     condition_application_tags : List[str] = Field(default_factory=list)
     protocol_tags : List[str] = Field(default_factory=list)
-
+    input_plate_format : Optional[str] = None
+    """Required container format of the input plate (e.g. '8x12' for a 96 well plate). None means unconstrained."""
+    input_plate_type : Optional[str] = None
+    """Required plate type of the input plate (e.g. a PCR strip). None means unconstrained."""
+    output_plate_format : Optional[str] = None
+    output_plate_type : Optional[str] = None
+    input_attribute_tags : List[str] = Field(default_factory=list)
+    """Attributes whose values may be entered per input well before the execution (e.g. protein concentration)."""
+    output_attribute_tags : List[str] = Field(default_factory=list)
+    """Attributes for which data are expected on the output wells of a successful execution."""
+    success_submission_state : Optional[str] = None
+    """Optional submission state (name of SubmissionStatesEnums, e.g. 'PROCESSED') that is set automatically for the linked submissions when an execution is confirmed successful."""
+    pubmed_ids : List[str] = Field(default_factory=list)
+    """PubMed IDs of the publications this procedure is based on or referenced by."""
+    min_output_wells_per_sample : int = 1
+    """Minimum number of output wells each sample is transferred to per execution: 1 means the
+    module mirrors the sample numbers; larger values describe a fixed or minimal duplication of
+    the samples (e.g. 8 for an 8-fraction fractionation)."""
+    max_output_wells_per_sample : Optional[int] = None
+    """Maximum number of output wells per sample; None means unbounded. min == max fixes the
+    number exactly (e.g. min = max = 8 for exactly 8 fractions)."""
 
 
 class InsertModularProcedureModel(BaseModel):
@@ -37,6 +80,16 @@ class InsertModularProcedureModel(BaseModel):
     condition_application_trees : List[AttributeTree] = Field(default_factory=list)
     """New condition applications defined as hierarchical attribute/trait trees (like when inserting a submission)."""
     protocol_tags : List[str] = Field(default_factory=list)
+    input_plate_format : Optional[str] = None
+    input_plate_type : Optional[str] = None
+    output_plate_format : Optional[str] = None
+    output_plate_type : Optional[str] = None
+    input_attribute_tags : List[str] = Field(default_factory=list)
+    output_attribute_tags : List[str] = Field(default_factory=list)
+    success_submission_state : Optional[str] = None
+    pubmed_ids : List[str] = Field(default_factory=list)
+    min_output_wells_per_sample : int = 1
+    max_output_wells_per_sample : Optional[int] = None
 
 
 class UpdateModularProcedureModel(BaseModel):
@@ -45,6 +98,16 @@ class UpdateModularProcedureModel(BaseModel):
     condition_application_tags : List[str] = Field(default_factory=list)
     condition_application_trees : List[AttributeTree] = Field(default_factory=list)
     protocol_tags : List[str] = Field(default_factory=list)
+    input_plate_format : Optional[str] = None
+    input_plate_type : Optional[str] = None
+    output_plate_format : Optional[str] = None
+    output_plate_type : Optional[str] = None
+    input_attribute_tags : List[str] = Field(default_factory=list)
+    output_attribute_tags : List[str] = Field(default_factory=list)
+    success_submission_state : Optional[str] = None
+    pubmed_ids : List[str] = Field(default_factory=list)
+    min_output_wells_per_sample : int = 1
+    max_output_wells_per_sample : Optional[int] = None
 
 
 
@@ -67,6 +130,50 @@ class ModularProcedureSubmissionModel(BaseModel):
 
 
 
+class ExecutionStateModel(BaseModel):
+    "A state of a procedure execution in its state history: the state itself, when it was set and by whom."
+    state : str
+    created_at : Optional[float] = None
+    user_tag : Optional[str] = None
+
+
+class SampleLocationWellModel(BaseModel):
+    "A well of a procedure execution holding the sample, on the input or output plate."
+    plate_tag : str
+    position : str
+    side : str
+
+
+class SampleLocationModel(BaseModel):
+    """The current location of a sample: the wells of its most recent procedure execution
+    (a sample stays where the last execution placed it, even if that execution failed)."""
+    sample_tag : str
+    procedure_tag : str
+    execution_tag : str
+    execution_status : str = "RUNNING"
+    created_at : Optional[float] = None
+    wells : List[SampleLocationWellModel] = Field(default_factory=list)
+
+
+class ExecutionSummaryModel(BaseModel):
+    "Summary of a procedure execution for the overview listing: the header data and well counts."
+    tag : str
+    procedure_tag : str
+    input_plate_tag : str
+    output_plate_tag : str
+    user_tag : str
+    responsible_user_tag : Optional[str] = None
+    created_at : Optional[float] = None
+    status : ProcedureExecutionStatusEnum = Field(default=ProcedureExecutionStatusEnum.RUNNING)
+    wells_blocked : bool = True
+    finished_at : Optional[float] = None
+    finished_by : Optional[str] = None
+    finish_comment : Optional[str] = None
+    done_submission_tags : List[str] = Field(default_factory=list)
+    n_input_wells : int = 0
+    n_output_wells : int = 0
+
+
 class ExecutionInputWellModel(BaseModel):
     "An input plate well of a procedure execution with its samples and the output wells it is transferred to."
     position : str
@@ -87,6 +194,8 @@ class ExecutionWellMetricModel(BaseModel):
     position : str
     trait_tag : str
     value : float
+    side : str = "OUTPUT"
+    "The side of the plate the well belongs to: INPUT (values entered before the execution) or OUTPUT (data measured after the execution)."
 
 
 
@@ -108,6 +217,20 @@ class InsertProcedureExecutionModel(BaseModel):
     input_wells : List[ExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ExecutionOutputWellModel] = Field(default_factory=list)
     output_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)  # [{position, trait_tag, value}]
+    input_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)
+    """Values of the declared input attributes per input well (e.g. the concentration of each sample before harmonization)."""
+
+
+class FinishProcedureExecutionModel(BaseModel):
+    """The confirmation of a running procedure execution: the outcome closes the execution and frees the linked
+    submissions for the next module. Only SUCCEEDED triggers the optional submission state change and the adoption
+    of the condition applications by the submissions."""
+    outcome : ProcedureExecutionOutcomeEnum
+    comment : Optional[str] = None
+    block_output_wells : Optional[bool] = None
+    """Overrides whether the output wells stay blocked after this change (e.g. an aborted robot run
+    with dirty wells must stay blocked); omitted it defaults to the outcome (SUCCEEDED blocks,
+    FAILED/ABORTED release the wells for a re-run)."""
 
 
 
@@ -118,6 +241,7 @@ class ProcedureExecutionInputWellModel(BaseModel):
     column_index : int
     sample_tags : List[str] = Field(default_factory=list)
     output_positions : List[str] = Field(default_factory=list)
+    metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
 
 
 
@@ -141,6 +265,14 @@ class ProcedureExecutionModel(BaseModel):
     user_tag : str
     responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
+    status : ProcedureExecutionStatusEnum = Field(default=ProcedureExecutionStatusEnum.RUNNING)
+    wells_blocked : bool = True
+    """Whether the output wells of this execution block re-use: true while running; on confirmation it
+    follows the outcome unless the confirming user chose otherwise."""
+    finished_at : Optional[float] = None
+    finished_by : Optional[str] = None
+    finish_comment : Optional[str] = None
     done_submission_tags : List[str] = Field(default_factory=list)
+    input_well_metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
     input_wells : List[ProcedureExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ProcedureExecutionOutputWellModel] = Field(default_factory=list)

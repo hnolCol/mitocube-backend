@@ -5,13 +5,17 @@ import time
 from neo4j import Driver, Result
 from typing import List, Optional
 
+from lib.cache.scope_cache import invalidate_all_cached_scopes
 from lib.database.abstract.Procedures import ModularProceduresABC
+from lib.database.neo4j.Plates import PLATE_ATTRIBUTES
 from services.encryption import create_hierarchical_hash
 from config.models.procedures import (
     ModularProcedureBaseModel,
     ModularProcedureSubmissionModel,
     PublishModularProcedureModel,
 )
+
+EXECUTION_STATE_TAGS = ["RUNNING", "SUCCEEDED", "FAILED", "ABORTED"]
 
 
 
@@ -34,30 +38,95 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
     def _compute_content_hash(self, title: str, description: str,
                                condition_application_tags: List[str],
-                               protocol_tags: List[str]) -> str:
+                               protocol_tags: List[str],
+                               plate_constraints: dict = None,
+                               input_attribute_tags: List[str] = None,
+                               output_attribute_tags: List[str] = None,
+                               success_submission_state: str = None,
+                               pubmed_ids: List[str] = None,
+                               min_output_wells_per_sample: int = 1,
+                               max_output_wells_per_sample: int = None) -> str:
         "Computes the SHA-256 hash over the canonical serialization of the procedure content."
         content = {
             "title": title,
             "description": description,
             "condition_application_tags": sorted(condition_application_tags or []),
             "protocol_tags": sorted(protocol_tags or []),
+            "plate_constraints": plate_constraints or {},
+            "input_attribute_tags": sorted(input_attribute_tags or []),
+            "output_attribute_tags": sorted(output_attribute_tags or []),
+            "success_submission_state": success_submission_state,
+            "pubmed_ids": sorted(pubmed_ids or []),
+            "min_output_wells_per_sample": min_output_wells_per_sample,
+            "max_output_wells_per_sample": max_output_wells_per_sample,
         }
         return hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+    def _validate_success_submission_state(self, success_submission_state) -> None:
+        """Validates that the optional success submission state is the name of a submission state."""
+        from config.enums.states import SubmissionStatesEnums
+        if success_submission_state is None:
+            return
+        if success_submission_state not in [state.name for state in SubmissionStatesEnums]:
+            raise ValueError(f"Unknown submission state: {success_submission_state}")
+
+    def _validate_attributes(self, attribute_tags: List[str], relationship: str, tag: str) -> None:
+        """Validates that the given attributes exist and links them to the procedure with the given relationship."""
+        for attribute_tag in attribute_tags or []:
+            attribute_exists = self._driver.execute_query(
+                "WITH EXISTS {(a:Attribute {tag : $attribute_tag})} as exists RETURN exists",
+                routing_="r", attribute_tag=attribute_tag, result_transformer_=Result.value)
+            if len(attribute_exists) == 0 or not attribute_exists[0]:
+                raise ValueError(f"Attribute not found: {attribute_tag}")
+            self._driver.execute_query(
+                f"MATCH (m:ModularProcedure {{tag : $tag}}) MATCH (a:Attribute {{tag : $attribute_tag}}) "
+                f"MERGE (m)-[:{relationship}]->(a) ",
+                routing_="w", tag=tag, attribute_tag=attribute_tag)
+
+    def _link_procedure_attributes(self, tag: str, input_attribute_tags: List[str],
+                                    output_attribute_tags: List[str]) -> None:
+        """Replaces the attribute declarations of the procedure."""
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $tag})-[r:ACCEPTS_INPUT_ATTRIBUTE|EXPECTS_OUTPUT_ATTRIBUTE]->() DELETE r",
+            routing_="w", tag=tag)
+        self._validate_attributes(input_attribute_tags, "ACCEPTS_INPUT_ATTRIBUTE", tag)
+        self._validate_attributes(output_attribute_tags, "EXPECTS_OUTPUT_ATTRIBUTE", tag)
 
     def exists(self, tag: str) -> bool:
         query = "WITH EXISTS {(m:ModularProcedure {tag : $tag})} as exists RETURN exists"
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else False
 
+    def _validate_sample_multiplicity(self, min_output_wells_per_sample, max_output_wells_per_sample) -> None:
+        "Validates the per-sample output well bounds of a procedure."
+        if min_output_wells_per_sample is None:
+            min_output_wells_per_sample = 1
+        if not isinstance(min_output_wells_per_sample, int) or min_output_wells_per_sample < 1:
+            raise ValueError("min_output_wells_per_sample must be an integer >= 1.")
+        if max_output_wells_per_sample is not None:
+            if not isinstance(max_output_wells_per_sample, int) or max_output_wells_per_sample < min_output_wells_per_sample:
+                raise ValueError("max_output_wells_per_sample must be an integer >= min_output_wells_per_sample or None.")
+
     def insert(self, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
                condition_application_trees: List = None,
-               protocol_tags: List[str] = None) -> str:
+               protocol_tags: List[str] = None,
+               plate_constraints: dict = None,
+               input_attribute_tags: List[str] = None,
+               output_attribute_tags: List[str] = None,
+               success_submission_state: str = None,
+               pubmed_ids: List[str] = None,
+               min_output_wells_per_sample: int = 1,
+               max_output_wells_per_sample: int = None) -> str:
         """Inserts a new draft modular procedure. The tag is generated based on the title,
         description, condition applications and version. Condition applications can be reused
         by tag or newly defined as attribute/trait trees (resolved to tags on insert)."""
         condition_application_tags = self._resolve_condition_application_tags(condition_application_tags, condition_application_trees)
         protocol_tags = protocol_tags or []
+        plate_constraints = plate_constraints or {}
+        self._validate_success_submission_state(success_submission_state)
+        self._validate_plate_constraint_texts(plate_constraints)
+        self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
         tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
         if self.exists(tag=tag):
             raise ValueError("Tag is already in the database.")
@@ -77,6 +146,14 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "version": 1,
             "lineage_tag": tag,
             "user_tag": user_tag,
+            "input_plate_format": plate_constraints.get("input_plate_format"),
+            "input_plate_type": plate_constraints.get("input_plate_type"),
+            "output_plate_format": plate_constraints.get("output_plate_format"),
+            "output_plate_type": plate_constraints.get("output_plate_type"),
+            "success_submission_state": success_submission_state,
+            "pubmed_ids": list(pubmed_ids or []),
+            "min_output_wells_per_sample": min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
+            "max_output_wells_per_sample": max_output_wells_per_sample,
         }
 
         r = self._driver.execute_query(query, routing_="w", tag=tag, user_tag=user_tag, props=props,
@@ -89,6 +166,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 "MATCH (m:ModularProcedure {tag : $tag}) MATCH (c:ConditionApplication {tag : $ca_tag}) "
                 "MERGE (m)-[:HAS_CONDITION_APPLICATION]->(c)",
                 routing_="w", tag=tag, ca_tag=ca_tag)
+
+        self._link_procedure_attributes(tag=tag, input_attribute_tags=input_attribute_tags,
+                                         output_attribute_tags=output_attribute_tags)
 
         for protocol_tag in protocol_tags:
             self._driver.execute_query(
@@ -104,11 +184,23 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "MATCH (m:ModularProcedure {tag : $tag}) "
             "OPTIONAL MATCH (m)-[:HAS_CONDITION_APPLICATION]->(c:ConditionApplication) "
             "OPTIONAL MATCH (m)-[:HAS_PROTOCOL]->(p:Protocol) "
-            "WITH m, collect(DISTINCT c.tag) as ca_tags, collect(DISTINCT p.tag) as protocol_tags "
+            "OPTIONAL MATCH (m)-[:ACCEPTS_INPUT_ATTRIBUTE]->(ia:Attribute) "
+            "OPTIONAL MATCH (m)-[:EXPECTS_OUTPUT_ATTRIBUTE]->(oa:Attribute) "
+            "WITH m, collect(DISTINCT c.tag) as ca_tags, collect(DISTINCT p.tag) as protocol_tags, "
+            "collect(DISTINCT ia.tag) as input_attribute_tags, collect(DISTINCT oa.tag) as output_attribute_tags "
             "RETURN {tag: m.tag, title: m.title, description: m.description, status: m.status, "
             "version: m.version, lineage_tag: m.lineage_tag, content_hash: m.content_hash, user_tag: m.user_tag, "
             "created_at: m.created_at, published_at: m.published_at, "
-            "condition_application_tags: ca_tags, protocol_tags: protocol_tags} as procedure"
+            "condition_application_tags: [tag IN ca_tags WHERE tag IS NOT NULL], "
+            "protocol_tags: [tag IN protocol_tags WHERE tag IS NOT NULL], "
+            "input_plate_format: m.input_plate_format, input_plate_type: m.input_plate_type, "
+            "output_plate_format: m.output_plate_format, output_plate_type: m.output_plate_type, "
+            "input_attribute_tags: [tag IN input_attribute_tags WHERE tag IS NOT NULL], "
+            "output_attribute_tags: [tag IN output_attribute_tags WHERE tag IS NOT NULL], "
+            "success_submission_state: m.success_submission_state, "
+            "pubmed_ids: coalesce(m.pubmed_ids, []), "
+            "min_output_wells_per_sample: coalesce(m.min_output_wells_per_sample, 1), "
+            "max_output_wells_per_sample: m.max_output_wells_per_sample} as procedure"
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
         if len(r) == 0:
@@ -174,11 +266,22 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "version": new_version,
             "lineage_tag": parent.lineage_tag,
             "user_tag": user_tag,
+            "input_plate_format": parent.input_plate_format,
+            "input_plate_type": parent.input_plate_type,
+            "output_plate_format": parent.output_plate_format,
+            "output_plate_type": parent.output_plate_type,
+            "success_submission_state": parent.success_submission_state,
+            "pubmed_ids": list(parent.pubmed_ids or []),
+            "min_output_wells_per_sample": parent.min_output_wells_per_sample if parent.min_output_wells_per_sample is not None else 1,
+            "max_output_wells_per_sample": parent.max_output_wells_per_sample,
         }
         r = self._driver.execute_query(query, routing_="w", tag=new_tag, user_tag=user_tag,
                                        parent_tag=tag, props=props, result_transformer_=Result.value)
         if len(r) == 0 or r[0] is None:
             raise ValueError("Modular procedure version could not be created.")
+
+        self._link_procedure_attributes(tag=new_tag, input_attribute_tags=parent.input_attribute_tags,
+                                         output_attribute_tags=parent.output_attribute_tags)
 
         for ca_tag in parent.condition_application_tags:
             self._driver.execute_query(
@@ -204,7 +307,11 @@ class Neo4JModularProcedures(ModularProceduresABC):
     def update(self, tag: str, title: str, description: str, user_tag: str,
                condition_application_tags: List[str] = None,
                condition_application_trees: List = None,
-               protocol_tags: List[str] = None) -> bool:
+               protocol_tags: List[str] = None,
+               plate_constraints: dict = None,
+               input_attribute_tags: List[str] = None,
+               output_attribute_tags: List[str] = None,
+               success_submission_state: str = None) -> bool:
         "Updates a draft modular procedure. Published procedures are immutable."
         if not self.exists(tag=tag):
             raise ValueError("Modular procedure not found.")
@@ -212,6 +319,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError("Published modular procedures are immutable.")
         condition_application_tags = self._resolve_condition_application_tags(condition_application_tags, condition_application_trees)
         protocol_tags = protocol_tags or []
+        plate_constraints = plate_constraints or {}
+        self._validate_success_submission_state(success_submission_state)
+        self._validate_plate_constraint_texts(plate_constraints)
 
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
@@ -220,12 +330,28 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "OPTIONAL MATCH (m)-[r2:HAS_PROTOCOL]->() DELETE r2 "
             "WITH DISTINCT m "
             "MATCH (u:User {tag : $user_tag}) "
-            "SET m.title = $title, m.description = $description, m.modified_at = timestamp() "
+            "SET m.title = $title, m.description = $description, m.modified_at = timestamp(), "
+            "m.input_plate_format = $input_plate_format, m.input_plate_type = $input_plate_type, "
+            "m.output_plate_format = $output_plate_format, m.output_plate_type = $output_plate_type, "
+            "m.success_submission_state = $success_submission_state, "
+            "m.pubmed_ids = $pubmed_ids, "
+            "m.min_output_wells_per_sample = $min_output_wells_per_sample, "
+            "m.max_output_wells_per_sample = $max_output_wells_per_sample "
             "MERGE (u)-[:UPDATED]->(m) "
             "RETURN m.tag as tag"
         )
+        plate_props = {
+            "input_plate_format": plate_constraints.get("input_plate_format"),
+            "input_plate_type": plate_constraints.get("input_plate_type"),
+            "output_plate_format": plate_constraints.get("output_plate_format"),
+            "output_plate_type": plate_constraints.get("output_plate_type"),
+            "success_submission_state": success_submission_state,
+            "pubmed_ids": list(pubmed_ids or []),
+            "min_output_wells_per_sample": min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
+            "max_output_wells_per_sample": max_output_wells_per_sample,
+        }
         r = self._driver.execute_query(query, routing_="w", tag=tag, title=title, description=description,
-                                       user_tag=user_tag, result_transformer_=Result.value)
+                                       user_tag=user_tag, **plate_props, result_transformer_=Result.value)
         if len(r) == 0 or r[0] is None:
             return False
 
@@ -234,6 +360,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 "MATCH (m:ModularProcedure {tag : $tag}) MATCH (c:ConditionApplication {tag : $ca_tag}) "
                 "MERGE (m)-[:HAS_CONDITION_APPLICATION]->(c)",
                 routing_="w", tag=tag, ca_tag=ca_tag)
+
+        self._link_procedure_attributes(tag=tag, input_attribute_tags=input_attribute_tags,
+                                         output_attribute_tags=output_attribute_tags)
 
         for protocol_tag in protocol_tags:
             self._driver.execute_query(
@@ -248,9 +377,20 @@ class Neo4JModularProcedures(ModularProceduresABC):
         procedure = self.get(tag=tag)
         if procedure.status == "PUBLISHED":
             raise ValueError("Modular procedure is already published.")
-        content_hash = self._compute_content_hash(title=procedure.title, description=procedure.description,
-                                                  condition_application_tags=procedure.condition_application_tags,
-                                                  protocol_tags=procedure.protocol_tags)
+        content_hash = self._compute_content_hash(
+            title=procedure.title, description=procedure.description,
+            condition_application_tags=procedure.condition_application_tags,
+            protocol_tags=procedure.protocol_tags,
+            plate_constraints={"input_plate_format": procedure.input_plate_format,
+                               "input_plate_type": procedure.input_plate_type,
+                               "output_plate_format": procedure.output_plate_format,
+                               "output_plate_type": procedure.output_plate_type},
+            input_attribute_tags=procedure.input_attribute_tags,
+            output_attribute_tags=procedure.output_attribute_tags,
+            success_submission_state=procedure.success_submission_state,
+            pubmed_ids=procedure.pubmed_ids,
+            min_output_wells_per_sample=procedure.min_output_wells_per_sample,
+            max_output_wells_per_sample=procedure.max_output_wells_per_sample)
         query = (
             "MATCH (m:ModularProcedure {tag : $tag}) "
             "MATCH (u:User {tag : $user_tag}) "
@@ -265,10 +405,32 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError("Modular procedure not found.")
         return PublishModularProcedureModel(tag=tag, version=r[0], content_hash=content_hash)
 
+    def retire(self, tag: str, user_tag: str) -> "ModularProcedureBaseModel":
+        """Retires a published modular procedure: the content (and its SHA-256 hash) stay exactly
+        as they are and procedures are never deleted — the procedure keeps running the module
+        history of its submissions and its executions stay reproducible — but the procedure is
+        marked retired: greyed out in the UI and no longer assignable or executable. Existing
+        links are untouched (their submissions can still be marked done)."""
+        procedure = self.get(tag=tag)
+        if procedure.status == "RETIRED":
+            raise ValueError("This modular procedure is already retired.")
+        if procedure.status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be retired.")
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $tag}) MATCH (u:User {tag : $user_tag}) "
+            "SET m.status = 'RETIRED', m.retired_at = timestamp() "
+            "MERGE (u)-[:RETIRED]->(m) ",
+            routing_="w", tag=tag, user_tag=user_tag)
+        return self.get(tag=tag)
+
     def link(self, tag: str, submission_tag: str, user_tag: str) -> bool:
-        "Assigns a submission to the procedure, appended at the end of the submission's procedure order."
+        """Assigns a submission to the procedure, appended at the end of the submission's procedure
+        order. Retired procedures can no longer be assigned; already linked submissions keep their
+        module history and can still be marked done."""
         if not self.exists(tag=tag):
             raise ValueError("Modular procedure not found.")
+        if self.get(tag=tag).status == "RETIRED":
+            raise ValueError("This modular procedure is retired and can no longer be assigned to submissions.")
         already_linked = self._driver.execute_query(
             "WITH EXISTS {(s:Submission {tag : $submission_tag})-[:IN_PROCEDURE]->(m:ModularProcedure {tag : $tag})} as exists RETURN exists",
             routing_="r", tag=tag, submission_tag=submission_tag, result_transformer_=Result.value)
@@ -387,8 +549,147 @@ class Neo4JModularProcedures(ModularProceduresABC):
             row = row * 26 + (ord(character) - ord("A") + 1)
         return row - 1, int(match.group(2)) - 1
 
+    def _validate_plate_constraint_texts(self, plate_constraints: dict) -> None:
+        """Validates that the format and type texts of the plate constraints exist as trait texts
+        of the plate format / plate type attributes, so typos are rejected when the procedure is
+        defined instead of silently blocking every execution."""
+        format_texts = self._driver.execute_query(
+            "MATCH (t:Trait {attribute_tag : $attribute_tag}) RETURN collect(t.text) as texts",
+            routing_="r", attribute_tag=PLATE_ATTRIBUTES["format"], result_transformer_=Result.value)
+        type_texts = self._driver.execute_query(
+            "MATCH (t:Trait {attribute_tag : $attribute_tag}) RETURN collect(t.text) as texts",
+            routing_="r", attribute_tag=PLATE_ATTRIBUTES["plate_type"], result_transformer_=Result.value)
+        known_formats = format_texts[0] if len(format_texts) > 0 else []
+        known_types = type_texts[0] if len(type_texts) > 0 else []
+        for side in ("input", "output"):
+            required_format = (plate_constraints or {}).get(f"{side}_plate_format")
+            required_type = (plate_constraints or {}).get(f"{side}_plate_type")
+            if required_format is not None and required_format not in known_formats:
+                raise ValueError(f"Unknown plate format: {required_format}. Known formats: {', '.join(known_formats)}.")
+            if required_type is not None and required_type not in known_types:
+                raise ValueError(f"Unknown plate type: {required_type}. Known types: {', '.join(known_types)}.")
+
+    def _validate_plate_constraints(self, procedure, plate_tag: str, side: str) -> None:
+        """Validates that the given plate matches the plate layout constraints the procedure defines
+        for the given side (input or output). Unconstrained sides always pass."""
+        required_format = getattr(procedure, f"{side}_plate_format")
+        required_type = getattr(procedure, f"{side}_plate_type")
+        if required_format is None and required_type is None:
+            return
+        plate_props = self._driver.execute_query(
+            "MATCH (p:Plate {tag : $plate_tag}) "
+            "RETURN {format: p.format, plate_type: [(p)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+            "WHERE (ca)-[:OF_ATTRIBUTE]->(:Attribute {tag : 'att_plate_type'}) | t.text][0]} as plate",
+            routing_="r", plate_tag=plate_tag, result_transformer_=Result.data)
+        if len(plate_props) == 0:
+            raise ValueError(f"Plate not found: {plate_tag}")
+        plate = plate_props[0]["plate"] or {}
+        if required_format is not None and plate.get("format") != required_format:
+            raise ValueError(f"The {side} plate of this procedure must have the format {required_format}, "
+                             f"but the plate has {plate.get('format')}.")
+        if required_type is not None and plate.get("plate_type") != required_type:
+            raise ValueError(f"The {side} plate of this procedure must be of type {required_type}, "
+                             f"but the plate is {plate.get('plate_type')}.")
+
+    def _set_execution_state(self, execution_tag: str, state: str, user_tag: str) -> None:
+        """Appends a state to the execution's state history: creates an IN_STATE relationship to
+        the ProcessingState node with created_at and user_tag, and keeps the status property
+        (the current state) in sync."""
+        if state not in EXECUTION_STATE_TAGS:
+            raise ValueError(f"Unknown procedure execution state: {state}")
+        self._driver.execute_query(
+            "MERGE (ps:ProcessingState {tag : $state}) "
+            "WITH ps MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "CREATE (e)-[r:IN_STATE]->(ps) "
+            "SET r.created_at = $created_at, r.user_tag = $user_tag, e.status = $state ",
+            routing_="w", state=state, execution_tag=execution_tag,
+            created_at=time.time(), user_tag=user_tag)
+
+    def get_execution_states(self, execution_tag: str) -> List:
+        """Returns the state history of a procedure execution, newest state first:"""
+        from config.models.procedures import ExecutionStateModel
+        execution_exists = self._driver.execute_query(
+            "WITH EXISTS {(e:ModularProcedureExecution {tag : $execution_tag})} as exists RETURN exists",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+        if len(execution_exists) == 0 or not execution_exists[0]:
+            raise KeyError("Procedure execution not found.")
+        rows = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[r:IN_STATE]->(ps:ProcessingState) "
+            "RETURN {state: ps.tag, created_at: r.created_at, user_tag: r.user_tag} as state "
+            "ORDER BY r.created_at DESC",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
+        return [ExecutionStateModel(**row["state"]) for row in rows]
+
+    def get_current_execution_state(self, execution) -> str:
+        """Returns the current state of the execution: the newest IN_STATE state, falling back
+        to the status property for executions created before the state history existed."""
+        current = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[r:IN_STATE]->(ps:ProcessingState) "
+            "RETURN ps.tag as state ORDER BY r.created_at DESC LIMIT 1",
+            routing_="r", execution_tag=execution.tag, result_transformer_=Result.value)
+        return current[0] if len(current) > 0 and current[0] is not None else (execution.status or "RUNNING")
+
+    def get_submission_sample_locations(self, submission_tag: str) -> List:
+        """Returns the current plate locations of the samples of a submission: for every sample
+        the wells of its most recent procedure execution (input and output side, with the plate
+        tags), newest execution first. Samples that were never placed show no entry.
+        Raises a KeyError if the submission does not exist."""
+        from config.models.procedures import SampleLocationModel
+        submission_exists = self._driver.execute_query(
+            "WITH EXISTS {(s:Submission {tag : $submission_tag})} as exists RETURN exists",
+            routing_="r", submission_tag=submission_tag, result_transformer_=Result.value)
+        if len(submission_exists) == 0 or not submission_exists[0]:
+            raise KeyError("Submission not found.")
+        rows = self._driver.execute_query(
+            "MATCH (sub:Submission {tag : $submission_tag})-[:HAS_SAMPLE]->(sample:Sample)-[:IN_WELL]->(w:ExecutionWell) "
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w) "
+            "RETURN {sample_tag: sample.tag, procedure_tag: e.procedure_tag, execution_tag: e.tag, "
+            "status: coalesce(e.status, 'RUNNING'), created_at: e.created_at, "
+            "position: w.position, side: w.side, "
+            "plate_tag: CASE w.side WHEN 'INPUT' THEN e.input_plate_tag ELSE e.output_plate_tag END} as location ",
+            routing_="r", submission_tag=submission_tag, result_transformer_=Result.data)
+        placed = {}
+        for row in rows:
+            location = row["location"]
+            placed.setdefault(location["sample_tag"], []).append(location)
+        locations = []
+        for sample_tag, entries in placed.items():
+            latest_created_at = max(entry["created_at"] or 0 for entry in entries)
+            latest = [entry for entry in entries if (entry["created_at"] or 0) == latest_created_at]
+            head = latest[0]
+            locations.append(SampleLocationModel(
+                sample_tag=sample_tag, procedure_tag=head["procedure_tag"],
+                execution_tag=head["execution_tag"], execution_status=head["status"],
+                created_at=head["created_at"],
+                wells=[{"plate_tag": entry["plate_tag"], "position": entry["position"], "side": entry["side"]}
+                       for entry in latest]))
+        return sorted(locations, key=lambda location: location.sample_tag)
+
+    def get_sample_submission_map(self, sample_tags: List[str]) -> "dict":
+        """Returns a map of the given sample tags to the tags of the submissions owning them."""
+        if not sample_tags:
+            return {}
+        rows = self._driver.execute_query(
+            "MATCH (s:Submission)-[:HAS_SAMPLE]->(sample:Sample) "
+            "WHERE sample.tag IN $sample_tags "
+            "RETURN sample.tag as sample_tag, collect(DISTINCT s.tag) as submission_tags",
+            routing_="r", sample_tags=list(sample_tags), result_transformer_=Result.data)
+        return {row["sample_tag"]: row["submission_tags"] for row in rows}
+
+    def find_execution_tags_by_submissions(self, submission_tags: List[str]) -> List[str]:
+        """Returns the tags of the procedure executions that placed samples of the given submissions."""
+        if not submission_tags:
+            return []
+        return self._driver.execute_query(
+            "MATCH (s:Submission)-[:HAS_SAMPLE]->(:Sample)-[:IN_WELL]->(w:ExecutionWell) "
+            "WHERE s.tag IN $submission_tags "
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w) "
+            "RETURN DISTINCT e.tag as tag ORDER BY tag",
+            routing_="r", submission_tags=list(submission_tags), result_transformer_=Result.value)
+
     def execute(self, tag: str, execution, user_tag: str) -> "ProcedureExecutionModel":
-        "Executes a published modular procedure on a set of samples and marks the affected submissions as done."
+        """Starts a published modular procedure execution on a set of samples. The execution is created in the
+        RUNNING state; the submissions are only freed when the execution is confirmed via finish_execution."""
         from config.models.procedures import ProcedureExecutionModel
         procedure = self.get(tag=tag)
         if procedure.status != "PUBLISHED":
@@ -402,21 +703,28 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 raise ValueError(f"Plate not found: {plate_tag}")
 
         responsible_user_tag = execution.responsible_user_tag or user_tag
-        responsible_user_exists = self._driver.execute_query(
-            "WITH EXISTS {(u:User {tag : $user_tag})} as exists RETURN exists",
+        responsible_user = self._driver.execute_query(
+            "MATCH (u:User {tag : $user_tag}) RETURN u.role as role",
             routing_="r", user_tag=responsible_user_tag, result_transformer_=Result.value)
-        if len(responsible_user_exists) == 0 or not responsible_user_exists[0]:
+        if len(responsible_user) == 0 or responsible_user[0] is None:
             raise ValueError(f"Responsible user not found: {responsible_user_tag}")
+        from config.enums.users.roles import UserRolesEnum
+        if responsible_user[0] < UserRolesEnum.CURATOR:
+            raise ValueError("The responsible user of a procedure execution must be a curator.")
 
-        metric_positions = [metric.position for metric in execution.output_well_metrics]
+        self._validate_plate_constraints(procedure, execution.input_plate_tag, "input")
+        self._validate_plate_constraints(procedure, execution.output_plate_tag, "output")
+
+        all_metrics = list(execution.output_well_metrics) + list(getattr(execution, "input_well_metrics") or [])
+        metric_keys = [(metric.position, metric.trait_tag, metric.side) for metric in all_metrics]
         output_positions = {well.position for well in execution.output_wells}
         input_positions = {well.position for well in execution.input_wells}
         if len(output_positions) != len(execution.output_wells) or len(input_positions) != len(execution.input_wells):
             raise ValueError("Duplicate well positions are not allowed.")
 
-        if len(set(metric_positions)) != len(metric_positions):
-            raise ValueError("Duplicate metric positions are not allowed.")
-        metric_trait_tags = sorted({metric.trait_tag for metric in execution.output_well_metrics})
+        if len(set(metric_keys)) != len(metric_keys):
+            raise ValueError("Duplicate metrics (same well, trait and side) are not allowed.")
+        metric_trait_tags = sorted({metric.trait_tag for metric in all_metrics})
         trait_attribute_tags = self._driver.execute_query(
             "UNWIND $trait_tags as trait_tag "
             "MATCH (t:Trait {tag : trait_tag}) "
@@ -426,11 +734,20 @@ class Neo4JModularProcedures(ModularProceduresABC):
         missing_traits = [trait_tag for trait_tag in metric_trait_tags if trait_tag not in trait_to_attribute]
         if len(missing_traits) > 0:
             raise ValueError(f"Traits not found: {', '.join(missing_traits)}")
-        for metric in execution.output_well_metrics:
-            if metric.position not in output_positions:
-                raise ValueError(f"Metrics were given for a non-defined output well: {metric.position}")
+        for metric in all_metrics:
+            side_positions = output_positions if metric.side == "OUTPUT" else input_positions
+            side_name = "output" if metric.side == "OUTPUT" else "input"
+            if metric.position not in side_positions:
+                raise ValueError(f"Metrics were given for a non-defined {side_name} well: {metric.position}")
+        if len(all_metrics) > 0:
+            declared_attribute_tags = set(procedure.input_attribute_tags) | set(procedure.output_attribute_tags)
+            undeclared_traits = [trait_tag for trait_tag, attribute_tag in trait_to_attribute.items()
+                                 if attribute_tag not in declared_attribute_tags]
+            if len(declared_attribute_tags) > 0 and len(undeclared_traits) > 0:
+                raise ValueError(f"Metrics were given for traits that are not declared by the procedure: {', '.join(sorted(undeclared_traits))}")
 
         output_well_samples = {position: set() for position in output_positions}
+        outputs_per_sample = {}
         for well in execution.input_wells:
             if len(well.sample_tags) == 0:
                 raise ValueError(f"Input well {well.position} has no samples.")
@@ -438,10 +755,28 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 if output_position not in output_positions:
                     raise ValueError(f"Output well {output_position} is not defined.")
                 output_well_samples[output_position].update(well.sample_tags)
+                for sample_tag in well.sample_tags:
+                    outputs_per_sample.setdefault(sample_tag, set()).add(output_position)
 
+        # the procedure declares how the run treats the sample numbers: mirroring (1 output well per
+        # sample), a fixed or bounded N-fold duplication (e.g. N fractions) or anything in between
+        min_outputs = procedure.min_output_wells_per_sample if procedure.min_output_wells_per_sample is not None else 1
+        max_outputs = procedure.max_output_wells_per_sample
+        for sample_tag, samples_outputs in sorted(outputs_per_sample.items()):
+            if len(samples_outputs) < min_outputs:
+                raise ValueError(f"Sample {sample_tag} is transferred to {len(samples_outputs)} output wells, but the "
+                                 f"procedure requires at least {min_outputs} output wells per sample.")
+            if max_outputs is not None and len(samples_outputs) > max_outputs:
+                raise ValueError(f"Sample {sample_tag} is transferred to {len(samples_outputs)} output wells, but the "
+                                 f"procedure requires at most {max_outputs} output wells per sample.")
+
+        # only executions that are still running or that succeeded occupy their output wells:
+        # a failed or aborted run does not block redoing the same wells
         occupied_output_wells = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
             "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
+            "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
+            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
             "RETURN collect(DISTINCT w.position) as occupied",
             routing_="r", output_plate_tag=execution.output_plate_tag,
             positions=sorted(output_positions), result_transformer_=Result.value)
@@ -466,12 +801,11 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_wells": [{"position": w.position,
                               "condition_application_tags": sorted(w.condition_application_tags)} for w in execution.output_wells],
         }
-        execution_tag = hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
-        execution_exists = self._driver.execute_query(
-            "WITH EXISTS {(e:ModularProcedureExecution {tag : $execution_tag})} as exists RETURN exists",
-            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
-        if len(execution_exists) > 0 and execution_exists[0]:
-            raise ValueError("An identical procedure execution already exists.")
+        # the creation time is part of the hash so the same transfer map can legitimately be
+        # re-run (e.g. after a failed or aborted execution); the occupancy rule above is what
+        # actually protects wells from being overwritten concurrently
+        execution_tag = hashlib.sha256(json.dumps(
+            {**content, "created_at": time.time()}, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
 
         self._driver.execute_query(
             "MATCH (m:ModularProcedure {tag : $procedure_tag}) MATCH (u:User {tag : $user_tag}) "
@@ -482,7 +816,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
             props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
                    "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
-                   "responsible_user_tag": responsible_user_tag})
+                   "responsible_user_tag": responsible_user_tag, "status": "RUNNING",
+                   "wells_blocked": True})
+        self._set_execution_state(execution_tag=execution_tag, state="RUNNING", user_tag=user_tag)
 
         for well in execution.input_wells:
             row_index, column_index = self._parse_position(well.position)
@@ -519,36 +855,124 @@ class Neo4JModularProcedures(ModularProceduresABC):
                     "MERGE (w)-[:HAS_APPLICATION]->(c) ",
                     routing_="w", execution_tag=execution_tag, position=well.position, ca_tag=ca_tag)
 
-        for metric in execution.output_well_metrics:
+        for metric in all_metrics:
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
-                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'OUTPUT'}) "
+                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : $side}) "
                 "MATCH (t:Trait {tag : $trait_tag}) "
-                "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, trait_tag : $trait_tag}) "
+                "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, "
+                "trait_tag : $trait_tag, side : $side}) "
                 "SET m.value = $value, m.created_at = timestamp() "
                 "MERGE (w)-[:HAS_METRIC]->(m) "
                 "MERGE (m)-[:INSTANCE_OF]->(t) "
                 "WITH m, t "
                 "MERGE (a:Attribute {tag : t.attribute_tag}) "
                 "MERGE (m)-[:OF_ATTRIBUTE]->(a) ",
-                routing_="w", execution_tag=execution_tag, position=metric.position,
+                routing_="w", execution_tag=execution_tag, position=metric.position, side=metric.side,
                 trait_tag=metric.trait_tag, value=metric.value)
 
+        return self.get_execution(execution_tag=execution_tag)
+
+    def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None,
+                         block_output_wells: bool = None) -> "ProcedureExecutionModel":
+        """Transitions a procedure execution to the given state (SUCCEEDED, FAILED or ABORTED).
+        Leaving the RUNNING state always frees the submissions owning the placed samples in the
+        procedure (they stay where they are physically, but are freed for the next module). A
+        transition to SUCCEEDED applies the success effects; finished executions can be corrected
+        later (e.g. FAILED to SUCCEEDED) — every state is recorded in the IN_STATE history.
+        block_output_wells overrides whether the output wells stay blocked after the change (e.g.
+        an aborted robot run with dirty wells must stay blocked); omitted it defaults to the
+        outcome (SUCCEEDED blocks, FAILED/ABORTED release the wells for a re-run)."""
+        wells_blocked = block_output_wells if block_output_wells is not None else (outcome == "SUCCEEDED")
+        from config.models.procedures import ProcedureExecutionModel
+        if outcome not in ("SUCCEEDED", "FAILED", "ABORTED"):
+            raise ValueError("Outcome must be SUCCEEDED, FAILED or ABORTED.")
+        execution = self.get_execution(execution_tag=execution_tag)
+        current_state = self.get_current_execution_state(execution)
+        if outcome == "RUNNING" or outcome == current_state:
+            raise ValueError(f"This procedure execution is already in state {current_state}.")
+        procedure = self.get(tag=execution.procedure_tag)
+
+        if current_state != "RUNNING":
+            self._set_execution_state(execution_tag=execution_tag, state=outcome, user_tag=user_tag)
+            self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+                "SET e.finished_at = $finished_at, e.finished_by = $user_tag, e.finish_comment = $comment, "
+                "e.wells_blocked = $wells_blocked",
+                routing_="w", execution_tag=execution_tag, wells_blocked=wells_blocked,
+                finished_at=time.time(), user_tag=user_tag, comment=comment)
+            if outcome == "SUCCEEDED":
+                self._apply_success(execution_tag=execution_tag, procedure=procedure, user_tag=user_tag)
+            return self.get_execution(execution_tag=execution_tag)
+
         done_submission_tags = self._driver.execute_query(
-            "UNWIND $sample_tags as sample_tag "
-            "MATCH (s:Sample {tag : sample_tag})<-[:HAS_SAMPLE]-(sub:Submission) "
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+            "(w:ExecutionWell {execution_tag : $execution_tag, side : 'INPUT'}) "
+            "MATCH (s:Sample)-[:IN_WELL]->(w)<-[:HAS_SAMPLE]-(sub:Submission) "
             "MATCH (sub)-[r:IN_PROCEDURE]->(m:ModularProcedure {tag : $procedure_tag}) "
             "SET r.done = true, r.done_at = $done_at, r.done_by = $user_tag "
             "RETURN collect(DISTINCT sub.tag) as done_submissions",
-            routing_="w", sample_tags=all_sample_tags, procedure_tag=tag, user_tag=user_tag,
-            done_at=time.time(), result_transformer_=Result.value)
+            routing_="w", execution_tag=execution_tag, procedure_tag=procedure.tag,
+            user_tag=user_tag, done_at=time.time(), result_transformer_=Result.value)
         done_submissions = done_submission_tags[0] if len(done_submission_tags) > 0 else []
+
+        if outcome == "SUCCEEDED" and len(done_submissions) > 0:
+            self._apply_success(execution_tag=execution_tag, procedure=procedure, user_tag=user_tag,
+                                submission_tags=done_submissions)
+
+        self._set_execution_state(execution_tag=execution_tag, state=outcome, user_tag=user_tag)
         self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
-            "SET e.done_submission_tags = $done_submissions",
-            routing_="w", execution_tag=execution_tag, done_submissions=done_submissions)
+            "SET e.finished_at = $finished_at, e.finished_by = $user_tag, "
+            "e.finish_comment = $comment, e.done_submission_tags = $done_submissions, "
+            "e.wells_blocked = $wells_blocked",
+            routing_="w", execution_tag=execution_tag, wells_blocked=wells_blocked,
+            finished_at=time.time(), user_tag=user_tag, comment=comment, done_submissions=done_submissions)
 
         return self.get_execution(execution_tag=execution_tag)
+
+    def _apply_success(self, execution_tag: str, procedure, user_tag: str, submission_tags: List[str] = None) -> None:
+        """Applies the success effects to the submissions owning the placed samples: they adopt the
+        condition applications (procedure level and per output well) and get the optional success
+        submission state. No-op if the execution placed no samples."""
+        if submission_tags is None:
+            submission_tags = self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+                "(w:ExecutionWell {execution_tag : $execution_tag, side : 'INPUT'}) "
+                "MATCH (s:Sample)-[:IN_WELL]->(w)<-[:HAS_SAMPLE]-(sub:Submission) "
+                "RETURN collect(DISTINCT sub.tag) as submissions",
+                routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+            submission_tags = submission_tags[0] if len(submission_tags) > 0 else []
+        if len(submission_tags) == 0:
+            return
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $procedure_tag})-[:HAS_CONDITION_APPLICATION]->(c:ConditionApplication) "
+            "MATCH (sub:Submission) WHERE sub.tag IN $submission_tags "
+            "MERGE (sub)-[r:HAS_APPLICATION]->(c) "
+            "SET r.created_at = timestamp() ",
+            routing_="w", procedure_tag=procedure.tag, submission_tags=submission_tags)
+        self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+            "(w:ExecutionWell {execution_tag : $execution_tag, side : 'OUTPUT'}) "
+            "MATCH (w)-[:HAS_APPLICATION]->(c:ConditionApplication) "
+            "MATCH (s:Sample)-[:IN_WELL]->(w)<-[:HAS_SAMPLE]-(sub:Submission) "
+            "WHERE sub.tag IN $submission_tags "
+            "MERGE (sub)-[r:HAS_APPLICATION]->(c) "
+            "SET r.created_at = timestamp() ",
+            routing_="w", execution_tag=execution_tag, submission_tags=submission_tags)
+        if procedure.success_submission_state is not None:
+            from config.enums.states import SubmissionStatesEnums
+            new_state = SubmissionStatesEnums[procedure.success_submission_state]
+            self._driver.execute_query(
+                "MATCH (sub:Submission) WHERE sub.tag IN $submission_tags "
+                "MATCH (state:State {tag : $new_state}) "
+                "CREATE (sub)-[r:IN_STATE]->(state) "
+                "SET r.created_at = timestamp(), r.user_tag = $user_tag ",
+                routing_="w", submission_tags=submission_tags,
+                new_state=new_state.value, user_tag=user_tag)
+            # like Submission.update_state: a state change can affect the submission scope of
+            # every user (e.g. a success state of PUBLISHED), so the scope cache must be cleared
+            invalidate_all_cached_scopes()
 
     def get_execution(self, execution_tag: str) -> "ProcedureExecutionModel":
         "Returns the procedure execution by its tag."
@@ -562,9 +986,13 @@ class Neo4JModularProcedures(ModularProceduresABC):
         input_wells = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell {side : 'INPUT'}) "
             "OPTIONAL MATCH (s:Sample)-[:IN_WELL]->(w) "
-            "WITH w, collect(s.tag) as sample_tags "
+            "OPTIONAL MATCH (w)-[:HAS_METRIC]->(m:ExecutionWellMetric)-[:INSTANCE_OF]->(t:Trait) "
+            "WITH w, collect(DISTINCT s.tag) as sample_tags, "
+            "collect(CASE WHEN m IS NULL THEN NULL ELSE "
+            "{trait_tag: t.tag, attribute_tag: t.attribute_tag, value: m.value} END) as metrics "
             "RETURN {position: w.position, row_index: w.row_index, column_index: w.column_index, "
-            "sample_tags: sample_tags, output_positions: w.output_positions} as well "
+            "sample_tags: [tag IN sample_tags WHERE tag IS NOT NULL], output_positions: w.output_positions, "
+            "metrics: [metric IN metrics WHERE metric IS NOT NULL]} as well "
             "ORDER BY w.row_index, w.column_index",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
         output_wells = self._driver.execute_query(
@@ -578,6 +1006,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN {position: w.position, row_index: w.row_index, column_index: w.column_index, "
             "sample_tags: sample_tags, condition_application_tags: ca_tags, "
             "metrics: [metric IN metrics WHERE metric IS NOT NULL]} as well "
+
             "ORDER BY w.row_index, w.column_index",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
 
@@ -597,12 +1026,27 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN {tag: e.tag, procedure_tag: e.procedure_tag, input_plate_tag: e.input_plate_tag, "
             "output_plate_tag: e.output_plate_tag, user_tag: e.user_tag, "
             "responsible_user_tag: e.responsible_user_tag, created_at: e.created_at, "
-            "done_submission_tags: e.done_submission_tags} as execution",
+            "status: e.status, wells_blocked: coalesce(e.wells_blocked, true), "
+            "finished_at: e.finished_at, finished_by: e.finished_by, "
+            "finish_comment: e.finish_comment, done_submission_tags: e.done_submission_tags} as execution",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
         execution = head[0]["execution"]
         execution["input_wells"] = [ProcedureExecutionInputWellModel(**well) for well in input_wells]
         execution["output_wells"] = [ProcedureExecutionOutputWellModel(**well) for well in output_wells]
         return ProcedureExecutionModel(**execution)
+
+    def find_execution_tags(self, status: str = None, limit: int = None) -> List[str]:
+        """Returns the tags of all procedure executions, newest first, optionally filtered by
+        their current state."""
+        params = {"limit": limit}
+        query = "MATCH (e:ModularProcedureExecution) "
+        if status is not None:
+            query += ("WHERE coalesce(e.status, 'RUNNING') = $status ")
+            params["status"] = status
+        query += "RETURN e.tag as tag ORDER BY e.created_at DESC"
+        if limit is not None:
+            query += " LIMIT $limit"
+        return self._driver.execute_query(query, routing_="r", parameters_=params, result_transformer_=Result.value)
 
     def get_executions(self, tag: str) -> List[str]:
         "Returns the tags of the executions of the given procedure."
@@ -622,18 +1066,23 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if len(execution_exists) == 0 or not execution_exists[0]:
             raise KeyError("Procedure execution not found.")
 
-        metric_keys = [(metric.position, metric.trait_tag) for metric in well_metrics]
+        metric_keys = [(metric.position, metric.trait_tag, metric.side) for metric in well_metrics]
         if len(set(metric_keys)) != len(metric_keys):
-            raise ValueError("Duplicate metrics (same well and trait) are not allowed.")
-        positions = sorted({metric.position for metric in well_metrics})
+            raise ValueError("Duplicate metrics (same well, trait and side) are not allowed.")
+        for metric in well_metrics:
+            if metric.side not in ("INPUT", "OUTPUT"):
+                raise ValueError(f"Invalid metric side: {metric.side}")
         existing_positions = self._driver.execute_query(
-            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
-            "WHERE w.position IN $positions RETURN collect(w.position) as positions",
-            routing_="r", execution_tag=execution_tag, positions=positions, result_transformer_=Result.value)
-        existing = existing_positions[0] if len(existing_positions) > 0 else []
-        missing = [position for position in positions if position not in existing]
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell) "
+            "WHERE w.position IN $positions "
+            "RETURN collect({position: w.position, side: w.side}) as wells",
+            routing_="r", execution_tag=execution_tag,
+            positions=sorted({metric.position for metric in well_metrics}), result_transformer_=Result.value)
+        existing = {(w["position"], w["side"]) for w in (existing_positions[0] if existing_positions else [])}
+        missing = [f"{metric.position} ({metric.side})" for metric in well_metrics
+                   if (metric.position, metric.side) not in existing]
         if len(missing) > 0:
-            raise ValueError(f"Metrics were given for wells that are not output wells of this execution: {', '.join(missing)}")
+            raise ValueError(f"Metrics were given for wells that do not exist on that side of this execution: {', '.join(missing)}")
 
         trait_tags = sorted({metric.trait_tag for metric in well_metrics})
         found_traits = self._driver.execute_query(
@@ -647,15 +1096,15 @@ class Neo4JModularProcedures(ModularProceduresABC):
         for metric in well_metrics:
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
-                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'OUTPUT'}) "
+                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : $side}) "
                 "MATCH (t:Trait {tag : $trait_tag}) "
-                "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, trait_tag : $trait_tag}) "
-                "SET m.value = $value, m.created_at = timestamp() "
+                "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, "
+                "trait_tag : $trait_tag, side : $side}) "
                 "MERGE (w)-[:HAS_METRIC]->(m) "
                 "MERGE (m)-[:INSTANCE_OF]->(t) "
                 "WITH m, t "
                 "MERGE (a:Attribute {tag : t.attribute_tag}) "
                 "MERGE (m)-[:OF_ATTRIBUTE]->(a) ",
-                routing_="w", execution_tag=execution_tag, position=metric.position,
+                routing_="w", execution_tag=execution_tag, position=metric.position, side=metric.side,
                 trait_tag=metric.trait_tag, value=metric.value)
         return self.get_execution(execution_tag=execution_tag)
