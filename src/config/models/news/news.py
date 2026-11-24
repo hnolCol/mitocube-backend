@@ -12,6 +12,7 @@ class NewsInsertModel(BaseModel):
     submission_tags : Optional[List[str]] = []
     feature_tags : Optional[List[str]] = []
     user_tag : Optional[str] = None
+    research_group_tag : Optional[str] = None      
     
 class NewsModel(BaseModel):
     tag : str
@@ -22,8 +23,7 @@ class NewsModel(BaseModel):
     submission_tags : Optional[List[str]] = []
     feature_tags : Optional[List[str]] = []
     user_tag : str 
-    
-    
+    research_group_tag : Optional[str] = None
 
 
     

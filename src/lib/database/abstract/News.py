@@ -49,7 +49,7 @@ class NewsABC(ABC):
         """
         
     @abstractmethod
-    def find(self, limit : int = None, order : Literal["desc","asc"] = "desc") -> List[str]:
+    def find(self, limit : int = None, order : Literal["desc","asc"] = "desc", research_group_tags : List[str] = None) -> List[str]:
         """
         Finds the latest news items, returns their tags. Limit can be set to restrict the number of items returned.
         Parameters
@@ -58,7 +58,9 @@ class NewsABC(ABC):
             The maximum number of news items to return, by default None
         order : Literal["desc","asc"], optional
             The order in which to return the news items, by default "desc"  
-            
+        research_group_tags : List[str], optional
+            If given, only news items without a research group or targeted at one of
+            these research groups are returned. Pass None to retrieve all news items.
         Returns
         -------
         List[str]
