@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
+from typing import Optional, List
 from services.random_generators import get_random_string 
 
 class ResearchGroupModel(BaseModel):
@@ -18,6 +18,12 @@ class ResearchGroupResponseModel(ResearchGroupModel):
     n_users : Optional[int] = None 
     n_datasets : Optional[int] = None
     
+class ResearchGroupExploreScopeModel(BaseModel):
+    disabled : bool
+    scope : str
+    visible_to : List[str] = []
+    
+
 class ResearchGroupInput(BaseModel):
     text : str 
     abbreviation : str 

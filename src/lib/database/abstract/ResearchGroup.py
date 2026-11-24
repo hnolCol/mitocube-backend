@@ -85,6 +85,22 @@ class ResearchGroupABC(ABC):
         "Returns the tags of all research groups whose head (PI) disabled the explore visibility"
 
     @abstractmethod
+    def get_explore_scope(self, tag : str) -> Dict:
+        "Returns the explore visibility scope of the research group: whether it is disabled, whether the groups submissions are visible in the explore view to all research groups ('ALL') or only to the groups of the explicit allow list ('GROUPS')"
+
+    @abstractmethod
+    def set_explore_scope(self, tag : str, scope : str, visible_to : List[str]) -> bool:
+        "Sets the explore visibility scope of the research group ('ALL' or 'GROUPS') and replaces the groups of the explicit allow list (EXPLORE_VISIBLE_TO)"
+
+    @abstractmethod
+    def has_explore_group_scopes(self) -> bool:
+        "Returns whether at least one research group restricted its explore visibility to an explicit allow list of research groups"
+
+    @abstractmethod
+    def get_explore_scope_target_models(self, tag : str) -> List:
+        "Returns all research groups except the given one as models, ordered alphabetically by their name"
+
+    @abstractmethod
     def set_head(self, group_tag : str, user_tag : str):
         "Makes the user a head (PI) of the research group"
 

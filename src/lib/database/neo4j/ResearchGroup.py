@@ -374,6 +374,80 @@ class Neo4JResearchGroup(ResearchGroupABC):
         )
         return self._driver.execute_query(query, routing_ = "r", result_transformer_ = Result.value)
 
+    def get_explore_scope(self, tag : str) -> Dict:
+        """Returns the explore visibility scope of the research group: whether the explore view
+        is disabled, whether the groups submissions are visible in the explore view to all research
+        groups ('ALL', the default) or only to the groups of the explicit allow list ('GROUPS')."""
+        query = (
+            "MATCH (rg:ResearchGroup {tag : $tag}) "
+            "OPTIONAL MATCH (rg)-[:EXPLORE_VISIBLE_TO]->(other:ResearchGroup) "
+            "RETURN coalesce(rg.explore_disabled, true) AS disabled, coalesce(rg.explore_scope, 'ALL') AS scope, "
+            "collect(other.tag) AS visible_to "
+        )
+        r = self._driver.execute_query(query, routing_ = "r", tag = tag)
+        if len(r.records) == 0:
+            return {"disabled" : True, "scope" : "ALL", "visible_to" : []}
+        row = r.records[0]
+        return {
+            "disabled" : bool(row["disabled"]),
+            "scope" : row["scope"] if row["scope"] in ("ALL", "GROUPS") else "ALL",
+            "visible_to" : sorted(row["visible_to"] or [])
+        }
+
+    def set_explore_scope(self, tag : str, scope : str, visible_to : List[str]) -> bool:
+        """Sets the explore visibility scope of the research group to 'ALL' (visible to all research
+        groups in the explore view) or 'GROUPS' (visible only to the groups of the explicit allow
+        list) and replaces the allow list (EXPLORE_VISIBLE_TO) with the given group tags. Requires
+        the head (PI) of the group or a curator (router enforced)."""
+        if scope not in ("ALL", "GROUPS"):
+            raise ValueError("The explore scope must be 'ALL' or 'GROUPS'.")
+        if not self.exists(tag): raise ValueError(f"Research group with tag {tag} does not exist.")
+        visible_to_tags = sorted({group_tag for group_tag in (visible_to or []) if isinstance(group_tag, str) and group_tag != tag})
+        set_query = (
+            "MATCH (rg:ResearchGroup {tag : $tag}) "
+            "SET rg.explore_scope = $scope "
+            "RETURN rg.tag "
+        )
+        clear_query = (
+            "MATCH (rg:ResearchGroup {tag : $tag})-[r:EXPLORE_VISIBLE_TO]->() "
+            "DELETE r"
+        )
+        r = self._driver.execute_query(set_query, routing_ = "w", tag = tag, scope = scope, result_transformer_ = Result.value)
+        self._driver.execute_query(clear_query, routing_ = "w", tag = tag)
+        if scope == "GROUPS" and len(visible_to_tags) > 0:
+            add_query = (
+                "MATCH (rg:ResearchGroup {tag : $tag}) "
+                "UNWIND $visible_to AS other_tag "
+                "MATCH (other:ResearchGroup {tag : other_tag}) "
+                "MERGE (rg)-[:EXPLORE_VISIBLE_TO]->(other) "
+                "RETURN count(other) "
+            )
+            self._driver.execute_query(add_query, routing_ = "w", tag = tag, visible_to = visible_to_tags)
+        return len(r) > 0
+
+    def has_explore_group_scopes(self) -> bool:
+        """Returns whether at least one research group restricted its explore visibility to an
+        explicit allow list of research groups. Then the explore visibility becomes dependent on
+        the requesting user and user independent caches may not be used."""
+        query = (
+            "MATCH (rg:ResearchGroup) "
+            "WHERE rg.explore_scope = 'GROUPS' "
+            "RETURN count(rg) > 0 "
+        )
+        r = self._driver.execute_query(query, routing_ = "r", result_transformer_ = Result.value)
+        return bool(r[0]) if len(r) > 0 else False
+
+    def get_explore_scope_target_models(self, tag : str) -> List[ResearchGroupModel]:
+        """Returns all research groups except the given one as models, ordered alphabetically by
+        their name. Used for the explore scope allow list of a research group."""
+        query = (
+            "MATCH (rg:ResearchGroup) "
+            "WHERE rg.tag <> $tag "
+            "RETURN properties(rg) AS props ORDER BY rg.text ASC "
+        )
+        r = self._driver.execute_query(query, routing_ = "r", tag = tag, result_transformer_ = Result.data)
+        return [ResearchGroupModel(**row["props"]) for row in r if isinstance(row, dict) and isinstance(row.get("props"), dict)]
+
     def set_subgroup(self, parent_tag : str, child_tag : str):
         "Defines a parent-child relationship between two research groups, where the child group is a subgroup of the parent group."
         if not self.exists(parent_tag): raise ValueError(f"Parent research group with tag {parent_tag} does not exist.")

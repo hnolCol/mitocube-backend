@@ -135,7 +135,7 @@ def explore_submissions(search_string : Optional[str] = None,
     if has_tag_filters and not get_general_settings().explore_tag_search_enabled:
         raise HTTPException(status_code = 403, detail="Searching submissions by condition applications or users is disabled on this instance.")
     return db.collaborations.explore(search_string = search_string, ca_tags = ca_tags,
-                                     user_tags = user_tags, limit = limit)
+                                     user_tags = user_tags, limit = limit, current_user_tag = user.tag)
 
 
 @router.get("/submissions/explore/cas", response_model=List[SubmissionExploreConditionApplicationModel],
@@ -153,11 +153,15 @@ def explore_submission_condition_applications(limit : int = 1000,
     is therefore gated by the same instance setting as the tag search."""
     if not get_general_settings().explore_tag_search_enabled:
         raise HTTPException(status_code = 403, detail="Aggregated condition applications of explored submissions are disabled on this instance (explore tag search disabled).")
-    cached = get_cached_explore_cas(limit)
+    # The shared cache is only valid while no research group restricted its explore visibility
+    # to an explicit allow list: with such a scope the result depends on the requesting user.
+    scoped = db.research_groups.has_explore_group_scopes()
+    cached = None if scoped else get_cached_explore_cas(limit)
     if cached is not None:
         return cached
-    results = db.collaborations.explore_condition_applications(limit = limit)
-    cache_explore_cas(results, limit)
+    results = db.collaborations.explore_condition_applications(limit = limit, current_user_tag = user.tag)
+    if not scoped:
+        cache_explore_cas(results, limit)
     return results
 
 

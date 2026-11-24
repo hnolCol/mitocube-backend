@@ -348,23 +348,39 @@ class Neo4JCollaborations(CollaborationsABC):
         return [self._row_to_request_model(row) for row in r]
 
     def explore(self, search_string : str = None, ca_tags : Optional[List[str]] = None,
-                user_tags : Optional[List[str]] = None, limit : int = 40) -> List[SubmissionExploreModel]:
+                user_tags : Optional[List[str]] = None, limit : int = 40,
+                current_user_tag : str = None) -> List[SubmissionExploreModel]:
         """Returns minimal metadata of all submissions matching the search string
         and having ALL the given condition application and user tags (AND
         semantics, combined with the title search via AND as well).
         This is a discovery endpoint: it returns only the title, owner, research
-        group, state and which filter tags matched, never any sensitive data."""
+        group, state and which filter tags matched, never any sensitive data.
+        Submissions of research groups that restricted their explore visibility to an explicit
+        allow list of research groups (explore_scope 'GROUPS') are only returned for members of
+        the allowed research groups (given via current_user_tag)."""
         ca_tags = [t for t in (ca_tags or []) if t]
         user_tags = [t for t in (user_tags or []) if t]
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
             "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, true) } "
+        )
+        if current_user_tag is not None:
+            query += (
+                "AND NOT EXISTS { "
+                "MATCH (xu:User)-[:CREATED]->(s) "
+                "MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) "
+                "WHERE xrg.explore_scope = 'GROUPS' "
+                "AND NOT EXISTS { MATCH (viewer:User {tag : $current_user_tag})-[:MEMBER_OF]->(vrg:ResearchGroup), (vrg)-[:EXPLORE_VISIBLE_TO]->(xrg) } } "
+            )
+        query += (
             "WITH s, "
             "[ca_tag IN $ca_tags WHERE COUNT { (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(:ConditionApplication {tag : ca_tag}) } > 0] AS matched_ca_tags, "
             "[user_tag IN $user_tags WHERE COUNT { (:User {tag : user_tag})-[:CREATED|COLLABORATES]->(s) } > 0] AS matched_user_tags "
         )
         params = {"limit" : limit, "ca_tags" : ca_tags, "user_tags" : user_tags}
+        if current_user_tag is not None:
+            params["current_user_tag"] = current_user_tag
         conditions = []
         if search_string is not None:
             tokens = [token.lower() for token in re.split(r"\s+", search_string.strip()) if token]
@@ -422,15 +438,28 @@ class Neo4JCollaborations(CollaborationsABC):
             ))
         return results
 
-    def explore_condition_applications(self, limit : int = 1000) -> List[SubmissionExploreConditionApplicationModel]:
+    def explore_condition_applications(self, limit : int = 1000, current_user_tag : str = None) -> List[SubmissionExploreConditionApplicationModel]:
         """Returns the top-level condition applications (attribute tag/text,
         trait tag/text, value) of all explore-visible submissions, grouped per
         submission. Uses the same explore_disabled filter as explore: submissions
-        of research groups that disabled the explore view are never returned."""
+        of research groups that disabled the explore view are never returned.
+        Submissions of research groups that restricted their explore visibility to an explicit
+        allow list (explore_scope 'GROUPS') are only returned for members of the allowed research
+        groups (given via current_user_tag)."""
         query = (
             "MATCH (s:Submission) "
             "WHERE s.title IS NOT NULL "
-            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, false) } "
+            "AND NOT EXISTS { MATCH (xu:User)-[:CREATED]->(s) MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) WHERE coalesce(xrg.explore_disabled, true) } "
+        )
+        if current_user_tag is not None:
+            query += (
+                "AND NOT EXISTS { "
+                "MATCH (xu:User)-[:CREATED]->(s) "
+                "MATCH (xu)-[:MEMBER_OF]->(xrg:ResearchGroup) "
+                "WHERE xrg.explore_scope = 'GROUPS' "
+                "AND NOT EXISTS { MATCH (viewer:User {tag : $current_user_tag})-[:MEMBER_OF]->(vrg:ResearchGroup), (vrg)-[:EXPLORE_VISIBLE_TO]->(xrg) } } "
+            )
+        query += (
             "MATCH (s)-[:HAS_APPLICATION|HAS_SAMPLE*1..2]->(ca:ConditionApplication) "
             "OPTIONAL MATCH (ca)-[:OF_ATTRIBUTE]->(a:Attribute) "
             "OPTIONAL MATCH (ca)-[:INSTANCE_OF]->(t:Trait) "
@@ -438,7 +467,10 @@ class Neo4JCollaborations(CollaborationsABC):
             "WITH s, collect(DISTINCT {condition_application_tag : ca.tag, attribute_tag : a.tag, attribute_text : a.text, trait_tag : t.tag, trait_text : t.text, value : ca.value}) AS cas "
             "RETURN s.tag AS submission_tag, cas LIMIT $limit "
         )
-        rows = self._driver.execute_query(query, limit = limit, result_transformer_=Result.data)
+        params = {"limit" : limit}
+        if current_user_tag is not None:
+            params["current_user_tag"] = current_user_tag
+        rows = self._driver.execute_query(query, result_transformer_=Result.data, **params)
         return [
             SubmissionExploreConditionApplicationModel(
                 submission_tag = row["submission_tag"],

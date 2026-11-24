@@ -10,7 +10,7 @@ from services.users import get_user_from_token, is_user_at_least_curator
 from lib.cache.user_cache import invalidate_cached_user
 from services.submission import check_submission_tags_access
 from services.encryption import create_hierarchical_hash
-from config.models.researchgroup import ResearchGroupInput, ResearchGroupResponseModel, ResearchGroupResponseModel
+from config.models.researchgroup import ResearchGroupInput, ResearchGroupResponseModel, ResearchGroupResponseModel, ResearchGroupExploreScopeModel, ResearchGroupModel
 from config.models.parameter import APIParamString
 
 router = APIRouter(dependencies=[Depends(get_user_from_token)],
@@ -209,6 +209,57 @@ def set_research_group_explore_disabled(research_group_tag : str, disabled : boo
     if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = research_group_tag):
         raise HTTPException(status_code=403, detail="Only the head (PI) of the research group or a curator can change the explore visibility.")
     return db.research_groups.set_explore_disabled(tag = research_group_tag, disabled = disabled)
+
+
+@router.get("/{research_group_tag}/explore-scope", response_model=ResearchGroupExploreScopeModel,
+            summary="Returns whether the explore visibility of the research group is disabled and whether its submissions are visible in the explore view to all research groups or only to an explicit allow list.")
+def get_research_group_explore_scope(research_group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ResearchGroupExploreScopeModel:
+    """
+    Returns the explore visibility scope of the research group: 'disabled' is True if the head
+    (PI) disabled the explore visibility, 'scope' is 'ALL' if the groups submissions are
+    visible in the explore view to all research groups or 'GROUPS' if they are visible only to
+    the research groups of the allow list 'visible_to'.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    return db.research_groups.get_explore_scope(tag = research_group_tag)
+
+
+@router.put("/{research_group_tag}/explore-scope", response_model=ResearchGroupExploreScopeModel,
+            summary="Sets the explore visibility scope of the research group ('ALL' or 'GROUPS') and replaces its allow list. Requires the head (PI) of the group or a curator.")
+def set_research_group_explore_scope(research_group_tag : str, scope : str = "ALL", visible_to : str = None,
+                                     user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> ResearchGroupExploreScopeModel:
+    """
+    Lets the head (PI) of a research group (or a curator) restrict the explore visibility of
+    the groups submissions: with scope 'ALL' they are visible in the explore view to all
+    research groups, with scope 'GROUPS' only to the research groups of the allow list
+    (given as semicolon separated group tags in 'visible_to'). Disabling the explore
+    visibility is done with the explore-disabled endpoint; the scope is only effective while
+    the explore visibility is enabled.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    if user.role < UserRolesEnum.CURATOR and not db.research_groups.is_head(user_tag = user.tag, group_tag = research_group_tag):
+        raise HTTPException(status_code=403, detail="Only the head (PI) of the research group or a curator can change the explore visibility scope.")
+    visible_to_tags = [group_tag for group_tag in (visible_to or "").split(";") if group_tag]
+    try:
+        db.research_groups.set_explore_scope(tag = research_group_tag, scope = scope, visible_to = visible_to_tags)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="The explore scope must be 'ALL' or 'GROUPS'.")
+    return db.research_groups.get_explore_scope(tag = research_group_tag)
+
+
+@router.get("/{research_group_tag}/explore-scope/targets", response_model=List[ResearchGroupModel],
+            summary="Returns all other research groups (ordered alphabetically by name) that can be added to the explore visibility allow list of the research group.")
+def get_research_group_explore_scope_targets(research_group_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ResearchGroupModel]:
+    """
+    Returns all research groups except the given one, ordered alphabetically by their name.
+    Used by frontends to pick the research groups whose users may see the submissions of the
+    given group in the explore view.
+    """
+    if not db.research_groups.exists(tag = research_group_tag):
+        raise research_group_not_found_exception
+    return db.research_groups.get_explore_scope_target_models(tag = research_group_tag)
 
 
 @router.get("/{research_group_tag}/heads")
