@@ -655,7 +655,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN {sample_tag: sample.tag, procedure_tag: e.procedure_tag, execution_tag: e.tag, "
             "status: coalesce(e.status, 'RUNNING'), created_at: e.created_at, "
             "position: w.position, side: w.side, "
-            "plate_tag: CASE w.side WHEN 'INPUT' THEN e.input_plate_tag ELSE e.output_plate_tag END} as location ",
+            "plate_tag: coalesce(w.plate_tag, CASE w.side WHEN 'INPUT' THEN e.input_plate_tag "
+            "ELSE e.output_plate_tag END)} as location ",
             routing_="r", submission_tag=submission_tag, result_transformer_=Result.data)
         placed = {}
         for row in rows:
@@ -696,6 +697,34 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN DISTINCT e.tag as tag ORDER BY tag",
             routing_="r", submission_tags=list(submission_tags), result_transformer_=Result.value)
 
+    @staticmethod
+    def _group_by_plate(well_keys) -> dict:
+        """Groups (plate_tag, position) well keys into a map of plate tag to its positions."""
+        grouped = {}
+        for plate_tag, position in well_keys:
+            grouped.setdefault(plate_tag, set()).add(position)
+        return grouped
+
+    @staticmethod
+    def _design_plate_tags(execution, side: str) -> List[str]:
+        """The effective plate list of one side (input / output) of an execution design: the
+        primary plate first, followed by the additional plates (multi-plate support for large
+        sample numbers), duplicates removed while preserving the order."""
+        from config.models.procedures import split_well_ref  # noqa: F401 (documented well ref convention)
+        primary = getattr(execution, f"{side}_plate_tag", None)
+        additional = list(getattr(execution, f"additional_{side}_plate_tags", None) or [])
+        ordered, seen = [], set()
+        for plate_tag in ([primary] if primary else []) + additional:
+            if plate_tag not in seen:
+                seen.add(plate_tag)
+                ordered.append(plate_tag)
+        return ordered
+
+    @staticmethod
+    def _well_plate(well, primary_plate_tag: str) -> str:
+        """The plate a design well is on: the well's own plate tag or the primary plate."""
+        return getattr(well, "plate_tag", None) or primary_plate_tag
+
     def _validate_execution_design(self, procedure, execution, user_tag) -> dict:
         """Full design validation of an execution: the plates must exist, the responsible user must
         be a curator, the plates must match the procedure's layout constraints, well positions
@@ -703,14 +732,18 @@ class Neo4JModularProcedures(ModularProceduresABC):
         and the transfer map must respect the declared sample numbers (mirroring / N-fold
         duplication). Returns the derived storage data. The occupancy of the output wells is
         checked separately (only when an execution actually starts running)."""
-        for plate_tag in [execution.input_plate_tag, execution.output_plate_tag]:
-            if plate_tag is None:
+        from config.models.procedures import split_well_ref
+        input_plates = self._design_plate_tags(execution, "input")
+        output_plates = self._design_plate_tags(execution, "output")
+        for side, plate_tags in (("input", input_plates), ("output", output_plates)):
+            if len(plate_tags) == 0:
                 raise ValueError("Input and output plates must be defined.")
-            plate_exists = self._driver.execute_query(
-                "WITH EXISTS {(p:Plate {tag : $plate_tag})} as exists RETURN exists",
-                routing_="r", plate_tag=plate_tag, result_transformer_=Result.value)
-            if len(plate_exists) == 0 or not plate_exists[0]:
-                raise ValueError(f"Plate not found: {plate_tag}")
+            for plate_tag in plate_tags:
+                plate_exists = self._driver.execute_query(
+                    "WITH EXISTS {(p:Plate {tag : $plate_tag})} as exists RETURN exists",
+                    routing_="r", plate_tag=plate_tag, result_transformer_=Result.value)
+                if len(plate_exists) == 0 or not plate_exists[0]:
+                    raise ValueError(f"Plate not found: {plate_tag}")
 
         responsible_user_tag = execution.responsible_user_tag or user_tag
         responsible_user = self._driver.execute_query(
@@ -722,15 +755,24 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if responsible_user[0] < UserRolesEnum.CURATOR:
             raise ValueError("The responsible user of a procedure execution must be a curator.")
 
-        self._validate_plate_constraints(procedure, execution.input_plate_tag, "input")
-        self._validate_plate_constraints(procedure, execution.output_plate_tag, "output")
+        for plate_tag in input_plates:
+            self._validate_plate_constraints(procedure, plate_tag, "input")
+        for plate_tag in output_plates:
+            self._validate_plate_constraints(procedure, plate_tag, "output")
+
+        # well identities are (plate, position) pairs: positions may repeat on different plates
+        input_keys = {(self._well_plate(well, input_plates[0]), well.position) for well in execution.input_wells}
+        output_keys = {(self._well_plate(well, output_plates[0]), well.position) for well in execution.output_wells}
+        if len(output_keys) != len(execution.output_wells) or len(input_keys) != len(execution.input_wells):
+            raise ValueError("Duplicate well positions (on the same plate) are not allowed.")
+        for side, keys, plates in (("input", input_keys, input_plates), ("output", output_keys, output_plates)):
+            unknown = sorted({f"{plate_tag}:{position}" for plate_tag, position in keys if plate_tag not in plates})
+            if len(unknown) > 0:
+                raise ValueError(f"Wells were given for plates that are not part of this execution: {', '.join(unknown)}")
 
         all_metrics = list(execution.output_well_metrics) + list(getattr(execution, "input_well_metrics") or [])
-        metric_keys = [(metric.position, metric.trait_tag, metric.side) for metric in all_metrics]
-        output_positions = {well.position for well in execution.output_wells}
-        input_positions = {well.position for well in execution.input_wells}
-        if len(output_positions) != len(execution.output_wells) or len(input_positions) != len(execution.input_wells):
-            raise ValueError("Duplicate well positions are not allowed.")
+        metric_keys = [(getattr(metric, "plate_tag", None), metric.position, metric.trait_tag, metric.side)
+                       for metric in all_metrics]
 
         if len(set(metric_keys)) != len(metric_keys):
             raise ValueError("Duplicate metrics (same well, trait and side) are not allowed.")
@@ -745,10 +787,13 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if len(missing_traits) > 0:
             raise ValueError(f"Traits not found: {', '.join(missing_traits)}")
         for metric in all_metrics:
-            side_positions = output_positions if metric.side == "OUTPUT" else input_positions
+            side_keys = output_keys if metric.side == "OUTPUT" else input_keys
+            side_plates = output_plates if metric.side == "OUTPUT" else input_plates
             side_name = "output" if metric.side == "OUTPUT" else "input"
-            if metric.position not in side_positions:
-                raise ValueError(f"Metrics were given for a non-defined {side_name} well: {metric.position}")
+            metric_plate = getattr(metric, "plate_tag", None) or side_plates[0]
+            if (metric_plate, metric.position) not in side_keys:
+                raise ValueError(f"Metrics were given for a non-defined {side_name} well: "
+                                 f"{metric_plate}:{metric.position}")
         if len(all_metrics) > 0:
             declared_attribute_tags = set(procedure.input_attribute_tags) | set(procedure.output_attribute_tags)
             undeclared_traits = [trait_tag for trait_tag, attribute_tag in trait_to_attribute.items()
@@ -756,17 +801,18 @@ class Neo4JModularProcedures(ModularProceduresABC):
             if len(declared_attribute_tags) > 0 and len(undeclared_traits) > 0:
                 raise ValueError(f"Metrics were given for traits that are not declared by the procedure: {', '.join(sorted(undeclared_traits))}")
 
-        output_well_samples = {position: set() for position in output_positions}
+        output_well_samples = {key: set() for key in output_keys}
         outputs_per_sample = {}
         for well in execution.input_wells:
             if len(well.sample_tags) == 0:
                 raise ValueError(f"Input well {well.position} has no samples.")
-            for output_position in well.output_positions:
-                if output_position not in output_positions:
-                    raise ValueError(f"Output well {output_position} is not defined.")
-                output_well_samples[output_position].update(well.sample_tags)
+            for output_ref in well.output_positions:
+                output_plate_tag, output_position = split_well_ref(output_ref, output_plates[0])
+                if (output_plate_tag, output_position) not in output_keys:
+                    raise ValueError(f"Output well {output_ref} is not defined.")
+                output_well_samples[(output_plate_tag, output_position)].update(well.sample_tags)
                 for sample_tag in well.sample_tags:
-                    outputs_per_sample.setdefault(sample_tag, set()).add(output_position)
+                    outputs_per_sample.setdefault(sample_tag, set()).add((output_plate_tag, output_position))
 
         # the procedure declares how the run treats the sample numbers: mirroring (1 output well per
         # sample), a fixed or bounded N-fold duplication (e.g. N fractions) or anything in between
@@ -790,30 +836,40 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError(f"Samples not found: {', '.join(missing_samples)}")
 
         return {"responsible_user_tag": responsible_user_tag,
+                "input_plates": input_plates,
+                "output_plates": output_plates,
+                "input_keys": input_keys,
+                "output_keys": output_keys,
                 "output_well_samples": output_well_samples,
                 "all_metrics": all_metrics}
 
-    def _validate_output_wells_free(self, output_plate_tag, positions, exclude_execution_tag=None) -> None:
+    def _validate_output_wells_free(self, output_plate_positions, exclude_execution_tag=None) -> None:
         """Only executions that are still running or that succeeded (or were explicitly kept blocked)
         occupy their output wells: failed or aborted runs free the wells for a re-run and drafts do
-        not block anything until they start."""
-        if len(positions) == 0:
+        not block anything until they start. `output_plate_positions` is a map of output plate tag to
+        the positions used on it (multi-plate executions are checked per plate)."""
+        if len(output_plate_positions) == 0:
             return
         exclude = ""
-        params = {"output_plate_tag": output_plate_tag, "positions": sorted(positions)}
         if exclude_execution_tag is not None:
             exclude = "AND e.tag <> $exclude_tag "
-            params["exclude_tag"] = exclude_execution_tag
-        occupied_output_wells = self._driver.execute_query(
-            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
-            "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
-            f"{exclude}"
-            "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
-            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
-            "RETURN collect(DISTINCT w.position) as occupied",
-            routing_="r", parameters_=params, result_transformer_=Result.value)
-        if len(occupied_output_wells) > 0 and len(occupied_output_wells[0]) > 0:
-            raise ValueError(f"Output wells already used by another execution: {', '.join(occupied_output_wells[0])}")
+        for output_plate_tag, positions in output_plate_positions.items():
+            if len(positions) == 0:
+                continue
+            params = {"output_plate_tag": output_plate_tag, "positions": sorted(positions)}
+            if exclude_execution_tag is not None:
+                params["exclude_tag"] = exclude_execution_tag
+            occupied_output_wells = self._driver.execute_query(
+                "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
+                "WHERE coalesce(w.plate_tag, e.output_plate_tag) = $output_plate_tag AND w.position IN $positions "
+                f"{exclude}"
+                "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
+                "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
+                "RETURN collect(DISTINCT w.position) as occupied",
+                routing_="r", parameters_=params, result_transformer_=Result.value)
+            if len(occupied_output_wells) > 0 and len(occupied_output_wells[0]) > 0:
+                raise ValueError(f"Output wells on {output_plate_tag} already used by another execution: "
+                                 f"{', '.join(occupied_output_wells[0])}")
 
     def _store_execution_design(self, execution_tag: str, execution, design: dict, wells_blocked: bool) -> None:
         """Stores the plates, transfer map (input wells with samples and their output targets,
@@ -825,61 +881,73 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "OPTIONAL MATCH (w)-[:HAS_METRIC]->(m:ExecutionWellMetric {execution_tag : $execution_tag}) "
             "DETACH DELETE w, m "
             "SET e.input_plate_tag = $input_plate_tag, e.output_plate_tag = $output_plate_tag, "
+            "e.input_plate_tags = $input_plate_tags, e.output_plate_tags = $output_plate_tags, "
             "e.responsible_user_tag = $responsible_user_tag, e.wells_blocked = $wells_blocked",
             routing_="w", execution_tag=execution_tag,
-            input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
+            input_plate_tag=design["input_plates"][0], output_plate_tag=design["output_plates"][0],
+            input_plate_tags=design["input_plates"], output_plate_tags=design["output_plates"],
             responsible_user_tag=design["responsible_user_tag"], wells_blocked=wells_blocked)
         output_well_samples = design["output_well_samples"]
 
         for well in execution.input_wells:
             row_index, column_index = self._parse_position(well.position)
+            plate_tag = self._well_plate(well, design["input_plates"][0])
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
-                "MERGE (w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'INPUT'}) "
+                "MERGE (w:ExecutionWell {execution_tag : $execution_tag, position : $position, "
+                "plate_tag : $plate_tag, side : 'INPUT'}) "
                 "SET w.row_index = $row_index, w.column_index = $column_index, "
                 "w.output_positions = $output_positions "
                 "MERGE (e)-[:HAS_WELL]->(w) "
                 "WITH w "
                 "MATCH (s:Sample) WHERE s.tag IN $sample_tags "
                 "MERGE (s)-[:IN_WELL]->(w) ",
-                routing_="w", execution_tag=execution_tag, position=well.position,
+                routing_="w", execution_tag=execution_tag, position=well.position, plate_tag=plate_tag,
                 row_index=row_index, column_index=column_index,
                 output_positions=sorted(well.output_positions), sample_tags=sorted(well.sample_tags))
 
         for well in execution.output_wells:
             row_index, column_index = self._parse_position(well.position)
+            plate_tag = self._well_plate(well, design["output_plates"][0])
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
-                "MERGE (w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'OUTPUT'}) "
+                "MERGE (w:ExecutionWell {execution_tag : $execution_tag, position : $position, "
+                "plate_tag : $plate_tag, side : 'OUTPUT'}) "
                 "SET w.row_index = $row_index, w.column_index = $column_index "
                 "MERGE (e)-[:HAS_WELL]->(w) "
                 "WITH w "
                 "MATCH (s:Sample) WHERE s.tag IN $sample_tags "
                 "MERGE (s)-[:IN_WELL]->(w) ",
-                routing_="w", execution_tag=execution_tag, position=well.position,
+                routing_="w", execution_tag=execution_tag, position=well.position, plate_tag=plate_tag,
                 row_index=row_index, column_index=column_index,
-                sample_tags=sorted(output_well_samples[well.position]))
+                sample_tags=sorted(output_well_samples[(plate_tag, well.position)]))
             for ca_tag in well.condition_application_tags:
                 self._driver.execute_query(
-                    "MATCH (w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : 'OUTPUT'}) "
+                    "MATCH (w:ExecutionWell {execution_tag : $execution_tag, position : $position, "
+                    "plate_tag : $plate_tag, side : 'OUTPUT'}) "
                     "MATCH (c:ConditionApplication {tag : $ca_tag}) "
                     "MERGE (w)-[:HAS_APPLICATION]->(c) ",
-                    routing_="w", execution_tag=execution_tag, position=well.position, ca_tag=ca_tag)
+                    routing_="w", execution_tag=execution_tag, position=well.position,
+                    plate_tag=plate_tag, ca_tag=ca_tag)
 
         for metric in design["all_metrics"]:
+            primary_side_plates = design["output_plates"] if metric.side == "OUTPUT" else design["input_plates"]
+            metric_plate = getattr(metric, "plate_tag", None) or primary_side_plates[0]
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
-                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : $side}) "
+                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, "
+                "plate_tag : $plate_tag, side : $side}) "
                 "MATCH (t:Trait {tag : $trait_tag}) "
                 "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, "
-                "trait_tag : $trait_tag, side : $side}) "
+                "plate_tag : $plate_tag, trait_tag : $trait_tag, side : $side}) "
                 "SET m.value = $value, m.created_at = timestamp() "
                 "MERGE (w)-[:HAS_METRIC]->(m) "
                 "MERGE (m)-[:INSTANCE_OF]->(t) "
                 "WITH m, t "
                 "MERGE (a:Attribute {tag : t.attribute_tag}) "
                 "MERGE (m)-[:OF_ATTRIBUTE]->(a) ",
-                routing_="w", execution_tag=execution_tag, position=metric.position, side=metric.side,
+                routing_="w", execution_tag=execution_tag, position=metric.position,
+                plate_tag=metric_plate, side=metric.side,
                 trait_tag=metric.trait_tag, value=metric.value)
 
     def _design_from_stored_execution(self, execution):
@@ -890,13 +958,27 @@ class Neo4JModularProcedures(ModularProceduresABC):
         output_metrics = [metric for well in execution.output_wells for metric in (well.metrics or [])]
         def _with_side(metric, side):
             return metric if getattr(metric, "side", None) else metric.model_copy(update={"side": side})
+        def _primary(side):
+            tags = list(getattr(execution, f"{side}_plate_tags", None) or [])
+            if len(tags) == 0 and getattr(execution, f"{side}_plate_tag", None) is not None:
+                tags = [getattr(execution, f"{side}_plate_tag")]
+            return tags[0] if len(tags) > 0 else None
+        def _stored_plate(well, side):
+            # wells of legacy single-plate executions carry no plate tag: they are on the primary plate
+            return getattr(well, "plate_tag", None) or _primary(side)
         return InsertProcedureExecutionModel(
-            input_plate_tag=execution.input_plate_tag,
-            output_plate_tag=execution.output_plate_tag,
+            input_plate_tag=_primary("input"),
+            output_plate_tag=_primary("output"),
+            additional_input_plate_tags=[tag for tag in (getattr(execution, "input_plate_tags", None) or [])
+                                         if tag != (_primary("input"))],
+            additional_output_plate_tags=[tag for tag in (getattr(execution, "output_plate_tags", None) or [])
+                                         if tag != (_primary("output"))],
             responsible_user_tag=execution.responsible_user_tag,
-            input_wells=[{"position": w.position, "sample_tags": list(w.sample_tags),
+            input_wells=[{"position": w.position, "plate_tag": _stored_plate(w, "input"),
+                          "sample_tags": list(w.sample_tags),
                           "output_positions": list(w.output_positions)} for w in execution.input_wells],
-            output_wells=[{"position": w.position, "sample_tags": list(w.sample_tags),
+            output_wells=[{"position": w.position, "plate_tag": _stored_plate(w, "output"),
+                           "sample_tags": list(w.sample_tags),
                            "condition_application_tags": list(w.condition_application_tags)}
                           for w in execution.output_wells],
             input_well_metrics=[_with_side(m, "INPUT") for m in input_metrics],
@@ -911,7 +993,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             return []
         rows = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
-            "WHERE e.output_plate_tag = $plate_tag "
+            "WHERE coalesce(w.plate_tag, e.output_plate_tag) = $plate_tag "
             "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
             "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
             "RETURN collect(DISTINCT w.position) as occupied",
@@ -928,15 +1010,15 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if procedure.status != "PUBLISHED":
             raise ValueError(f"Only published modular procedures can be executed - this procedure is in state {procedure.status}.")
         design = self._validate_execution_design(procedure, execution, user_tag)
-        self._validate_output_wells_free(execution.output_plate_tag,
-                                        {well.position for well in execution.output_wells})
+        self._validate_output_wells_free(self._group_by_plate(design["output_keys"]))
         content = {
             "procedure_tag": tag,
-            "input_plate_tag": execution.input_plate_tag,
-            "output_plate_tag": execution.output_plate_tag,
-            "input_wells": [{"position": w.position, "sample_tags": sorted(w.sample_tags),
+            "input_plate_tags": design["input_plates"],
+            "output_plate_tags": design["output_plates"],
+            "input_wells": [{"position": w.position, "plate_tag": self._well_plate(w, design["input_plates"][0]),
+                             "sample_tags": sorted(w.sample_tags),
                              "output_positions": sorted(w.output_positions)} for w in execution.input_wells],
-            "output_wells": [{"position": w.position,
+            "output_wells": [{"position": w.position, "plate_tag": self._well_plate(w, design["output_plates"][0]),
                               "condition_application_tags": sorted(w.condition_application_tags)} for w in execution.output_wells],
         }
         # the creation time is part of the hash so the same transfer map can legitimately be
@@ -952,8 +1034,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "MERGE (m)-[:WAS_EXECUTED]->(e) "
             "MERGE (u)-[:EXECUTED]->(e) ",
             routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
-            props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
-                   "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
+            props={"procedure_tag": tag, "input_plate_tag": design["input_plates"][0],
+                   "output_plate_tag": design["output_plates"][0],
+                   "input_plate_tags": design["input_plates"], "output_plate_tags": design["output_plates"],
+                   "user_tag": user_tag,
                    "responsible_user_tag": design["responsible_user_tag"], "status": "RUNNING",
                    "wells_blocked": True})
         self._store_execution_design(execution_tag, execution, design, wells_blocked=True)
@@ -978,7 +1062,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "MERGE (u)-[:EXECUTED]->(e) ",
             routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
             props={"procedure_tag": tag, "input_plate_tag": None, "output_plate_tag": None,
-                   "user_tag": user_tag, "responsible_user_tag": user_tag, "status": "DRAFT",
+                   "input_plate_tags": [], "output_plate_tags": [],
+                   "user_tag": user_tag, "responsible_user_tag": None, "status": "DRAFT",
                    "wells_blocked": False})
         self._set_execution_state(execution_tag=execution_tag, state="DRAFT", user_tag=user_tag)
         return self.get_execution(execution_tag=execution_tag)
@@ -1011,9 +1096,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError(f"Only published modular procedures can be executed - this procedure is in state {procedure.status}.")
         design_update = self._design_from_stored_execution(execution)
         design = self._validate_execution_design(procedure, design_update, user_tag)
-        self._validate_output_wells_free(execution.output_plate_tag,
-                                        {well.position for well in execution.output_wells},
-                                        exclude_execution_tag=execution_tag)
+        self._validate_output_wells_free(self._group_by_plate(design["output_keys"]),
+                                         exclude_execution_tag=execution_tag)
         self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
             "SET e.status = 'RUNNING', e.wells_blocked = true, e.user_tag = $user_tag, "
@@ -1158,10 +1242,11 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "WITH w, collect(DISTINCT s.tag) as sample_tags, "
             "collect(CASE WHEN m IS NULL THEN NULL ELSE "
             "{trait_tag: t.tag, attribute_tag: t.attribute_tag, value: m.value} END) as metrics "
-            "RETURN {position: w.position, row_index: w.row_index, column_index: w.column_index, "
+            "RETURN {position: w.position, plate_tag: w.plate_tag, row_index: w.row_index, "
+            "column_index: w.column_index, "
             "sample_tags: [tag IN sample_tags WHERE tag IS NOT NULL], output_positions: w.output_positions, "
             "metrics: [metric IN metrics WHERE metric IS NOT NULL]} as well "
-            "ORDER BY w.row_index, w.column_index",
+            "ORDER BY w.plate_tag, w.row_index, w.column_index",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
         output_wells = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
@@ -1171,11 +1256,11 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "WITH w, collect(DISTINCT s.tag) as sample_tags, collect(DISTINCT c.tag) as ca_tags, "
             "collect(CASE WHEN m IS NULL THEN NULL ELSE "
             "{trait_tag: t.tag, attribute_tag: t.attribute_tag, value: m.value} END) as metrics "
-            "RETURN {position: w.position, row_index: w.row_index, column_index: w.column_index, "
+            "RETURN {position: w.position, plate_tag: w.plate_tag, row_index: w.row_index, "
+            "column_index: w.column_index, "
             "sample_tags: sample_tags, condition_application_tags: ca_tags, "
             "metrics: [metric IN metrics WHERE metric IS NOT NULL]} as well "
-
-            "ORDER BY w.row_index, w.column_index",
+            "ORDER BY w.plate_tag, w.row_index, w.column_index",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
 
         return self._assemble_execution(execution_tag=execution_tag,
@@ -1191,7 +1276,10 @@ class Neo4JModularProcedures(ModularProceduresABC):
         )
         head = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
-            "RETURN {tag: e.tag, procedure_tag: e.procedure_tag, input_plate_tag: e.input_plate_tag, "
+            "RETURN {tag: e.tag, procedure_tag: e.procedure_tag, "
+            "input_plate_tags: coalesce(e.input_plate_tags, CASE WHEN e.input_plate_tag IS NULL THEN [] ELSE [e.input_plate_tag] END), "
+            "output_plate_tags: coalesce(e.output_plate_tags, CASE WHEN e.output_plate_tag IS NULL THEN [] ELSE [e.output_plate_tag] END), "
+            "input_plate_tag: e.input_plate_tag, "
             "output_plate_tag: e.output_plate_tag, user_tag: e.user_tag, "
             "responsible_user_tag: e.responsible_user_tag, created_at: e.created_at, "
             "status: e.status, wells_blocked: coalesce(e.wells_blocked, true), "
@@ -1234,7 +1322,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if len(execution_exists) == 0 or not execution_exists[0]:
             raise KeyError("Procedure execution not found.")
 
-        metric_keys = [(metric.position, metric.trait_tag, metric.side) for metric in well_metrics]
+        metric_keys = [(getattr(metric, "plate_tag", None), metric.position, metric.trait_tag, metric.side)
+                       for metric in well_metrics]
         if len(set(metric_keys)) != len(metric_keys):
             raise ValueError("Duplicate metrics (same well, trait and side) are not allowed.")
         for metric in well_metrics:
@@ -1243,12 +1332,27 @@ class Neo4JModularProcedures(ModularProceduresABC):
         existing_positions = self._driver.execute_query(
             "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->(w:ExecutionWell) "
             "WHERE w.position IN $positions "
-            "RETURN collect({position: w.position, side: w.side}) as wells",
+            "RETURN collect({position: w.position, plate_tag: w.plate_tag, side: w.side}) as wells",
             routing_="r", execution_tag=execution_tag,
             positions=sorted({metric.position for metric in well_metrics}), result_transformer_=Result.value)
-        existing = {(w["position"], w["side"]) for w in (existing_positions[0] if existing_positions else [])}
-        missing = [f"{metric.position} ({metric.side})" for metric in well_metrics
-                   if (metric.position, metric.side) not in existing]
+        plates = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "RETURN {input: coalesce(e.input_plate_tags, CASE WHEN e.input_plate_tag IS NULL THEN [] "
+            "ELSE [e.input_plate_tag] END), output: coalesce(e.output_plate_tags, "
+            "CASE WHEN e.output_plate_tag IS NULL THEN [] ELSE [e.output_plate_tag] END)} as plates",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+        primary_plates = plates[0] if len(plates) > 0 else {}
+        def _metric_plate(metric):
+            side_key = "input" if metric.side == "INPUT" else "output"
+            side_plates = list((primary_plates or {}).get(side_key) or [])
+            if len(side_plates) == 0:
+                return None
+            return getattr(metric, "plate_tag", None) or side_plates[0]
+        existing = {(w.get("plate_tag") or (primary_plates or {}).get(
+                        "input" if w["side"] == "INPUT" else "output"), w["position"], w["side"])
+                    for w in (existing_positions[0] if existing_positions else [])}
+        missing = [f"{_metric_plate(metric)}:{metric.position} ({metric.side})" for metric in well_metrics
+                   if (_metric_plate(metric), metric.position, metric.side) not in existing]
         if len(missing) > 0:
             raise ValueError(f"Metrics were given for wells that do not exist on that side of this execution: {', '.join(missing)}")
 
@@ -1264,15 +1368,17 @@ class Neo4JModularProcedures(ModularProceduresABC):
         for metric in well_metrics:
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
-                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : $side}) "
+                "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, "
+                "plate_tag : $plate_tag, side : $side}) "
                 "MATCH (t:Trait {tag : $trait_tag}) "
                 "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, "
-                "trait_tag : $trait_tag, side : $side}) "
+                "plate_tag : $plate_tag, trait_tag : $trait_tag, side : $side}) "
                 "MERGE (w)-[:HAS_METRIC]->(m) "
                 "MERGE (m)-[:INSTANCE_OF]->(t) "
                 "WITH m, t "
                 "MERGE (a:Attribute {tag : t.attribute_tag}) "
                 "MERGE (m)-[:OF_ATTRIBUTE]->(a) ",
-                routing_="w", execution_tag=execution_tag, position=metric.position, side=metric.side,
+                routing_="w", execution_tag=execution_tag, position=metric.position,
+                plate_tag=_metric_plate(metric), side=metric.side,
                 trait_tag=metric.trait_tag, value=metric.value)
         return self.get_execution(execution_tag=execution_tag)

@@ -175,24 +175,43 @@ class ExecutionSummaryModel(BaseModel):
     n_output_wells : int = 0
 
 
+def split_well_ref(ref, default_plate_tag=None):
+    """Splits a well reference into ``(plate_tag, position)``: the transfer map may target wells
+    on several plates of one side, so a reference is either a plain position (e.g. ``A1`` - the
+    primary plate of that side) or plate-qualified (``plate_tag:A1``)."""
+    if isinstance(ref, str) and ":" in ref:
+        plate_tag, position = ref.split(":", 1)
+        return plate_tag, position
+    return (default_plate_tag, ref)
+
+
 class ExecutionInputWellModel(BaseModel):
-    "An input plate well of a procedure execution with its samples and the output wells it is transferred to."
+    """An input plate well of a procedure execution with its samples and the output wells it is
+    transferred to. `plate_tag` is the input plate the well is on (None: the primary input plate)."""
     position : str
+    plate_tag : Optional[str] = None
     sample_tags : List[str] = Field(default_factory=list)
     output_positions : List[str] = Field(default_factory=list)
+    """Output wells this input well is transferred to: plain positions (primary output plate) or
+    plate-qualified refs ("plate_tag:A1" for the additional output plates)."""
 
 
 
 class ExecutionOutputWellModel(BaseModel):
-    "An output plate well of a procedure execution with its condition applications."
+    """An output plate well of a procedure execution with its condition applications. `plate_tag`
+    is the output plate the well is on (None: the primary output plate)."""
     position : str
+    plate_tag : Optional[str] = None
     condition_application_tags : List[str] = Field(default_factory=list)
 
 
 
 class ExecutionWellMetricModel(BaseModel):
-    "A measured value of a single output well: the trait defines the measured quantity (e.g. u g/uL of the concentration attribute)."
+    """A measured value of a single well: the trait defines the measured quantity (e.g. u g/uL of
+    the concentration attribute). `plate_tag` is the plate the well is on (None: the primary plate
+    of that side)."""
     position : str
+    plate_tag : Optional[str] = None
     trait_tag : str
     value : float
     side : str = "OUTPUT"
@@ -215,6 +234,13 @@ class InsertProcedureExecutionModel(BaseModel):
     input_plate_tag : str
     output_plate_tag : str
     responsible_user_tag : Optional[str] = None
+    additional_input_plate_tags : List[str] = Field(default_factory=list)
+    additional_output_plate_tags : List[str] = Field(default_factory=list)
+    """Further input / output plates of the execution: a design can hold several plates per side when
+    the samples (or the produced wells) do not fit on a single plate (e.g. >96 samples). The primary
+    tags above stay first in the effective plate lists; well positions are unique per plate, so wells
+    on the additional plates must carry `plate_tag` and transfer targets there are plate-qualified
+    ("plate_tag:A1")."""
     input_wells : List[ExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ExecutionOutputWellModel] = Field(default_factory=list)
     output_well_metrics : List[ExecutionWellMetricModel] = Field(default_factory=list)  # [{position, trait_tag, value}]
@@ -236,19 +262,25 @@ class FinishProcedureExecutionModel(BaseModel):
 
 
 class ProcedureExecutionInputWellModel(BaseModel):
-    "A stored input well of a procedure execution."
+    """A stored input well of a procedure execution. `plate_tag` is the input plate the well is on
+    (for single-plate executions it equals the primary input plate)."""
     position : str
+    plate_tag : Optional[str] = None
     row_index : int
     column_index : int
     sample_tags : List[str] = Field(default_factory=list)
     output_positions : List[str] = Field(default_factory=list)
+    """Plate-qualified where needed: plain positions refer to the primary output plate, wells on the
+    additional output plates are referenced as "plate_tag:A1"."""
     metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
 
 
 
 class ProcedureExecutionOutputWellModel(BaseModel):
-    "A stored output well of a procedure execution. The sample tags are derived from the transfer map (pooling and splitting supported)."
+    """A stored output well of a procedure execution. The sample tags are derived from the transfer
+    map (pooling and splitting supported). `plate_tag` is the output plate the well is on."""
     position : str
+    plate_tag : Optional[str] = None
     row_index : int
     column_index : int
     sample_tags : List[str] = Field(default_factory=list)
@@ -270,6 +302,10 @@ class ProcedureExecutionModel(BaseModel):
     moves them to RUNNING. The plates are optional only while an execution is still an empty draft."""
     tag : str
     procedure_tag : str
+    input_plate_tags : List[str] = Field(default_factory=list)
+    output_plate_tags : List[str] = Field(default_factory=list)
+    """All input / output plates of the execution (multi-plate support for large sample numbers);
+    the compat single tags below are the primary (first) plates of each side."""
     input_plate_tag : Optional[str] = None
     output_plate_tag : Optional[str] = None
     user_tag : str
@@ -284,6 +320,7 @@ class ProcedureExecutionModel(BaseModel):
     finish_comment : Optional[str] = None
     done_submission_tags : List[str] = Field(default_factory=list)
     input_well_metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
-    _coerce_none_lists = field_validator("done_submission_tags", "input_well_metrics", mode="before")(_none_to_list)
+    _coerce_none_lists = field_validator("done_submission_tags", "input_well_metrics",
+                                         "input_plate_tags", "output_plate_tags", mode="before")(_none_to_list)
     input_wells : List[ProcedureExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ProcedureExecutionOutputWellModel] = Field(default_factory=list)
