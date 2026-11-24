@@ -13,6 +13,7 @@ from config.models.feature import FeatureNeoModel
 from config.models.attributes import AttributeTreeNode, InsertTraitModel, UpdateTraitModel
 
 from services.json import read_json
+from services.regex import build_token_contains_clause, tokenize_search_string
 
 
 class Neo4JAttributes(AttributesABC):
@@ -182,8 +183,10 @@ class Neo4JAttributes(AttributesABC):
 
         query = "MATCH (a:Attribute) WHERE coalesce(a.combined, false) = false "
             
+        token_params = {}
         if search_string is not None:
-            query += "AND a.s CONTAINS $search_string "
+            search_clause, token_params = build_token_contains_clause("a.s", search_string)
+            query += f"AND {search_clause} "
         
         if attribute_groups is not None:
 
@@ -219,8 +222,8 @@ class Neo4JAttributes(AttributesABC):
                         attribute_groups = attribute_groups,
                         result_transformer_=Result.values, #requires this to make the correct grouping
                         min_state = min_state,
-                        search_string = search_string.lower() if isinstance(search_string,str) else "",
-                        limit = limit)
+                        limit = limit,
+                        **token_params)
             
             return OrderedDict(grouped_attribute_tags) 
         
@@ -231,8 +234,8 @@ class Neo4JAttributes(AttributesABC):
                         attribute_groups = attribute_groups,
                         result_transformer_=Result.value,
                         min_state = min_state,
-                        search_string = search_string.lower() if isinstance(search_string,str) else "",
-                        limit = limit)
+                        limit = limit,
+                        **token_params)
         
         
             return attribute_tags 
@@ -308,7 +311,8 @@ class Neo4JAttributes(AttributesABC):
             
             query += "a.tag = $attribute_tag AND "
             
-        query += ("t.s CONTAINS $search_string "
+        search_clause, token_params = build_token_contains_clause("t.s", search_string)
+        query += (f"{search_clause} "
                   "RETURN t.tag ORDER BY t.priority ")
         
         if limit is not None:
@@ -318,8 +322,8 @@ class Neo4JAttributes(AttributesABC):
                                        routing_="r",
                                        result_transformer_=Result.value,
                                        attribute_tag = attribute_tag,
-                                       search_string = search_string.lower(),
-                                       limit = limit)
+                                       limit = limit,
+                                       **token_params)
         
         return trait_tags
         
@@ -916,14 +920,18 @@ class Neo4JAttributes(AttributesABC):
         if attribute_groups is not None:
             where_clauses.append("EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups}")
 
+        token_params = {}
+        if search_string is not None:
+            # multi-word searches are matched token-wise with AND semantics, so that
+            # e.g. "WT MB" still matches a trait/attribute search string like "MB10 treated WT"
+            for index, token in enumerate(tokenize_search_string(search_string)):
+                name = f"token_{index}"
+                where_clauses.append(f"(a.s CONTAINS ${name} OR t.s CONTAINS ${name})")
+                token_params[name] = token
+
         if where_clauses:
             query += "WHERE " + " AND ".join(where_clauses) + " "
-            
-            
-        if search_string is not None:
-            query += " AND (a.s CONTAINS $search_string OR t.s CONTAINS $search_string) "
 
-            
         query += (
             "WITH a, t ORDER BY a.priority DESC, "
             "CASE WHEN EXISTS {(a)<-[:IS_CHILD]-(:Attribute)} THEN 1 ELSE 0 END, "
@@ -936,14 +944,14 @@ class Neo4JAttributes(AttributesABC):
         
         r  = self._driver.execute_query(
             query,
-            search_string=search_string.lower() if search_string is not None else "",
             limit = limit,
             min_state = min_state, 
             attribute_tags = attribute_tags,
             attribute_groups = attribute_groups,
             result_transformer_= Result.data,
             routing_="r", 
-            database_="neo4j")
+            database_="neo4j",
+            **token_params)
         
         if not include_parent_paths:
             return [AttributeTraitTagResponseModel(**ri) for ri in r]
