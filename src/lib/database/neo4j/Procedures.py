@@ -926,7 +926,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         from config.models.procedures import ProcedureExecutionModel
         procedure = self.get(tag=tag)
         if procedure.status != "PUBLISHED":
-            raise ValueError("Only published modular procedures can be executed.")
+            raise ValueError(f"Only published modular procedures can be executed - this procedure is in state {procedure.status}.")
         design = self._validate_execution_design(procedure, execution, user_tag)
         self._validate_output_wells_free(execution.output_plate_tag,
                                         {well.position for well in execution.output_wells})
@@ -968,7 +968,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         import uuid
         procedure = self.get(tag=tag)
         if procedure.status != "PUBLISHED":
-            raise ValueError("Only published modular procedures can be executed.")
+            raise ValueError(f"Only published modular procedures can be executed - this procedure is in state {procedure.status}.")
         execution_tag = "exec_" + uuid.uuid4().hex[:20]
         self._driver.execute_query(
             "MATCH (m:ModularProcedure {tag : $procedure_tag}) MATCH (u:User {tag : $user_tag}) "
@@ -1008,7 +1008,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             raise ValueError("The draft has no design yet — save the plates, samples and transfer map first.")
         procedure = self.get(tag=execution.procedure_tag)
         if procedure.status != "PUBLISHED":
-            raise ValueError("Only published modular procedures can be executed.")
+            raise ValueError(f"Only published modular procedures can be executed - this procedure is in state {procedure.status}.")
         design_update = self._design_from_stored_execution(execution)
         design = self._validate_execution_design(procedure, design_update, user_tag)
         self._validate_output_wells_free(execution.output_plate_tag,
@@ -1196,7 +1196,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "responsible_user_tag: e.responsible_user_tag, created_at: e.created_at, "
             "status: e.status, wells_blocked: coalesce(e.wells_blocked, true), "
             "finished_at: e.finished_at, finished_by: e.finished_by, "
-            "finish_comment: e.finish_comment, done_submission_tags: e.done_submission_tags} as execution",
+            "finish_comment: e.finish_comment, done_submission_tags: coalesce(e.done_submission_tags, [])} as execution",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.data)
         execution = head[0]["execution"]
         execution["input_wells"] = [ProcedureExecutionInputWellModel(**well) for well in input_wells]

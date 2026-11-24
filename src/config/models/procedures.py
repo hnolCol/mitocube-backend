@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, field_validator, Field
 from typing import List, Optional, Dict
 from enum import Enum
 
@@ -257,6 +257,12 @@ class ProcedureExecutionOutputWellModel(BaseModel):
 
 
 
+def _none_to_list(value):
+    """Pydantic model hook: a null list (e.g. from a property that does not exist yet on a fresh
+    draft execution) is treated as an empty list instead of a validation error."""
+    return [] if value is None else value
+
+
 class ProcedureExecutionModel(BaseModel):
     """A concrete execution of a published modular procedure on a set of samples, mapping input
     plate wells to output plate wells. Executions start as DRAFT (backend-generated ID, setup can
@@ -278,5 +284,6 @@ class ProcedureExecutionModel(BaseModel):
     finish_comment : Optional[str] = None
     done_submission_tags : List[str] = Field(default_factory=list)
     input_well_metrics : List[ProcedureExecutionWellMetricModel] = Field(default_factory=list)
+    _coerce_none_lists = field_validator("done_submission_tags", "input_well_metrics", mode="before")(_none_to_list)
     input_wells : List[ProcedureExecutionInputWellModel] = Field(default_factory=list)
     output_wells : List[ProcedureExecutionOutputWellModel] = Field(default_factory=list)

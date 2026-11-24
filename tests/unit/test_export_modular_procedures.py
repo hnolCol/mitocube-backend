@@ -117,3 +117,17 @@ def test_submission_without_modules_returns_empty():
             self.modular_procedures.links = []
             self.modular_procedures.find_execution_tags_by_submissions = lambda submission_tags: []
     assert format_modular_procedures("subm_1", EmptyDB()) == ""
+
+
+def test_execution_model_tolerates_null_lists():
+    """Fresh draft executions have no done_submission_tags / stored input metrics yet: the database
+    returns null and the model must coerce it to an empty list instead of failing (the executions
+    overview reads every visible execution)."""
+    import sys
+    sys.path.insert(0, "src")
+    from config.models.procedures import ProcedureExecutionModel
+    execution = ProcedureExecutionModel(
+        tag="exec_draft", procedure_tag="proc_1", input_plate_tag=None, output_plate_tag=None,
+        user_tag="usr_1", status="DRAFT", done_submission_tags=None, input_well_metrics=None)
+    assert execution.done_submission_tags == []
+    assert execution.input_well_metrics == []
