@@ -40,7 +40,7 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
     <-[:IN_PROCEDURE {position, created_at, done, done_at, done_by}]- (:Submission)
     <-[:WAS_EXECUTED]-               (:ModularProcedureExecution)
 
-(:ModularProcedureExecution {tag, procedure_tag, input_plate_tag, output_plate_tag,
+(:ModularProcedureExecution {tag, procedure_tag, input_plate_tag(s), output_plate_tag(s),
                              user_tag, responsible_user_tag, created_at,
                              status: RUNNING|SUCCEEDED|FAILED|ABORTED,
                              wells_blocked, finished_at, finished_by, finish_comment,
@@ -60,6 +60,12 @@ the database implementation `src/lib/database/neo4j/Procedures.py`, the models
 
 Notes:
 
+- **Multi-plate executions**: a design can hold several plates per side
+  (`additional_input_plate_tags` / `additional_output_plate_tags` - e.g. a submission with more
+  samples than fit on one plate). Well positions are unique **per plate**: the wells carry a
+  `plate_tag` (no tag = the primary plate of that side), and transfer map entries may be
+  plate-qualified (`"plate_tag:A1"` - plain positions refer to the primary output plate). The
+  occupancy rules apply per plate as well: the same position on a different plate is free.
 - `ExecutionWell.output_positions` (input side) stores the transfer map: the output wells
   this input well was transferred to. The samples of an output well are derived from this
   map, so a sample can legitimately appear in several output wells (splitting) and a pooled

@@ -42,6 +42,29 @@ class FakeAttributesDB:
         return []
 
 
+def _split_ref(ref, primary):
+    "Splits a well reference into (plate, position): plain positions belong to the primary plate."
+    if isinstance(ref, str) and ":" in ref:
+        plate_tag, position = ref.split(":", 1)
+        return plate_tag, position
+    return primary, ref
+
+
+def _design_plates(design, side):
+    primary = getattr(design, f"{side}_plate_tag")
+    additional = list(getattr(design, f"additional_{side}_plate_tags", None) or [])
+    ordered, seen = [], set()
+    for plate_tag in ([primary] if primary else []) + additional:
+        if plate_tag not in seen:
+            seen.add(plate_tag)
+            ordered.append(plate_tag)
+    return ordered
+
+
+def _well_plate(well, primary):
+    return getattr(well, "plate_tag", None) or primary
+
+
 class FakeModularProceduresDB:
     def __init__(self):
         self.procedures = {
@@ -262,28 +285,39 @@ class FakeModularProceduresDB:
         # only running or succeeded executions occupy their output wells
         blocks = (lambda exec_model: exec_model.status == "RUNNING"
                   or getattr(exec_model, "wells_blocked", exec_model.status == "SUCCEEDED"))
-        occupied = [well.position for exec_model in self.executions.values()
-                    for well in exec_model.output_wells
-                    if exec_model.output_plate_tag == execution.output_plate_tag
-                    and blocks(exec_model)]
-        conflicts = sorted(set(occupied) & {w.position for w in execution.output_wells})
+        input_plates = _design_plates(execution, "input")
+        output_plates = _design_plates(execution, "output")
+        output_keys = {(_well_plate(w, output_plates[0]), w.position) for w in execution.output_wells}
+        if any(plate == "missing-plate" for plate in input_plates + output_plates):
+            raise ValueError("Plate not found.")
+        def _exec_output_plates(exec_model):
+            tags = list(getattr(exec_model, "output_plate_tags", None) or [])
+            return tags if len(tags) > 0 else ([exec_model.output_plate_tag] if exec_model.output_plate_tag else [])
+        occupied = [(_well_plate(w, ps[0]), w.position)
+                    for exec_model in self.executions.values()
+                    for ps in [_exec_output_plates(exec_model)] for w in exec_model.output_wells
+                    if ps[0] in output_plates and blocks(exec_model)]
+        conflicts = sorted({f"{plate}:{pos}" for plate, pos in (set(occupied) & output_keys)})
         if len(conflicts) > 0:
-            raise ValueError(f"Output wells already used by another execution: {', '.join(conflicts)}")
+            raise ValueError(f"Output wells on {conflicts[0].split(':')[0]} already used by another execution: "
+                             f"{', '.join(sorted({c.split(':')[1] for c in conflicts}))}")
         if tag not in self.procedures:
             raise KeyError("Modular procedure not found.")
         if self.procedures[tag].status != "PUBLISHED":
             raise ValueError("Only published modular procedures can be executed.")
         if execution.input_plate_tag == "missing-plate" or execution.output_plate_tag == "missing-plate":
             raise ValueError("Plate not found.")
-        input_positions = [well.position for well in execution.input_wells]
-        output_positions = {well.position for well in execution.output_wells}
-        if len(set(input_positions)) != len(input_positions):
+        if any(t == "missing-plate" for t in _design_plates(execution, "input") + _design_plates(execution, "output")):
+            raise ValueError("Plate not found.")
+        input_keys = [(_well_plate(w, input_plates[0]), w.position) for w in execution.input_wells]
+        output_key_set = {(_well_plate(w, output_plates[0]), w.position) for w in execution.output_wells}
+        if len(set(input_keys)) != len(input_keys) or len(output_key_set) != len(execution.output_wells):
             raise ValueError("Duplicate well positions are not allowed.")
         for well in execution.input_wells:
             if len(well.sample_tags) == 0:
                 raise ValueError(f"Input well {well.position} has no samples.")
             for output_position in well.output_positions:
-                if output_position not in output_positions:
+                if _split_ref(output_position, output_plates[0]) not in output_key_set:
                     raise ValueError(f"Output well {output_position} is not defined.")
         if "missing-sample" in [t for well in execution.input_wells for t in well.sample_tags]:
             raise ValueError("Samples not found: missing-sample")
@@ -308,9 +342,12 @@ class FakeModularProceduresDB:
         all_metrics = list(execution.output_well_metrics) + list(execution.input_well_metrics or [])
         for metric in all_metrics:
             side_wells = execution.output_wells if metric.side == "OUTPUT" else execution.input_wells
+            side_plates = output_plates if metric.side == "OUTPUT" else input_plates
             side_name = "output" if metric.side == "OUTPUT" else "input"
-            if metric.position not in {w.position for w in side_wells}:
-                raise ValueError(f"Metrics were given for a non-defined {side_name} well: {metric.position}")
+            metric_plate = getattr(metric, "plate_tag", None) or side_plates[0]
+            if (metric_plate, metric.position) not in {(_well_plate(w, side_plates[0]), w.position) for w in side_wells}:
+                raise ValueError(f"Metrics were given for a non-defined {side_name} well: "
+                                 f"{metric_plate}:{metric.position}")
             if metric.trait_tag not in ["trait-ugul", "trait-ph"]:
                 raise ValueError(f"Traits not found: {metric.trait_tag}")
         input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
@@ -319,19 +356,25 @@ class FakeModularProceduresDB:
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag,
             input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
+            input_plate_tags=input_plates, output_plate_tags=output_plates,
             user_tag=user_tag, responsible_user_tag=responsible_user_tag,
             created_at=4.0, status="RUNNING", done_submission_tags=[],
             input_well_metrics=[{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
                                 for m in (execution.input_well_metrics or [])],
-            input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+            input_wells=[{"position": w.position, "plate_tag": _well_plate(w, input_plates[0]),
+                          "row_index": 0, "column_index": 0,
                           "sample_tags": w.sample_tags, "output_positions": w.output_positions,
                           "metrics": [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
-                                       for m in (execution.input_well_metrics or []) if m.position == w.position]}
+                                       for m in (execution.input_well_metrics or [])
+                                       if m.position == w.position]}
                          for w in execution.input_wells],
-            output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+            output_wells=[{"position": w.position, "plate_tag": _well_plate(w, output_plates[0]),
+                           "row_index": 0, "column_index": 0,
                            "sample_tags": sorted({sample_tag for input_well in execution.input_wells
                                                    for sample_tag in input_well.sample_tags
-                                                   if w.position in input_well.output_positions}),
+                                                   for output_ref in input_well.output_positions
+                                                   if _split_ref(output_ref, output_plates[0])
+                                                   == (_well_plate(w, output_plates[0]), w.position)}),
                            "condition_application_tags": w.condition_application_tags,
                            "metrics": [{"trait_tag": m.trait_tag, "attribute_tag": "att_concentration", "value": m.value}
                                        for m in execution.output_well_metrics if m.position == w.position]}
@@ -343,7 +386,10 @@ class FakeModularProceduresDB:
                   or getattr(exec_model, "wells_blocked", exec_model.status == "SUCCEEDED"))
         return [well.position for exec_model in self.executions.values()
                 for well in exec_model.output_wells
-                if exec_model.output_plate_tag == plate_tag and blocks(exec_model)]
+                if (_well_plate(well, exec_model.output_plate_tag
+                                if not getattr(exec_model, "output_plate_tags", None)
+                                else exec_model.output_plate_tags[0]) == plate_tag)
+                and blocks(exec_model)]
 
     def create_execution_draft(self, tag, user_tag):
         if tag not in self.procedures:
@@ -367,29 +413,38 @@ class FakeModularProceduresDB:
             raise ValueError("Only draft executions can be set up — a started execution is immutable.")
         if design_update.input_plate_tag == "missing-plate" or design_update.output_plate_tag == "missing-plate":
             raise ValueError("Plate not found.")
-        input_positions = [well.position for well in design_update.input_wells]
-        output_positions = {well.position for well in design_update.output_wells}
-        if len(set(input_positions)) != len(input_positions) or len(output_positions) != len(design_update.output_wells):
+        input_plates = _design_plates(design_update, "input")
+        output_plates = _design_plates(design_update, "output")
+        if any(t == "missing-plate" for t in input_plates + output_plates):
+            raise ValueError("Plate not found.")
+        input_keys = [(_well_plate(w, input_plates[0]), w.position) for w in design_update.input_wells]
+        output_keys = {(_well_plate(w, output_plates[0]), w.position) for w in design_update.output_wells}
+        if len(set(input_keys)) != len(input_keys) or len(output_keys) != len(design_update.output_wells):
             raise ValueError("Duplicate well positions are not allowed.")
         for well in design_update.input_wells:
             if len(well.sample_tags) == 0:
                 raise ValueError(f"Input well {well.position} has no samples.")
             for output_position in well.output_positions:
-                if output_position not in output_positions:
+                if _split_ref(output_position, output_plates[0]) not in output_keys:
                     raise ValueError(f"Output well {output_position} is not defined.")
         responsible_user_tag = design_update.responsible_user_tag or user_tag
         self.executions[execution_tag] = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=execution.procedure_tag,
             input_plate_tag=design_update.input_plate_tag, output_plate_tag=design_update.output_plate_tag,
+            input_plate_tags=input_plates, output_plate_tags=output_plates,
             user_tag=execution.user_tag, responsible_user_tag=responsible_user_tag,
             created_at=execution.created_at, status="DRAFT", wells_blocked=False, done_submission_tags=[],
-            input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+            input_wells=[{"position": w.position, "plate_tag": _well_plate(w, input_plates[0]),
+                          "row_index": 0, "column_index": 0,
                           "sample_tags": w.sample_tags, "output_positions": w.output_positions}
                          for w in design_update.input_wells],
-            output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+            output_wells=[{"position": w.position, "plate_tag": _well_plate(w, output_plates[0]),
+                           "row_index": 0, "column_index": 0,
                            "sample_tags": sorted({sample_tag for input_well in design_update.input_wells
                                                    for sample_tag in input_well.sample_tags
-                                                   if w.position in input_well.output_positions}),
+                                                   for output_ref in input_well.output_positions
+                                                   if _split_ref(output_ref, output_plates[0])
+                                                   == (_well_plate(w, output_plates[0]), w.position)}),
                            "condition_application_tags": w.condition_application_tags}
                           for w in design_update.output_wells])
         return self.executions[execution_tag]
@@ -404,14 +459,21 @@ class FakeModularProceduresDB:
             raise ValueError("The draft has no design yet — save the plates, samples and transfer map first.")
         blocks = (lambda exec_model: exec_model.status == "RUNNING"
                   or getattr(exec_model, "wells_blocked", exec_model.status == "SUCCEEDED"))
-        occupied = [well.position for exec_model in self.executions.values()
+        output_plate_tags = list(getattr(execution, "output_plate_tags", None) or []) or \
+            ([execution.output_plate_tag] if execution.output_plate_tag else [])
+        occupied = [(_well_plate(well, (list(getattr(exec_model, "output_plate_tags", None) or [])
+                                         or [exec_model.output_plate_tag])[0]), well.position)
+                    for exec_model in self.executions.values()
                     for well in exec_model.output_wells
                     if exec_model.tag != execution_tag
-                    and exec_model.output_plate_tag == execution.output_plate_tag
+                    and (list(getattr(exec_model, "output_plate_tags", None) or [])
+                         or [exec_model.output_plate_tag])[0] in output_plate_tags
                     and blocks(exec_model)]
-        conflicts = sorted(set(occupied) & {well.position for well in execution.output_wells})
+        own = {(_well_plate(w, output_plate_tags[0]), w.position) for w in execution.output_wells}
+        conflicts = sorted({f"{plate}:{pos}" for plate, pos in set(occupied) & own})
         if len(conflicts) > 0:
-            raise ValueError(f"Output wells already used by another execution: {', '.join(conflicts)}")
+            raise ValueError(f"Output wells on {conflicts[0].split(':')[0]} already used by another execution: "
+                             f"{', '.join(sorted({c.split(':')[1] for c in conflicts}))}")
         self.executions[execution_tag].status = "RUNNING"
         self.executions[execution_tag].wells_blocked = True
         self.executions[execution_tag].user_tag = user_tag
@@ -495,18 +557,22 @@ class FakeModularProceduresDB:
         for sample_tag in sample_tags:
             entries = []
             for tag, execution in self.executions.items():
+                def _plates(exec_model, side):
+                    tags = list(getattr(exec_model, f"{side}_plate_tags", None) or [])
+                    primary = getattr(exec_model, f"{side}_plate_tag")
+                    return tags if len(tags) > 0 else ([primary] if primary else [])
                 for well in execution.input_wells:
                     if sample_tag in well.sample_tags:
                         entries.append({"procedure_tag": execution.procedure_tag, "execution_tag": tag,
                                          "status": execution.status or "RUNNING", "created_at": execution.created_at,
                                          "position": well.position, "side": "INPUT",
-                                         "plate_tag": execution.input_plate_tag})
+                                         "plate_tag": _well_plate(well, _plates(execution, "input")[0])})
                 for well in execution.output_wells:
                     if sample_tag in well.sample_tags:
                         entries.append({"procedure_tag": execution.procedure_tag, "execution_tag": tag,
                                          "status": execution.status or "RUNNING", "created_at": execution.created_at,
                                          "position": well.position, "side": "OUTPUT",
-                                         "plate_tag": execution.output_plate_tag})
+                                         "plate_tag": _well_plate(well, _plates(execution, "output")[0])})
             if len(entries) == 0:
                 continue
             latest_created_at = max(entry["created_at"] or 0 for entry in entries)
@@ -1559,3 +1625,109 @@ class TestModularProcedureConditionApplicationTrees:
             ]})
         assert resp.status_code == 200
         assert resp.json()["condition_application_tags"] == ["ca-tree-att_compound"]
+
+
+class TestModularProcedureMultiPlateExecutions:
+    """Multi-plate executions: a design can hold several input and several output plates - the
+    samples (or the produced wells) do not always fit on a single plate. Wells carry the plate they
+    are on; transfer targets on additional output plates are plate-qualified ("plate:position")."""
+
+    MULTI_PLATE_PAYLOAD = {
+        "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+        "additional_input_plate_tags": ["plate-1b"],
+        "additional_output_plate_tags": ["plate-2b"],
+        "input_wells": [
+            {"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]},
+            # the same position on another input plate is not a duplicate
+            {"position": "A1", "plate_tag": "plate-1b", "sample_tags": ["sample-3"],
+             "output_positions": ["plate-2b:A1"]},
+        ],
+        "output_wells": [
+            {"position": "A1"},
+            {"position": "A1", "plate_tag": "plate-2b"},
+        ],
+    }
+
+    def test_execute_multi_plate_design(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json=self.MULTI_PLATE_PAYLOAD)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["input_plate_tags"] == ["plate-1", "plate-1b"]
+        assert body["output_plate_tags"] == ["plate-2", "plate-2b"]
+        assert body["input_plate_tag"] == "plate-1"
+        assert body["output_plate_tag"] == "plate-2"
+        input_by_plate = {(w["plate_tag"], w["position"]) for w in body["input_wells"]}
+        assert input_by_plate == {("plate-1", "A1"), ("plate-1b", "A1")}
+        output_by_plate = {(w["plate_tag"], w["position"], tuple(sorted(w["sample_tags"])))
+                           for w in body["output_wells"]}
+        assert output_by_plate == {("plate-2", "A1", ("sample-1",)),
+                                   ("plate-2b", "A1", ("sample-3",))}
+
+    def test_plate_positions_are_scoped_per_plate(self, client):
+        # a real duplicate (same plate) is rejected
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            **DESIGN_PAYLOAD,
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1", "A2"]}],
+            "output_wells": [{"position": "A1"}, {"position": "A1"}]})
+        assert resp.status_code == 400
+        assert "Duplicate" in resp.json()["detail"]
+        # ... but with several output plates the same position is legal (two different wells)
+        resp = client.post("/api/procedures/proc-2/execute", json=self.MULTI_PLATE_PAYLOAD)
+        assert resp.status_code == 200
+
+    def test_unknown_additional_plate_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            **DESIGN_PAYLOAD, "additional_output_plate_tags": ["missing-plate"]})
+        assert resp.status_code == 400
+        assert "Plate not found" in resp.json()["detail"]
+
+    def test_well_on_undeclared_plate_rejected(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            **DESIGN_PAYLOAD,
+            "output_wells": [{"position": "A1", "plate_tag": "plate-1b"}]})
+        assert resp.status_code == 400
+
+    def test_occupancy_is_per_plate(self, client):
+        # occupy A1 on plate-2 ...
+        resp = client.post("/api/procedures/proc-2/execute", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        resp = client.get("/api/procedures/plates/plate-2/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == ["A1"]
+        resp = client.get("/api/procedures/plates/plate-2b/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == []
+        # ... the same position on the additional output plate is still free
+        additional_only = {
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "additional_output_plate_tags": ["plate-2b"],
+            "input_wells": [{"position": "B2", "sample_tags": ["sample-3"],
+                             "output_positions": ["plate-2b:A1"]}],
+            "output_wells": [{"position": "A1", "plate_tag": "plate-2b"}]}
+        resp = client.post("/api/procedures/proc-2/execute", json=additional_only)
+        assert resp.status_code == 200
+        # but a second run on the same additional plate conflicts
+        resp = client.post("/api/procedures/proc-2/execute", json=additional_only)
+        assert resp.status_code == 400
+        assert "already used" in resp.json()["detail"]
+
+    def test_draft_multi_plate_design_can_be_saved_and_started(self, client):
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.put(f"/api/procedures/executions/{draft_tag}", json=self.MULTI_PLATE_PAYLOAD)
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["output_plate_tags"] == ["plate-2", "plate-2b"]
+        assert body["status"] == "DRAFT"
+        assert client.get("/api/procedures/plates/plate-2/occupied").json() == []
+        resp = client.post(f"/api/procedures/executions/{draft_tag}/start")
+        assert resp.status_code == 200
+        assert client.get("/api/procedures/plates/plate-2b/occupied").json() == ["A1"]
+
+    def test_multi_plate_sample_locations(self, client):
+        resp = client.post("/api/procedures/proc-2/execute", json=self.MULTI_PLATE_PAYLOAD)
+        assert resp.status_code == 200
+        resp = client.get("/api/procedures/submissions/subm-2/wells")
+        assert resp.status_code == 200
+        wells = [well for location in resp.json() for well in location["wells"]]
+        assert sorted((w["plate_tag"], w["position"], w["side"]) for w in wells) == \
+            [("plate-1b", "A1", "INPUT"), ("plate-2b", "A1", "OUTPUT")]

@@ -249,24 +249,37 @@ def format_modular_procedures(submission_tag: str, db) -> str:
                              {sample for well in execution.output_wells for sample in well.sample_tags})
         sample_map = mp.get_sample_submission_map(all_samples)
 
+        # wells carry the plate they are on (multi-plate executions)
+        def _well_plate(well, primary, side_plates):
+            plate_tag = getattr(well, "plate_tag", None) or primary
+            if len(side_plates) > 1:
+                return f"{plate_tag}:{well.position}"
+            return well.position
+        input_plates = list(getattr(execution, "input_plate_tags", None) or []) or \
+            ([execution.input_plate_tag] if execution.input_plate_tag else [])
+        output_plates = list(getattr(execution, "output_plate_tags", None) or []) or \
+            ([execution.output_plate_tag] if execution.output_plate_tag else [])
+        input_primary = input_plates[0] if len(input_plates) > 0 else None
+        output_primary = output_plates[0] if len(output_plates) > 0 else None
+
         input_rows, output_rows = [], []
         for well in execution.input_wells:
             own_samples = _own_samples(well.sample_tags, sample_map)
             if not own_samples:
                 continue
-            input_rows.append([well.position, own_samples,
+            input_rows.append([_well_plate(well, input_primary, input_plates), own_samples,
                                well.output_positions, _metrics_text(well.metrics)])
         for well in execution.output_wells:
             own_samples = _own_samples(well.sample_tags, sample_map)
             if not own_samples:
                 continue
-            output_rows.append([well.position, own_samples,
+            output_rows.append([_well_plate(well, output_primary, output_plates), own_samples,
                                well.condition_application_tags, _metrics_text(well.metrics)])
 
         lines = [
             f"### Execution `{execution_tag}` — {procedure_title}", "",
-            f"- **Input plate:** {execution.input_plate_tag}  ",
-            f"- **Output plate:** {execution.output_plate_tag}  ",
+            f"- **Input plate{'s' if len(input_plates) > 1 else ''}:** {', '.join(input_plates)}  ",
+            f"- **Output plate{'s' if len(output_plates) > 1 else ''}:** {', '.join(output_plates)}  ",
             f"- **Responsible:** {_user_name(db, execution.responsible_user_tag or execution.user_tag)}  ",
             f"- **State:** {execution.status}  ",
             f"- **Created:** {_ts(execution.created_at)}  ",
