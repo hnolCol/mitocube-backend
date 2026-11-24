@@ -1689,6 +1689,18 @@ class Neo4JSubmissions(SubmissionsABC):
         invalidate_cached_scope(user_tag)
         return len(r) > 0 and r[0].get("removed", 0) > 0
 
+    def get_tags_since(self, since : float = None) -> List[Dict]:
+        """Returns the tags and created_at timestamps of all submissions that
+        were created at or after the given timestamp. If since is None, all
+        submissions are returned."""
+        query = (
+            "MATCH (s:Submission) "
+            "WHERE $since IS NULL OR s.created_at >= $since "
+            "RETURN s.tag AS tag, s.created_at AS created_at "
+            "ORDER BY s.created_at ASC "
+        )
+        return self._driver.execute_query(query, routing_="r", since=since, result_transformer_=Result.data)
+
 class Neo4JSubmissionFilter(SubmissionFilterABC):
     def __init__(self, driver : Driver, users : UserABC, research_groups : ResearchGroupABC, consortiums : ConsortiumABC = None) -> None:
         

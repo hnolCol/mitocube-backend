@@ -7,3 +7,5 @@ class PATScopeEnum(str, Enum):
     its scopes; it never acts as a general login session.
     """
     QC_UPLOAD = "qc.upload"
+    SUBMISSIONS_READ = "submissions.read"
+    SAMPLE_MEASURING = "sample.measuring"

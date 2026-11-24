@@ -135,6 +135,45 @@ class TestAuthenticatePATAuthz:
         assert pats_router.revoke_pat.__defaults__[0].dependency is users_service.is_user_at_least_curator
 
 
+class TestScopedPATGuards:
+    def make_request(self, token=None):
+        class R:
+            headers = {}
+            if token is not None:
+                headers["authorization"] = f"Bearer {token}"
+        return R()
+
+    def test_submissions_read_guard_accepts_pat_with_scope(self, no_rate_limit):
+        record = make_record([PATScopeEnum.SUBMISSIONS_READ.value])
+        db = FakeDB(record, FakeUser(role=UserRolesEnum.CURATOR))
+        for guard in (pats_service.get_curator_or_submissions_read_pat,):
+            user = guard(self.make_request(generate_pat_token()), db=db)
+            assert user.tag == "abcdefgh"
+
+    def test_submissions_read_guard_rejects_pat_without_scope(self, no_rate_limit):
+        record = make_record([PATScopeEnum.QC_UPLOAD.value])
+        db = FakeDB(record, FakeUser())
+        for guard in (pats_service.get_curator_or_submissions_read_pat, pats_service.get_curator_or_sample_measuring_pat):
+            with pytest.raises(HTTPException) as e:
+                guard(self.make_request(generate_pat_token()), db=db)
+            assert e.value.status_code == 403
+            assert "does not have the required scope" in e.value.detail
+
+    def test_sample_measuring_guard_accepts_pat_with_scope(self, no_rate_limit):
+        record = make_record([PATScopeEnum.SAMPLE_MEASURING.value])
+        db = FakeDB(record, FakeUser(role=UserRolesEnum.CURATOR))
+        user = pats_service.get_curator_or_sample_measuring_pat(self.make_request(generate_pat_token()), db=db)
+        assert user.tag == "abcdefgh"
+
+    def test_guards_reject_standard_role_owner_even_with_scope(self, no_rate_limit):
+        record = make_record([PATScopeEnum.SUBMISSIONS_READ.value, PATScopeEnum.SAMPLE_MEASURING.value])
+        db = FakeDB(record, FakeUser(role=UserRolesEnum.STANDARD))
+        with pytest.raises(HTTPException) as e:
+            pats_service.get_curator_or_submissions_read_pat(self.make_request(generate_pat_token()), db=db)
+        assert e.value.status_code == 403
+
+
+
 class TestGetCuratorOrQCUploadPAT:
     def make_request(self, token=None):
         class R:

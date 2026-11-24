@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator, field_serializer
-from typing import Optional
+from typing import List, Optional
 import time 
 class InstrumentStateModel(BaseModel):
     
@@ -47,3 +47,25 @@ class InstrumentStateHistoryModel(BaseModel):
 
 class InstrumentStateHistoryResponseModel(InstrumentStateHistoryModel):
     ""
+
+class SampleMeasuringInsertModel(BaseModel):
+    """Payload for marking a sample as currently being measured (live data).
+
+    Marks the sample identified by the sample_tag as being measured, optionally
+    on the given instruments. A PAT with the 'sample.measuring' scope (or curator
+    rights) is required. Setting it again refreshes the measurement timestamp and
+    instruments."""
+    sample_tag : str
+    instrument_tags : List[str] = []
+
+
+class SampleMeasuringResponseModel(BaseModel):
+    """A live measurement of a sample, connected to the sample and, if given,
+    to the instrument Trait nodes it is being measured on. Stored on a dedicated
+    LiveMeasurement node, one per sample, via (:Sample)-[:BEING_MEASURED]->(:LiveMeasurement)."""
+    tag : str
+    sample_tag : str
+    instrument_tags : List[str] = []
+    created_at : float
+    updated_at : float
+    created_by : Optional[str] = None
