@@ -15,7 +15,7 @@ from config.models.procedures import (
     PublishModularProcedureModel,
 )
 
-EXECUTION_STATE_TAGS = ["RUNNING", "SUCCEEDED", "FAILED", "ABORTED"]
+EXECUTION_STATE_TAGS = ["DRAFT", "RUNNING", "SUCCEEDED", "FAILED", "ABORTED"]
 
 
 
@@ -687,15 +687,16 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "RETURN DISTINCT e.tag as tag ORDER BY tag",
             routing_="r", submission_tags=list(submission_tags), result_transformer_=Result.value)
 
-    def execute(self, tag: str, execution, user_tag: str) -> "ProcedureExecutionModel":
-        """Starts a published modular procedure execution on a set of samples. The execution is created in the
-        RUNNING state; the submissions are only freed when the execution is confirmed via finish_execution."""
-        from config.models.procedures import ProcedureExecutionModel
-        procedure = self.get(tag=tag)
-        if procedure.status != "PUBLISHED":
-            raise ValueError("Only published modular procedures can be executed.")
-
+    def _validate_execution_design(self, procedure, execution, user_tag) -> dict:
+        """Full design validation of an execution: the plates must exist, the responsible user must
+        be a curator, the plates must match the procedure's layout constraints, well positions
+        must be unique and every transfer target defined, metrics must reference declared traits
+        and the transfer map must respect the declared sample numbers (mirroring / N-fold
+        duplication). Returns the derived storage data. The occupancy of the output wells is
+        checked separately (only when an execution actually starts running)."""
         for plate_tag in [execution.input_plate_tag, execution.output_plate_tag]:
+            if plate_tag is None:
+                raise ValueError("Input and output plates must be defined.")
             plate_exists = self._driver.execute_query(
                 "WITH EXISTS {(p:Plate {tag : $plate_tag})} as exists RETURN exists",
                 routing_="r", plate_tag=plate_tag, result_transformer_=Result.value)
@@ -770,19 +771,6 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 raise ValueError(f"Sample {sample_tag} is transferred to {len(samples_outputs)} output wells, but the "
                                  f"procedure requires at most {max_outputs} output wells per sample.")
 
-        # only executions that are still running or that succeeded occupy their output wells:
-        # a failed or aborted run does not block redoing the same wells
-        occupied_output_wells = self._driver.execute_query(
-            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
-            "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
-            "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
-            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
-            "RETURN collect(DISTINCT w.position) as occupied",
-            routing_="r", output_plate_tag=execution.output_plate_tag,
-            positions=sorted(output_positions), result_transformer_=Result.value)
-        if len(occupied_output_wells) > 0 and len(occupied_output_wells[0]) > 0:
-            raise ValueError(f"Output wells already used by another execution: {', '.join(occupied_output_wells[0])}")
-
         all_sample_tags = sorted({sample_tag for well in execution.input_wells for sample_tag in well.sample_tags})
         missing_samples = self._driver.execute_query(
             "UNWIND $sample_tags as sample_tag "
@@ -792,33 +780,47 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if len(missing_samples) > 0:
             raise ValueError(f"Samples not found: {', '.join(missing_samples)}")
 
-        content = {
-            "procedure_tag": tag,
-            "input_plate_tag": execution.input_plate_tag,
-            "output_plate_tag": execution.output_plate_tag,
-            "input_wells": [{"position": w.position, "sample_tags": sorted(w.sample_tags),
-                             "output_positions": sorted(w.output_positions)} for w in execution.input_wells],
-            "output_wells": [{"position": w.position,
-                              "condition_application_tags": sorted(w.condition_application_tags)} for w in execution.output_wells],
-        }
-        # the creation time is part of the hash so the same transfer map can legitimately be
-        # re-run (e.g. after a failed or aborted execution); the occupancy rule above is what
-        # actually protects wells from being overwritten concurrently
-        execution_tag = hashlib.sha256(json.dumps(
-            {**content, "created_at": time.time()}, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
+        return {"responsible_user_tag": responsible_user_tag,
+                "output_well_samples": output_well_samples,
+                "all_metrics": all_metrics}
 
+    def _validate_output_wells_free(self, output_plate_tag, positions, exclude_execution_tag=None) -> None:
+        """Only executions that are still running or that succeeded (or were explicitly kept blocked)
+        occupy their output wells: failed or aborted runs free the wells for a re-run and drafts do
+        not block anything until they start."""
+        if len(positions) == 0:
+            return
+        exclude = ""
+        params = {"output_plate_tag": output_plate_tag, "positions": sorted(positions)}
+        if exclude_execution_tag is not None:
+            exclude = "AND e.tag <> $exclude_tag "
+            params["exclude_tag"] = exclude_execution_tag
+        occupied_output_wells = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
+            "WHERE e.output_plate_tag = $output_plate_tag AND w.position IN $positions "
+            f"{exclude}"
+            "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
+            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
+            "RETURN collect(DISTINCT w.position) as occupied",
+            routing_="r", parameters_=params, result_transformer_=Result.value)
+        if len(occupied_output_wells) > 0 and len(occupied_output_wells[0]) > 0:
+            raise ValueError(f"Output wells already used by another execution: {', '.join(occupied_output_wells[0])}")
+
+    def _store_execution_design(self, execution_tag: str, execution, design: dict, wells_blocked: bool) -> None:
+        """Stores the plates, transfer map (input wells with samples and their output targets,
+        output wells with their derived samples and condition applications) and the well metrics
+        of an execution. Wipes any previously stored design first (used by draft saves)."""
         self._driver.execute_query(
-            "MATCH (m:ModularProcedure {tag : $procedure_tag}) MATCH (u:User {tag : $user_tag}) "
-            "MERGE (e:ModularProcedureExecution {tag : $execution_tag}) "
-            "SET e.created_at = timestamp(), e += $props "
-            "MERGE (m)-[:WAS_EXECUTED]->(e) "
-            "MERGE (u)-[:EXECUTED]->(e) ",
-            routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
-            props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
-                   "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
-                   "responsible_user_tag": responsible_user_tag, "status": "RUNNING",
-                   "wells_blocked": True})
-        self._set_execution_state(execution_tag=execution_tag, state="RUNNING", user_tag=user_tag)
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "OPTIONAL MATCH (e)-[:HAS_WELL]->(w:ExecutionWell {execution_tag : $execution_tag}) "
+            "OPTIONAL MATCH (w)-[:HAS_METRIC]->(m:ExecutionWellMetric {execution_tag : $execution_tag}) "
+            "DETACH DELETE w, m "
+            "SET e.input_plate_tag = $input_plate_tag, e.output_plate_tag = $output_plate_tag, "
+            "e.responsible_user_tag = $responsible_user_tag, e.wells_blocked = $wells_blocked",
+            routing_="w", execution_tag=execution_tag,
+            input_plate_tag=execution.input_plate_tag, output_plate_tag=execution.output_plate_tag,
+            responsible_user_tag=design["responsible_user_tag"], wells_blocked=wells_blocked)
+        output_well_samples = design["output_well_samples"]
 
         for well in execution.input_wells:
             row_index, column_index = self._parse_position(well.position)
@@ -855,7 +857,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
                     "MERGE (w)-[:HAS_APPLICATION]->(c) ",
                     routing_="w", execution_tag=execution_tag, position=well.position, ca_tag=ca_tag)
 
-        for metric in all_metrics:
+        for metric in design["all_metrics"]:
             self._driver.execute_query(
                 "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
                 "(w:ExecutionWell {execution_tag : $execution_tag, position : $position, side : $side}) "
@@ -871,7 +873,147 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 routing_="w", execution_tag=execution_tag, position=metric.position, side=metric.side,
                 trait_tag=metric.trait_tag, value=metric.value)
 
+    def _design_from_stored_execution(self, execution):
+        """Presents the stored design of an execution in the shape the design validation expects."""
+        from config.models.procedures import InsertProcedureExecutionModel, ExecutionWellMetricModel
+        input_metrics = list(execution.input_well_metrics or [])
+        input_metrics += [metric for well in execution.input_wells for metric in (getattr(well, "metrics", None) or [])]
+        output_metrics = [metric for well in execution.output_wells for metric in (well.metrics or [])]
+        def _with_side(metric, side):
+            return metric if getattr(metric, "side", None) else metric.model_copy(update={"side": side})
+        return InsertProcedureExecutionModel(
+            input_plate_tag=execution.input_plate_tag,
+            output_plate_tag=execution.output_plate_tag,
+            responsible_user_tag=execution.responsible_user_tag,
+            input_wells=[{"position": w.position, "sample_tags": list(w.sample_tags),
+                          "output_positions": list(w.output_positions)} for w in execution.input_wells],
+            output_wells=[{"position": w.position, "sample_tags": list(w.sample_tags),
+                           "condition_application_tags": list(w.condition_application_tags)}
+                          for w in execution.output_wells],
+            input_well_metrics=[_with_side(m, "INPUT") for m in input_metrics],
+            output_well_metrics=[_with_side(m, "OUTPUT") for m in output_metrics],
+        )
+
+    def execute(self, tag: str, execution, user_tag: str) -> "ProcedureExecutionModel":
+        """Starts a published modular procedure execution as a run: the execution is validated
+        (design + output well occupancy), created directly in the RUNNING state with an
+        execution-tag hash and starts blocking its output wells; the submissions are only freed
+        when the execution is confirmed via finish_execution."""
+        from config.models.procedures import ProcedureExecutionModel
+        procedure = self.get(tag=tag)
+        if procedure.status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be executed.")
+        design = self._validate_execution_design(procedure, execution, user_tag)
+        self._validate_output_wells_free(execution.output_plate_tag,
+                                        {well.position for well in execution.output_wells})
+        content = {
+            "procedure_tag": tag,
+            "input_plate_tag": execution.input_plate_tag,
+            "output_plate_tag": execution.output_plate_tag,
+            "input_wells": [{"position": w.position, "sample_tags": sorted(w.sample_tags),
+                             "output_positions": sorted(w.output_positions)} for w in execution.input_wells],
+            "output_wells": [{"position": w.position,
+                              "condition_application_tags": sorted(w.condition_application_tags)} for w in execution.output_wells],
+        }
+        # the creation time is part of the hash so the same transfer map can legitimately be
+        # re-run (e.g. after a failed or aborted execution); the occupancy rule above is what
+        # actually protects wells from being overwritten concurrently
+        execution_tag = hashlib.sha256(json.dumps(
+            {**content, "created_at": time.time()}, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()[:24]
+
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $procedure_tag}) MATCH (u:User {tag : $user_tag}) "
+            "MERGE (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "SET e.created_at = timestamp(), e += $props "
+            "MERGE (m)-[:WAS_EXECUTED]->(e) "
+            "MERGE (u)-[:EXECUTED]->(e) ",
+            routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
+            props={"procedure_tag": tag, "input_plate_tag": execution.input_plate_tag,
+                   "output_plate_tag": execution.output_plate_tag, "user_tag": user_tag,
+                   "responsible_user_tag": design["responsible_user_tag"], "status": "RUNNING",
+                   "wells_blocked": True})
+        self._store_execution_design(execution_tag, execution, design, wells_blocked=True)
+        self._set_execution_state(execution_tag=execution_tag, state="RUNNING", user_tag=user_tag)
         return self.get_execution(execution_tag=execution_tag)
+
+    def create_execution_draft(self, tag: str, user_tag: str) -> "ProcedureExecutionModel":
+        """Creates an empty DRAFT execution of a published modular procedure with a
+        backend-generated ID: the design (plates, sample placement, transfer map, values) can be
+        saved and continued later without blocking anything — see update_execution_draft. The
+        run starts (and is fully validated incl. the output well occupancy) via start_execution."""
+        import uuid
+        procedure = self.get(tag=tag)
+        if procedure.status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be executed.")
+        execution_tag = "exec_" + uuid.uuid4().hex[:20]
+        self._driver.execute_query(
+            "MATCH (m:ModularProcedure {tag : $procedure_tag}) MATCH (u:User {tag : $user_tag}) "
+            "MERGE (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "SET e.created_at = timestamp(), e += $props "
+            "MERGE (m)-[:WAS_EXECUTED]->(e) "
+            "MERGE (u)-[:EXECUTED]->(e) ",
+            routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
+            props={"procedure_tag": tag, "input_plate_tag": None, "output_plate_tag": None,
+                   "user_tag": user_tag, "responsible_user_tag": None, "status": "DRAFT",
+                   "wells_blocked": False})
+        self._set_execution_state(execution_tag=execution_tag, state="DRAFT", user_tag=user_tag)
+        return self.get_execution(execution_tag=execution_tag)
+
+    def update_execution_draft(self, execution_tag: str, design_update, user_tag: str) -> "ProcedureExecutionModel":
+        """Saves the setup of a DRAFT execution (the current design is replaced wholesale): plates,
+        responsible user, sample placement, transfer map, condition applications and per-well
+        values. The design must be valid on its own (existing plates/samples/traits, unique
+        positions, every transfer target defined, declared sample numbers) but the output wells do
+        not block anything yet — the occupancy is checked when the execution starts."""
+        execution = self.get_execution(execution_tag=execution_tag)
+        if execution.status != "DRAFT":
+            raise ValueError("Only draft executions can be set up — a started execution is immutable.")
+        procedure = self.get(tag=execution.procedure_tag)
+        design = self._validate_execution_design(procedure, design_update, user_tag)
+        self._store_execution_design(execution_tag, design_update, design, wells_blocked=False)
+        return self.get_execution(execution_tag=execution_tag)
+
+    def start_execution(self, execution_tag: str, user_tag: str) -> "ProcedureExecutionModel":
+        """Starts a saved DRAFT execution as a run: the stored design is validated again in full —
+        including the output well occupancy, which drafts do not block until they start — and the
+        execution moves to RUNNING, blocking its output wells."""
+        execution = self.get_execution(execution_tag=execution_tag)
+        if execution.status != "DRAFT":
+            raise ValueError("Only draft executions can be started.")
+        if len(execution.input_wells) == 0 or len(execution.output_wells) == 0:
+            raise ValueError("The draft has no design yet — save the plates, samples and transfer map first.")
+        procedure = self.get(tag=execution.procedure_tag)
+        if procedure.status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be executed.")
+        design_update = self._design_from_stored_execution(execution)
+        design = self._validate_execution_design(procedure, design_update, user_tag)
+        self._validate_output_wells_free(execution.output_plate_tag,
+                                        {well.position for well in execution.output_wells},
+                                        exclude_execution_tag=execution_tag)
+        self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "SET e.status = 'RUNNING', e.wells_blocked = true, e.user_tag = $user_tag, "
+            "e.responsible_user_tag = coalesce(e.responsible_user_tag, $user_tag)",
+            routing_="w", execution_tag=execution_tag, user_tag=user_tag)
+        self._set_execution_state(execution_tag=execution_tag, state="RUNNING", user_tag=user_tag)
+        return self.get_execution(execution_tag=execution_tag)
+
+    def delete_execution_draft(self, execution_tag: str, user_tag: str) -> bool:
+        """Deletes a DRAFT execution (and only a draft). Drafts are setup work, not recorded
+        facility history: unlike started executions they can be removed again."""
+        execution = self.get_execution(execution_tag=execution_tag)
+        if execution.status != "DRAFT":
+            raise ValueError("Only draft executions can be deleted — a started execution is part of the recorded history.")
+        self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag}) "
+            "OPTIONAL MATCH (e)-[:HAS_WELL]->(w:ExecutionWell {execution_tag : $execution_tag}) "
+            "OPTIONAL MATCH (w)-[:HAS_METRIC]->(m:ExecutionWellMetric {execution_tag : $execution_tag}) "
+            "DETACH DELETE e, w, m",
+            routing_="w", execution_tag=execution_tag)
+        self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[r:IN_STATE]->() DELETE r",
+            routing_="w", execution_tag=execution_tag)
+        return True
 
     def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None,
                          block_output_wells: bool = None) -> "ProcedureExecutionModel":
@@ -891,6 +1033,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
         current_state = self.get_current_execution_state(execution)
         if outcome == "RUNNING" or outcome == current_state:
             raise ValueError(f"This procedure execution is already in state {current_state}.")
+        if current_state == "DRAFT":
+            raise ValueError("This procedure execution is still a draft — start it before confirming an outcome.")
         procedure = self.get(tag=execution.procedure_tag)
 
         if current_state != "RUNNING":

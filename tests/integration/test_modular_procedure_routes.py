@@ -338,6 +338,86 @@ class FakeModularProceduresDB:
                           for w in execution.output_wells])
         return self.executions[execution_tag]
 
+    def create_execution_draft(self, tag, user_tag):
+        if tag not in self.procedures:
+            raise KeyError("Modular procedure not found.")
+        if self.procedures[tag].status != "PUBLISHED":
+            raise ValueError("Only published modular procedures can be executed.")
+        self.execution_counter = getattr(self, "execution_counter", 0) + 1
+        execution_tag = f"draft-{self.execution_counter}"
+        model = ProcedureExecutionModel(
+            tag=execution_tag, procedure_tag=tag, input_plate_tag=None, output_plate_tag=None,
+            user_tag=user_tag, responsible_user_tag=None, created_at=3.0,
+            status="DRAFT", wells_blocked=False, done_submission_tags=[])
+        self.executions[execution_tag] = model
+        return model
+
+    def update_execution_draft(self, execution_tag, design_update, user_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        execution = self.executions[execution_tag]
+        if execution.status != "DRAFT":
+            raise ValueError("Only draft executions can be set up — a started execution is immutable.")
+        if design_update.input_plate_tag == "missing-plate" or design_update.output_plate_tag == "missing-plate":
+            raise ValueError("Plate not found.")
+        input_positions = [well.position for well in design_update.input_wells]
+        output_positions = {well.position for well in design_update.output_wells}
+        if len(set(input_positions)) != len(input_positions) or len(output_positions) != len(design_update.output_wells):
+            raise ValueError("Duplicate well positions are not allowed.")
+        for well in design_update.input_wells:
+            if len(well.sample_tags) == 0:
+                raise ValueError(f"Input well {well.position} has no samples.")
+            for output_position in well.output_positions:
+                if output_position not in output_positions:
+                    raise ValueError(f"Output well {output_position} is not defined.")
+        responsible_user_tag = design_update.responsible_user_tag or user_tag
+        self.executions[execution_tag] = ProcedureExecutionModel(
+            tag=execution_tag, procedure_tag=execution.procedure_tag,
+            input_plate_tag=design_update.input_plate_tag, output_plate_tag=design_update.output_plate_tag,
+            user_tag=execution.user_tag, responsible_user_tag=responsible_user_tag,
+            created_at=execution.created_at, status="DRAFT", wells_blocked=False, done_submission_tags=[],
+            input_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+                          "sample_tags": w.sample_tags, "output_positions": w.output_positions}
+                         for w in design_update.input_wells],
+            output_wells=[{"position": w.position, "row_index": 0, "column_index": 0,
+                           "sample_tags": sorted({sample_tag for input_well in design_update.input_wells
+                                                   for sample_tag in input_well.sample_tags
+                                                   if w.position in input_well.output_positions}),
+                           "condition_application_tags": w.condition_application_tags}
+                          for w in design_update.output_wells])
+        return self.executions[execution_tag]
+
+    def start_execution(self, execution_tag, user_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        execution = self.executions[execution_tag]
+        if execution.status != "DRAFT":
+            raise ValueError("Only draft executions can be started.")
+        if len(execution.input_wells) == 0 or len(execution.output_wells) == 0:
+            raise ValueError("The draft has no design yet — save the plates, samples and transfer map first.")
+        blocks = (lambda exec_model: exec_model.status == "RUNNING"
+                  or getattr(exec_model, "wells_blocked", exec_model.status == "SUCCEEDED"))
+        occupied = [well.position for exec_model in self.executions.values()
+                    for well in exec_model.output_wells
+                    if exec_model.tag != execution_tag
+                    and exec_model.output_plate_tag == execution.output_plate_tag
+                    and blocks(exec_model)]
+        conflicts = sorted(set(occupied) & {well.position for well in execution.output_wells})
+        if len(conflicts) > 0:
+            raise ValueError(f"Output wells already used by another execution: {', '.join(conflicts)}")
+        self.executions[execution_tag].status = "RUNNING"
+        self.executions[execution_tag].wells_blocked = True
+        self.executions[execution_tag].user_tag = user_tag
+        return self.executions[execution_tag]
+
+    def delete_execution_draft(self, execution_tag, user_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        if self.executions[execution_tag].status != "DRAFT":
+            raise ValueError("Only draft executions can be deleted — a started execution is part of the recorded history.")
+        del self.executions[execution_tag]
+        return True
+
     def finish_execution(self, execution_tag, outcome, user_tag, comment=None, block_output_wells=None):
         if execution_tag not in self.executions:
             raise KeyError("Procedure execution not found.")
@@ -346,6 +426,8 @@ class FakeModularProceduresDB:
         execution = self.executions[execution_tag]
         if outcome == execution.status:
             raise ValueError(f"This procedure execution is already in state {execution.status}.")
+        if execution.status == "DRAFT":
+            raise ValueError("This procedure execution is still a draft — start it before confirming an outcome.")
         previous_state = execution.status
         input_sample_tags = [sample_tag for well in execution.input_wells for sample_tag in well.sample_tags]
         done_submissions = sorted({self.sample_submissions[sample_tag] for sample_tag in input_sample_tags
@@ -1327,6 +1409,92 @@ class TestModularProcedureSetupExtras:
             "output_wells": [{"position": p, "condition_application_tags": []}
                              for p in ["A1", "B1", "C1"]]})
         assert resp.status_code == 200
+
+
+DESIGN_PAYLOAD = {
+    "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+    "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+    "output_wells": [{"position": "A1", "condition_application_tags": []}],
+}
+
+
+class TestModularProcedureExecutionDrafts:
+    """Draft executions: a backend-generated ID, a setup that can be saved and continued, and a
+    start that runs the full validation — drafts never block wells until they start."""
+
+    def test_draft_lifecycle_create_save_start(self, client):
+        resp = client.post("/api/procedures/proc-2/executions/draft")
+        assert resp.status_code == 200
+        draft = resp.json()
+        assert draft["status"] == "DRAFT"
+        assert draft["input_plate_tag"] is None
+        assert draft["wells_blocked"] is False
+        # finishing a draft is not possible
+        resp = client.post(f"/api/procedures/executions/{draft['tag']}/finish", json={"outcome": "SUCCEEDED"})
+        assert resp.status_code == 400
+        assert "draft" in resp.json()["detail"]
+        # save the design
+        resp = client.put(f"/api/procedures/executions/{draft['tag']}", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "DRAFT"
+        assert resp.json()["output_wells"][0]["sample_tags"] == ["sample-1"]
+        # ... and go back to it: a second save replaces the design
+        resp = client.put(f"/api/procedures/executions/{draft['tag']}", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        # a draft without a design cannot start
+        resp = client.post("/api/procedures/proc-2/executions/draft")
+        empty_draft_tag = resp.json()["tag"]
+        resp = client.post(f"/api/procedures/executions/{empty_draft_tag}/start")
+        assert resp.status_code == 400
+        # starting the saved draft runs it
+        resp = client.post(f"/api/procedures/executions/{draft['tag']}/start")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "RUNNING"
+        assert resp.json()["wells_blocked"] is True
+        # started executions are immutable and undeletable
+        resp = client.put(f"/api/procedures/executions/{draft['tag']}", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 400
+        resp = client.delete(f"/api/procedures/executions/{draft['tag']}")
+        assert resp.status_code == 400
+
+    def test_draft_rejects_invalid_design(self, client):
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        # transfer to a non-defined output well
+        resp = client.put(f"/api/procedures/executions/{draft_tag}", json={
+            **DESIGN_PAYLOAD,
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["B1"]}]})
+        assert resp.status_code == 400
+        assert "not defined" in resp.json()["detail"]
+
+    def test_drafts_do_not_block_wells_until_start(self, client):
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.put(f"/api/procedures/executions/{draft_tag}", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        # another execution may take the same output wells while the draft is not started
+        resp = client.post("/api/procedures/proc-2/execute", json={
+            **DESIGN_PAYLOAD, "output_plate_tag": "plate-2"})
+        assert resp.status_code == 200
+        # starting the draft now conflicts with the running execution on those wells
+        resp = client.post(f"/api/procedures/executions/{draft_tag}/start")
+        assert resp.status_code == 400
+        assert "already used" in resp.json()["detail"]
+
+    def test_draft_can_be_deleted(self, client):
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.delete(f"/api/procedures/executions/{draft_tag}")
+        assert resp.status_code == 200
+        assert resp.json() is True
+        resp = client.get(f"/api/procedures/executions/{draft_tag}")
+        assert resp.status_code == 404
+
+    def test_draft_of_unpublished_procedure_rejected(self, client):
+        resp = client.post("/api/procedures/proc-1/executions/draft")
+        assert resp.status_code == 400
+
+    def test_standard_user_rejected_on_draft_creation(self):
+        with _make_client(make_user(role=UserRolesEnum.STANDARD)) as c:
+            resp = c.post("/api/procedures/proc-2/executions/draft")
+            assert resp.status_code == 403
 
 
 class TestModularProcedureConditionApplicationTrees:

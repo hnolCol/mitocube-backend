@@ -23,6 +23,7 @@ class ProcedureExecutionStatusEnum(str, Enum):
     """Lifecycle status of a procedure execution. Executions start RUNNING and are closed by an explicit
     confirmation (SUCCEEDED, FAILED or ABORTED) that frees the linked submissions for the next module."""
     RUNNING = "RUNNING"
+    DRAFT = "DRAFT"
     SUCCEEDED = "SUCCEEDED"
     FAILED = "FAILED"
     ABORTED = "ABORTED"
@@ -257,11 +258,14 @@ class ProcedureExecutionOutputWellModel(BaseModel):
 
 
 class ProcedureExecutionModel(BaseModel):
-    "A concrete execution of a published modular procedure on a set of samples, mapping input plate wells to output plate wells."
+    """A concrete execution of a published modular procedure on a set of samples, mapping input
+    plate wells to output plate wells. Executions start as DRAFT (backend-generated ID, setup can
+    be saved and continued later, nothing is blocked yet); starting runs the full validation and
+    moves them to RUNNING. The plates are optional only while an execution is still an empty draft."""
     tag : str
     procedure_tag : str
-    input_plate_tag : str
-    output_plate_tag : str
+    input_plate_tag : Optional[str] = None
+    output_plate_tag : Optional[str] = None
     user_tag : str
     responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
