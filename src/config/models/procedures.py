@@ -157,11 +157,12 @@ class SampleLocationModel(BaseModel):
 
 
 class ExecutionSummaryModel(BaseModel):
-    "Summary of a procedure execution for the overview listing: the header data and well counts."
+    """Summary of a procedure execution for the overview listing: the header data and well counts.
+    The plates are optional: a fresh draft execution has not selected its plates yet."""
     tag : str
     procedure_tag : str
-    input_plate_tag : str
-    output_plate_tag : str
+    input_plate_tag : Optional[str] = None
+    output_plate_tag : Optional[str] = None
     user_tag : str
     responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None

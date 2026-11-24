@@ -131,3 +131,16 @@ def test_execution_model_tolerates_null_lists():
         user_tag="usr_1", status="DRAFT", done_submission_tags=None, input_well_metrics=None)
     assert execution.done_submission_tags == []
     assert execution.input_well_metrics == []
+
+
+def test_execution_summary_model_tolerates_draft_without_plates():
+    """A fresh draft execution has not selected its plates yet - the overview summaries (the
+    executions overview listing) must accept the missing plates instead of failing."""
+    import sys
+    sys.path.insert(0, "src")
+    from config.models.procedures import ExecutionSummaryModel
+    summary = ExecutionSummaryModel(tag="exec_draft", procedure_tag="proc_1",
+                                    input_plate_tag=None, output_plate_tag=None, user_tag="usr_1",
+                                    status="DRAFT")
+    assert summary.input_plate_tag is None
+    assert summary.output_plate_tag is None
