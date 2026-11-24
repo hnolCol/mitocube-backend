@@ -357,6 +357,61 @@ def execute_modular_procedure(procedure_tag : str, execution : InsertProcedureEx
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.post("/{procedure_tag}/executions/draft", response_model=ProcedureExecutionModel)
+def create_execution_draft(procedure_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Creates an empty DRAFT execution of the given published modular procedure with a
+    backend-generated ID: the design (plates, sample placement, transfer map, per-well values)
+    can be saved via PUT /executions/{execution_tag} and continued later — drafts do not block
+    anything. Starting the run (full validation incl. output well occupancy) happens via
+    POST /executions/{execution_tag}/start. The user must be at least curator."""
+    try:
+        return db.modular_procedures.create_execution_draft(tag=procedure_tag, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Modular procedure not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.put("/executions/{execution_tag}", response_model=ProcedureExecutionModel)
+def save_execution_draft(execution_tag : str, design : InsertProcedureExecutionModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Saves the setup of a DRAFT execution, replacing the stored design wholesale (plates,
+    responsible user, sample placement, transfer map, condition applications and per-well
+    values). Executions that already started are immutable. The user must be at least curator."""
+    try:
+        return db.modular_procedures.update_execution_draft(execution_tag=execution_tag, design_update=design, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/executions/{execution_tag}/start", response_model=ProcedureExecutionModel)
+def start_procedure_execution(execution_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
+    """Starts a saved draft execution as a run: the stored design is re-validated in full —
+    including the output well occupancy, which drafts do not block until they start — and the
+    execution moves to RUNNING and starts blocking its output wells. The user must be at least
+    curator (and becomes the executing user)."""
+    try:
+        return db.modular_procedures.start_execution(execution_tag=execution_tag, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/executions/{execution_tag}", response_model=bool)
+def delete_procedure_execution_draft(execution_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> bool:
+    """Deletes a DRAFT execution (and only a draft): drafts are setup work, not recorded facility
+    history. Started executions are never deleted — they are part of the reproducibility chain.
+    The user must be at least curator."""
+    try:
+        return db.modular_procedures.delete_execution_draft(execution_tag=execution_tag, user_tag=user.tag)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Procedure execution not found.")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/executions/{execution_tag}/finish", response_model=ProcedureExecutionModel)
 def finish_modular_procedure_execution(execution_tag : str, confirmation : FinishProcedureExecutionModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
     """Transitions a procedure execution to the given state (SUCCEEDED, FAILED or ABORTED):

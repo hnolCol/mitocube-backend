@@ -142,6 +142,36 @@ class ModularProceduresABC(ABC):
         layout constraints of the procedure or the transfer map is inconsistent."""
 
     @abstractmethod
+    def create_execution_draft(self, tag: str, user_tag: str):
+        """Creates an empty DRAFT execution of a published modular procedure with a
+        backend-generated ID. The design (plates, samples, transfer map, values)
+        is saved via update_execution_draft and can be continued later; drafts do
+        not block output wells until they are started via start_execution.
+        Raises a ValueError if the procedure does not exist or is not published."""
+
+    @abstractmethod
+    def update_execution_draft(self, execution_tag: str, design_update, user_tag: str):
+        """Saves the setup of a DRAFT execution, replacing the stored design wholesale.
+        The design must be valid on its own (plates, samples and traits must exist,
+        positions unique, transfer targets defined, declared sample numbers
+        respected); the output well occupancy is only checked on start.
+        Raises a KeyError if the execution does not exist and a ValueError if it is
+        not a draft or the design is invalid."""
+
+    @abstractmethod
+    def start_execution(self, execution_tag: str, user_tag: str):
+        """Starts a saved DRAFT as a run: the stored design is re-validated in full
+        (including the output well occupancy) and the execution moves to RUNNING,
+        blocking its output wells. Raises a KeyError if the execution does not exist
+        and a ValueError if it is not a draft or the validation fails."""
+
+    @abstractmethod
+    def delete_execution_draft(self, execution_tag: str, user_tag: str):
+        """Deletes a DRAFT execution (and only a draft): drafts are setup work, not
+        recorded history. Raises a KeyError if the execution does not exist and a
+        ValueError if it is not a draft."""
+
+    @abstractmethod
     def finish_execution(self, execution_tag: str, outcome: str, user_tag: str, comment: str = None,
                          block_output_wells: bool = None):
         """Transitions a procedure execution to the given state (SUCCEEDED, FAILED
