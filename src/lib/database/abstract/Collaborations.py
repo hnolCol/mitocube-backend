@@ -53,17 +53,22 @@ class CollaborationsABC(ABC):
 
     @abstractmethod
     def explore(self, search_string : str = None, ca_tags : Optional[List[str]] = None,
-                user_tags : Optional[List[str]] = None, limit : int = 40) -> List[SubmissionExploreModel]:
+                user_tags : Optional[List[str]] = None, limit : int = 40,
+                current_user_tag : str = None) -> List[SubmissionExploreModel]:
         """Returns minimal metadata (title, owner, research group, state) of
         all submissions that match the search string and have all the given
         condition application and user tags (AND semantics). This is a discovery
-        endpoint and must never return sensitive submission data."""
+        endpoint and must never return sensitive submission data. Submissions of
+        research groups restricted to an explicit allow list are only returned
+        for members of the allowed research groups."""
 
     @abstractmethod
-    def explore_condition_applications(self, limit : int = 1000) -> List[SubmissionExploreConditionApplicationModel]:
+    def explore_condition_applications(self, limit : int = 1000, current_user_tag : str = None) -> List[SubmissionExploreConditionApplicationModel]:
         """Returns the top-level condition applications (attribute, trait,
         value) of all explore-visible submissions, grouped per submission. This
-        is a discovery endpoint and must never return sensitive submission data."""
+        is a discovery endpoint and must never return sensitive submission data.
+        Submissions of research groups restricted to an explicit allow list are
+        only returned for members of the allowed research groups."""
 
     @abstractmethod
     def has_approved_collaboration_request(self, submission_tag : str, user_tag : str) -> bool:
