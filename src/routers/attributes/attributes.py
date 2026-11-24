@@ -96,6 +96,7 @@ def get_attributes(
     limit: int = 20,
     attribute_tags : Optional[str] = None,
     group_by : Optional[Literal["attribute_group","min_state"]] = None,
+    allow_input : Optional[bool] = None,
     user: UserModel = Depends(get_user_from_token)
 , db : DatabaseABC = Depends(get_db)) -> List[AttributeTraitTagResponseModel] | List[str] | Dict[str, List[str]]:
     """
@@ -107,6 +108,26 @@ def get_attributes(
 
     if attribute_groups is not None:
         attribute_groups = APIParamString(param = attribute_groups).param
+
+    result = _get_attributes_unfiltered(
+        search_string=search_string, min_state=min_state, attribute_groups=attribute_groups,
+        include_traits=include_traits, include_parent_paths=include_parent_paths,
+        limit=limit, attribute_tags=attribute_tags, group_by=group_by, db=db)
+    if allow_input is None or result is None:
+        return result
+
+    # filter by the allow_input flag of the attributes
+    if include_traits:
+        return [attribute for attribute in result if bool(getattr(attribute, "allow_input", None)) == allow_input]
+    if isinstance(result, list):
+        return [tag for tag in result if db.attributes.allow_input(tag=tag) == allow_input]
+    return {group: [tag for tag in group_tags if db.attributes.allow_input(tag=tag) == allow_input]
+            for group, group_tags in result.items()}
+
+
+def _get_attributes_unfiltered(search_string, min_state, attribute_groups, include_traits,
+                               include_parent_paths, limit, attribute_tags, group_by, db):
+    "The attribute query without the allow_input filter."
         
     if include_traits:
             return db.attributes.find_attributes_and_traits(
