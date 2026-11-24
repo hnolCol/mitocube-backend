@@ -11,6 +11,7 @@ from config.models.parameter import APIParamString, APIParamInt
 from services.encryption import verify_password
 from services.users import is_user_admin, get_user_from_token, is_user_at_least_group_curator
 from services.mail import send_email_in_background
+from lib.mfa.mfa import mfa_runtime
 from services.enums import get_enum_as_dict
 
 from config.settings.general import get_general_settings
@@ -152,6 +153,75 @@ def change_password(updated_pw: Dict[str, str], user: UserModel = Depends(get_us
     if not db.users.update(tag=user.tag, user_props={"password": hashed}):
         raise HTTPException(400, "Could not update password.")
     
+
+@router.post("/{user_tag}/reset", summary="Resets a user account: generates a new password, disables MFA and emails the new password. Requires admin rights.")
+def reset_user_account(background_task : BackgroundTasks, user_tag : str, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)):
+    """Resets a user account. Limited to admin users.
+
+    Generates a new random password, disables the user's MFA and sends the
+    new password to the user's email address. The user then logs in with the
+    new password and goes through the same first-login procedure as a new
+    account, including the MFA setup.
+    """
+    db_user = db.users.get_user_by_tag(user_tag)
+    if db_user is None:
+        raise user_not_found
+
+    plain_pw = db.users.create_plain_password()
+    hashed_pw = db.users.hash_password(plain_pw)
+    if not db.users.update(tag=user_tag, user_props={"password": hashed_pw, "mfa_enabled": False, "mfa_secret": None}):
+        raise HTTPException(status_code=500, detail="Could not reset user account.")
+
+    mfa_runtime.reset_attempts(user_tag)
+    mfa_runtime.clear_challenge(user_tag)
+    mfa_runtime.reset_login_failures(f"email:{db_user.email}")
+
+    send_email_in_background(background_tasks=background_task,
+                             subject="Account reset.",
+                             email_to=[db_user.email],
+                             include_setting_cc=False,
+                             body={
+                                 "app_name" : GENERAL_SETTINGS.app_name,
+                                 "first_name" : db_user.firstname,
+                                 "password" : plain_pw,
+                                 "url" : GENERAL_SETTINGS.url
+                             },
+                             template_name=EMAIL_SETTINGS.mail_account_reset_template)
+    return {"success": True}
+
+
+@router.post("/{user_tag}/reset_mfa", summary="Resets the multi-factor authentication of a user. Requires admin rights.")
+def reset_user_mfa(background_task : BackgroundTasks, user_tag : str, user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)):
+    """Disables the MFA of a user so they can set it up again on the next login.
+
+    Limited to admin users, e.g. if the user lost access to their
+    authentication device. The password is unchanged; the user logs in with
+    their existing password and is guided through the MFA setup again.
+    """
+    db_user = db.users.get_user_by_tag(user_tag)
+    if db_user is None:
+        raise user_not_found
+    if not db_user.mfa_enabled:
+        raise HTTPException(status_code=422, detail="MFA is not enabled for this user.")
+
+    if not db.users.update(tag=user_tag, user_props={"mfa_enabled": False, "mfa_secret": None}):
+        raise HTTPException(status_code=500, detail="Could not reset MFA.")
+
+    mfa_runtime.reset_attempts(user_tag)
+    mfa_runtime.clear_challenge(user_tag)
+
+    send_email_in_background(background_tasks=background_task,
+                             subject="Multi-factor authentication reset.",
+                             email_to=[db_user.email],
+                             include_setting_cc=False,
+                             body={
+                                 "app_name" : GENERAL_SETTINGS.app_name,
+                                 "first_name" : db_user.firstname,
+                                 "url" : GENERAL_SETTINGS.url
+                             },
+                             template_name=EMAIL_SETTINGS.mail_mfa_reset_template)
+    return {"success": True}
+
 
 @router.get("/full",  response_model=UsersAdminResponse)
 def get_users(user : UserModel = Depends(is_user_admin), db : DatabaseABC = Depends(get_db)):
