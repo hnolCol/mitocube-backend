@@ -4,7 +4,7 @@ from abc import abstractmethod, ABC
 from typing import List, Dict, Optional, Tuple
 from deprecated import deprecated
 import pandas as pd 
-from config.models.instruments import InstrumentStateHistoryModel, InstrumentsStateResponseModel, InstrumentStateModel, InstrumentInfoModel
+from config.models.instruments import InstrumentStateHistoryModel, InstrumentsStateResponseModel, InstrumentStateModel, InstrumentInfoModel, SampleMeasuringResponseModel
 
 class InstrumentStatesABC(ABC):
     
@@ -114,3 +114,20 @@ class InstrumentsABC(ABC):
     @abstractmethod
     def pause_measuring_submissions(self, instrument_tag: str) -> List[str]:
         """Set the state of all submissions on this instrument whose latest state is MEASURING to PAUSED, and return their tags."""
+
+    @abstractmethod
+    def set_sample_measuring(self, sample_tag : str, instrument_tags : List[str] = None, user_tag : str = None) -> SampleMeasuringResponseModel:
+        """Creates or refreshes the LiveMeasurement node of a sample to mark it
+        as currently being measured (live data), optionally on the given
+        instruments.
+
+        Raises
+        ------
+        ValueError
+            If the sample or one of the instruments does not exist.
+        """
+
+    @abstractmethod
+    def get_sample_measuring(self, sample_tag : str) -> Optional[SampleMeasuringResponseModel]:
+        """Returns the LiveMeasurement of the sample, or None if the sample is
+        not marked as being measured."""

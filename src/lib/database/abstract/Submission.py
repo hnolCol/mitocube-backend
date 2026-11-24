@@ -669,6 +669,24 @@ class SubmissionsABC(ABC):
     def remove_collaborator(self, tag: str, user_tag: str) -> bool:
         "Removes the collaboration access (COLLABORATES) of the given user for the submission. Returns False when the user was not a collaborator."
 
+    @abstractmethod
+    def get_tags_since(self, since : float = None) -> List[Dict]:
+        """Returns the tags and created_at timestamps of all submissions that
+        were created at or after the given timestamp.
+
+        Parameters
+        ----------
+        since : float, optional
+            Epoch milliseconds. Submissions created at or after this timestamp
+            are returned. If None, all submissions are returned, by default None
+
+        Returns
+        -------
+        List[Dict]
+            List of dicts with keys 'tag' and 'created_at' ordered by creation
+            time ascending.
+        """
+
 class SubmissionFilterABC(ABC):
     
     

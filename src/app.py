@@ -95,6 +95,7 @@ from routers.policy import permissions as policy_permissions
 from routers.impressum import impressum
 from routers.plates import plates
 from routers.tickets import tickets
+from routers.automation import automation
 
 # from routers import play  # route to test things during development ###########################################################
 from lib.lifespan import lifespan
@@ -186,7 +187,8 @@ router_sources = [policy_permissions,
                   submission_export,
                   plates,
                   modular_procedures,
-                  submission_durations
+                  submission_durations,
+                  automation
 ]
     
 

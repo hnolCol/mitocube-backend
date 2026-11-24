@@ -3,7 +3,7 @@ from typing import List, Dict, Optional
 import pandas as pd 
 from datetime import datetime
 from services.random_generators import get_random_string
-from config.models.instruments import InstrumentStateModel, InstrumentsStateResponseModel, InstrumentStateHistoryModel, InstrumentInfoModel
+from config.models.instruments import InstrumentStateModel, InstrumentsStateResponseModel, InstrumentStateHistoryModel, InstrumentInfoModel, SampleMeasuringResponseModel
 from config.enums.states import SubmissionStatesEnums  
 
 from lib.database.abstract.Instruments import InstrumentsABC
@@ -668,3 +668,58 @@ class Neo4JInstruments(InstrumentsABC):
             measuring=SubmissionStatesEnums.MEASURING,
             paused=SubmissionStatesEnums.PAUSED,
         )
+
+    def set_sample_measuring(self, sample_tag : str, instrument_tags : List[str] = None, user_tag : str = None) -> SampleMeasuringResponseModel:
+        """Creates or refreshes the LiveMeasurement node of a sample to mark it
+        as currently being measured (live data), optionally on the given
+        instruments. One LiveMeasurement node per sample; setting it again
+        refreshes the updated_at timestamp and the connected instruments."""
+        instrument_tags = list(instrument_tags) if instrument_tags else []
+        for instrument_tag in instrument_tags:
+            if self._find_instrument(instrument_tag) is None:
+                raise ValueError(f"Instrument '{instrument_tag}' not found.")
+        query = (
+            "MATCH (sample:Sample {tag : $sample_tag}) "
+            "MERGE (lm:LiveMeasurement {sample_tag : $sample_tag}) "
+            "ON CREATE SET lm.created_at = timestamp(), lm.created_by = $user_tag, "
+            "                           lm.tag = 'lm_' + $sample_tag "
+            "SET lm.sample_tag = $sample_tag, lm.updated_at = timestamp() "
+            "MERGE (sample)-[:BEING_MEASURED]->(lm) "
+            "WITH lm "
+            "OPTIONAL MATCH (lm)-[old:MEASURED_ON]->() "
+            "DELETE old "
+            "WITH DISTINCT lm "
+            "RETURN lm.tag "
+        )
+        r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value,
+                                        sample_tag=sample_tag, instrument_tags=instrument_tags, user_tag=user_tag)
+        if len(r) == 0:
+            raise ValueError(f"Sample '{sample_tag}' not found.")
+        if len(instrument_tags) > 0:
+            query = (
+                "MATCH (lm:LiveMeasurement {sample_tag : $sample_tag}) "
+                "UNWIND $instrument_tags AS itag "
+                "MATCH (inst:Trait {tag : itag}) "
+                "MERGE (lm)-[:MEASURED_ON]->(inst) "
+                "RETURN count(DISTINCT inst) AS connected "
+            )
+            r = self._driver.execute_query(query, routing_="w", result_transformer_=Result.value,
+                                            sample_tag=sample_tag, instrument_tags=instrument_tags)
+            if len(r) == 0 or r[0] < len(set(instrument_tags)):
+                raise ValueError("Not all instruments could be connected to the live measurement.")
+        measurement = self.get_sample_measuring(sample_tag)
+        if measurement is None:
+            raise ValueError(f"Live measurement of sample '{sample_tag}' could not be read back.")
+        return measurement
+
+    def get_sample_measuring(self, sample_tag : str) -> Optional[SampleMeasuringResponseModel]:
+        """Returns the LiveMeasurement of the sample, or None if the sample is
+        not marked as being measured."""
+        query = (
+            "MATCH (lm:LiveMeasurement {sample_tag : $sample_tag})<-[:BEING_MEASURED]-(sample:Sample {tag : $sample_tag}) "
+            "OPTIONAL MATCH (lm)-[:MEASURED_ON]->(inst:Trait) "
+            "RETURN {tag : lm.tag, sample_tag : lm.sample_tag, instrument_tags : collect(DISTINCT inst.tag), "
+            "        created_at : lm.created_at, updated_at : lm.updated_at, created_by : lm.created_by} "
+        )
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, sample_tag=sample_tag)
+        return SampleMeasuringResponseModel(**r[0]) if len(r) > 0 else None

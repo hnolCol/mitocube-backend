@@ -79,11 +79,25 @@ def get_curator_or_qc_upload_pat(request : Request, db : DatabaseABC = Depends(g
     Accepts either a verified curator login or a PAT that carries the
     'qc.upload' scope and belongs to a curator.
     """
-    user, scopes = get_user_from_pat_or_token(request, db=db)
-    if scopes is None:
+    return get_guard_for_pat_scope(PATScopeEnum.QC_UPLOAD)(request, db=db)
+
+
+def get_guard_for_pat_scope(scope : PATScopeEnum):
+    """Builds a route guard for an endpoint that accepts either a verified
+    curator login or a PAT that carries the given scope and whose owner has
+    at least curator rights.
+    """
+    def guard(request : Request, db : DatabaseABC = Depends(get_db)) -> UserModel:
+        user, pat_scopes = get_user_from_pat_or_token(request, db=db)
+        if pat_scopes is None:
+            return user
+        require_pat_scope(scope, user, pat_scopes)
+        if user.role < UserRolesEnum.CURATOR:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="The token owner must have at least curator rights.")
         return user
-    require_pat_scope(PATScopeEnum.QC_UPLOAD, user, scopes)
-    if user.role < UserRolesEnum.CURATOR:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="The token owner must have at least curator rights.")
-    return user
+    return guard
+
+
+get_curator_or_submissions_read_pat = get_guard_for_pat_scope(PATScopeEnum.SUBMISSIONS_READ)
+get_curator_or_sample_measuring_pat = get_guard_for_pat_scope(PATScopeEnum.SAMPLE_MEASURING)
