@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from lib.cache.scope_cache import invalidate_all_cached_scopes
 from lib.database.abstract.Procedures import ModularProceduresABC
-from lib.database.neo4j.Plates import PLATE_ATTRIBUTES
+from lib.database.neo4j.Plates import STORAGE_GROUP_TAG
 from services.encryption import create_hierarchical_hash
 from config.models.procedures import (
     ModularProcedureBaseModel,
@@ -550,17 +550,23 @@ class Neo4JModularProcedures(ModularProceduresABC):
         return row - 1, int(match.group(2)) - 1
 
     def _validate_plate_constraint_texts(self, plate_constraints: dict) -> None:
-        """Validates that the format and type texts of the plate constraints exist as trait texts
-        of the plate format / plate type attributes, so typos are rejected when the procedure is
-        defined instead of silently blocking every execution."""
-        format_texts = self._driver.execute_query(
-            "MATCH (t:Trait {attribute_tag : $attribute_tag}) RETURN collect(t.text) as texts",
-            routing_="r", attribute_tag=PLATE_ATTRIBUTES["format"], result_transformer_=Result.value)
-        type_texts = self._driver.execute_query(
-            "MATCH (t:Trait {attribute_tag : $attribute_tag}) RETURN collect(t.text) as texts",
-            routing_="r", attribute_tag=PLATE_ATTRIBUTES["plate_type"], result_transformer_=Result.value)
-        known_formats = format_texts[0] if len(format_texts) > 0 else []
-        known_types = type_texts[0] if len(type_texts) > 0 else []
+        """Validates that the format and type texts of the plate constraints exist in the storage
+        attribute group (which defines the plates): a format text must be the text of a trait whose
+        value defines the container format (e.g. '8x12' -> the 96 well plate), a type text must be
+        the text of any other selectable trait of the group. Typos are rejected when the procedure
+        is defined instead of silently blocking every execution."""
+        trait_rows = self._driver.execute_query(
+            "MATCH (a:Attribute)-[:PART_OF]->(:AttributeGroup {tag : $group_tag}) "
+            "MATCH (a)-[:HAS_TRAIT]->(t:Trait) "
+            "RETURN t.text as text, t.value as value",
+            routing_="r", group_tag=STORAGE_GROUP_TAG, result_transformer_=Result.data)
+        import re
+        known_formats, known_types = [], []
+        for row in trait_rows:
+            if re.match(r"^[0-9]+x[0-9]+$", str(row["value"] or "")):
+                known_formats.append(row["text"])
+            else:
+                known_types.append(row["text"])
         for side in ("input", "output"):
             required_format = (plate_constraints or {}).get(f"{side}_plate_format")
             required_type = (plate_constraints or {}).get(f"{side}_plate_type")
@@ -571,15 +577,18 @@ class Neo4JModularProcedures(ModularProceduresABC):
 
     def _validate_plate_constraints(self, procedure, plate_tag: str, side: str) -> None:
         """Validates that the given plate matches the plate layout constraints the procedure defines
-        for the given side (input or output). Unconstrained sides always pass."""
+        for the given side (input or output): the format (the text of the plate's selected container
+        format trait, e.g. '8x12') and the type (any other trait selected for the plate from the
+        storage attribute group). Unconstrained sides always pass."""
         required_format = getattr(procedure, f"{side}_plate_format")
         required_type = getattr(procedure, f"{side}_plate_type")
         if required_format is None and required_type is None:
             return
         plate_props = self._driver.execute_query(
             "MATCH (p:Plate {tag : $plate_tag}) "
-            "RETURN {format: p.format, plate_type: [(p)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
-            "WHERE (ca)-[:OF_ATTRIBUTE]->(:Attribute {tag : 'att_plate_type'}) | t.text][0]} as plate",
+            "OPTIONAL MATCH (p)-[:HAS_APPLICATION]->(:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
+            "WITH p, collect(DISTINCT t.text) as trait_texts "
+            "RETURN {format: p.format, trait_texts: trait_texts} as plate",
             routing_="r", plate_tag=plate_tag, result_transformer_=Result.data)
         if len(plate_props) == 0:
             raise ValueError(f"Plate not found: {plate_tag}")
@@ -587,9 +596,9 @@ class Neo4JModularProcedures(ModularProceduresABC):
         if required_format is not None and plate.get("format") != required_format:
             raise ValueError(f"The {side} plate of this procedure must have the format {required_format}, "
                              f"but the plate has {plate.get('format')}.")
-        if required_type is not None and plate.get("plate_type") != required_type:
-            raise ValueError(f"The {side} plate of this procedure must be of type {required_type}, "
-                             f"but the plate is {plate.get('plate_type')}.")
+        if required_type is not None and required_type not in (plate.get("trait_texts") or []):
+            raise ValueError(f"The {side} plate of this procedure must be of type {required_type} "
+                             f"(a matching selected trait of the plate).")
 
     def _set_execution_state(self, execution_tag: str, state: str, user_tag: str) -> None:
         """Appends a state to the execution's state history: creates an IN_STATE relationship to
