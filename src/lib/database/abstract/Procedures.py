@@ -142,6 +142,12 @@ class ModularProceduresABC(ABC):
         layout constraints of the procedure or the transfer map is inconsistent."""
 
     @abstractmethod
+    def get_occupied_output_wells(self, plate_tag: str):
+        """Returns the positions of the plate's output wells blocked by executions (running or
+        kept blocked) — the wells an execution setup must not map its outputs onto. Drafts and
+        finished-unblocked executions do not block anything."""
+
+    @abstractmethod
     def create_execution_draft(self, tag: str, user_tag: str):
         """Creates an empty DRAFT execution of a published modular procedure with a
         backend-generated ID. The design (plates, samples, transfer map, values)

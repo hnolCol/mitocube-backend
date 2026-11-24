@@ -903,6 +903,21 @@ class Neo4JModularProcedures(ModularProceduresABC):
             output_well_metrics=[_with_side(m, "OUTPUT") for m in output_metrics],
         )
 
+    def get_occupied_output_wells(self, plate_tag: str) -> List[str]:
+        """Returns the positions of the plate's output wells that are blocked by executions of
+        modular procedures (still running or kept blocked): the wells an execution setup must not
+        map its outputs onto. Drafts and finished-unblocked executions do not block anything."""
+        if plate_tag is None:
+            return []
+        rows = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell {side : 'OUTPUT'}) "
+            "WHERE e.output_plate_tag = $plate_tag "
+            "AND (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
+            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
+            "RETURN collect(DISTINCT w.position) as occupied",
+            routing_="r", plate_tag=plate_tag, result_transformer_=Result.value)
+        return rows[0] if len(rows) > 0 and rows[0] is not None else []
+
     def execute(self, tag: str, execution, user_tag: str) -> "ProcedureExecutionModel":
         """Starts a published modular procedure execution as a run: the execution is validated
         (design + output well occupancy), created directly in the RUNNING state with an

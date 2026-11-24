@@ -357,6 +357,14 @@ def execute_modular_procedure(procedure_tag : str, execution : InsertProcedureEx
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@router.get("/plates/{plate_tag}/occupied", response_model=List[str])
+def get_procedure_plate_occupied_wells(plate_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    """Returns the positions of the plate's output wells that are blocked by executions of modular
+    procedures (still running or kept blocked after a change). An execution setup must not map its
+    outputs onto these wells; draft executions block nothing."""
+    return db.modular_procedures.get_occupied_output_wells(plate_tag=plate_tag)
+
+
 @router.post("/{procedure_tag}/executions/draft", response_model=ProcedureExecutionModel)
 def create_execution_draft(procedure_tag : str, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
     """Creates an empty DRAFT execution of the given published modular procedure with a

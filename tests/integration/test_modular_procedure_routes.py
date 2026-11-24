@@ -338,6 +338,13 @@ class FakeModularProceduresDB:
                           for w in execution.output_wells])
         return self.executions[execution_tag]
 
+    def get_occupied_output_wells(self, plate_tag):
+        blocks = (lambda exec_model: exec_model.status == "RUNNING"
+                  or getattr(exec_model, "wells_blocked", exec_model.status == "SUCCEEDED"))
+        return [well.position for exec_model in self.executions.values()
+                for well in exec_model.output_wells
+                if exec_model.output_plate_tag == plate_tag and blocks(exec_model)]
+
     def create_execution_draft(self, tag, user_tag):
         if tag not in self.procedures:
             raise KeyError("Modular procedure not found.")
@@ -1416,6 +1423,20 @@ DESIGN_PAYLOAD = {
     "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
     "output_wells": [{"position": "A1", "condition_application_tags": []}],
 }
+
+
+class TestModularProcedurePlateOccupancy:
+    def test_occupied_wells_of_plate(self, client):
+        client.post("/api/procedures/proc-2/execute", json=DESIGN_PAYLOAD)
+        resp = client.get("/api/procedures/plates/plate-2/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == ["A1"]
+        # drafts do not block anything
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        client.put(f"/api/procedures/executions/{draft_tag}", json=dict(DESIGN_PAYLOAD, output_plate_tag="plate-3"))
+        resp = client.get("/api/procedures/plates/plate-3/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == []
 
 
 class TestModularProcedureExecutionDrafts:
