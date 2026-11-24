@@ -21,7 +21,9 @@ class PlatesABC(ABC):
 
     @abstractmethod
     def get_options(self) -> PlateOptionsModel:
-        "Returns the selectable traits (format, cold storage, plate type, vendor) for creating a plate."
+        """Returns all attributes of the storage attribute group with their selectable traits for
+        creating a plate. An attribute that is also part of the mandatory attribute group is
+        flagged with mandatory."""
 
     @abstractmethod
     def insert(self, plate : PlateInsertModel, user_tag : str) -> str:
@@ -40,6 +42,10 @@ class PlatesABC(ABC):
     @abstractmethod
     def list(self) -> List[PlateModel]:
         "Returns all plates, newest first."
+
+    @abstractmethod
+    def list_by_submission(self, submission_tag : str) -> List[PlateModel]:
+        "Returns all plates on which the submission was measured (via any runlist), newest first."
 
     @abstractmethod
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:

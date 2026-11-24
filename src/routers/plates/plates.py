@@ -16,13 +16,27 @@ router = APIRouter(dependencies=[Depends(get_user_from_token)],
 
 @router.get("/plates/options", response_model=PlateOptionsModel)
 def get_plate_options(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
-    "Returns the selectable formats, cold storages, plate types and vendors for creating a plate."
+    "Returns all attributes of the storage attribute group with their selectable traits for creating a plate."
     return db.plates.get_options()
 
 @router.get("/plates", response_model=List[PlateModel])
 def get_plates(user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     "Returns all plates. Runlist and submission counts are only visible to curators."
     plates = db.plates.list()
+    if user.role < UserRolesEnum.CURATOR:
+        for plate in plates:
+            plate.n_runlists = 0
+            plate.n_submissions = 0
+    return plates
+
+
+@router.get("/plates/by-submission/{submission_tag}", response_model=List[PlateModel])
+def get_plates_by_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[PlateModel]:
+    """
+    Returns all plates on which the submission was measured (via any runlist).
+    Runlist and submission counts are only visible to curators.
+    """
+    plates = db.plates.list_by_submission(submission_tag=submission_tag)
     if user.role < UserRolesEnum.CURATOR:
         for plate in plates:
             plate.n_runlists = 0

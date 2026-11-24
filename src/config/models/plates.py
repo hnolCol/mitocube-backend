@@ -1,42 +1,42 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import List, Optional
+
+from config.models.submissions.runs import RunListInstrumentModel
 
 
 class PlateInsertModel(BaseModel):
     """
-    What the user fills in when creating a plate.
+    What the user fills in when creating a plate. The traits are not fixed: any attribute of the
+    storage attribute group (including attributes added later by the admins) can be selected.
 
     Parameter
     ---------
     name : str
         Label of the physical plate, e.g. 'P-96-001'. Must be unique.
-    format_trait_tag : str
-        Trait of the plate format attribute (value e.g. '8x12'). Rows and columns are taken from it.
-    cold_storage_trait_tag : str, optional
-        Trait of the cold storage attribute (e.g. -80 °C freezer).
-    plate_type_trait_tag : str, optional
-        Trait of the plate type attribute (e.g. PCR plate (skirted)).
-    vendor_trait_tag : str, optional
-        Trait of the vendor attribute (e.g. Eppendorf).
-    plate_color_trait_tag : str, optional
-        Trait of the plate color attribute (e.g. Black).
+    trait_tags : dict
+        Maps the tag of an attribute of the storage attribute group to the tag of the trait selected
+        for it, e.g. {'att_container_format': 'att_container_format:8x12'}. Exactly one of the selected
+        traits must have a value of the form '<rows>x<columns>' (e.g. 8x12) - it defines the container
+        format, the number of wells and the plate name prefix.
     location : str, optional
         Free text, e.g. 'Rack 3, Shelf 2'.
     description : str, optional
         Free text.
     """
     name : str = Field(..., min_length=1, max_length=50)
-    format_trait_tag : str
-    cold_storage_trait_tag : Optional[str] = None
-    plate_type_trait_tag : Optional[str] = None
-    vendor_trait_tag : Optional[str] = None
-    plate_color_trait_tag : Optional[str] = None
+    trait_tags : dict = Field(default_factory=dict)
     location : Optional[str] = None
     description : Optional[str] = None
 
+class PlateApplicationModel(BaseModel):
+    "A trait selected for a plate, resolved via its condition application, e.g. container format -> 96-well plate."
+    attribute_tag : str
+    attribute_text : str
+    trait_tag : str
+    trait_text : str
 
 class PlateModel(BaseModel):
-    "A plate as stored in the database. Format, storage, type and vendor come from its condition applications."
+    "A plate as stored in the database. Its selected attributes come from its condition applications."
     tag : str
     name : str
     rows : int
@@ -51,10 +51,7 @@ class PlateModel(BaseModel):
     n_runlists : int = 0
     n_submissions : int = 0
     format : Optional[str] = None
-    cold_storage : Optional[str] = None
-    plate_type : Optional[str] = None
-    vendor : Optional[str] = None
-    plate_color : Optional[str] = None
+    applications : List[PlateApplicationModel] = []
 
 
 class PlateOptionModel(BaseModel):
@@ -62,16 +59,30 @@ class PlateOptionModel(BaseModel):
     tag : str
     text : str
     description : Optional[str] = None
-    rows : Optional[int] = None      # only for formats
-    columns : Optional[int] = None   # only for formats
+    rows : Optional[int] = None      # only for traits with a '<rows>x<columns>' value
+    columns : Optional[int] = None   # only for traits with a '<rows>x<columns>' value
+
+class PlateAttributeOptionsModel(BaseModel):
+    """
+    An attribute of the storage attribute group with its selectable traits. Attributes can be
+    nested: an attribute with a parent_tag (e.g. a container material under the container format)
+    is offered when its parent attribute has a selected trait. An attribute that is also part of
+    the mandatory attribute group is flagged with mandatory and offered as a required input.
+    """
+    tag : str
+    text : str
+    description : Optional[str] = None
+    parent_tag : Optional[str] = None
+    is_format : bool = False
+    mandatory : bool = False   # attribute is also part of the mandatory attribute group: offered as a required input
+    traits : List[PlateOptionModel] = []
 
 
 class PlateRunlistModel(BaseModel):
     "A runlist that has at least one run on a plate, with the per-plate usage."
     runlist_tag : str
     created_at : float
-    instrument_tag : Optional[str] = None
-    instrument_text : Optional[str] = None
+    instruments : List[RunListInstrumentModel] = []
     fractionated : bool = False
     scrambled : bool = False
     n_runs_on_plate : int
@@ -128,8 +139,5 @@ class PlateSubmissionsLayoutModel(BaseModel):
 
 
 class PlateOptionsModel(BaseModel):
-    formats : list[PlateOptionModel] = []
-    cold_storage : list[PlateOptionModel] = []
-    plate_type : list[PlateOptionModel] = []
-    vendor : list[PlateOptionModel] = []
-    plate_color : list[PlateOptionModel] = []
+    "All attributes of the storage attribute group with their selectable traits."
+    attributes : List[PlateAttributeOptionsModel] = []

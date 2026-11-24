@@ -1391,13 +1391,12 @@ class Neo4JSubmissions(SubmissionsABC):
         rl_tag = get_random_string(N=10)
         
         # Build the Cypher query based on whether an instrument relationship should be created or not
-        if runlist.instrument_tag is not None:
+        if runlist.instruments:
             # Query WITH instrument relationship
             query = (
                 "MATCH (submission:Submission {tag: $submission_tag}) "
                 "WITH submission "
                 "MATCH (u:User {tag: $user_tag}) "
-                "MATCH (inst:Trait {tag: $instrument_tag}) "
                 "CREATE (rl:RunList {tag: $rl_tag, created_at: timestamp(), "
                 "   submission_tag: $submission_tag, n_runs: $n_runs, n_plates: $n_plates, "
                 "   scrambled: $scrambled, scrambled_across_plates: $scrambled_across_plates, "
@@ -1405,8 +1404,11 @@ class Neo4JSubmissions(SubmissionsABC):
                 "   aggregated_on: $aggregated_on, user_tag: $user_tag}) "
                 "MERGE (submission)-[:HAS_RUNLIST]->(rl) "
                 "MERGE (u)-[:CREATED]->(rl) "
-                "MERGE (rl)-[:MEASURED_BY]->(inst) "
                 "WITH rl "
+                "UNWIND $instrument_tags AS i_tag "
+                "MATCH (inst:Trait {tag: i_tag}) "
+                "MERGE (rl)-[:MEASURED_BY]->(inst) "
+                "WITH DISTINCT rl "
                 "UNWIND $runs AS run "
                 "CREATE (r:Run {tag: randomUUID(), text: run.name, "
                 "   index: run.index, measurement_index: run.measurement_index, "
@@ -1419,7 +1421,7 @@ class Neo4JSubmissions(SubmissionsABC):
                 "submission_tag": submission_tag,
                 "user_tag": user_tag,
                 "rl_tag": rl_tag,
-                "instrument_tag": runlist.instrument_tag,
+                "instrument_tags": [i.tag for i in runlist.instruments],
                 "n_runs": runlist.n_runs,
                 "n_plates": runlist.n_plates,
                 "scrambled": runlist.scrambled,
@@ -1534,8 +1536,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList {tag: $rl_tag}) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
-            "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
-            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag, "
+            "RETURN rl{.*, user_tag: u.tag, "
+            "   instruments: [(rl)-[:MEASURED_BY]->(i:Trait) | {tag: i.tag, text: i.text}], "
             "   submission_tag: coalesce(rl.submission_tag, rl.dataset_label, $tag)} as rl, "
             "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "
@@ -1556,8 +1558,8 @@ class Neo4JSubmissions(SubmissionsABC):
             "MATCH (:Submission {tag: $tag})-[:HAS_RUNLIST]->(rl:RunList) "
             "MATCH (rl)-[:HAS_RUN]->(r:Run) "
             "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
-            "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
-            "RETURN rl{.*, user_tag: u.tag, instrument_tag: inst.tag, "
+            "RETURN rl{.*, user_tag: u.tag, "
+            "   instruments: [(rl)-[:MEASURED_BY]->(i:Trait) | {tag: i.tag, text: i.text}], "
             "   submission_tag: coalesce(rl.submission_tag, rl.dataset_label, $tag)} as rl, "
             "   collect(r{.*, position: coalesce(r.position, ''), plate_tag: [(r)-[:ON_PLATE]->(p:Plate) | p.tag][0], "
             "             plate_name: [(r)-[:ON_PLATE]->(p:Plate) | p.name][0]}) as runs "

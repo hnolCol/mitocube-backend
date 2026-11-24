@@ -953,14 +953,16 @@ def create_submission_runlist(
             submission_tag=submission_tag,
             sample_list=samples_df,
             user=user,
-            **runlist_props.model_dump(exclude={"instrument_tag", "plate_tags"})
+            **runlist_props.model_dump(exclude={"instrument_tags", "plate_tags"})
         ).create()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    runlist.instrument_tag = runlist_props.instrument_tag
-    if runlist.instrument_tag:
-        runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
+    # the runlist can be measured with multiple instruments (e.g. the LC system and the mass spectrometer)
+    runlist.instruments = [
+        {"tag": i_tag, "text": db.attributes.get_trait_text(tag=i_tag)}
+        for i_tag in dict.fromkeys(runlist_props.instrument_tags)
+    ]
 
     if runlist_props.plate_tags:
         plate_names = {t: db.plates.get(tag=t).name for t in runlist_props.plate_tags}
@@ -987,8 +989,6 @@ def get_submission_runlists(submission_tag: str, user: UserModel = Depends(get_u
     responses = []
     for runlist in runlists:
         ru = db.users.get_user_by_tag(tag=runlist.user_tag)
-        if runlist.instrument_tag:
-            runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
         responses.append(RunListResponseModel(
             **runlist.model_dump(),
             user_email=ru.email if ru else "",
@@ -1007,8 +1007,6 @@ def get_submission_runlist(submission_tag: str, rl_tag: str, user: UserModel = D
         raise HTTPException(status_code=404, detail="No runlist found.")
 
     ru = db.users.get_user_by_tag(tag=runlist.user_tag)
-    if runlist.instrument_tag:
-        runlist.instrument_text = db.attributes.get_trait_text(tag=runlist.instrument_tag)
     return RunListResponseModel(
         **runlist.model_dump(),
         user_email=ru.email if ru else "",
@@ -1034,8 +1032,11 @@ def check_submission(
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     state = db.submissions.get_state(tag=submission_tag)
     
+    # only attributes that are part of both the mandatory and the dataset group are checked for
+    # submissions; other groups (e.g. the storage attributes of the plates) share the mandatory group
     mandatory_tags = db.attributes.get(
-        attribute_groups="mandatory", 
+        attribute_groups=["mandatory", "dataset"],
+        attribute_group_operator="all",
         min_state=state
     )
     ca_defined_attributes = db.submissions.get_defined_attributes(tag=submission_tag)

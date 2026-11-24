@@ -1,3 +1,4 @@
+import time
 from typing import List, Optional
 
 from neo4j import Driver, Result
@@ -9,11 +10,34 @@ from config.models.Policy import (PolicyModel, PolicyInsertModel, PolicyUpdateMo
 
 class Neo4JPolicy(PolicyABC):
 
+    _EXISTS_TTL_SECONDS = 60.0
+    _exists_cache = {"value": False, "expires": 0.0}
+
     def __init__(self, driver : Driver) -> None:
         self._driver = driver
 
+    @classmethod
+    def _invalidate_exists_cache(cls) -> None:
+        cls._exists_cache["expires"] = 0.0
+
+    def exists(self) -> bool:
+        """Returns True if at least one policy exists. Cached with a short TTL so
+        that per-request checks do not spam the database (and its warnings) when
+        no policy has been created yet."""
+        now = time.monotonic()
+        if now < self._exists_cache["expires"]:
+            return self._exists_cache["value"]
+        query = "MATCH (p:Policy) RETURN p.tag AS tag LIMIT 1 "
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        exists = len(r) > 0
+        self._exists_cache["value"] = exists
+        self._exists_cache["expires"] = now + self._EXISTS_TTL_SECONDS
+        return exists
+
     def list(self) -> List[PolicyModel]:
         "Returns the policies (terms of use, data protection) that exist, in the order of POLICY_TYPES."
+        if not self.exists():
+            return []
         query = (
             "MATCH (p:Policy) WHERE p.type IN $types "
             "RETURN properties(p) "
@@ -60,6 +84,7 @@ class Neo4JPolicy(PolicyABC):
                                        required=policy.required,
                                        user_tag=user_tag,
                                        result_transformer_=Result.value)
+        self._invalidate_exists_cache()
         return PolicyModel(**r[0])
 
     def update(self, tag : str, policy : PolicyUpdateModel, user_tag : str) -> Optional[PolicyModel]:
@@ -98,6 +123,7 @@ class Neo4JPolicy(PolicyABC):
             "RETURN deleted_tag "
         )
         r = self._driver.execute_query(query, routing_="w", tag=tag, result_transformer_=Result.value)
+        self._invalidate_exists_cache()
         return len(r) > 0
 
     def agree(self, tag : str, user_tag : str) -> bool:
@@ -114,6 +140,8 @@ class Neo4JPolicy(PolicyABC):
 
     def get_status(self, user_tag : str) -> List[PolicyStatusModel]:
         "Returns for every existing policy whether the user has to agree to it before using MitoCube."
+        if not self.exists():
+            return []
         query = (
             "MATCH (u:User {tag : $user_tag}) "
             "MATCH (p:Policy) WHERE p.type IN $types "

@@ -3,7 +3,7 @@ from string import ascii_uppercase
 from typing import List, Optional, Tuple
 from neo4j import Driver, Result
 
-from config.models.plates import PlateInsertModel, PlateModel, PlateOptionModel, PlateOptionsModel, PlateRunlistModel, PlateSubmissionModel, PlateSubmissionsLayoutModel, PlateWellSubmissionModel, PlateSubmissionLegendModel
+from config.models.plates import PlateInsertModel, PlateModel, PlateOptionModel, PlateOptionsModel, PlateAttributeOptionsModel, PlateRunlistModel, PlateSubmissionModel, PlateSubmissionsLayoutModel, PlateWellSubmissionModel, PlateSubmissionLegendModel
 from config.models.attributes import AttributeTree
 from lib.database.abstract.Plates import PlatesABC
 from lib.database.abstract.ConditionApplications import ConditionApplicationABC
@@ -11,12 +11,13 @@ from services.random_generators import get_random_string
 
 
 # attribute tags of the storage group used for plates
-PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "container_type": "att_container_type", "vendor": "att_vendor", "plate_color" : "att_container_color"}
+#PLATE_ATTRIBUTES = {"format": "att_container_format", "cold_storage": "att_cold_storage", "container_type": "att_container_type", "vendor": "att_vendor", "plate_color" : "att_container_color"}
 
 # attributes + traits the plates need; created on startup if missing (existing ones are never changed)
 STORAGE_GROUP_TAG = "storage"
+MANDATORY_GROUP_TAG = "mandatory"
 STORAGE_ATTRIBUTES = [
-    {"tag": "att_container_format", "text": "Container Format", "traits": [
+    {"tag": "att_container_format", "text": "Container Format", "mandatory": True, "traits": [
         {"value": "1x8",   "text": "1x8",   "description": "8-tube PCR strip"},
         {"value": "1x12",  "text": "1x12",  "description": "12-tube PCR strip"},
         {"value": "3x5",   "text": "3x5",   "description": "15 wells (PAL)"},
@@ -24,7 +25,7 @@ STORAGE_ATTRIBUTES = [
         {"value": "8x12",  "text": "8x12",  "description": "96-well plate"},
         {"value": "16x24", "text": "16x24", "description": "384-well plate"},
     ]},
-    {"tag": "att_cold_storage", "text": "Cold Storage", "traits": [
+    {"tag": "att_cold_storage", "text": "Cold Storage", "mandatory": True, "traits": [
         {"value": "-20", "text": "-20 °C freezer", "description": "Standard freezer (-20 °C)"},
         {"value": "-80", "text": "-80 °C freezer", "description": "Ultra-low temperature freezer (-80 °C)"},
     ]},
@@ -47,13 +48,6 @@ STORAGE_ATTRIBUTES = [
 ]
 
 
-def _trait_text(param_name : str) -> str:
-    "Cypher pattern comprehension returning the trait text of the plate's condition application for an attribute."
-    return (
-        "[(p)-[:HAS_APPLICATION]->(ca:ConditionApplication)-[:INSTANCE_OF]->(t:Trait) "
-        f"WHERE (ca)-[:OF_ATTRIBUTE]->(:Attribute {{tag : ${param_name}}}) | t.text][0]"
-    )
-
 
 def _parse_format(value : str) -> Tuple[int, int]:
     "Parses a format trait value like '8x12' into (rows, columns)."
@@ -70,7 +64,7 @@ class Neo4JPlates(PlatesABC):
     Graph
     -----
     (:User)-[:CREATED]->(:Plate {rows, columns, ...})
-    (:Plate)-[:HAS_APPLICATION]->(:ConditionApplication)   # format, cold storage, plate type, vendor
+    (:Plate)-[:HAS_APPLICATION]->(:ConditionApplication)   # one per selected attribute of the storage group
     (:Run)-[:ON_PLATE {row_index, column_index, position}]->(:Plate)
     """
 
@@ -80,11 +74,10 @@ class Neo4JPlates(PlatesABC):
         "   n_used_wells: COUNT {(p)<-[:ON_PLATE]-(:Run)}, "
         "   n_runlists: COUNT { MATCH (p)<-[:ON_PLATE]-(:Run)<-[:HAS_RUN]-(rl:RunList) RETURN DISTINCT rl }, "
         "   n_submissions: COUNT { MATCH (p)<-[:ON_PLATE]-(:Run)<-[:HAS_RUN]-(:RunList)<-[:HAS_RUNLIST]-(s:Submission) RETURN DISTINCT s }, "
-        f"   format: coalesce(p.format, {_trait_text('format_attribute_tag')}), "
-        f"   cold_storage: {_trait_text('cold_storage_attribute_tag')}, "
-        f"   plate_type: {_trait_text('plate_type_attribute_tag')}, "
-        f"   plate_color: {_trait_text('plate_color_attribute_tag')}, "
-        f"   vendor: {_trait_text('vendor_attribute_tag')}"
+        "   format: p.format, "
+        "   applications: [(p)-[:HAS_APPLICATION]->(:ConditionApplication)-[:INSTANCE_OF]->(t:Trait)"
+        "                   <-[:HAS_TRAIT]-(a:Attribute) "
+        "                   | {attribute_tag: a.tag, attribute_text: a.text, trait_tag: t.tag, trait_text: t.text}]"
         "} AS plate "
     )
 
@@ -121,6 +114,11 @@ class Neo4JPlates(PlatesABC):
             "              a.s = attr.s, a.created_at = timestamp() "
             "MERGE (a)-[:PART_OF]->(ag) "
             "WITH a, attr "
+            "FOREACH (_ IN CASE WHEN attr.mandatory THEN [1] ELSE [] END | "
+            "    MERGE (mg:AttributeGroup {tag: $mandatory_group_tag}) "
+            "    ON CREATE SET mg.created_at = timestamp() "
+            "    MERGE (a)-[:PART_OF]->(mg)) "
+            "WITH a, attr "
             "OPTIONAL MATCH (s:State) WHERE toInteger(s.tag) = 0 "
             "FOREACH (_ IN CASE WHEN s IS NULL THEN [] ELSE [1] END | MERGE (a)-[:REQUIRES_STATE]->(s)) "
             "WITH a, attr "
@@ -130,7 +128,7 @@ class Neo4JPlates(PlatesABC):
             "              t.priority = 500, t.attribute_tag = attr.tag, t.s = trait.s, t.created_at = timestamp() "
             "MERGE (a)-[:HAS_TRAIT]->(t) "
         )
-        self._driver.execute_query(query, group_tag=STORAGE_GROUP_TAG, attributes=attributes, routing_="w")
+        self._driver.execute_query(query, group_tag=STORAGE_GROUP_TAG, mandatory_group_tag=MANDATORY_GROUP_TAG, attributes=attributes, routing_="w")
 
     def exists(self, tag : str) -> bool:
         query = (
@@ -159,72 +157,125 @@ class Neo4JPlates(PlatesABC):
         numbers = [int(m.group(1)) for name in names if (m := pattern.match(name))]
         return f"{prefix}{(max(numbers) + 1 if numbers else 1):03d}"
 
-    def _get_traits(self, attribute_tag : str) -> List[dict]:
-        "Returns the traits of an attribute ordered by priority."
-        query = (
-            "MATCH (:Attribute {tag : $attribute_tag})-[:HAS_TRAIT]->(t:Trait) "
-            "RETURN t.tag AS tag, t.text AS text, t.description AS description, t.value AS value "
-            "ORDER BY t.priority DESC "
-        )
-        return self._driver.execute_query(query, routing_="r", attribute_tag=attribute_tag, result_transformer_=Result.data)
+    def _get_selected_traits(self, selected : List[Tuple[str, str]]) -> List[dict]:
+        """Resolves the selected (attribute_tag, trait_tag) pairs against the storage attribute group.
 
-    def _get_trait_value(self, attribute_tag : str, trait_tag : str) -> Optional[str]:
-        "Returns the trait value if the trait belongs to the attribute, otherwise None."
+        Returns
+        -------
+        List[dict]
+            One entry per valid pair with attribute/trait tag, trait text and trait value.
+
+        Raises
+        ------
+        ValueError
+            If a pair does not exist, i.e. the attribute is not part of the storage attribute group
+            or the trait does not belong to the attribute.
+        """
         query = (
-            "MATCH (:Attribute {tag : $attribute_tag})-[:HAS_TRAIT]->(t:Trait {tag : $trait_tag}) "
-            "RETURN coalesce(t.value, t.text) "
+            "UNWIND $selected AS pair "
+            "MATCH (a:Attribute {tag : pair.attribute_tag})-[:PART_OF]->(:AttributeGroup {tag : $group_tag}) "
+            "MATCH (a)-[:HAS_TRAIT]->(t:Trait {tag : pair.trait_tag}) "
+            "RETURN a.tag AS attribute_tag, t.tag AS trait_tag, t.text AS trait_text, t.value AS trait_value "
         )
-        r = self._driver.execute_query(query, routing_="r", attribute_tag=attribute_tag, trait_tag=trait_tag, result_transformer_=Result.value)
-        return r[0] if len(r) > 0 else None
+        r = self._driver.execute_query(query, routing_="r", group_tag=STORAGE_GROUP_TAG,
+                                        selected=[{"attribute_tag": a, "trait_tag": t} for a, t in selected],
+                                        result_transformer_=Result.data)
+        found = {(row["attribute_tag"], row["trait_tag"]) for row in r}
+        for attribute_tag, trait_tag in selected:
+            if (attribute_tag, trait_tag) not in found:
+                raise ValueError(f"Trait '{trait_tag}' does not belong to an attribute of the storage attribute group.")
+        return r
 
     def get_options(self) -> PlateOptionsModel:
-        formats = []
-        for t in self._get_traits(PLATE_ATTRIBUTES["format"]):
-            try:
-                rows, columns = _parse_format(t["value"])
-            except ValueError:
-                continue  # skip traits without a valid '<rows>x<columns>' value
-            formats.append(PlateOptionModel(tag=t["tag"], text=t["text"], description=t["description"], rows=rows, columns=columns))
+        """Returns all attributes of the storage attribute group with their selectable traits.
 
-        def options(key : str) -> List[PlateOptionModel]:
-            return [PlateOptionModel(tag=t["tag"], text=t["text"], description=t["description"]) for t in self._get_traits(PLATE_ATTRIBUTES[key])]
-
-        return PlateOptionsModel(
-            formats=formats,
-            cold_storage=options("cold_storage"),
-            plate_type=options("plate_type"),
-            vendor=options("vendor"),
-            plate_color=options("plate_color"),
+        The group defines the plates: every attribute added to the group by the admins (also nested
+        child attributes like a container material under the container format) is offered in the
+        create plate dialog. An attribute whose traits have values of the form '<rows>x<columns>' is
+        flagged as the container format. An attribute that is also part of the mandatory attribute
+        group is flagged as mandatory.
+        """
+        query = (
+            "MATCH (a:Attribute)-[:PART_OF]->(:AttributeGroup {tag : $group_tag}) "
+            "OPTIONAL MATCH (parent:Attribute)-[:IS_CHILD]->(a) "
+            "OPTIONAL MATCH (a)-[:PART_OF]->(m:AttributeGroup {tag : $mandatory_group_tag}) "
+            "OPTIONAL MATCH (a)-[:HAS_TRAIT]->(t:Trait) "
+            "WITH a, parent, t ORDER BY t.priority DESC "
+            "WITH a, parent, collect(t {.tag, .text, .description, .value}) AS traits "
+            "RETURN a.tag AS attribute_tag, a.text AS attribute_text, a.description AS attribute_description, "
+            "       parent.tag AS parent_tag, m IS NOT NULL AS mandatory, traits "
+            "ORDER BY a.priority DESC "
         )
+        rows = self._driver.execute_query(query, routing_="r", group_tag=STORAGE_GROUP_TAG,
+                                          mandatory_group_tag=MANDATORY_GROUP_TAG, result_transformer_=Result.data)
+
+        attributes = []
+        for row in rows:
+            traits = []
+            for t in row["traits"]:
+                if not t.get("tag"):
+                    continue
+                trait_rows, trait_columns = None, None
+                try:
+                    trait_rows, trait_columns = _parse_format(t.get("value"))
+                except ValueError:
+                    pass
+                traits.append(PlateOptionModel(tag=t["tag"], text=t["text"], description=t.get("description"),
+                                                rows=trait_rows, columns=trait_columns))
+            if len(traits) == 0:
+                continue
+            attributes.append(PlateAttributeOptionsModel(
+                tag=row["attribute_tag"],
+                text=row["attribute_text"],
+                description=row["attribute_description"],
+                parent_tag=row["parent_tag"],
+                is_format=any(t.rows is not None for t in traits),
+                mandatory=row["mandatory"],
+                traits=traits,
+            ))
+        return PlateOptionsModel(attributes=attributes)
 
     def insert(self, plate : PlateInsertModel, user_tag : str) -> str:
         name = plate.name.strip()
 
-        # format -> rows, columns and text (stored on the plate node)
-        format_value = self._get_trait_value(PLATE_ATTRIBUTES["format"], plate.format_trait_tag)
-        if format_value is None:
-            raise ValueError("Unknown plate format.")
-        rows, columns = _parse_format(format_value)
-        format_text = self._driver.execute_query(
-            "MATCH (t:Trait {tag : $tag}) RETURN t.text", routing_="r",
-            tag=plate.format_trait_tag, result_transformer_=Result.value)[0]
+        # validate the selected traits against the storage attribute group
+        selected = [(attribute_tag, trait_tag) for attribute_tag, trait_tag in plate.trait_tags.items() if trait_tag]
+        if len(selected) == 0:
+            raise ValueError("Select the traits of the plate in the storage attribute group.")
+        resolved = self._get_selected_traits(selected)
+
+        # attributes that are also part of the mandatory attribute group must have a selected trait;
+        # a mandatory child attribute is only enforced when its parent attribute has a selected trait
+        options = self.get_options()
+        selected_attribute_tags = {attribute_tag for attribute_tag, trait_tag in selected}
+        for attribute in options.attributes:
+            if not attribute.mandatory:
+                continue
+            parent = attribute.parent_tag
+            while parent:
+                if parent not in selected_attribute_tags:
+                    break
+                parent = next((a.parent_tag for a in options.attributes if a.tag == parent), None)
+            else:
+                if attribute.tag not in selected_attribute_tags:
+                    raise ValueError(f"Select a trait for the mandatory attribute '{attribute.text}'.")
+
+        # the container format is the selected trait with a '<rows>x<columns>' value
+        formats = []
+        for row in resolved:
+            try:
+                rows, columns = _parse_format(row["trait_value"])
+            except ValueError:
+                continue
+            formats.append((row, rows, columns))
+        if len(formats) != 1:
+            raise ValueError("Exactly one selected trait must define the container format (value e.g. 8x12).")
+        format_row, rows, columns = formats[0]
+        format_text = format_row["trait_text"]
 
         if self.name_exists(name):
             raise ValueError(f"A plate with the name '{name}' exists already. "
                              f"Suggested name: {self.next_name(rows, columns)}")
-
-        # selected traits that become condition applications of the plate
-        selected = [
-            (PLATE_ATTRIBUTES["format"], plate.format_trait_tag),
-            (PLATE_ATTRIBUTES["cold_storage"], plate.cold_storage_trait_tag),
-            (PLATE_ATTRIBUTES["plate_type"], plate.plate_type_trait_tag),
-            (PLATE_ATTRIBUTES["vendor"], plate.vendor_trait_tag),
-            (PLATE_ATTRIBUTES["plate_color"], plate.plate_color_trait_tag),
-        ]
-        selected = [(a, t) for a, t in selected if t]
-        for attribute_tag, trait_tag in selected:
-            if self._get_trait_value(attribute_tag, trait_tag) is None:
-                raise ValueError(f"Trait '{trait_tag}' does not belong to attribute '{attribute_tag}'.")
 
         tag = get_random_string(N=10)
         while self.exists(tag):
@@ -266,23 +317,32 @@ class Neo4JPlates(PlatesABC):
         self._driver.execute_query(query, routing_="w", tag=tag, ca_tags=ca_tags)
         return tag
 
-    def _plate_return_params(self) -> dict:
-        return {
-            "format_attribute_tag": PLATE_ATTRIBUTES["format"],
-            "cold_storage_attribute_tag": PLATE_ATTRIBUTES["cold_storage"],
-            "plate_type_attribute_tag": PLATE_ATTRIBUTES["container_type"],
-            "vendor_attribute_tag": PLATE_ATTRIBUTES["vendor"],
-            "plate_color_attribute_tag": PLATE_ATTRIBUTES["plate_color"]
-        }
+ #   def _plate_return_params(self) -> dict:
+ #       return {
+ #           "format_attribute_tag": PLATE_ATTRIBUTES["format"],
+ #          "cold_storage_attribute_tag": PLATE_ATTRIBUTES["cold_storage"],
+ #           "plate_type_attribute_tag": PLATE_ATTRIBUTES["container_type"],
+ #           "vendor_attribute_tag": PLATE_ATTRIBUTES["vendor"],
+ #           "plate_color_attribute_tag": PLATE_ATTRIBUTES["plate_color"]
+ #       }
 
     def get(self, tag : str) -> Optional[PlateModel]:
         query = "MATCH (p:Plate {tag : $tag}) " + self._PLATE_RETURN
-        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value, **self._plate_return_params())
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.value)
         return PlateModel(**r[0]) if len(r) > 0 else None
 
     def list(self) -> List[PlateModel]:
         query = "MATCH (p:Plate) " + self._PLATE_RETURN + "ORDER BY plate.created_at DESC "
-        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value, **self._plate_return_params())
+        r = self._driver.execute_query(query, routing_="r", result_transformer_=Result.value)
+        return [PlateModel(**p) for p in r]
+
+    def list_by_submission(self, submission_tag : str) -> List[PlateModel]:
+        "Returns all plates on which the submission was measured (via any runlist), newest first."
+        query = (
+            "MATCH (:Submission {tag : $submission_tag})-[:HAS_RUNLIST]->(:RunList)-[:HAS_RUN]->(:Run)-[:ON_PLATE]->(p:Plate) "
+            "WITH DISTINCT p " + self._PLATE_RETURN + "ORDER BY plate.created_at DESC "
+        )
+        r = self._driver.execute_query(query, routing_="r", submission_tag=submission_tag, result_transformer_=Result.value)
         return [PlateModel(**p) for p in r]
 
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:
@@ -296,9 +356,8 @@ class Neo4JPlates(PlatesABC):
     _RUNLISTS_QUERY = (
         "MATCH (p:Plate {tag : $tag})<-[o:ON_PLATE]-(r:Run)<-[:HAS_RUN]-(rl:RunList)<-[:HAS_RUNLIST]-(s:Submission) "
         "OPTIONAL MATCH (u:User)-[:CREATED]->(rl) "
-        "OPTIONAL MATCH (rl)-[:MEASURED_BY]->(inst:Trait) "
         "RETURN rl.tag AS runlist_tag, rl.created_at AS created_at, "
-        "   inst.tag AS instrument_tag, inst.text AS instrument_text, "
+        "   [(rl)-[:MEASURED_BY]->(i:Trait) | {tag: i.tag, text: i.text}] AS instruments, "
         "   rl.fractionated AS fractionated, rl.scrambled AS scrambled, "
         "   count(r) AS n_runs_on_plate, collect(DISTINCT o.position) AS used_positions, "
         "   u.tag AS user_tag, u.firstname AS user_firstname, u.lastname AS user_lastname, "

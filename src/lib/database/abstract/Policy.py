@@ -6,6 +6,9 @@ from config.models.Policy import PolicyModel, PolicyInsertModel, PolicyUpdateMod
 class PolicyABC(ABC):
 
     @abstractmethod
+    def exists(self) -> bool:
+        ""
+    @abstractmethod
     def list(self) -> List[PolicyModel]: 
         ""
     @abstractmethod

@@ -11,7 +11,7 @@ from config.enums.states import SubmissionStatesEnums
 from config.enums.users.roles import UserRolesEnum
 from config.models.permissions import PermissionResponseModel
 
-from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel, InstrumentsStateResponseModel
+from config.models.instruments import InstrumentStateModel, InstrumentStateHistoryResponseModel, InstrumentsStateResponseModel, InstrumentInfoModel, InstrumentInfoUpdateModel
 
 
 from lib.database.abstract.Database import DatabaseABC
@@ -80,6 +80,25 @@ def set_instrument_state(instrument_tag : str, state_tag : str, user : UserModel
     db.instrument_states.set_state(tag = state_tag, instrument_tag = instrument_tag)
     paused = db.instruments.pause_measuring_submissions(instrument_tag) if state_tag != RUNNING_INSTRUMENT_STATE else []
     return {"paused_submissions": paused}
+
+@router.get("/{instrument_tag}/info", response_model=InstrumentInfoModel)
+def get_instrument_info(instrument_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> InstrumentInfoModel:
+    """Returns the free text info of an instrument (e.g. technician contact, service contract)."""
+    info = db.instruments.get_info(instrument_tag=instrument_tag)
+    if info is None:
+        raise HTTPException(status_code=404, detail="Instrument not found.")
+    return info
+
+@router.put("/{instrument_tag}/info", response_model=InstrumentInfoModel)
+def update_instrument_info(instrument_tag : str, info : InstrumentInfoUpdateModel, user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> InstrumentInfoModel:
+    """
+    Creates or updates the free text info of an instrument (e.g. technician contact, service contract).
+    The user must be at least curator. Passing an empty text clears the info.
+    """
+    try:
+        return db.instruments.set_info(instrument_tag=instrument_tag, text=info.text, user_tag=user.tag)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/{instrument_tag}/states/durations") 
 def get_instrument_state_durations(instrument_tag : str, timestamp_min : float = None, timestamp_max : float = None, limit : int = None, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[InstrumentStateHistoryResponseModel]:

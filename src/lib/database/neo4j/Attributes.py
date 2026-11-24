@@ -349,6 +349,7 @@ class Neo4JAttributes(AttributesABC):
     def get(self, 
             tags : List[str] = None,
             attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
+            attribute_group_operator : Literal["any","all"] = "any",
             min_state : SubmissionStatesEnums = None, 
             limit : int = None,
             group_by : Literal["attribute_group","min_state"] = None) -> List[str]|Dict[str, List[str]]:
@@ -364,8 +365,12 @@ class Neo4JAttributes(AttributesABC):
         if attribute_groups is not None:
             if isinstance(attribute_groups,str):
                 attribute_groups = [attribute_groups]
-                
-            query += "AND EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
+
+            if attribute_group_operator == "all":
+                # attributes must be part of every given group
+                query += "AND ALL(g IN $attribute_groups WHERE g IN [(a)-[:PART_OF]->(ag:AttributeGroup) | ag.tag]) "
+            else:
+                query += "AND EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
             
         if min_state is not None:
             query += "AND EXISTS {(s:State)<-[:REQUIRES_STATE]-(a) WHERE toInteger(s.tag) <= $min_state} "
