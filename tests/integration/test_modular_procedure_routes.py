@@ -1271,6 +1271,28 @@ class TestModularProcedureExecutionOverviewRoutes:
         shared_db.submissions.scopes[user.tag] = scope
         return client
 
+    def test_executions_filtered_by_plate(self, client):
+        self._execute_two_submissions(client)
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-3",
+            "input_wells": [{"position": "D1", "sample_tags": ["sample-2"], "output_positions": ["D1"]}],
+            "output_wells": [{"position": "D1", "condition_application_tags": []}]})
+        # a plate fragment matches executions whose input or output plate contains it
+        resp = client.get("/api/procedures/executions/q", params={"search_plate_tag": "plate-3"})
+        assert resp.status_code == 200
+        assert [summary["tag"] for summary in resp.json()] == ["exec-2"]
+        resp = client.get("/api/procedures/executions/q", params={"search_plate_tag": "PLATE-1"})
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+        # combination with the state filter
+        resp = client.get("/api/procedures/executions/q",
+            params={"search_plate_tag": "plate-3", "status": "RUNNING"})
+        assert resp.status_code == 200
+        assert [summary["tag"] for summary in resp.json()] == ["exec-2"]
+        # a fragment that matches nothing returns an empty list
+        resp = client.get("/api/procedures/executions/q", params={"search_plate_tag": "plate-9"})
+        assert resp.status_code == 200
+        assert resp.json() == []
     def test_summaries_include_plateless_drafts(self, client):
         # drafts without a saved design have no plates yet - the overview must list them, not crash
         draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
