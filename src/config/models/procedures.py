@@ -164,8 +164,10 @@ class ExecutionSummaryModel(BaseModel):
     "Summary of a procedure execution for the overview listing: the header data and well counts."
     tag : str
     procedure_tag : str
-    input_plate_tag : str
-    output_plate_tag : str
+    """The plate tags are None while the (draft) execution has no plates in its design yet —
+    drafts appear in the overview listing without a saved design."""
+    input_plate_tag : Optional[str] = None
+    output_plate_tag : Optional[str] = None
     user_tag : str
     responsible_user_tag : Optional[str] = None
     created_at : Optional[float] = None
@@ -235,8 +237,10 @@ class InsertProcedureExecutionModel(BaseModel):
     """The user input to execute a published modular procedure on a set of samples.
     The responsible user defaults to the executing user; well metrics map measured
     attributes (e.g. protein concentration) to output wells."""
-    input_plate_tag : str
-    output_plate_tag : str
+    input_plate_tag : Optional[str] = None
+    output_plate_tag : Optional[str] = None
+    """A draft setup can be saved at any stage: as long as no wells and no metrics are given, the
+    plates may be omitted (a partial save of the work done so far)."""
     responsible_user_tag : Optional[str] = None
     additional_input_plate_tags : List[str] = Field(default_factory=list)
     additional_output_plate_tags : List[str] = Field(default_factory=list)
