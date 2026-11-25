@@ -36,17 +36,20 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
     if len(attribute_tag) <= 4:
         raise HTTPException(status_code=500, detail = "The attribute tag is too short. Please use a longer text for the attribute. Note that the attribute tag is generated from the text by replacing spaces with underscores and adding the prefix 'att_'. Non utf-8 characters are removed. The attribute tag must be at least 5 characters long.")
 
-    ok = db.attributes.insert(tag=attribute_tag, 
-                              text=attribute.text, 
-                              priority=attribute.priority, 
-                              min_state=attribute.min_state, 
-                              abbreviation=attribute.abbr, 
-                              allow_input=attribute.allow_input, 
-                              placeholder=attribute.placeholder,
-                              group_tags=attribute.group_tags, 
-                              parents=attribute.parents,
-                              children=attribute.children, 
-                              required_trait_tags=attribute.required_trait_tags)
+    try:
+        ok = db.attributes.insert(tag=attribute_tag, 
+                                  text=attribute.text, 
+                                  priority=attribute.priority, 
+                                  min_state=attribute.min_state, 
+                                  abbreviation=attribute.abbr, 
+                                  allow_input=attribute.allow_input, 
+                                  placeholder=attribute.placeholder,
+                                  group_tags=attribute.group_tags, 
+                                  parents=attribute.parents,
+                                  children=attribute.children, 
+                                  required_trait_tags=attribute.required_trait_tags)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if ok:
         for t in attribute.traits:
             #tag is created in here
@@ -72,17 +75,20 @@ def update_attribute(attribute_tag : str, attribute : AttributeEditModel, user :
     "Updates existing attribute in the database. Returns True if successful, False otherwise."
     if not db.attributes.exists(tag = attribute_tag):
         raise HTTPException(status_code=404, detail = "Attribute not found.")
-    ok = db.attributes.update(tag=attribute_tag,
-                              text=attribute.text, 
-                              priority=attribute.priority, 
-                              min_state=attribute.min_state, 
-                              abbreviation=attribute.abbr, 
-                              allow_input=attribute.allow_input, 
-                              placeholder=attribute.placeholder,
-                              group_tags=attribute.group_tags, 
-                              parents=attribute.parents,
-                              children=attribute.children, 
-                              required_trait_tags=attribute.required_trait_tags)
+    try:
+        ok = db.attributes.update(tag=attribute_tag,
+                                  text=attribute.text, 
+                                  priority=attribute.priority, 
+                                  min_state=attribute.min_state, 
+                                  abbreviation=attribute.abbr, 
+                                  allow_input=attribute.allow_input, 
+                                  placeholder=attribute.placeholder,
+                                  group_tags=attribute.group_tags, 
+                                  parents=attribute.parents,
+                                  children=attribute.children, 
+                                  required_trait_tags=attribute.required_trait_tags)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return ok
 
 
@@ -278,6 +284,11 @@ def get_attribute_abbr(attribute_tag : str, user : UserModel = Depends(get_user_
 def get_attribute_required_traits(attribute_tag : str, db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the list of required traits for an attribute by its tag"
     return db.attributes.get_required_traits(tag=attribute_tag)
+
+@router.get("/{attribute_tag}/required_traits/owners")
+def get_attribute_required_trait_owners(attribute_tag : str, db : DatabaseABC = Depends(get_db)) -> Dict[str, List[str]]:
+    "Returns for each required trait of the attribute the attribute tags that own the trait (resolved via HAS_TRAIT from the unique trait tag). Maps trait_tag -> owner attribute tags."
+    return db.attributes.get_required_trait_owner_map(tag=attribute_tag)
 
 @router.get("/traits/q")
 def query_trait(search_string : str, attribute_tag : str = None, limit : int = 50, db : DatabaseABC = Depends(get_db)) -> List[str]:

@@ -374,6 +374,22 @@ class AttributesABC(ABC):
         "Returns the parent attribute tag. If no parent defined, an empty list is returned."
         
     @abstractmethod
+    def get_required_trait_owner_tags(self, required_trait_tags : List[str]) -> Dict[str, List[str]]:
+        """Maps each given trait tag to the attribute tags that have this trait (HAS_TRAIT).
+        Traits without any owning attribute map to an empty list."""
+        
+    @abstractmethod
+    def validate_required_traits_for_parents(self, parents : List[str], required_trait_tags : List[str]) -> List[str]:
+        """Returns the required trait tags that are not a trait of any of the given parent
+        attributes. A required trait of an attribute must belong to one of its parents
+        (per-parent yes/no); required traits of other attributes are invalid."""
+        
+    @abstractmethod
+    def get_required_trait_owner_map(self, tag : str) -> Dict[str, List[str]]:
+        """Maps each required trait tag of the attribute to the attribute tags that own the
+        trait, resolved via the HAS_TRAIT relationship from the unique trait tag."""
+        
+    @abstractmethod
     def get_trait_tags(self, tag : str = None, limit : int = None) ->  List[AttributeValueModel]:
         "Return the trait_tags for a given attribute_tag"
         
