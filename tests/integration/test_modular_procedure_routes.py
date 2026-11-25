@@ -400,7 +400,7 @@ class FakeModularProceduresDB:
         execution_tag = f"draft-{self.execution_counter}"
         model = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag, input_plate_tag=None, output_plate_tag=None,
-            user_tag=user_tag, responsible_user_tag=None, created_at=3.0,
+            user_tag=user_tag, responsible_user_tag=user_tag, created_at=3.0,
             status="DRAFT", wells_blocked=False, done_submission_tags=[])
         self.executions[execution_tag] = model
         return model
@@ -1516,6 +1516,8 @@ class TestModularProcedureExecutionDrafts:
         assert draft["status"] == "DRAFT"
         assert draft["input_plate_tag"] is None
         assert draft["wells_blocked"] is False
+        # the creating user is the default responsible user
+        assert draft["responsible_user_tag"] == "abcdefgh"
         # finishing a draft is not possible
         resp = client.post(f"/api/procedures/executions/{draft['tag']}/finish", json={"outcome": "SUCCEEDED"})
         assert resp.status_code == 400
