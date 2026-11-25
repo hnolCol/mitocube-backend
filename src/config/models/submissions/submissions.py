@@ -81,6 +81,7 @@ class NewSubmissionModel(BaseModel):
     dataset_attributes : List[AttributeTree] 
     research_aim : str
     links : List[SubmissionLink] = None
+    linked_submission_tag : Optional[str] = None
     genotypes : Optional[List[List[str]]] = Field(default_factory=list)
     
   

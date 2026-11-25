@@ -327,6 +327,18 @@ def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_use
     check_submission_access(submission_tag = submission_tag, user = user, db = db)
     return db.submissions.get_created_at(tag = submission_tag)
 
+@router.get("/submissions/{submission_tag}/links")
+def get_submission_links(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[Dict]:
+    "Returns the external links of a submission (list of {id, url, comment})."
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    return db.submissions.get_links(tag = submission_tag)
+
+@router.get("/submissions/{submission_tag}/linked_submission")
+def get_linked_submission(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Optional[str]:
+    "Returns the tag of the submission this submission is linked to (e.g. a repeated experiment), or null."
+    check_submission_access(submission_tag = submission_tag, user = user, db = db)
+    return db.submissions.get_linked_submission_tag(tag = submission_tag)
+
 @router.get("/submissions/{submission_tag}/metatext")
 def get_metatext_by_tag(submission_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
     "Returns the metatext tags associated with the given submission"
@@ -650,6 +662,16 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                           title = submission.title,
                           user_tag = user.tag,
                           collaborators = submission.collaborators)
+    # link to another submission (e.g. a repeated experiment) - the linked submission must be in the user's scope
+    if submission.linked_submission_tag:
+        if submission.linked_submission_tag == submission.tag:
+            raise HTTPException(status_code=400, detail="A submission cannot be linked to itself.")
+        check_submission_access(submission_tag = submission.linked_submission_tag, user = user, db = db)
+        db.submissions.set_linked_submission(tag = submission.tag, linked_submission_tag = submission.linked_submission_tag, user_tag = user.tag)
+    # persist external links (skip empty entries)
+    links = [link.model_dump(mode="json") for link in (submission.links or []) if link.url and str(link.url).strip() not in ("", "https://")]
+    if len(links) > 0:
+        db.submissions.set_links(tag = submission.tag, links = links)
     #set the state to submitted
     db.submissions.set_state(tag = submission.tag, state = SubmissionStatesEnums.SUBMITTED, user_tag = user.tag) 
     db.submissions.insert_attributes(tag = submission.tag, traits = submission.dataset_attributes) 
