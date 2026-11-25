@@ -19,6 +19,7 @@ from config.models.procedures import (
     ModularProcedureSubmissionModel,
     ProcedureExecutionModel,
     PublishModularProcedureModel,
+    SUBMISSION_STATE_CHOICES,
 )
 from services.users import get_user_from_token
 from lib.database.Database import get_db
@@ -170,8 +171,10 @@ class FakeModularProceduresDB:
     def insert(self, title, description, user_tag, condition_application_tags=None,
                condition_application_trees=None, protocol_tags=None, plate_constraints=None,
                input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None,
+               required_submission_state=None,
                pubmed_ids=None, min_output_wells_per_sample=1, max_output_wells_per_sample=None):
         self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
+        self._validate_submission_state(required_submission_state)
         condition_application_tags = list(condition_application_tags or [])
         for tree in (condition_application_trees or []):
             # simulate the condition application insert: hash-tagged, idempotent
@@ -192,10 +195,18 @@ class FakeModularProceduresDB:
             input_attribute_tags=list(input_attribute_tags or []),
             output_attribute_tags=list(output_attribute_tags or []),
             success_submission_state=success_submission_state,
+            required_submission_state=required_submission_state,
             pubmed_ids=list(pubmed_ids or []),
             min_output_wells_per_sample=min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
             max_output_wells_per_sample=max_output_wells_per_sample)
         return tag
+
+    @staticmethod
+    def _validate_submission_state(required_submission_state):
+        if required_submission_state is None:
+            return
+        if required_submission_state not in SUBMISSION_STATE_CHOICES:
+            raise ValueError(f"Unknown submission state: {required_submission_state}")
 
     @staticmethod
     def _validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample):
@@ -211,6 +222,7 @@ class FakeModularProceduresDB:
     def update(self, tag, title, description, user_tag, condition_application_tags=None,
                condition_application_trees=None, protocol_tags=None, plate_constraints=None,
                input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None,
+               required_submission_state=None,
                pubmed_ids=None, min_output_wells_per_sample=1, max_output_wells_per_sample=None):
         if tag not in self.procedures:
             raise ValueError("Modular procedure not found.")
@@ -220,6 +232,9 @@ class FakeModularProceduresDB:
         self.procedures[tag].title = title
         self.procedures[tag].description = description
         self.procedures[tag].pubmed_ids = list(pubmed_ids or [])
+        self._validate_submission_state(required_submission_state)
+        self.procedures[tag].success_submission_state = success_submission_state
+        self.procedures[tag].required_submission_state = required_submission_state
         self.procedures[tag].min_output_wells_per_sample = min_output_wells_per_sample if min_output_wells_per_sample is not None else 1
         self.procedures[tag].max_output_wells_per_sample = max_output_wells_per_sample
         return True
@@ -682,6 +697,30 @@ class TestModularProcedureRoutes:
             "condition_application_tags": ["ca-1"], "protocol_tags": ["protocol-1"]})
         assert resp.status_code == 200
         assert resp.json()["status"] == "DRAFT"
+
+    def test_required_submission_state_on_insert_and_update(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "Stateful", "description": "Only state 0 submissions",
+            "required_submission_state": "SUBMITTED"})
+        assert resp.status_code == 200
+        assert resp.json()["required_submission_state"] == "SUBMITTED"
+        # unknown state names are rejected
+        resp = client.post("/api/procedures/", json={
+            "title": "Stateful", "description": "Bad state", "required_submission_state": "NOT_A_STATE"})
+        assert resp.status_code == 400
+        assert "Unknown submission state" in resp.json()["detail"]
+        # the field is optional and can be updated on a draft
+        resp = client.patch("/api/procedures/proc-1", json={
+            "title": "Updated", "description": "d", "required_submission_state": "PROCESSED"})
+        assert resp.status_code == 200
+        assert resp.json()["required_submission_state"] == "PROCESSED"
+        resp = client.patch("/api/procedures/proc-1", json={
+            "title": "Updated", "description": "d", "required_submission_state": None})
+        assert resp.status_code == 200
+        # storing it requires a valid state name as well
+        resp = client.patch("/api/procedures/proc-1", json={
+            "title": "Updated", "description": "d", "required_submission_state": "ALSO_NOT_A_STATE"})
+        assert resp.status_code == 400
 
     def test_update_draft_procedure(self, client):
         resp = client.patch("/api/procedures/proc-1", json={

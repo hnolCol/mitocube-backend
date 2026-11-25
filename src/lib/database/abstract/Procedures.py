@@ -33,14 +33,17 @@ class ModularProceduresABC(ABC):
                plate_constraints: dict = None,
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
-               success_submission_state: str = None) -> str:
+               success_submission_state: str = None,
+               required_submission_state: str = None) -> str:
         """Adds a new draft modular procedure. Condition applications can be reused by
         tag or newly defined as hierarchical attribute/trait trees (like when inserting
         a submission); trees are resolved to condition application tags on insert.
         plate_constraints optionally fixes the required input/output plate format and
         type; input/output attribute tags declare the per-well attributes of the
         procedure; success_submission_state optionally names a submission state that
-        is set automatically for the linked submissions on a successful execution.
+        is set automatically for the linked submissions on a successful execution;
+        required_submission_state optionally restricts executions of the procedure to
+        submissions in that state (None means unconstrained).
         Returns the tag of the created procedure.
         Raises a ValueError if a procedure with the same tag already exists."""
 
@@ -64,7 +67,8 @@ class ModularProceduresABC(ABC):
                plate_constraints: dict = None,
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
-               success_submission_state: str = None) -> bool:
+               success_submission_state: str = None,
+               required_submission_state: str = None) -> bool:
         """Updates a draft modular procedure. Condition application trees are resolved
         to tags like on insert.
         Raises a ValueError if the procedure does not exist or is published

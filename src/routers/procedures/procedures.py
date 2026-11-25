@@ -238,6 +238,7 @@ def insert_modular_procedure(procedure : InsertModularProcedureModel, user : Use
                                           input_attribute_tags=procedure.input_attribute_tags,
                                           output_attribute_tags=procedure.output_attribute_tags,
                                           success_submission_state=procedure.success_submission_state,
+                                          required_submission_state=procedure.required_submission_state,
                                           pubmed_ids=procedure.pubmed_ids,
                                           min_output_wells_per_sample=procedure.min_output_wells_per_sample,
                                           max_output_wells_per_sample=procedure.max_output_wells_per_sample)
@@ -267,6 +268,7 @@ def update_modular_procedure(procedure_tag : str, updated_procedure : UpdateModu
                                      input_attribute_tags=updated_procedure.input_attribute_tags,
                                      output_attribute_tags=updated_procedure.output_attribute_tags,
                                      success_submission_state=updated_procedure.success_submission_state,
+                                     required_submission_state=updated_procedure.required_submission_state,
                                      pubmed_ids=updated_procedure.pubmed_ids,
                                      min_output_wells_per_sample=updated_procedure.min_output_wells_per_sample,
                                      max_output_wells_per_sample=updated_procedure.max_output_wells_per_sample)
