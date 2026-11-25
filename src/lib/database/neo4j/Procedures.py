@@ -43,6 +43,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
                                input_attribute_tags: List[str] = None,
                                output_attribute_tags: List[str] = None,
                                success_submission_state: str = None,
+                               required_submission_state: str = None,
                                pubmed_ids: List[str] = None,
                                min_output_wells_per_sample: int = 1,
                                max_output_wells_per_sample: int = None) -> str:
@@ -56,6 +57,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "input_attribute_tags": sorted(input_attribute_tags or []),
             "output_attribute_tags": sorted(output_attribute_tags or []),
             "success_submission_state": success_submission_state,
+            "required_submission_state": required_submission_state,
             "pubmed_ids": sorted(pubmed_ids or []),
             "min_output_wells_per_sample": min_output_wells_per_sample,
             "max_output_wells_per_sample": max_output_wells_per_sample,
@@ -115,6 +117,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
                success_submission_state: str = None,
+               required_submission_state: str = None,
                pubmed_ids: List[str] = None,
                min_output_wells_per_sample: int = 1,
                max_output_wells_per_sample: int = None) -> str:
@@ -125,6 +128,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         protocol_tags = protocol_tags or []
         plate_constraints = plate_constraints or {}
         self._validate_success_submission_state(success_submission_state)
+        self._validate_success_submission_state(required_submission_state)
         self._validate_plate_constraint_texts(plate_constraints)
         self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
         tag = create_hierarchical_hash([title, description, sorted(condition_application_tags), "1"])
@@ -151,6 +155,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format": plate_constraints.get("output_plate_format"),
             "output_plate_type": plate_constraints.get("output_plate_type"),
             "success_submission_state": success_submission_state,
+            "required_submission_state": required_submission_state,
             "pubmed_ids": list(pubmed_ids or []),
             "min_output_wells_per_sample": min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
             "max_output_wells_per_sample": max_output_wells_per_sample,
@@ -198,6 +203,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "input_attribute_tags: [tag IN input_attribute_tags WHERE tag IS NOT NULL], "
             "output_attribute_tags: [tag IN output_attribute_tags WHERE tag IS NOT NULL], "
             "success_submission_state: m.success_submission_state, "
+            "required_submission_state: m.required_submission_state, "
             "pubmed_ids: coalesce(m.pubmed_ids, []), "
             "min_output_wells_per_sample: coalesce(m.min_output_wells_per_sample, 1), "
             "max_output_wells_per_sample: m.max_output_wells_per_sample} as procedure"
@@ -271,6 +277,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format": parent.output_plate_format,
             "output_plate_type": parent.output_plate_type,
             "success_submission_state": parent.success_submission_state,
+            "required_submission_state": parent.required_submission_state,
             "pubmed_ids": list(parent.pubmed_ids or []),
             "min_output_wells_per_sample": parent.min_output_wells_per_sample if parent.min_output_wells_per_sample is not None else 1,
             "max_output_wells_per_sample": parent.max_output_wells_per_sample,
@@ -311,7 +318,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
                plate_constraints: dict = None,
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
-               success_submission_state: str = None) -> bool:
+               success_submission_state: str = None,
+               required_submission_state: str = None) -> bool:
         "Updates a draft modular procedure. Published procedures are immutable."
         if not self.exists(tag=tag):
             raise ValueError("Modular procedure not found.")
@@ -321,6 +329,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
         protocol_tags = protocol_tags or []
         plate_constraints = plate_constraints or {}
         self._validate_success_submission_state(success_submission_state)
+        self._validate_success_submission_state(required_submission_state)
         self._validate_plate_constraint_texts(plate_constraints)
 
         query = (
@@ -334,6 +343,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "m.input_plate_format = $input_plate_format, m.input_plate_type = $input_plate_type, "
             "m.output_plate_format = $output_plate_format, m.output_plate_type = $output_plate_type, "
             "m.success_submission_state = $success_submission_state, "
+            "m.required_submission_state = $required_submission_state, "
             "m.pubmed_ids = $pubmed_ids, "
             "m.min_output_wells_per_sample = $min_output_wells_per_sample, "
             "m.max_output_wells_per_sample = $max_output_wells_per_sample "
@@ -346,6 +356,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_format": plate_constraints.get("output_plate_format"),
             "output_plate_type": plate_constraints.get("output_plate_type"),
             "success_submission_state": success_submission_state,
+            "required_submission_state": required_submission_state,
             "pubmed_ids": list(pubmed_ids or []),
             "min_output_wells_per_sample": min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
             "max_output_wells_per_sample": max_output_wells_per_sample,
@@ -388,6 +399,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             input_attribute_tags=procedure.input_attribute_tags,
             output_attribute_tags=procedure.output_attribute_tags,
             success_submission_state=procedure.success_submission_state,
+            required_submission_state=procedure.required_submission_state,
             pubmed_ids=procedure.pubmed_ids,
             min_output_wells_per_sample=procedure.min_output_wells_per_sample,
             max_output_wells_per_sample=procedure.max_output_wells_per_sample)
@@ -834,6 +846,25 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="r", sample_tags=all_sample_tags, result_transformer_=Result.value)
         if len(missing_samples) > 0:
             raise ValueError(f"Samples not found: {', '.join(missing_samples)}")
+
+        # the procedure may restrict its executions to submissions in a given state (e.g. SUBMITTED)
+        if procedure.required_submission_state is not None:
+            from config.enums.states import SubmissionStatesEnums
+            required_state_tag = int(SubmissionStatesEnums[procedure.required_submission_state])
+            wrong_state_submissions = self._driver.execute_query(
+                "UNWIND $sample_tags as sample_tag "
+                "MATCH (s:Submission)-[:HAS_SAMPLE]->(sample:Sample {tag : sample_tag}) "
+                "OPTIONAL MATCH (s)-[:IN_STATE]->(state:State) "
+                "WITH s, sample, collect(DISTINCT state.tag) as state_tags "
+                "WHERE NOT $required_state_tag IN state_tags "
+                "RETURN DISTINCT s.tag as submission_tag, state_tags",
+                routing_="r", sample_tags=all_sample_tags, required_state_tag=required_state_tag,
+                result_transformer_=Result.data)
+            if len(wrong_state_submissions) > 0:
+                raise ValueError("Submissions not in the state required by the procedure "
+                                 f"({procedure.required_submission_state}): "
+                                 + ", ".join(f"{row['submission_tag']} (state {', '.join(str(s) for s in row['state_tags'])})"
+                                              for row in wrong_state_submissions))
 
         return {"responsible_user_tag": responsible_user_tag,
                 "input_plates": input_plates,
