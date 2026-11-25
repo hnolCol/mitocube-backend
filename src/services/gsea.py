@@ -116,15 +116,10 @@ def null_enrichment_scores(scores, n_h, n_permutations, p=1.0, seed=None):
     if n_h > n:
         raise ValueError("Set size larger than the ranked list.")
 
-    out = np.empty(n_permutations, dtype=np.float64)
-    chunk = max(1, min(n_permutations, int(20_000_000 // max(n, 1))))
-    done = 0
-    while done < n_permutations:
-        m = min(chunk, n_permutations - done)
-        idx = np.argpartition(rng.random((m, n)), n_h, axis=1)[:, :n_h]
-        out[done:done + m] = _enrichment_scores_uniform(scores, idx, p)
-        done += m
-    return out
+    hits = np.empty((n_permutations, n_h), dtype=np.int64)
+    for i in range(n_permutations):
+        hits[i] = rng.choice(n, n_h, replace=False)
+    return _enrichment_scores_uniform(scores, hits, p)
 
 
 _NULL_CACHE = {}
