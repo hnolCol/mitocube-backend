@@ -1063,7 +1063,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="w", procedure_tag=tag, user_tag=user_tag, execution_tag=execution_tag,
             props={"procedure_tag": tag, "input_plate_tag": None, "output_plate_tag": None,
                    "input_plate_tags": [], "output_plate_tags": [],
-                   "user_tag": user_tag, "responsible_user_tag": None, "status": "DRAFT",
+                   "user_tag": user_tag, "responsible_user_tag": user_tag, "status": "DRAFT",
                    "wells_blocked": False})
         self._set_execution_state(execution_tag=execution_tag, state="DRAFT", user_tag=user_tag)
         return self.get_execution(execution_tag=execution_tag)
