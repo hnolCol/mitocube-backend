@@ -1031,6 +1031,22 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="r", plate_tag=plate_tag, result_transformer_=Result.value)
         return rows[0] if len(rows) > 0 and rows[0] is not None else []
 
+    def get_draft_executions_wells(self, plate_tag: str) -> Dict[str, List[str]]:
+        """Returns a map of the plate's well positions to the tags of the DRAFT executions that
+        use them (input or output side). Drafts block nothing — publishing this map lets the
+        setup pages warn about potential conflicts between parallel drafts of several curators
+        (only the execution that starts first gets the wells)."""
+        if plate_tag is None:
+            return {}
+        rows = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {status : 'DRAFT'})-[:HAS_WELL]->(w:ExecutionWell) "
+            "WHERE ((w.side = 'INPUT' AND coalesce(w.plate_tag, e.input_plate_tag) = $plate_tag) OR "
+            "(w.side = 'OUTPUT' AND coalesce(w.plate_tag, e.output_plate_tag) = $plate_tag)) "
+            "RETURN w.position AS position, collect(DISTINCT e.tag) AS draft_tags "
+            "ORDER BY w.position",
+            routing_="r", plate_tag=plate_tag, result_transformer_=Result.data)
+        return {row["position"]: list(row["draft_tags"]) for row in rows}
+
     def execute(self, tag: str, execution, user_tag: str) -> "ProcedureExecutionModel":
         """Starts a published modular procedure execution as a run: the execution is validated
         (design + output well occupancy), created directly in the RUNNING state with an

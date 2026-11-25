@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List
+from typing import Dict, List
 
 from config.models.user import UserModel
 from services.attribute_hierarchy import validate_attribute_trees
@@ -365,6 +365,15 @@ def get_procedure_plate_occupied_wells(plate_tag : str, user : UserModel = Depen
     procedures (still running or kept blocked after a change). An execution setup must not map its
     outputs onto these wells; draft executions block nothing."""
     return db.modular_procedures.get_occupied_output_wells(plate_tag=plate_tag)
+
+
+@router.get("/plates/{plate_tag}/drafts/occupied", response_model=Dict[str, List[str]])
+def get_procedure_plate_draft_wells(plate_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict[str, List[str]]:
+    """Returns a map of the plate's well positions to the tags of the DRAFT executions using them
+    (input or output side). Drafts block nothing, but set ups that would place or map the same
+    wells can warn about the potential conflict between parallel drafts of several curators
+    (only the execution that starts first gets the wells)."""
+    return db.modular_procedures.get_draft_executions_wells(plate_tag=plate_tag)
 
 
 @router.post("/{procedure_tag}/executions/draft", response_model=ProcedureExecutionModel)
