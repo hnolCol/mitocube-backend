@@ -735,8 +735,15 @@ class Neo4JModularProcedures(ModularProceduresABC):
         from config.models.procedures import split_well_ref
         input_plates = self._design_plate_tags(execution, "input")
         output_plates = self._design_plate_tags(execution, "output")
+        # a draft can be saved at any stage: an empty design (no wells, no metrics) may omit one or
+        # both plates - the design is completed by a later save and fully validated when starting
+        empty_design = (len(execution.input_wells) == 0 and len(execution.output_wells) == 0
+                        and len(execution.output_well_metrics or []) == 0
+                        and len(getattr(execution, "input_well_metrics", None) or []) == 0)
         for side, plate_tags in (("input", input_plates), ("output", output_plates)):
             if len(plate_tags) == 0:
+                if empty_design:
+                    continue
                 raise ValueError("Input and output plates must be defined.")
             for plate_tag in plate_tags:
                 plate_exists = self._driver.execute_query(
@@ -884,7 +891,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "e.input_plate_tags = $input_plate_tags, e.output_plate_tags = $output_plate_tags, "
             "e.responsible_user_tag = $responsible_user_tag, e.wells_blocked = $wells_blocked",
             routing_="w", execution_tag=execution_tag,
-            input_plate_tag=design["input_plates"][0], output_plate_tag=design["output_plates"][0],
+            input_plate_tag=design["input_plates"][0] if design["input_plates"] else None,
+            output_plate_tag=design["output_plates"][0] if design["output_plates"] else None,
             input_plate_tags=design["input_plates"], output_plate_tags=design["output_plates"],
             responsible_user_tag=design["responsible_user_tag"], wells_blocked=wells_blocked)
         output_well_samples = design["output_well_samples"]
