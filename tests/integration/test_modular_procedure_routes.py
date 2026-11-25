@@ -1271,6 +1271,16 @@ class TestModularProcedureExecutionOverviewRoutes:
         shared_db.submissions.scopes[user.tag] = scope
         return client
 
+    def test_summaries_include_plateless_drafts(self, client):
+        # drafts without a saved design have no plates yet - the overview must list them, not crash
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.get("/api/procedures/executions/q")
+        assert resp.status_code == 200
+        by_tag = {summary["tag"]: summary for summary in resp.json()}
+        assert by_tag[draft_tag]["input_plate_tag"] is None
+        assert by_tag[draft_tag]["output_plate_tag"] is None
+        assert by_tag[draft_tag]["status"] == "DRAFT"
+
     def test_curator_sees_all_executions(self, client):
         shared_db = self._shared_db(client)
         self._execute_two_submissions(client)
