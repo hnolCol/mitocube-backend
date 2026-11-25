@@ -391,6 +391,19 @@ class FakeModularProceduresDB:
                                 else exec_model.output_plate_tags[0]) == plate_tag)
                 and blocks(exec_model)]
 
+    def get_draft_executions_wells(self, plate_tag):
+        draft_wells = {}
+        for exec_model in self.executions.values():
+            if exec_model.status != "DRAFT":
+                continue
+            if exec_model.input_plate_tag == plate_tag:
+                for well in exec_model.input_wells:
+                    draft_wells.setdefault(well.position, []).append(exec_model.tag)
+            if exec_model.output_plate_tag == plate_tag:
+                for well in exec_model.output_wells:
+                    draft_wells.setdefault(well.position, []).append(exec_model.tag)
+        return draft_wells
+
     def create_execution_draft(self, tag, user_tag):
         if tag not in self.procedures:
             raise KeyError("Modular procedure not found.")
@@ -1567,6 +1580,23 @@ class TestModularProcedureExecutionDrafts:
         resp = client.post(f"/api/procedures/executions/{draft_tag}/start")
         assert resp.status_code == 400
         assert "already used" in resp.json()["detail"]
+
+    def test_draft_wells_are_reported_for_conflict_warnings(self, client):
+        # drafts block nothing, but their wells are reported so setups can warn about conflicts
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.put(f"/api/procedures/executions/{draft_tag}", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        resp = client.get("/api/procedures/plates/plate-1/drafts/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == {"A1": [draft_tag]}
+        resp = client.get("/api/procedures/plates/plate-2/drafts/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == {"A1": [draft_tag]}
+        # a started execution is no draft and is not reported here
+        client.post(f"/api/procedures/executions/{draft_tag}/start")
+        resp = client.get("/api/procedures/plates/plate-2/drafts/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == {}
 
     def test_draft_can_be_deleted(self, client):
         draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]

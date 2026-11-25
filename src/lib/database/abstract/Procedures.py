@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from config.models.procedures import (
     ModularProcedureBaseModel,
@@ -146,6 +146,13 @@ class ModularProceduresABC(ABC):
         """Returns the positions of the plate's output wells blocked by executions (running or
         kept blocked) — the wells an execution setup must not map its outputs onto. Drafts and
         finished-unblocked executions do not block anything."""
+
+    @abstractmethod
+    def get_draft_executions_wells(self, plate_tag: str) -> Dict[str, List[str]]:
+        """Returns a map of the plate's well positions to the tags of the DRAFT executions that
+        use them (input or output side). Drafts block nothing — set ups use this map to warn
+        about potential conflicts between parallel drafts (only the execution that starts
+        first gets the wells)."""
 
     @abstractmethod
     def create_execution_draft(self, tag: str, user_tag: str):
