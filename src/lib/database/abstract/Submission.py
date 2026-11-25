@@ -91,6 +91,22 @@ class SubmissionsABC(ABC):
     @abstractmethod
     def get_title(self, tag : str) -> str:
         "Return the title of a given submission."
+
+    @abstractmethod
+    def set_links(self, tag : str, links : List[Dict]) -> bool:
+        """Stores the external links of a submission (list of {id, url, comment} dicts)."""
+
+    @abstractmethod
+    def get_links(self, tag : str) -> List[Dict]:
+        """Returns the external links of a submission (list of {id, url, comment} dicts)."""
+
+    @abstractmethod
+    def set_linked_submission(self, tag : str, linked_submission_tag : str, user_tag : str = None) -> bool:
+        """Links a submission to another submission (e.g. a repeated experiment)."""
+
+    @abstractmethod
+    def get_linked_submission_tag(self, tag : str) -> Optional[str]:
+        """Returns the tag of the submission this submission is linked to, or None."""
         
     @abstractmethod
     def set_title(self, tag : str, title : str)-> bool:
