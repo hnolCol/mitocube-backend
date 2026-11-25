@@ -346,9 +346,19 @@ class Neo4JPlates(PlatesABC):
         return [PlateModel(**p) for p in r]
 
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:
+        """The occupied wells of a plate: the wells holding a runlist run and the wells blocked by
+        executions of modular procedures (a running execution occupies the wells of both its
+        sides; finished executions keep their output wells blocked unless they were released)."""
         query = (
             "MATCH (:Plate {tag : $tag})<-[o:ON_PLATE]-(:Run) "
             "RETURN o.row_index AS row_index, o.column_index AS column_index, o.position AS position "
+            "UNION "
+            "MATCH (e:ModularProcedureExecution)-[:HAS_WELL]->(w:ExecutionWell) "
+            "WHERE (coalesce(e.status, 'RUNNING') = 'RUNNING' OR "
+            "coalesce(e.wells_blocked, coalesce(e.status, 'RUNNING') = 'SUCCEEDED')) "
+            "AND ((w.side = 'INPUT' AND coalesce(w.plate_tag, e.input_plate_tag) = $tag) OR "
+            "(w.side = 'OUTPUT' AND coalesce(w.plate_tag, e.output_plate_tag) = $tag)) "
+            "RETURN w.row_index AS row_index, w.column_index AS column_index, w.position AS position "
         )
         r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.data)
         return [(w["row_index"], w["column_index"], w["position"]) for w in r]

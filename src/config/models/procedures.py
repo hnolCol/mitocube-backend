@@ -62,6 +62,8 @@ class ModularProcedureBaseModel(BaseModel):
     """Attributes for which data are expected on the output wells of a successful execution."""
     success_submission_state : Optional[str] = None
     """Optional submission state (name of SubmissionStatesEnums, e.g. 'PROCESSED') that is set automatically for the linked submissions when an execution is confirmed successful."""
+    required_submission_state : Optional[str] = None
+    """Optional submission state (name of SubmissionStatesEnums, e.g. 'SUBMITTED' for state 0) that the linked submissions must be in: only submissions in this state are offered when setting up an execution. None means unconstrained."""
     pubmed_ids : List[str] = Field(default_factory=list)
     """PubMed IDs of the publications this procedure is based on or referenced by."""
     min_output_wells_per_sample : int = 1
@@ -88,6 +90,7 @@ class InsertModularProcedureModel(BaseModel):
     input_attribute_tags : List[str] = Field(default_factory=list)
     output_attribute_tags : List[str] = Field(default_factory=list)
     success_submission_state : Optional[str] = None
+    required_submission_state : Optional[str] = None
     pubmed_ids : List[str] = Field(default_factory=list)
     min_output_wells_per_sample : int = 1
     max_output_wells_per_sample : Optional[int] = None
@@ -106,6 +109,7 @@ class UpdateModularProcedureModel(BaseModel):
     input_attribute_tags : List[str] = Field(default_factory=list)
     output_attribute_tags : List[str] = Field(default_factory=list)
     success_submission_state : Optional[str] = None
+    required_submission_state : Optional[str] = None
     pubmed_ids : List[str] = Field(default_factory=list)
     min_output_wells_per_sample : int = 1
     max_output_wells_per_sample : Optional[int] = None

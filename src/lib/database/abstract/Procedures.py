@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import abstractmethod, ABC
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from config.models.procedures import (
     ModularProcedureBaseModel,
@@ -33,14 +33,17 @@ class ModularProceduresABC(ABC):
                plate_constraints: dict = None,
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
-               success_submission_state: str = None) -> str:
+               success_submission_state: str = None,
+               required_submission_state: str = None) -> str:
         """Adds a new draft modular procedure. Condition applications can be reused by
         tag or newly defined as hierarchical attribute/trait trees (like when inserting
         a submission); trees are resolved to condition application tags on insert.
         plate_constraints optionally fixes the required input/output plate format and
         type; input/output attribute tags declare the per-well attributes of the
         procedure; success_submission_state optionally names a submission state that
-        is set automatically for the linked submissions on a successful execution.
+        is set automatically for the linked submissions on a successful execution;
+        required_submission_state optionally restricts executions of the procedure to
+        submissions in that state (None means unconstrained).
         Returns the tag of the created procedure.
         Raises a ValueError if a procedure with the same tag already exists."""
 
@@ -64,7 +67,8 @@ class ModularProceduresABC(ABC):
                plate_constraints: dict = None,
                input_attribute_tags: List[str] = None,
                output_attribute_tags: List[str] = None,
-               success_submission_state: str = None) -> bool:
+               success_submission_state: str = None,
+               required_submission_state: str = None) -> bool:
         """Updates a draft modular procedure. Condition application trees are resolved
         to tags like on insert.
         Raises a ValueError if the procedure does not exist or is published
@@ -146,6 +150,13 @@ class ModularProceduresABC(ABC):
         """Returns the positions of the plate's output wells blocked by executions (running or
         kept blocked) — the wells an execution setup must not map its outputs onto. Drafts and
         finished-unblocked executions do not block anything."""
+
+    @abstractmethod
+    def get_draft_executions_wells(self, plate_tag: str) -> Dict[str, List[str]]:
+        """Returns a map of the plate's well positions to the tags of the DRAFT executions that
+        use them (input or output side). Drafts block nothing — set ups use this map to warn
+        about potential conflicts between parallel drafts (only the execution that starts
+        first gets the wells)."""
 
     @abstractmethod
     def create_execution_draft(self, tag: str, user_tag: str):
@@ -242,7 +253,9 @@ class ModularProceduresABC(ABC):
 
     @abstractmethod
     def set_execution_metrics(self, execution_tag: str, well_metrics, user_tag: str):
-        """Sets or updates the measured attribute values (metrics) of the output
-        wells of a procedure execution. Raises a KeyError if the execution does
-        not exist and a ValueError if a well is not an output well of the
-        execution or an attribute does not exist."""
+        """Sets or updates the measured attribute values (metrics) of an execution's wells: the
+        result values of the declared attributes are often only readable after the run, hence
+        this is available only for RUNNING and SUCCEEDED executions (a draft enters its values
+        via the draft save). Setting the same well, trait and side again updates the value.
+        Raises a KeyError if the execution does not exist and a ValueError if its state is
+        neither RUNNING nor SUCCEEDED or a well or trait is unknown."""

@@ -1,3 +1,4 @@
+import json
 import math
 import re
 from typing import Literal, List , Dict, Optional
@@ -227,7 +228,49 @@ class Neo4JSubmissions(SubmissionsABC):
         )
         r =  self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r[0] if len(r) > 0 else None
-    
+
+    def set_links(self, tag : str, links : List[Dict]) -> bool:
+        """Stores the external links of a submission as a JSON string property on the Submission node."""
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "SET submission.links = $links_json "
+            "RETURN submission.tag AS tag "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag = tag, links_json = json.dumps(links), result_transformer_=Result.value)
+        return len(r) > 0
+
+    def get_links(self, tag : str) -> List[Dict]:
+        """Returns the external links of a submission (list of {id, url, comment} dicts)."""
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "RETURN submission.links AS links "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        if len(r) == 0 or r[0] is None:
+            return []
+        return json.loads(r[0])
+
+    def set_linked_submission(self, tag : str, linked_submission_tag : str, user_tag : str = None) -> bool:
+        """Links a submission to another submission (e.g. a repeated experiment) via a LINKED_TO
+        relationship and a linked_submission_tag property on the Submission node."""
+        query = (
+            "MATCH (submission:Submission {tag : $tag}), (linked:Submission {tag : $linked_submission_tag}) "
+            "MERGE (submission)-[r:LINKED_TO]->(linked) "
+            "SET submission.linked_submission_tag = $linked_submission_tag, r.created_at = coalesce(r.created_at, timestamp()) "
+            "RETURN submission.tag AS tag "
+        )
+        r = self._driver.execute_query(query, routing_="w", tag = tag, linked_submission_tag = linked_submission_tag, result_transformer_=Result.value)
+        return len(r) > 0
+
+    def get_linked_submission_tag(self, tag : str) -> Optional[str]:
+        """Returns the tag of the submission this submission is linked to, or None."""
+        query = (
+            "MATCH (submission:Submission {tag : $tag}) "
+            "RETURN submission.linked_submission_tag AS linked "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
+        return r[0] if len(r) > 0 else None
+
     def get_state(self, tag: str) -> SubmissionStatesEnums:
         "This returns the current state of the submission. To see all states of the submission use history"
         

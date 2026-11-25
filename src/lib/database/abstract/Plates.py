@@ -49,7 +49,10 @@ class PlatesABC(ABC):
 
     @abstractmethod
     def get_occupied_positions(self, tag : str) -> List[Tuple[int, int, str]]:
-        "Returns (row_index, column_index, position) of all wells on the plate that hold a run."
+        """Returns (row_index, column_index, position) of all occupied wells of the plate: the
+        wells holding a runlist run and the wells blocked by executions of modular procedures
+        (running executions block both their sides; finished ones keep output wells blocked
+        unless released)."""
 
     @abstractmethod
     def get_runlists(self, tag : str) -> List[PlateRunlistModel]:

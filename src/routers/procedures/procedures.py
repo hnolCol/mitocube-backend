@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from lib.database.Database import get_db
 from lib.database.abstract.Database import DatabaseABC
-from typing import List
+from typing import Dict, List
 
 from config.models.user import UserModel
 from services.attribute_hierarchy import validate_attribute_trees
@@ -183,8 +183,11 @@ def get_modular_procedure_execution(execution_tag : str, user : UserModel = Depe
 
 @router.post("/executions/{execution_tag}/metrics", response_model=ProcedureExecutionModel)
 def set_modular_procedure_execution_metrics(execution_tag : str, well_metrics : List[ExecutionWellMetricModel], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
-    """Sets or updates the measured attribute values (metrics) of the output wells of a procedure
-    execution, e.g. the protein concentration of each well. The user must be at least curator."""
+    """Sets or updates the measured attribute values (metrics) of an execution's wells - the
+    result values of the declared attributes often can only be read out after the run, so this
+    is available for RUNNING and SUCCEEDED executions (drafts enter their values via the draft
+    save). Setting the same well, trait and side again updates the value.
+    The user must be at least curator."""
     try:
         return db.modular_procedures.set_execution_metrics(execution_tag=execution_tag, well_metrics=well_metrics, user_tag=user.tag)
     except KeyError:
@@ -238,6 +241,7 @@ def insert_modular_procedure(procedure : InsertModularProcedureModel, user : Use
                                           input_attribute_tags=procedure.input_attribute_tags,
                                           output_attribute_tags=procedure.output_attribute_tags,
                                           success_submission_state=procedure.success_submission_state,
+                                          required_submission_state=procedure.required_submission_state,
                                           pubmed_ids=procedure.pubmed_ids,
                                           min_output_wells_per_sample=procedure.min_output_wells_per_sample,
                                           max_output_wells_per_sample=procedure.max_output_wells_per_sample)
@@ -267,6 +271,7 @@ def update_modular_procedure(procedure_tag : str, updated_procedure : UpdateModu
                                      input_attribute_tags=updated_procedure.input_attribute_tags,
                                      output_attribute_tags=updated_procedure.output_attribute_tags,
                                      success_submission_state=updated_procedure.success_submission_state,
+                                     required_submission_state=updated_procedure.required_submission_state,
                                      pubmed_ids=updated_procedure.pubmed_ids,
                                      min_output_wells_per_sample=updated_procedure.min_output_wells_per_sample,
                                      max_output_wells_per_sample=updated_procedure.max_output_wells_per_sample)
@@ -363,6 +368,15 @@ def get_procedure_plate_occupied_wells(plate_tag : str, user : UserModel = Depen
     procedures (still running or kept blocked after a change). An execution setup must not map its
     outputs onto these wells; draft executions block nothing."""
     return db.modular_procedures.get_occupied_output_wells(plate_tag=plate_tag)
+
+
+@router.get("/plates/{plate_tag}/drafts/occupied", response_model=Dict[str, List[str]])
+def get_procedure_plate_draft_wells(plate_tag : str, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> Dict[str, List[str]]:
+    """Returns a map of the plate's well positions to the tags of the DRAFT executions using them
+    (input or output side). Drafts block nothing, but set ups that would place or map the same
+    wells can warn about the potential conflict between parallel drafts of several curators
+    (only the execution that starts first gets the wells)."""
+    return db.modular_procedures.get_draft_executions_wells(plate_tag=plate_tag)
 
 
 @router.post("/{procedure_tag}/executions/draft", response_model=ProcedureExecutionModel)

@@ -19,6 +19,7 @@ from config.models.procedures import (
     ModularProcedureSubmissionModel,
     ProcedureExecutionModel,
     PublishModularProcedureModel,
+    SUBMISSION_STATE_CHOICES,
 )
 from services.users import get_user_from_token
 from lib.database.Database import get_db
@@ -170,8 +171,10 @@ class FakeModularProceduresDB:
     def insert(self, title, description, user_tag, condition_application_tags=None,
                condition_application_trees=None, protocol_tags=None, plate_constraints=None,
                input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None,
+               required_submission_state=None,
                pubmed_ids=None, min_output_wells_per_sample=1, max_output_wells_per_sample=None):
         self._validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample)
+        self._validate_submission_state(required_submission_state)
         condition_application_tags = list(condition_application_tags or [])
         for tree in (condition_application_trees or []):
             # simulate the condition application insert: hash-tagged, idempotent
@@ -192,10 +195,18 @@ class FakeModularProceduresDB:
             input_attribute_tags=list(input_attribute_tags or []),
             output_attribute_tags=list(output_attribute_tags or []),
             success_submission_state=success_submission_state,
+            required_submission_state=required_submission_state,
             pubmed_ids=list(pubmed_ids or []),
             min_output_wells_per_sample=min_output_wells_per_sample if min_output_wells_per_sample is not None else 1,
             max_output_wells_per_sample=max_output_wells_per_sample)
         return tag
+
+    @staticmethod
+    def _validate_submission_state(required_submission_state):
+        if required_submission_state is None:
+            return
+        if required_submission_state not in SUBMISSION_STATE_CHOICES:
+            raise ValueError(f"Unknown submission state: {required_submission_state}")
 
     @staticmethod
     def _validate_sample_multiplicity(min_output_wells_per_sample, max_output_wells_per_sample):
@@ -211,6 +222,7 @@ class FakeModularProceduresDB:
     def update(self, tag, title, description, user_tag, condition_application_tags=None,
                condition_application_trees=None, protocol_tags=None, plate_constraints=None,
                input_attribute_tags=None, output_attribute_tags=None, success_submission_state=None,
+               required_submission_state=None,
                pubmed_ids=None, min_output_wells_per_sample=1, max_output_wells_per_sample=None):
         if tag not in self.procedures:
             raise ValueError("Modular procedure not found.")
@@ -220,6 +232,9 @@ class FakeModularProceduresDB:
         self.procedures[tag].title = title
         self.procedures[tag].description = description
         self.procedures[tag].pubmed_ids = list(pubmed_ids or [])
+        self._validate_submission_state(required_submission_state)
+        self.procedures[tag].success_submission_state = success_submission_state
+        self.procedures[tag].required_submission_state = required_submission_state
         self.procedures[tag].min_output_wells_per_sample = min_output_wells_per_sample if min_output_wells_per_sample is not None else 1
         self.procedures[tag].max_output_wells_per_sample = max_output_wells_per_sample
         return True
@@ -391,6 +406,19 @@ class FakeModularProceduresDB:
                                 else exec_model.output_plate_tags[0]) == plate_tag)
                 and blocks(exec_model)]
 
+    def get_draft_executions_wells(self, plate_tag):
+        draft_wells = {}
+        for exec_model in self.executions.values():
+            if exec_model.status != "DRAFT":
+                continue
+            if exec_model.input_plate_tag == plate_tag:
+                for well in exec_model.input_wells:
+                    draft_wells.setdefault(well.position, []).append(exec_model.tag)
+            if exec_model.output_plate_tag == plate_tag:
+                for well in exec_model.output_wells:
+                    draft_wells.setdefault(well.position, []).append(exec_model.tag)
+        return draft_wells
+
     def create_execution_draft(self, tag, user_tag):
         if tag not in self.procedures:
             raise KeyError("Modular procedure not found.")
@@ -400,7 +428,7 @@ class FakeModularProceduresDB:
         execution_tag = f"draft-{self.execution_counter}"
         model = ProcedureExecutionModel(
             tag=execution_tag, procedure_tag=tag, input_plate_tag=None, output_plate_tag=None,
-            user_tag=user_tag, responsible_user_tag=None, created_at=3.0,
+            user_tag=user_tag, responsible_user_tag=user_tag, created_at=3.0,
             status="DRAFT", wells_blocked=False, done_submission_tags=[])
         self.executions[execution_tag] = model
         return model
@@ -600,6 +628,8 @@ class FakeModularProceduresDB:
         if execution_tag not in self.executions:
             raise KeyError("Procedure execution not found.")
         execution = self.executions[execution_tag]
+        if execution.status not in ("RUNNING", "SUCCEEDED"):
+            raise ValueError("Measured values can only be recorded for a running or successfully finished execution.")
         metric_keys = [(m.position, m.trait_tag, m.side) for m in well_metrics]
         if len(set(metric_keys)) != len(metric_keys):
             raise ValueError("Duplicate metric positions are not allowed.")
@@ -682,6 +712,30 @@ class TestModularProcedureRoutes:
             "condition_application_tags": ["ca-1"], "protocol_tags": ["protocol-1"]})
         assert resp.status_code == 200
         assert resp.json()["status"] == "DRAFT"
+
+    def test_required_submission_state_on_insert_and_update(self, client):
+        resp = client.post("/api/procedures/", json={
+            "title": "Stateful", "description": "Only state 0 submissions",
+            "required_submission_state": "SUBMITTED"})
+        assert resp.status_code == 200
+        assert resp.json()["required_submission_state"] == "SUBMITTED"
+        # unknown state names are rejected
+        resp = client.post("/api/procedures/", json={
+            "title": "Stateful", "description": "Bad state", "required_submission_state": "NOT_A_STATE"})
+        assert resp.status_code == 400
+        assert "Unknown submission state" in resp.json()["detail"]
+        # the field is optional and can be updated on a draft
+        resp = client.patch("/api/procedures/proc-1", json={
+            "title": "Updated", "description": "d", "required_submission_state": "PROCESSED"})
+        assert resp.status_code == 200
+        assert resp.json()["required_submission_state"] == "PROCESSED"
+        resp = client.patch("/api/procedures/proc-1", json={
+            "title": "Updated", "description": "d", "required_submission_state": None})
+        assert resp.status_code == 200
+        # storing it requires a valid state name as well
+        resp = client.patch("/api/procedures/proc-1", json={
+            "title": "Updated", "description": "d", "required_submission_state": "ALSO_NOT_A_STATE"})
+        assert resp.status_code == 400
 
     def test_update_draft_procedure(self, client):
         resp = client.patch("/api/procedures/proc-1", json={
@@ -1516,6 +1570,8 @@ class TestModularProcedureExecutionDrafts:
         assert draft["status"] == "DRAFT"
         assert draft["input_plate_tag"] is None
         assert draft["wells_blocked"] is False
+        # the creating user is the default responsible user
+        assert draft["responsible_user_tag"] == "abcdefgh"
         # finishing a draft is not possible
         resp = client.post(f"/api/procedures/executions/{draft['tag']}/finish", json={"outcome": "SUCCEEDED"})
         assert resp.status_code == 400
@@ -1559,6 +1615,35 @@ class TestModularProcedureExecutionDrafts:
         resp = client.post(f"/api/procedures/executions/{draft_tag}/start")
         assert resp.status_code == 400
 
+    def test_output_values_recordable_after_success(self, client):
+        # a procedure declaring a result attribute measured at the output wells
+        resp = client.post("/api/procedures/", json={
+            "title": "With results", "description": "d", "output_attribute_tags": ["att_concentration"]})
+        assert resp.status_code == 200
+        result_procedure_tag = resp.json()["tag"]
+        client.post(f"/api/procedures/{result_procedure_tag}/publish")
+        resp = client.post(f"/api/procedures/{result_procedure_tag}/execute", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        running_tag = resp.json()["tag"]
+        # result values can be recorded while the execution runs ...
+        resp = client.post(f"/api/procedures/executions/{running_tag}/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5}])
+        assert resp.status_code == 200
+        well = [w for w in resp.json()["output_wells"] if w["position"] == "A1"][0]
+        assert well["metrics"][-1]["trait_tag"] == "trait-ugul"
+        assert well["metrics"][-1]["value"] == 2.5
+        # ... and after it was confirmed successful (values often arrive only then)
+        client.post(f"/api/procedures/executions/{running_tag}/finish", json={"outcome": "SUCCEEDED"})
+        resp = client.post(f"/api/procedures/executions/{running_tag}/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.25}])
+        assert resp.status_code == 200
+        # drafts do not accept measured values (their values come with the saved design)
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.post(f"/api/procedures/executions/{draft_tag}/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 1}])
+        assert resp.status_code == 400
+        assert "running or successfully finished" in resp.json()["detail"]
+
     def test_draft_rejects_invalid_design(self, client):
         draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
         # transfer to a non-defined output well
@@ -1580,6 +1665,23 @@ class TestModularProcedureExecutionDrafts:
         resp = client.post(f"/api/procedures/executions/{draft_tag}/start")
         assert resp.status_code == 400
         assert "already used" in resp.json()["detail"]
+
+    def test_draft_wells_are_reported_for_conflict_warnings(self, client):
+        # drafts block nothing, but their wells are reported so setups can warn about conflicts
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.put(f"/api/procedures/executions/{draft_tag}", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        resp = client.get("/api/procedures/plates/plate-1/drafts/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == {"A1": [draft_tag]}
+        resp = client.get("/api/procedures/plates/plate-2/drafts/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == {"A1": [draft_tag]}
+        # a started execution is no draft and is not reported here
+        client.post(f"/api/procedures/executions/{draft_tag}/start")
+        resp = client.get("/api/procedures/plates/plate-2/drafts/occupied")
+        assert resp.status_code == 200
+        assert resp.json() == {}
 
     def test_draft_can_be_deleted(self, client):
         draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
