@@ -3,7 +3,7 @@ import json
 import time
 
 from neo4j import Driver, Result
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from lib.cache.scope_cache import invalidate_all_cached_scopes
 from lib.database.abstract.Procedures import ModularProceduresABC
