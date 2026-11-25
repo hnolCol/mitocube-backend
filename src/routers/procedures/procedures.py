@@ -104,9 +104,12 @@ def get_modular_procedures(search_string : str = None, status : str = None, limi
 
 
 @router.get("/executions/q", response_model=List[ExecutionSummaryModel])
-def query_procedure_executions(search_submission_tag : str = None, status : str = None, limit : int = 200, user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[ExecutionSummaryModel]:
+def query_procedure_executions(search_submission_tag : str = None, status : str = None, search_plate_tag : str = None,
+                               limit : int = 200, user : UserModel = Depends(get_user_from_token),
+                               db : DatabaseABC = Depends(get_db)) -> List[ExecutionSummaryModel]:
     """Returns the procedure executions as summaries (header data and well counts) for the
-    overview, newest first, optionally filtered by a submission tag and the current state.
+    overview, newest first, optionally filtered by a submission tag, the current state and a
+    plate tag fragment (matched against the input and output plate tags, case-insensitive).
     The user's submission scope is respected: curators and admins see everything, group
     curators their group's executions and other users only the executions of their own
     submissions (creators); executions holding other users' data are not released."""
@@ -139,6 +142,11 @@ def query_procedure_executions(search_submission_tag : str = None, status : str 
             finish_comment=execution.finish_comment,
             done_submission_tags=execution.done_submission_tags,
             n_input_wells=len(execution.input_wells), n_output_wells=len(execution.output_wells)))
+    if search_plate_tag is not None:
+        needle = search_plate_tag.lower()
+        summaries = [summary for summary in summaries
+                     if (isinstance(summary.input_plate_tag, str) and needle in summary.input_plate_tag.lower())
+                     or (isinstance(summary.output_plate_tag, str) and needle in summary.output_plate_tag.lower())]
     return summaries
 
 
