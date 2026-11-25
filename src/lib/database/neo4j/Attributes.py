@@ -13,6 +13,7 @@ from config.models.feature import FeatureNeoModel
 from config.models.attributes import AttributeTreeNode, InsertTraitModel, UpdateTraitModel
 
 from services.json import read_json
+from services.regex import build_token_contains_clause, tokenize_search_string
 
 
 class Neo4JAttributes(AttributesABC):
@@ -182,8 +183,10 @@ class Neo4JAttributes(AttributesABC):
 
         query = "MATCH (a:Attribute) WHERE coalesce(a.combined, false) = false "
             
+        token_params = {}
         if search_string is not None:
-            query += "AND a.s CONTAINS $search_string "
+            search_clause, token_params = build_token_contains_clause("a.s", search_string)
+            query += f"AND {search_clause} "
         
         if attribute_groups is not None:
 
@@ -219,8 +222,8 @@ class Neo4JAttributes(AttributesABC):
                         attribute_groups = attribute_groups,
                         result_transformer_=Result.values, #requires this to make the correct grouping
                         min_state = min_state,
-                        search_string = search_string.lower() if isinstance(search_string,str) else "",
-                        limit = limit)
+                        limit = limit,
+                        **token_params)
             
             return OrderedDict(grouped_attribute_tags) 
         
@@ -231,8 +234,8 @@ class Neo4JAttributes(AttributesABC):
                         attribute_groups = attribute_groups,
                         result_transformer_=Result.value,
                         min_state = min_state,
-                        search_string = search_string.lower() if isinstance(search_string,str) else "",
-                        limit = limit)
+                        limit = limit,
+                        **token_params)
         
         
             return attribute_tags 
@@ -247,6 +250,40 @@ class Neo4JAttributes(AttributesABC):
         
         r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.value)
         return r
+
+    def get_required_trait_owner_tags(self, required_trait_tags : List[str]) -> Dict[str, List[str]]:
+        "Maps each given trait tag to the attribute tags that have this trait via HAS_TRAIT."
+        if not required_trait_tags:
+            return {}
+        query = (
+            "UNWIND $required_trait_tags AS trait_tag "
+            "OPTIONAL MATCH (a:Attribute)-[:HAS_TRAIT]->(t:Trait {tag : trait_tag}) "
+            "RETURN trait_tag, collect(a.tag) as owner_tags "
+        )
+        r = self._driver.execute_query(query, routing_="r", required_trait_tags=list(required_trait_tags), result_transformer_=Result.values)
+        return {trait_tag: owners for trait_tag, owners in r}
+
+    def validate_required_traits_for_parents(self, parents : List[str], required_trait_tags : List[str]) -> List[str]:
+        """Returns the required trait tags that are not a trait of any of the given parent attributes.
+        This aligns required traits to their parent attribute: a required trait must belong to
+        one of the attribute's parents (per-parent yes/no), otherwise it is invalid."""
+        if not required_trait_tags:
+            return []
+        owners = self.get_required_trait_owner_tags(required_trait_tags)
+        parent_set = set(parents or [])
+        return [t for t in required_trait_tags if not (set(owners.get(t, [])) & parent_set)]
+
+    def get_required_trait_owner_map(self, tag: str) -> Dict[str, List[str]]:
+        """Maps each required trait tag of the attribute (REQUIRES_TRAIT) to the attribute tags
+        that own the trait. The owner is resolved in Cypher from the unique trait tag via the
+        HAS_TRAIT relationship (no string splitting needed)."""
+        query = (
+            "MATCH (a:Attribute {tag : $tag})-[:REQUIRES_TRAIT]->(t:Trait) "
+            "OPTIONAL MATCH (owner:Attribute)-[:HAS_TRAIT]->(t) "
+            "RETURN t.tag as trait_tag, collect(owner.tag) as owner_tags "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag=tag, result_transformer_=Result.values)
+        return {ri[0]: ri[1] for ri in r}
         
     def get_abbr(self, tag : str):
         query = (
@@ -308,7 +345,8 @@ class Neo4JAttributes(AttributesABC):
             
             query += "a.tag = $attribute_tag AND "
             
-        query += ("t.s CONTAINS $search_string "
+        search_clause, token_params = build_token_contains_clause("t.s", search_string)
+        query += (f"{search_clause} "
                   "RETURN t.tag ORDER BY t.priority ")
         
         if limit is not None:
@@ -318,8 +356,8 @@ class Neo4JAttributes(AttributesABC):
                                        routing_="r",
                                        result_transformer_=Result.value,
                                        attribute_tag = attribute_tag,
-                                       search_string = search_string.lower(),
-                                       limit = limit)
+                                       limit = limit,
+                                       **token_params)
         
         return trait_tags
         
@@ -916,14 +954,18 @@ class Neo4JAttributes(AttributesABC):
         if attribute_groups is not None:
             where_clauses.append("EXISTS {(ag:AttributeGroup)<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups}")
 
+        token_params = {}
+        if search_string is not None:
+            # multi-word searches are matched token-wise with AND semantics, so that
+            # e.g. "WT MB" still matches a trait/attribute search string like "MB10 treated WT"
+            for index, token in enumerate(tokenize_search_string(search_string)):
+                name = f"token_{index}"
+                where_clauses.append(f"(a.s CONTAINS ${name} OR t.s CONTAINS ${name})")
+                token_params[name] = token
+
         if where_clauses:
             query += "WHERE " + " AND ".join(where_clauses) + " "
-            
-            
-        if search_string is not None:
-            query += " AND (a.s CONTAINS $search_string OR t.s CONTAINS $search_string) "
 
-            
         query += (
             "WITH a, t ORDER BY a.priority DESC, "
             "CASE WHEN EXISTS {(a)<-[:IS_CHILD]-(:Attribute)} THEN 1 ELSE 0 END, "
@@ -936,14 +978,14 @@ class Neo4JAttributes(AttributesABC):
         
         r  = self._driver.execute_query(
             query,
-            search_string=search_string.lower() if search_string is not None else "",
             limit = limit,
             min_state = min_state, 
             attribute_tags = attribute_tags,
             attribute_groups = attribute_groups,
             result_transformer_= Result.data,
             routing_="r", 
-            database_="neo4j")
+            database_="neo4j",
+            **token_params)
         
         if not include_parent_paths:
             return [AttributeTraitTagResponseModel(**ri) for ri in r]
@@ -1008,6 +1050,9 @@ class Neo4JAttributes(AttributesABC):
         "Insert attributes"
         if self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} already exists.")
+        invalid_required = self.validate_required_traits_for_parents(parents, required_trait_tags)
+        if invalid_required:
+            raise ValueError(f"Required trait tags {invalid_required} are not traits of any of the parent attributes {list(parents)}. A required trait must belong to one of the attribute's parents.")
         search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
 
         query = (
@@ -1038,6 +1083,9 @@ class Neo4JAttributes(AttributesABC):
         "Update attributes"
         if not self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} does not exist.")
+        invalid_required = self.validate_required_traits_for_parents(parents, required_trait_tags)
+        if invalid_required:
+            raise ValueError(f"Required trait tags {invalid_required} are not traits of any of the parent attributes {list(parents)}. A required trait must belong to one of the attribute's parents.")
         search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
 
         # delete existing relationships first to avoid duplicates, then reinsert them

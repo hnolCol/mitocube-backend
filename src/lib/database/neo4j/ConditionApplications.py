@@ -341,6 +341,9 @@ class Neo4JConditionApplications(ConditionApplicationABC):
         component = condition_application.model_dump()  # Convert Pydantic models to list of dicts if necessary
 
         component = self.clean_node(component, parent_attribute_tag=None)  # Clean the attribute tree to remove empty input attributes
+        if component is None:
+            # nothing left after cleaning (e.g. an allow_input attribute whose traits all have empty values)
+            return None
 
         hash_tag = create_hierarchical_hash({**component, **extra_data_for_hash})        
 

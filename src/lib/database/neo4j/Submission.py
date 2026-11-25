@@ -929,7 +929,9 @@ class Neo4JSubmissions(SubmissionsABC):
         submission_tag = tag        
         tag = self._condition_applications.insert(condition_application=attribute_tree) 
         if tag is None:
-            raise ValueError("Condition application could not be inserted.") 
+            # nothing to insert: the tree was empty after cleaning (e.g. an allow_input
+            # attribute whose traits all have empty values) - skip it silently
+            return
         
         query = (
             "MATCH (submission:Submission {tag : $submission_tag}) "
