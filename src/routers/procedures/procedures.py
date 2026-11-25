@@ -183,8 +183,11 @@ def get_modular_procedure_execution(execution_tag : str, user : UserModel = Depe
 
 @router.post("/executions/{execution_tag}/metrics", response_model=ProcedureExecutionModel)
 def set_modular_procedure_execution_metrics(execution_tag : str, well_metrics : List[ExecutionWellMetricModel], user : UserModel = Depends(is_user_at_least_curator), db : DatabaseABC = Depends(get_db)) -> ProcedureExecutionModel:
-    """Sets or updates the measured attribute values (metrics) of the output wells of a procedure
-    execution, e.g. the protein concentration of each well. The user must be at least curator."""
+    """Sets or updates the measured attribute values (metrics) of an execution's wells - the
+    result values of the declared attributes often can only be read out after the run, so this
+    is available for RUNNING and SUCCEEDED executions (drafts enter their values via the draft
+    save). Setting the same well, trait and side again updates the value.
+    The user must be at least curator."""
     try:
         return db.modular_procedures.set_execution_metrics(execution_tag=execution_tag, well_metrics=well_metrics, user_tag=user.tag)
     except KeyError:

@@ -253,7 +253,9 @@ class ModularProceduresABC(ABC):
 
     @abstractmethod
     def set_execution_metrics(self, execution_tag: str, well_metrics, user_tag: str):
-        """Sets or updates the measured attribute values (metrics) of the output
-        wells of a procedure execution. Raises a KeyError if the execution does
-        not exist and a ValueError if a well is not an output well of the
-        execution or an attribute does not exist."""
+        """Sets or updates the measured attribute values (metrics) of an execution's wells: the
+        result values of the declared attributes are often only readable after the run, hence
+        this is available only for RUNNING and SUCCEEDED executions (a draft enters its values
+        via the draft save). Setting the same well, trait and side again updates the value.
+        Raises a KeyError if the execution does not exist and a ValueError if its state is
+        neither RUNNING nor SUCCEEDED or a well or trait is unknown."""

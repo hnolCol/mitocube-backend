@@ -1361,8 +1361,13 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="r", tag=tag, result_transformer_=Result.value)
 
     def set_execution_metrics(self, execution_tag: str, well_metrics, user_tag: str) -> "ProcedureExecutionModel":
-        """Sets or updates the measured attribute values (metrics) of the output wells of a
-        procedure execution, e.g. the protein concentration of each well."""
+        """Sets or updates the measured attribute values (metrics) of an execution's wells: the
+        result values of the declared attributes are often only readable after the run, so this
+        is available for RUNNING and SUCCEEDED executions (drafts enter their values via the
+        draft save)."""
+        execution = self.get_execution(execution_tag=execution_tag)
+        if execution.status not in ("RUNNING", "SUCCEEDED"):
+            raise ValueError("Measured values can only be recorded for a running or successfully finished execution.")
         execution_exists = self._driver.execute_query(
             "WITH EXISTS {(e:ModularProcedureExecution {tag : $execution_tag})} as exists RETURN exists",
             routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
@@ -1420,6 +1425,7 @@ class Neo4JModularProcedures(ModularProceduresABC):
                 "MATCH (t:Trait {tag : $trait_tag}) "
                 "MERGE (m:ExecutionWellMetric {execution_tag : $execution_tag, position : $position, "
                 "plate_tag : $plate_tag, trait_tag : $trait_tag, side : $side}) "
+                "SET m.value = $value, m.created_at = timestamp(), m.user_tag = $user_tag "
                 "MERGE (w)-[:HAS_METRIC]->(m) "
                 "MERGE (m)-[:INSTANCE_OF]->(t) "
                 "WITH m, t "

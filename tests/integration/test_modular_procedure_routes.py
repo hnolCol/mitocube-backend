@@ -628,6 +628,8 @@ class FakeModularProceduresDB:
         if execution_tag not in self.executions:
             raise KeyError("Procedure execution not found.")
         execution = self.executions[execution_tag]
+        if execution.status not in ("RUNNING", "SUCCEEDED"):
+            raise ValueError("Measured values can only be recorded for a running or successfully finished execution.")
         metric_keys = [(m.position, m.trait_tag, m.side) for m in well_metrics]
         if len(set(metric_keys)) != len(metric_keys):
             raise ValueError("Duplicate metric positions are not allowed.")
@@ -1597,6 +1599,35 @@ class TestModularProcedureExecutionDrafts:
         assert resp.status_code == 400
         resp = client.delete(f"/api/procedures/executions/{draft['tag']}")
         assert resp.status_code == 400
+
+    def test_output_values_recordable_after_success(self, client):
+        # a procedure declaring a result attribute measured at the output wells
+        resp = client.post("/api/procedures/", json={
+            "title": "With results", "description": "d", "output_attribute_tags": ["att_concentration"]})
+        assert resp.status_code == 200
+        result_procedure_tag = resp.json()["tag"]
+        client.post(f"/api/procedures/{result_procedure_tag}/publish")
+        resp = client.post(f"/api/procedures/{result_procedure_tag}/execute", json=DESIGN_PAYLOAD)
+        assert resp.status_code == 200
+        running_tag = resp.json()["tag"]
+        # result values can be recorded while the execution runs ...
+        resp = client.post(f"/api/procedures/executions/{running_tag}/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 2.5}])
+        assert resp.status_code == 200
+        well = [w for w in resp.json()["output_wells"] if w["position"] == "A1"][0]
+        assert well["metrics"][-1]["trait_tag"] == "trait-ugul"
+        assert well["metrics"][-1]["value"] == 2.5
+        # ... and after it was confirmed successful (values often arrive only then)
+        client.post(f"/api/procedures/executions/{running_tag}/finish", json={"outcome": "SUCCEEDED"})
+        resp = client.post(f"/api/procedures/executions/{running_tag}/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 3.25}])
+        assert resp.status_code == 200
+        # drafts do not accept measured values (their values come with the saved design)
+        draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
+        resp = client.post(f"/api/procedures/executions/{draft_tag}/metrics",
+            json=[{"position": "A1", "trait_tag": "trait-ugul", "value": 1}])
+        assert resp.status_code == 400
+        assert "running or successfully finished" in resp.json()["detail"]
 
     def test_draft_rejects_invalid_design(self, client):
         draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
