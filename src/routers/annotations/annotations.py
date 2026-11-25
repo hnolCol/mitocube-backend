@@ -15,6 +15,8 @@ from services.encryption import create_hierarchical_hash
 from setup_utils.annotations_from_url.update_annotations import update_annotations_from_group_url
 from config.models.parameter import APIParamString
 from services.annotations.enrichment import compute_annotation_enrichment, compute_annotation_shift_from_member_values, enrichment_records
+from services.annotations.gsea import ( compute_annotation_gsea, compute_annotation_gsea_series, compute_annotation_hits_from_protein_map, filter_annotation_hits, prepare_ranked_rows )
+from routers.submission.analysis.volcano import handle_pairwise
 from lib.cache.cache import db_cache_runtime
 from datetime import timedelta
 import numpy as np
@@ -432,4 +434,229 @@ def annotation_shift_analysis(
             limit=request.limit,
         ),
         cache_time=ANNOTATION_ANALYSIS_CACHE_TIME,
+    )
+
+def _resolve_gsea_annotation_hits(
+    db: DatabaseABC,
+    user: UserModel,
+    submission_tag: str,
+    ca_tag_left: str,
+    ca_tag_right: str,
+    within_attribute_tags: Optional[str],
+    within_ca_tags: Optional[str],
+    annotation_tag: Optional[str],
+    equal_variance: bool,
+    group_tag: str,
+    min_size: int,
+    max_size: Optional[int],
+):
+    """Builds the ranked list + annotation hits for the GSEA analysis endpoints.
+
+    The ranked list is computed server side from the same pairwise condition
+    application comparison the volcano plot uses, so the client only sends the
+    ca tags. Returns (ranked_rows, annotation_hits, suffix).
+    """
+    check_submission_access(submission_tag=submission_tag, user=user, db=db)
+    if not db.annotation_groups.exists(group_tag):
+        raise HTTPException(status_code=404, detail="Annotation group not found")
+
+    sample_tags_left, sample_tags_right, sample_tags, suffix, _, _, _ = db.samples.handle_comparison(
+        submission_tag=submission_tag,
+        ca_tag_left=ca_tag_left,
+        ca_tag_right=ca_tag_right,
+        within_attribute_tags=within_attribute_tags,
+        within_ca_tags=within_ca_tags,
+        annotation_tag=annotation_tag,
+    )
+
+    stats = handle_pairwise(
+        submission_tag=submission_tag,
+        annotation_tag=annotation_tag,
+        sample_tags=sample_tags,
+        sample_tags_left=sample_tags_left,
+        sample_tags_right=sample_tags_right,
+        suffix=suffix,
+        equal_variance=equal_variance,
+        fdr=0.05,
+        db=db,
+    )
+
+    ranked_rows = prepare_ranked_rows(stats, f"log2FC {suffix}")
+    if ranked_rows.empty:
+        raise HTTPException(status_code=404, detail="No proteins with a log2FC value for the given comparison.")
+
+    universe_proteins = sorted({protein for proteins in ranked_rows["protein_tags"] for protein in proteins})
+
+    protein_map = db.annotations.get_annotation_protein_map(
+        universe_proteins=universe_proteins,
+        group_tag=group_tag,
+    )
+
+    annotation_hits = compute_annotation_hits_from_protein_map(ranked_rows, protein_map)
+    annotation_hits = filter_annotation_hits(annotation_hits, min_size=min_size, max_size=max_size)
+    return ranked_rows, annotation_hits, suffix
+
+
+@router.get("/analysis/gsea", response_model=List[Dict])
+def annotation_gsea_analysis(
+    submission_tag: str = Query(..., description="Submission tag of the pairwise comparison."),
+    ca_tag_left: str = Query(..., description="Condition application tag of the left (up-regulated) group."),
+    ca_tag_right: str = Query(..., description="Condition application tag of the right group."),
+    within_attribute_tags: Optional[str] = Query(None, description="Optional semicolon-separated within attribute tags (as in the volcano plot)."),
+    within_ca_tags: Optional[str] = Query(None, description="Optional semicolon-separated within condition application tags (as in the volcano plot)."),
+    annotation_tag: Optional[str] = Query(None, description="Optional proteome annotation tag context (as in the volcano plot)."),
+    equal_variance: bool = Query(True, description="Use equal variance for the pairwise t-test."),
+    group_tag: str = Query(..., description="Annotation group whose annotations are tested."),
+    min_size: int = Query(5, ge=1, description="Minimum number of ranked proteins per annotation to be tested."),
+    max_size: Optional[int] = Query(None, ge=1, description="Maximum number of ranked proteins per annotation to be tested."),
+    n_permutations: int = Query(1000, ge=10, le=10000, description="Monte Carlo permutations for the null distribution."),
+    weight_p: float = Query(1.0, ge=0.0, le=2.0, description="GSEA weight exponent p (0 = unweighted, 1 = classic)."),
+    limit: Optional[int] = Query(None, ge=1, description="Maximum number of results (after sorting by p-value)."),
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> List[Dict]:
+    """Gene set enrichment style analysis of annotations for the ranked list.
+
+    The ranked list is the log2FC of the pairwise condition application
+    comparison (top of the list = most upregulated in `ca_tag_left` vs
+    `ca_tag_right`). For every annotation of the given annotation group the
+    classic weighted Kolmogorov-Smirnov running-sum enrichment score (GSEA) is
+    computed, with Monte Carlo gene-set-permutation nominal p-values,
+    same-sign NES normalization and Benjamini-Hochberg FDR correction.
+    """
+    cache_key = db_cache_runtime.make_cache_key(
+        key_data={
+            "kind": "gsea",
+            "user_tag": user.tag,
+            "submission_tag": submission_tag,
+            "ca_tag_left": ca_tag_left,
+            "ca_tag_right": ca_tag_right,
+            "within_attribute_tags": within_attribute_tags,
+            "within_ca_tags": within_ca_tags,
+            "annotation_tag": annotation_tag,
+            "equal_variance": equal_variance,
+            "group_tag": group_tag,
+            "min_size": min_size,
+            "max_size": max_size,
+            "n_permutations": n_permutations,
+            "weight_p": weight_p,
+            "limit": limit,
+        },
+        namespace="annotation_analysis",
+    )
+    return db_cache_runtime.get_or_compute(
+        cache_key=cache_key,
+        compute_fn=lambda: _annotation_gsea_records(
+            db=db,
+            user=user,
+            submission_tag=submission_tag,
+            ca_tag_left=ca_tag_left,
+            ca_tag_right=ca_tag_right,
+            within_attribute_tags=within_attribute_tags,
+            within_ca_tags=within_ca_tags,
+            annotation_tag=annotation_tag,
+            equal_variance=equal_variance,
+            group_tag=group_tag,
+            min_size=min_size,
+            max_size=max_size,
+            n_permutations=n_permutations,
+            weight_p=weight_p,
+            limit=limit,
+        ),
+        cache_time=ANNOTATION_ANALYSIS_CACHE_TIME,
+    )
+
+
+def _annotation_gsea_records(
+    db: DatabaseABC,
+    user: UserModel,
+    submission_tag: str,
+    ca_tag_left: str,
+    ca_tag_right: str,
+    within_attribute_tags: Optional[str],
+    within_ca_tags: Optional[str],
+    annotation_tag: Optional[str],
+    equal_variance: bool,
+    group_tag: str,
+    min_size: int,
+    max_size: Optional[int],
+    n_permutations: int,
+    weight_p: float,
+    limit: Optional[int],
+) -> List[Dict]:
+    ranked_rows, annotation_hits, suffix = _resolve_gsea_annotation_hits(
+        db=db,
+        user=user,
+        submission_tag=submission_tag,
+        ca_tag_left=ca_tag_left,
+        ca_tag_right=ca_tag_right,
+        within_attribute_tags=within_attribute_tags,
+        within_ca_tags=within_ca_tags,
+        annotation_tag=annotation_tag,
+        equal_variance=equal_variance,
+        group_tag=group_tag,
+        min_size=min_size,
+        max_size=max_size,
+    )
+    if not annotation_hits:
+        return []
+
+    table = compute_annotation_gsea(
+        annotation_hits=annotation_hits,
+        ranked_rows=ranked_rows,
+        n_permutations=n_permutations,
+        weight_p=weight_p,
+    )
+    records = table.to_dict(orient="records")
+    if limit is not None:
+        records = records[:limit]
+    return records
+
+
+@router.get("/analysis/gsea/series", response_model=Optional[Dict])
+def annotation_gsea_series(
+    submission_tag: str = Query(..., description="Submission tag of the pairwise comparison."),
+    ca_tag_left: str = Query(..., description="Condition application tag of the left (up-regulated) group."),
+    ca_tag_right: str = Query(..., description="Condition application tag of the right group."),
+    within_attribute_tags: Optional[str] = Query(None),
+    within_ca_tags: Optional[str] = Query(None),
+    annotation_tag: Optional[str] = Query(None),
+    equal_variance: bool = Query(True),
+    group_tag: str = Query(..., description="Annotation group of the tested annotation."),
+    plot_annotation_tag: str = Query(..., description="Tag of the annotation to plot."),
+    min_size: int = Query(1, ge=1),
+    max_size: Optional[int] = Query(None, ge=1),
+    n_permutations: int = Query(1000, ge=10, le=10000),
+    weight_p: float = Query(1.0, ge=0.0, le=2.0),
+    user: UserModel = Depends(get_user_from_token),
+    db: DatabaseABC = Depends(get_db),
+) -> Optional[Dict]:
+    """Running-sum series of one annotation for the GSEA plot.
+
+    Same comparison and parameters as /analysis/gsea, but returns the full
+    running-sum series, hit ranks and leading edge of the single annotation
+    given by ``plot_annotation_tag``.
+    """
+    ranked_rows, annotation_hits, suffix = _resolve_gsea_annotation_hits(
+        db=db,
+        user=user,
+        submission_tag=submission_tag,
+        ca_tag_left=ca_tag_left,
+        ca_tag_right=ca_tag_right,
+        within_attribute_tags=within_attribute_tags,
+        within_ca_tags=within_ca_tags,
+        annotation_tag=annotation_tag,
+        equal_variance=equal_variance,
+        group_tag=group_tag,
+        min_size=min_size,
+        max_size=max_size,
+    )
+    if not annotation_hits:
+        return None
+    return compute_annotation_gsea_series(
+        annotation_hits=annotation_hits,
+        ranked_rows=ranked_rows,
+        annotation_tag=plot_annotation_tag,
+        n_permutations=n_permutations,
+        weight_p=weight_p,
     )
