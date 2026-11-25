@@ -618,6 +618,13 @@ class FakeModularProceduresDB:
             raise KeyError("Procedure execution not found.")
         return self.executions[execution_tag]
 
+    def get_execution_submission_tags(self, execution_tag):
+        if execution_tag not in self.executions:
+            raise KeyError("Procedure execution not found.")
+        sample_tags = {sample for well in self.executions[execution_tag].input_wells for sample in well.sample_tags}
+        return sorted({self.sample_submissions[sample] for sample in sample_tags
+                       if sample in self.sample_submissions})
+
     def get_executions(self, tag):
         if tag not in self.procedures:
             raise KeyError("Modular procedure not found.")
@@ -1316,6 +1323,7 @@ class TestModularProcedureExecutionOverviewRoutes:
         assert len(body) == 2
         by_tag = {summary["tag"]: summary for summary in body}
         assert by_tag["exec-1"]["n_input_wells"] == 2
+        assert by_tag["exec-1"]["n_submissions"] == 2
         assert by_tag["exec-2"]["n_input_wells"] == 1
         assert by_tag["exec-1"]["status"] == "RUNNING"
 

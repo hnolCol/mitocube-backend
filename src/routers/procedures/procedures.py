@@ -141,6 +141,7 @@ def query_procedure_executions(search_submission_tag : str = None, status : str 
             finished_at=execution.finished_at, finished_by=execution.finished_by,
             finish_comment=execution.finish_comment,
             done_submission_tags=execution.done_submission_tags,
+            n_submissions=len(db.modular_procedures.get_execution_submission_tags(execution_tag)),
             n_input_wells=len(execution.input_wells), n_output_wells=len(execution.output_wells)))
     if search_plate_tag is not None:
         needle = search_plate_tag.lower()

@@ -177,6 +177,9 @@ class ExecutionSummaryModel(BaseModel):
     finished_by : Optional[str] = None
     finish_comment : Optional[str] = None
     done_submission_tags : List[str] = Field(default_factory=list)
+    n_submissions : int = 0
+    """The distinct submissions placed in the input wells of the execution (0 while it is an
+    empty draft)."""
     n_input_wells : int = 0
     n_output_wells : int = 0
 
