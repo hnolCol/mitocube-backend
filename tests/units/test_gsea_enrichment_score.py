@@ -168,7 +168,9 @@ def test_gsea_p_values_enriched_vs_random():
     scores = np.linspace(10.0, 0.0, 300)
     enriched = np.arange(10)
     scattered = np.sort(rng.choice(300, size=40, replace=False))
-    p, es = gsea_p_values(scores, [enriched, scattered], n_permutations=300, seed=1)
+    p, es, nes = gsea_p_values(scores, [enriched, scattered], n_permutations=300, seed=1)
+    assert nes[0] > 0
+    assert np.sign(nes[1]) == np.sign(es[1])
     assert es[0] > 0.9
     assert p[0] < 0.05
     assert p[1] > p[0]
@@ -183,7 +185,7 @@ def test_gsea_p_values_ragged_sizes():
         np.sort(rng.choice(400, size=30, replace=False)),
         np.sort(rng.choice(400, size=8, replace=False)),
     ]
-    p, es = gsea_p_values(scores, sets, n_permutations=100, seed=2)
+    p, es, _ = gsea_p_values(scores, sets, n_permutations=100, seed=2)
     assert p.shape == (3,)
     assert es.shape == (3,)
     np.testing.assert_allclose(es, enrichment_scores(scores, sets))
@@ -192,6 +194,7 @@ def test_gsea_p_values_ragged_sizes():
 def test_gsea_p_values_from_constant_ranked_list_are_reproducible():
     scores = np.linspace(2.0, 0.2, 250)
     sets = [np.arange(0, 40, 4), np.arange(100, 140, 4)]
-    p1, _ = gsea_p_values(scores, sets, n_permutations=50, seed=9)
-    p2, _ = gsea_p_values(scores, sets, n_permutations=50, seed=9)
+    p1, _, nes1 = gsea_p_values(scores, sets, n_permutations=50, seed=9)
+    p2, _, nes2 = gsea_p_values(scores, sets, n_permutations=50, seed=9)
+    np.testing.assert_allclose(nes1, nes2)
     np.testing.assert_allclose(p1, p2)

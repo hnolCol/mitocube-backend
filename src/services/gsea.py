@@ -143,10 +143,13 @@ def gsea_p_values(scores, hits, n_permutations=1000, p=1.0, seed=0):
     the set size (not set membership), one null distribution is shared by all
     annotations of the same size. Nominal p-values use the classic same-sign
     convention: fraction of null ES values at least as extreme as the
-    observed ES with the same sign. Returns (p_values, es_scores).
+    observed ES with the same sign. The NES (normalized enrichment score) is
+    the observed ES divided by the mean of the same-sign null ES values.
+    Returns (p_values, es_scores, nes_scores).
     """
     scores = np.asarray(scores, dtype=np.float64)
     es = enrichment_scores(scores, hits, p=p)
+    nes = np.zeros_like(es)
 
     index_arrays = [np.asarray(h, dtype=np.int64).ravel() for h in hits] \
         if not (isinstance(hits, np.ndarray) and hits.ndim == 2 and hits.dtype != object) \
@@ -163,13 +166,17 @@ def gsea_p_values(scores, hits, n_permutations=1000, p=1.0, seed=0):
         null = _cached_null_scores(scores_tag, scores, size, n_permutations, p, seed)
         obs = es[indices]
         pos = obs >= 0
-        denom = max(1, int((null >= 0).sum()))
-        denom_neg = max(1, int((null < 0).sum()))
         pos_null = null[null >= 0]
         neg_null = null[null < 0]
+        denom = max(1, pos_null.size)
+        denom_neg = max(1, neg_null.size)
+        mean_pos = float(pos_null.mean()) if pos_null.size > 0 else 0.0
+        mean_neg = float(neg_null.mean()) if neg_null.size > 0 else 0.0
         for row_local, i in enumerate(indices):
             if pos[row_local]:
                 p_values[i] = np.sum(pos_null >= obs[row_local]) / denom
+                nes[i] = obs[row_local] / mean_pos if mean_pos != 0 else 0.0
             else:
                 p_values[i] = np.sum(neg_null <= obs[row_local]) / denom_neg
-    return p_values, es
+                nes[i] = obs[row_local] / mean_neg if mean_neg != 0 else 0.0
+    return p_values, es, nes
