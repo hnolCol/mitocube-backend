@@ -41,7 +41,7 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
                                   text=attribute.text, 
                                   priority=attribute.priority, 
                                   min_state=attribute.min_state, 
-                                  abbreviation=attribute.abbr, 
+                                  abbr=attribute.abbr, 
                                   allow_input=attribute.allow_input, 
                                   placeholder=attribute.placeholder,
                                   group_tags=attribute.group_tags, 
@@ -73,6 +73,7 @@ def insert_attribute(attribute : AttributeInsertModel, user : UserModel = Depend
 @router.patch("/{attribute_tag}") 
 def update_attribute(attribute_tag : str, attribute : AttributeEditModel, user : UserModel = Depends(is_user_at_least_group_curator), db : DatabaseABC = Depends(get_db)) -> bool:
     "Updates existing attribute in the database. Returns True if successful, False otherwise."
+
     if not db.attributes.exists(tag = attribute_tag):
         raise HTTPException(status_code=404, detail = "Attribute not found.")
     try:
@@ -80,7 +81,7 @@ def update_attribute(attribute_tag : str, attribute : AttributeEditModel, user :
                                   text=attribute.text, 
                                   priority=attribute.priority, 
                                   min_state=attribute.min_state, 
-                                  abbreviation=attribute.abbr, 
+                                  abbr=attribute.abbr, 
                                   allow_input=attribute.allow_input, 
                                   placeholder=attribute.placeholder,
                                   group_tags=attribute.group_tags, 
@@ -175,10 +176,6 @@ def get_attribute_groups(limit : int = None, db : DatabaseABC = Depends(get_db))
     Returns the attribute group tags present in the database.
     """
     return db.attributes.get_attribute_group_tags(limit=limit)
-
-
-
-
 
 
 

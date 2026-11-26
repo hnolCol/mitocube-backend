@@ -376,28 +376,6 @@ class Neo4JAttributes(AttributesABC):
         
         return trait_tags
         
-        
-            
-    # def find_attribute(self, search_string : str = None, 
-    #                    attribute_groups : str|List[Literal['dataset', 'filter', 'genotype', 'mandatory', 'qc', 'sample', 'user']] = None,
-    #                    min_state : SubmissionStatesEnums = None, 
-    #                    limit : int = 20) -> List[str]:
-    #     if all(a is None for a in [search_string, attribute_groups]): raise ValueError("Either 'search_string', 'attribute_groups' or 'min_state' must be provided.")
-
-    #     query = "MATCH (a:Attribute) WHERE "
-            
-    #     if search_string is not None:
-    #         query += "a.s CONTAINS $search_string "
-        
-    #     if attribute_groups is not None:
-
-    #         if isinstance(attribute_groups, str):
-    #             attribute_groups = [attribute_groups]
-
-    #         if search_string is not None:
-    #             query += "AND "
-
-    #         query += "EXISTS {(ag:AttributeGroup )<-[:PART_OF]-(a) WHERE ag.tag IN $attribute_groups} "
     
     def get(self, 
             tags : List[str] = None,
@@ -1043,13 +1021,14 @@ class Neo4JAttributes(AttributesABC):
 
 
     def _execute_upsert(self, query: str, tag: str, text: str, priority: int, allow_input: bool,
-                        abbreviation: str, group_tags: List[str], children: List[str],
+                        abbr: str, group_tags: List[str], children: List[str],
                         parents: List[str], required_trait_tags: List[str],
                         min_state: SubmissionStatesEnums, search_string: str, placeholder: str = None) -> bool:
         """Runs the final insert/update query with the shared parameter set."""
+        print(abbr ,"THIS IS THE ABBREVIATION!!")
         ok = self._driver.execute_query(
             query,
-            tag=tag, text=text, priority=priority, abbreviation=abbreviation,
+            tag=tag, text=text, priority=priority, abbr=abbr,
             group_tags=group_tags, children=children, parents=parents,
             required_trait_tags=required_trait_tags, allow_input=allow_input,
             min_state=min_state, search_string=search_string, placeholder=placeholder,
@@ -1059,7 +1038,7 @@ class Neo4JAttributes(AttributesABC):
 
 
     def insert(self, tag: str, text: str, priority: int = 500, allow_input: bool = False,
-            abbreviation: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
+            abbr: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
             group_tags: List[str] = [], parents: List[str] = [], children: List[str] = [],
             required_trait_tags: List[str] = [], placeholder: str = None) -> bool:
         "Insert attributes"
@@ -1068,7 +1047,7 @@ class Neo4JAttributes(AttributesABC):
         invalid_required = self.validate_required_traits_for_parents(parents, required_trait_tags)
         if invalid_required:
             raise ValueError(f"Required trait tags {invalid_required} are not traits of any of the parent attributes {list(parents)}. A required trait must belong to one of the attribute's parents.")
-        search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
+        search_string = text.lower() + " " + (abbr.lower() if abbr is not None else "") + " " + tag.lower()
 
         query = (
             "MERGE (a:Attribute {tag : $tag}) "
@@ -1086,13 +1065,13 @@ class Neo4JAttributes(AttributesABC):
         query += self._build_relation_clauses(children, parents, required_trait_tags)
         query += "RETURN count(a) > 0 "
 
-        return self._execute_upsert(query, tag, text, priority, allow_input, abbreviation,
+        return self._execute_upsert(query, tag, text, priority, allow_input, abbr,
                                     group_tags, children, parents, required_trait_tags,
                                     min_state, search_string, placeholder)
 
 
     def update(self, tag: str, text: str, priority: int = 500, allow_input: bool = False,
-            abbreviation: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
+            abbr: str = None, min_state: SubmissionStatesEnums = SubmissionStatesEnums.SUBMITTED,
             group_tags: List[str] = [], parents: List[str] = [], children: List[str] = [],
             required_trait_tags: List[str] = [], placeholder: str = None) -> bool:
         "Update attributes"
@@ -1101,7 +1080,7 @@ class Neo4JAttributes(AttributesABC):
         invalid_required = self.validate_required_traits_for_parents(parents, required_trait_tags)
         if invalid_required:
             raise ValueError(f"Required trait tags {invalid_required} are not traits of any of the parent attributes {list(parents)}. A required trait must belong to one of the attribute's parents.")
-        search_string = text.lower() + " " + (abbreviation.lower() if abbreviation is not None else "") + " " + tag.lower()
+        search_string = text.lower() + " " + (abbr.lower() if abbr is not None else "") + " " + tag.lower()
 
         # delete existing relationships first to avoid duplicates, then reinsert them
         delete_query = (
@@ -1116,7 +1095,7 @@ class Neo4JAttributes(AttributesABC):
 
         query = (
             "MATCH (a:Attribute {tag : $tag}) "
-            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.placeholder = $placeholder, a.modified_at = timestamp(), a.s = $search_string "
+            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbr, a.placeholder = $placeholder, a.modified_at = timestamp(), a.s = $search_string "
             "WITH a "
             "MATCH (s:State {tag : $min_state}) "
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
@@ -1130,7 +1109,7 @@ class Neo4JAttributes(AttributesABC):
         query += self._build_relation_clauses(children, parents, required_trait_tags)
         query += "RETURN count(a) > 0 "
 
-        return self._execute_upsert(query, tag, text, priority, allow_input, abbreviation,
+        return self._execute_upsert(query, tag, text, priority, allow_input, abbr,
                                     group_tags, children, parents, required_trait_tags,
                                     min_state, search_string, placeholder)
         

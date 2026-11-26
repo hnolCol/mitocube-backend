@@ -203,6 +203,7 @@ class AttributeEditModel(BaseModel):
         return self
 
 class AttributeResponseModel(AttributeBaseModel):
+    abbr : Optional[str] = None
     allow_input : bool = False  # if the attribute allows for data input by the user. For example, a concentration.
     placeholder : Optional[str] = None  # optional example value displayed as input placeholder, only relevant if allow_input is True
 

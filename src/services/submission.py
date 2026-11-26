@@ -18,7 +18,7 @@ from typing import List, Dict, Literal
 import pandas as pd 
 
 
-def check_submission_access(submission_tag : str, user : UserModel, db = None) -> bool:
+def check_submission_access(submission_tag : str, user : UserModel, db = None, raise_exception : bool = True) -> bool:
     """
     Checks if the submission exists and the user has access to it.
 
@@ -34,6 +34,8 @@ def check_submission_access(submission_tag : str, user : UserModel, db = None) -
         The user to check the access for.
     db : DatabaseABC, optional
         The database to use. If not provided, the global database is used.
+    raise_exception : bool, optional
+        Whether to raise an exception if access is denied. Defaults to True.
 
     Returns
     -------
@@ -53,10 +55,14 @@ def check_submission_access(submission_tag : str, user : UserModel, db = None) -
         db = Database.DB()
 
     if not db.submissions.exists(tag = submission_tag):
-        raise submission_tag_not_found
+        if raise_exception:
+            raise submission_tag_not_found
+        return False
 
     if not db.submission_filter.has_user_access(user_tag = user.tag, submission_tag = submission_tag):
-        raise submission_access_forbidden
+        if raise_exception:
+            raise submission_access_forbidden
+        return False
 
     return True
 

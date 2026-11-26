@@ -663,11 +663,13 @@ def add_submission(background_task : BackgroundTasks , submission : NewSubmissio
                           user_tag = user.tag,
                           collaborators = submission.collaborators)
     # link to another submission (e.g. a repeated experiment) - the linked submission must be in the user's scope
-    if submission.linked_submission_tag:
-        if submission.linked_submission_tag == submission.tag:
-            raise HTTPException(status_code=400, detail="A submission cannot be linked to itself.")
-        check_submission_access(submission_tag = submission.linked_submission_tag, user = user, db = db)
-        db.submissions.set_linked_submission(tag = submission.tag, linked_submission_tag = submission.linked_submission_tag, user_tag = user.tag)
+    if submission.linked_submission_tags:
+        for linked_submission_tag in submission.linked_submission_tags:
+            if linked_submission_tag == submission.tag:
+                continue
+            ok = check_submission_access(submission_tag = linked_submission_tag, user = user, db = db, raise_exception = False)
+            if ok:
+                db.submissions.set_linked_submission(tag = submission.tag, linked_submission_tag = linked_submission_tag, user_tag = user.tag)
     # persist external links (skip empty entries)
     links = [link.model_dump(mode="json") for link in (submission.links or []) if link.url and str(link.url).strip() not in ("", "https://")]
     if len(links) > 0:
