@@ -264,14 +264,29 @@ class Neo4JAttributes(AttributesABC):
         return {trait_tag: owners for trait_tag, owners in r}
 
     def validate_required_traits_for_parents(self, parents : List[str], required_trait_tags : List[str]) -> List[str]:
-        """Returns the required trait tags that are not a trait of any of the given parent attributes.
-        This aligns required traits to their parent attribute: a required trait must belong to
-        one of the attribute's parents (per-parent yes/no), otherwise it is invalid."""
+        """Returns the required trait tags that are not a trait of any of the given parent
+        attributes or of any of their ancestors. A required trait of an attribute must belong
+        to one of its parents or to an attribute further up the hierarchy, so that higher-level
+        traits can gate the display of nested attributes."""
         if not required_trait_tags:
             return []
+        owner_set = set(parents or [])
+        for parent_tag in (parents or []):
+            owner_set.update(self.get_ancestors(tag=parent_tag))
         owners = self.get_required_trait_owner_tags(required_trait_tags)
-        parent_set = set(parents or [])
-        return [t for t in required_trait_tags if not (set(owners.get(t, [])) & parent_set)]
+        return [t for t in required_trait_tags if not (set(owners.get(t, [])) & owner_set)]
+
+    def get_ancestors(self, tag : str) -> List[str]:
+        """Returns all ancestor attribute tags of an attribute, closest parent first.
+        If the attribute has no parents, an empty list is returned."""
+        query = (
+            "MATCH (a:Attribute {tag : $tag}) "
+            "MATCH p = (a)<-[:IS_CHILD*1..]-(ancestor:Attribute) "
+            "RETURN ancestor.tag as tag, min(length(p)) as distance "
+            "ORDER BY distance "
+        )
+        r = self._driver.execute_query(query, routing_="r", tag = tag, result_transformer_=Result.data)
+        return [ri["tag"] for ri in r]
 
     def get_required_trait_owner_map(self, tag: str) -> Dict[str, List[str]]:
         """Maps each required trait tag of the attribute (REQUIRES_TRAIT) to the attribute tags

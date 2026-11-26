@@ -381,8 +381,13 @@ class AttributesABC(ABC):
     @abstractmethod
     def validate_required_traits_for_parents(self, parents : List[str], required_trait_tags : List[str]) -> List[str]:
         """Returns the required trait tags that are not a trait of any of the given parent
-        attributes. A required trait of an attribute must belong to one of its parents
-        (per-parent yes/no); required traits of other attributes are invalid."""
+        attributes or of any of their ancestors. A required trait of an attribute must belong
+        to one of its parents or to an attribute further up the hierarchy."""
+    
+    @abstractmethod
+    def get_ancestors(self, tag : str) -> List[str]:
+        """Returns all ancestor attribute tags of an attribute, closest parent first. If the
+        attribute has no parents, an empty list is returned."""
         
     @abstractmethod
     def get_required_trait_owner_map(self, tag : str) -> Dict[str, List[str]]:
