@@ -698,6 +698,17 @@ class Neo4JModularProcedures(ModularProceduresABC):
             routing_="r", sample_tags=list(sample_tags), result_transformer_=Result.data)
         return {row["sample_tag"]: row["submission_tags"] for row in rows}
 
+    def get_execution_submission_tags(self, execution_tag: str) -> List[str]:
+        """Returns the tags of the distinct submissions owning the samples placed in the input
+        wells of the execution (empty if it placed no samples)."""
+        rows = self._driver.execute_query(
+            "MATCH (e:ModularProcedureExecution {tag : $execution_tag})-[:HAS_WELL]->"
+            "(w:ExecutionWell {execution_tag : $execution_tag, side : 'INPUT'}) "
+            "MATCH (s:Submission)-[:HAS_SAMPLE]->(:Sample)-[:IN_WELL]->(w) "
+            "RETURN collect(DISTINCT s.tag) as submission_tags",
+            routing_="r", execution_tag=execution_tag, result_transformer_=Result.value)
+        return sorted(rows[0]) if len(rows) > 0 and rows[0] is not None else []
+
     def find_execution_tags_by_submissions(self, submission_tags: List[str]) -> List[str]:
         """Returns the tags of the procedure executions that placed samples of the given submissions."""
         if not submission_tags:
@@ -1336,7 +1347,8 @@ class Neo4JModularProcedures(ModularProceduresABC):
             "output_plate_tags: coalesce(e.output_plate_tags, CASE WHEN e.output_plate_tag IS NULL THEN [] ELSE [e.output_plate_tag] END), "
             "input_plate_tag: e.input_plate_tag, "
             "output_plate_tag: e.output_plate_tag, user_tag: e.user_tag, "
-            "responsible_user_tag: e.responsible_user_tag, created_at: e.created_at, "
+            "responsible_user_tag: e.responsible_user_tag, "
+            "created_at: CASE WHEN e.created_at IS NULL THEN NULL ELSE toFloat(e.created_at) / 1000.0 END, "
             "status: e.status, wells_blocked: coalesce(e.wells_blocked, true), "
             "finished_at: e.finished_at, finished_by: e.finished_by, "
             "finish_comment: e.finish_comment, done_submission_tags: coalesce(e.done_submission_tags, [])} as execution",
