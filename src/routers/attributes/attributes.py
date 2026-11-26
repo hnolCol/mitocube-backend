@@ -359,6 +359,11 @@ def get_attribute_parents(attribute_tag: str, user: UserModel = Depends(get_user
     return db.attributes.get_parents(tag=attribute_tag)
 
 
+@router.get("/{attribute_tag}/ancestors")
+def get_attribute_ancestors(attribute_tag: str, user: UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)) -> List[str]:
+    "Returns all ancestor attribute tags of an attribute, closest parent first"
+    return db.attributes.get_ancestors(tag=attribute_tag)
+
 @router.get("/{attribute_tag}/min_state")
 def get_min_state_for_attribute(attribute_tag : str, db : DatabaseABC = Depends(get_db)) -> SubmissionStatesEnums:
     """Returns the minimum state for an attribute.
