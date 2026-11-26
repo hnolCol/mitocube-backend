@@ -47,7 +47,7 @@ def generate_literate_search(feature_tag: str, user: UserModel = Depends(get_use
 
 @router.get("/cypher", response_description="Generates a cypher query for a given prompt.")
 async def generate_cypher_query(prompt: str, session_id: str = None, user: UserModel = Depends(get_user_from_token)) -> Dict:
-    
+    raise HTTPException(status_code=500, detail=f"AI agent request failed.")
     if session_id is None:
         session_id = f"open_ai_chat_user_{user.tag}_{get_random_string()}"
     

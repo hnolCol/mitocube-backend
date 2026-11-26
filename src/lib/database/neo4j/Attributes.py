@@ -1108,7 +1108,6 @@ class Neo4JAttributes(AttributesABC):
             "WITH a "
         )
         query += self._build_relation_clauses(children, parents, required_trait_tags)
-        print(query,"AFTER RELATIONSHPS", required_trait_tags)
         query += "RETURN count(a) > 0 "
 
         return self._execute_upsert(query, tag, text, priority, allow_input, abbr,
