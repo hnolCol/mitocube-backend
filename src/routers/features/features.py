@@ -202,9 +202,10 @@ def get_feature_abundance(feature_tag : str,
 def get_feature_sample_abundance(feature_tag : str, metrics : Literal["raw","z_score_sample","z_score_protein_group","log2_fc_vs_mean"] = "raw", user : UserModel = Depends(get_user_from_token), db : DatabaseABC = Depends(get_db)):
     if not db.features.exists(tag=feature_tag):
         raise HTTPException(status_code=404, detail=f"The feature tag does not exist: {feature_tag} in the database.")
-    submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag)
-    if len(submission_scope_tags) == 0:
-        raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
+    submission_scope_tags = db.submission_filter.get_user_submission_scope_tags(user_tag=user.tag) #None = access to all
+    if submission_scope_tags is not None:
+        if len(submission_scope_tags) == 0:
+            raise HTTPException(status_code=404, detail=f"The user {user.tag} does not have any submission scope tags (e.g. no permission to access any submissions).")
     df =  db.features.get_quantification_per_sample(tag = feature_tag, metrics = metrics, submission_tags = submission_scope_tags)
     if df.empty:
         raise HTTPException(status_code=404, detail=f"No quantification data found for feature tag: {feature_tag} in the database.")

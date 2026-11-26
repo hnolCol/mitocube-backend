@@ -1051,7 +1051,7 @@ class Neo4JAttributes(AttributesABC):
 
         query = (
             "MERGE (a:Attribute {tag : $tag}) "
-            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbreviation, a.placeholder = $placeholder, a.created_at = timestamp(), a.s = $search_string "
+            "SET a.text = $text, a.priority = $priority, a.allow_input = $allow_input, a.abbr = $abbr, a.placeholder = $placeholder, a.created_at = timestamp(), a.s = $search_string "
             "WITH a "
             "MATCH (s:State {tag : $min_state}) "
             "MERGE (a)-[:REQUIRES_STATE]->(s) "
@@ -1078,6 +1078,7 @@ class Neo4JAttributes(AttributesABC):
         if not self.exists(tag=tag):
             raise ValueError(f"Attribute with tag {tag} does not exist.")
         invalid_required = self.validate_required_traits_for_parents(parents, required_trait_tags)
+        print(invalid_required, "INVALID REQUIRED", parents, required_trait_tags)
         if invalid_required:
             raise ValueError(f"Required trait tags {invalid_required} are not traits of any of the parent attributes {list(parents)}. A required trait must belong to one of the attribute's parents.")
         search_string = text.lower() + " " + (abbr.lower() if abbr is not None else "") + " " + tag.lower()
@@ -1107,6 +1108,7 @@ class Neo4JAttributes(AttributesABC):
             "WITH a "
         )
         query += self._build_relation_clauses(children, parents, required_trait_tags)
+        print(query,"AFTER RELATIONSHPS", required_trait_tags)
         query += "RETURN count(a) > 0 "
 
         return self._execute_upsert(query, tag, text, priority, allow_input, abbr,
