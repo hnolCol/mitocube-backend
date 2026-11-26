@@ -1293,6 +1293,26 @@ class TestModularProcedureExecutionOverviewRoutes:
         resp = client.get("/api/procedures/executions/q", params={"search_plate_tag": "plate-9"})
         assert resp.status_code == 200
         assert resp.json() == []
+
+    def test_query_executions_by_procedure_tag(self, client):
+        resp = client.get("/api/procedures/executions/q", params={"search_procedure_tag": "proc-2"})
+        assert resp.status_code == 200
+        assert len(resp.json()) == 0
+        resp = client.get("/api/procedures/executions/q")
+        assert resp.status_code == 200
+        assert len(resp.json()) == 0
+        client.post("/api/procedures/proc-2/execute", json={
+            "input_plate_tag": "plate-1", "output_plate_tag": "plate-2",
+            "input_wells": [{"position": "A1", "sample_tags": ["sample-1"], "output_positions": ["A1"]}],
+            "output_wells": [{"position": "A1", "condition_application_tags": []}]})
+        resp = client.get("/api/procedures/executions/q", params={"search_procedure_tag": "PROC-2"})
+        assert resp.status_code == 200
+        summaries = resp.json()
+        assert len(summaries) == 1
+        assert summaries[0]["procedure_tag"] == "proc-2"
+        resp = client.get("/api/procedures/executions/q", params={"search_procedure_tag": "proc-9"})
+        assert resp.status_code == 200
+        assert resp.json() == []
     def test_summaries_include_plateless_drafts(self, client):
         # drafts without a saved design have no plates yet - the overview must list them, not crash
         draft_tag = client.post("/api/procedures/proc-2/executions/draft").json()["tag"]
