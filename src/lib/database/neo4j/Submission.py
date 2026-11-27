@@ -1466,7 +1466,7 @@ class Neo4JSubmissions(SubmissionsABC):
                 "submission_tag": submission_tag,
                 "user_tag": user_tag,
                 "rl_tag": rl_tag,
-                "instrument_tags": [i.tag for i in runlist.instruments],
+                "instrument_tags": [i["tag"] for i in runlist.instruments],
                 "n_runs": runlist.n_runs,
                 "n_plates": runlist.n_plates,
                 "scrambled": runlist.scrambled,
