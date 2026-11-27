@@ -82,7 +82,7 @@ def _annotation_analysis(annotation_tag: str, submission_tag : str, db : Databas
     return {"ids" : pd.Index(protein_tags)}
     
  
-def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[str]], increase: bool = True, strict: bool = True, protein_group_tags: List[str] = None, db : DatabaseABC = Depends(get_db)) -> Dict:
+def _trend_analysis(submission_tag: str, attribute_tag: str, ca_tags: List[List[str]], db : DatabaseABC, increase: bool = True, strict: bool = True, protein_group_tags: List[str] = None) -> Dict:
     condition_applications = db.samples.get_sample_condition_application_map_for_submission(submission_tag=submission_tag)
     sample_groups, group_labels = [], []
     for ca_tag in ca_tags:
@@ -173,21 +173,21 @@ def _process_comparison_children(
  
     for child_comp in comparisons.children:
         leaf_id = child_comp.id or f"leaf_{len(leaf_data)}"
- 
         if child_comp.type == "trend":
-            if not child_comp.submission_tag or not child_comp.props.attribute_tag or not child_comp.props.ca_tags:
+            if not child_comp.submission_tag or not child_comp.props["attribute_tag"] or not child_comp.props["ca_tags"]:
                 raise HTTPException(status_code=400, detail="Missing required fields in comparison")
-            if len(child_comp.props.ca_tags) < 2:
+            if len(child_comp.props["ca_tags"]) < 2:
                 raise HTTPException(status_code=400, detail="At least two condition application tags are required for comparison")
             direction = child_comp.criteria
             trend_result = _trend_analysis(
                 submission_tag=child_comp.submission_tag,
-                attribute_tag=child_comp.props.attribute_tag,
-                ca_tags=child_comp.props.ca_tags,
+                attribute_tag=child_comp.props["attribute_tag"],
+                ca_tags=child_comp.props["ca_tags"],
+                db=db,
                 increase=direction == "increasing"
             )
-            description = f"trend ({direction}) over {child_comp.props.attribute_tag}: " + \
-                          " > ".join(";".join(ca) for ca in child_comp.props.ca_tags)
+            description = f"trend ({direction}) over {child_comp.props['attribute_tag']}: " + \
+                          " > ".join(";".join(ca) for ca in child_comp.props["ca_tags"])
             protein_tag_results["children"].append({
                 "id": leaf_id,
                 "type": "trend",
